@@ -56,10 +56,12 @@ class SGLocator(object):
     re_match = {
         'standard_name': re.compile(
             formats['standard_name'].format(
-                root=r'(\w+)', loc=r'([a-zA-Z])'), re.I).match,
+                root=r'(?P<root>\w+)',
+                loc=r'(?P<loc>[a-zA-Z])'), re.I).match,
         'long_name': re.compile(
             formats['long_name'].format(
-                root=r'([\w ]+)', loc=r'([a-zA-Z])'), re.I).match
+                root=r'(?P<root>[\w ]+)',
+                loc=r'(?P<loc>[a-zA-Z])'), re.I).match
         }
 
     def __init__(self, name_format=None):
@@ -73,45 +75,61 @@ class SGLocator(object):
         if name_format:
             self.formats['name'] = name_format
         self.re_match['name'] = re.compile(
-            self.formats['name'].format(root=r'(\w+)', loc=r'([a-zA-Z])'),
+            self.formats['name'].format(root=r'(?P<root>\w+)',
+                                        loc=r'(?P<loc>[a-zA-Z])'),
             re.I).match
 
-    def match(self, obj, attr, root, loc=None):
+    def parse_attr(self, attr, value):
+        """Parse an attribute string to get its root and location
+
+        Parameters
+        ----------
+        attr: {'name', 'standard_name', 'long_name'}
+            Attribute name
+        value: str
+            Attribute value
+
+        Return
+        ------
+        str
+            Root
+        letter or None
+            Location
+        """
+        m = self.re_match[attr](value)
+        if m is None:
+            return value, None
+        return m.group('root'), m.group('loc').lower()
+
+    def match_attr(self, attr, value, root, loc=None):
         """Check if an attribute is matching a location
 
         Parameters
         ----------
-        obj: object, xarray.DataArray
         attr: {'name', 'standard_name', 'long_name'}
             Attribute name
         root: str
-        loc: None, letter, False
+        loc: letter or null
             - None: any
             - letters: one of these locations
-            - False: no location
+            - False or '': no location
 
         Return
         ------
         bool or loc
         """
-        if not hasattr(obj, attr):
-            return False
-        value = getattr(obj, attr).lower()
+        value = value.lower()
+        vroot, vloc = self.parse_attr(attr, value)
         root = root.lower()
-        if loc is False:
-            return value == root
-        m = self.re_match[attr](value)
-        if m is None:
+        if vroot.lower() != root:
             return False
-        if m.group(1) == root:
-            if loc is None:
-                return m.group(2)
-            for lc in loc:
-                if lc == m.group(2):
-                    return lc
-        return False
+        if loc is None:
+            return True
+        if not loc:
+            return vloc is None
+        return vloc in loc
 
-    def format_attr(self, attr, root, loc):
+    def format_attr(self, attr, root, loc, standardize=True):
         """Format a attribute at a specified location
 
         Parameters
@@ -120,6 +138,8 @@ class SGLocator(object):
             Attribute name
         root: str
         loc: False, letter
+        standardize: bool
+            If True, standardize ``root`` and ``loc`` values.
 
         Example
         -------
@@ -133,9 +153,18 @@ class SGLocator(object):
         ------
         str
         """
-
+        if standardize:
+            if attr == 'long_name':
+                root = root.capitalize().replace('_', ' ')
+            else:
+                root = root.replace(' ', '_')
+                if attr == 'standard_name':
+                    root = root.lower()
         if not loc:
             return root
-        if attr == 'long_name':
-            loc = loc.upper()
+        if standardize:
+            if attr == 'long_name':
+                loc = loc.upper()
+            elif attr == 'standard_name':
+                loc = loc.lower()
         return self.formats[attr].format(root=root, loc=loc)
