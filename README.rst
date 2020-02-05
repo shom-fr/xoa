@@ -1,4 +1,4 @@
-xoa - Xarray-based Ocean Analysis library
+xoa - xarray-based ocean analysis library
 =========================================
 
 
