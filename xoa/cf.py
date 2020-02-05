@@ -37,7 +37,6 @@ Naming convention tools
 # knowledge of the CeCILL license and that you accept its terms.
 
 import re
-from collections import UserString
 
 
 class SGLocator(object):

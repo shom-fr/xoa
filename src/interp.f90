@@ -1,4 +1,5 @@
-! Copyright or © or Copr. Shom/Ifremer/Actimar
+! -*- coding: utf-8 -*-
+! Copyright or Copr. Shom/Ifremer/Actimar
 !
 ! stephane.raynaud@actimarshom.fr, charria@ifremer.fr, wilkins@actimar.fr
 !
