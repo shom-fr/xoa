@@ -1,11 +1,9 @@
-! Copyright or Â© or Copr. Actimar/IFREMER (contributor(s) : Stephane Raynaud) (2010-2019)
+! Copyright or © or Copr. Shom/Ifremer/Actimar
 !
-! raynaud@actimar.fr
+! stephane.raynaud@actimarshom.fr, charria@ifremer.fr, wilkins@actimar.fr
 !
-!
-! This software is a computer program whose purpose is to provide
-! utilities for handling oceanographic and atmospheric data,
-! with the ultimate goal of validating the MARS model from IFREMER.
+! This software is a computer program whose purpose is to [describe
+! functionalities and technical features of your software].
 !
 ! This software is governed by the CeCILL license under French law and
 ! abiding by the rules of distribution of free software.  You can  use,
@@ -32,7 +30,6 @@
 !
 ! The fact that you are presently reading this means that you have had
 ! knowledge of the CeCILL license and that you accept its terms.
-!
 ! =============================================================================
 ! ================================== 1D =======================================
 ! =============================================================================
