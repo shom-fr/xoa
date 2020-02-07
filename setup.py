@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # Copyright or © or Copr. Shom/Ifremer/Actimar
 #
-# stephane.raynaud@actimarshom.fr, charria@ifremer.fr, wilkins@actimar.fr
+# stephane.raynaud@shom.fr, charria@ifremer.fr, wilkins@actimar.fr
 #
 # This software is a computer program whose purpose is to [describe
 # functionalities and technical features of your software].
