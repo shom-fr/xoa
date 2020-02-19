@@ -38,6 +38,16 @@ The successor of Vacumm.
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
+import warnings
+import os
+import re
+import importlib
+
+import appdirs
+import configobj
+import validate
+
+
 __project__ = 'xoa'
 __version__ = '0.1.0'
 __release__ = '0'
@@ -47,3 +57,116 @@ __email__ = 'stephane.raynaud@actimarshom.fr, charria@ifremer.fr, wilkins@actima
 __copyright__ = 'Copyright (c) 2020 Shom/Ifremer/Actimar'
 __description__ = __doc__
 
+_RE_OPTION_MATCH = re.compile(r'^(\w+)\W(\w+)$').match
+
+_CONFIG_INI_FILE = os.path.join(os.path.dirname(__file__), 'xoa.ini')
+
+#: Default xoa user configuration file
+CONFIG_FILE = os.path.join(appdirs.user_data_dir('xoa'), 'xoa.cfg')
+
+_CACHE = {}
+
+
+class XoaError(Exception):
+    pass
+
+
+class XoaConfigError(XoaError):
+    pass
+
+
+def XoaWarning(UserWarning):
+    pass
+
+
+def xoa_warn(message):
+    """Issue a :class:`XoaWarning` warning"""
+    warnings.warn(message, XoaWarning, stacklevel=2)
+
+
+def load_options(cfgfile=None):
+    if 'cfgspecs' not in _CACHE:
+        _CACHE['cfgspecs'] = configobj.ConfigObj(
+            _CONFIG_INI_FILE,
+            list_values=False,
+            interpolation=False,
+            raise_errors=True,
+            file_error=True
+            )
+    if 'options' not in _CACHE:
+        _CACHE['options'] = configobj.ConfigObj(
+            CONFIG_FILE if os.path.exists(CONFIG_FILE) else None,
+            configspec=_CACHE['cfgspecs'],
+            file_error=False,
+            raise_errors=True,
+            list_values=True)
+    if cfgfile:
+        _CACHE['options'].merge(configobj.Configobj(
+            cfgfile,
+            file_error=True,
+            raise_errors=True,
+            list_values=True))
+    _CACHE['options'].validate(validate.Validator(), copy=True)
+
+
+def _get_options_():
+    if 'options' not in _CACHE:
+        load_options()
+    return _CACHE['options']
+
+
+def get_option(section, option=None):
+    options = _get_options_()
+    if option is None:
+        m = _RE_OPTION_MATCH(option)
+        if m:
+            section, option = m.groups()
+        else:
+            raise XoaConfigError(
+                "You must provide an option name to get_option")
+    try:
+        value = options[section][option]
+    except Exception:
+        return XoaConfigError(f'Invalid section/option: {section}/{option}')
+    return value
+
+
+def set_options(section, **options):
+    options = _get_options_()
+    for option, value in options.items():
+        options[section][option] = value
+    options.validate(validate.Validator())
+
+
+def print_options(specs=False):
+    """Print current xoa configuration
+
+    Parameters
+    ----------
+    specs: bool
+        Print option specifications instead
+    """
+    if specs:
+        with open(_CONFIG_INI_FILE) as f:
+            print(f.read())
+    else:
+        print('\n'.join(_get_options_().write()))
+
+
+def print_versions():
+    """Print the versions of xoa and of some dependencies"""
+    print('xoa:', __version__)
+    for package in ['xarray', 'matplotlib', 'cartopy', 'xesmf']:
+        version = importlib.import_module(package).__version__
+        print(f'- {package}: {version}')
+
+
+def print_info():
+    """Print xoa related info"""
+    print('# VERSIONS')
+    print_versions()
+    print('\n# FILES AND DIRECTORIES')
+    print('xoa library dir:', os.path.dirname(__file__))
+    print('default config file:', CONFIG_FILE)
+    print('\n# OPTIONS')
+    print_options()
