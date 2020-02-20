@@ -59,10 +59,21 @@ __description__ = __doc__
 
 _RE_OPTION_MATCH = re.compile(r'^(\w+)\W(\w+)$').match
 
-_CONFIG_INI_FILE = os.path.join(os.path.dirname(__file__), 'xoa.ini')
+#: Specifications of configuration options
+CONFIG_INI = """
+[plot]
+cmapdiv = string(default="cmo.balance") # defaut diveging colormap
+cmappos = string(default="cmo.amp")     # default positive colormap
+cmapneg = string(default="cmo.tempo_r") # default negative colormap
+cmapcyc = string(default="cmo.phase")   # default cyclic colormap
+"""
 
 #: Default xoa user configuration file
-CONFIG_FILE = os.path.join(appdirs.user_data_dir('xoa'), 'xoa.cfg')
+DEFAULT_USER_CONFIG_FILE = os.path.join(
+    appdirs.user_data_dir('xoa'), 'xoa.cfg')
+
+_REQUIREMENTS_FILE = os.path.join(os.path.dirname(__file__), '..',
+                                  'requirements.txt')
 
 _CACHE = {}
 
@@ -87,7 +98,7 @@ def xoa_warn(message):
 def load_options(cfgfile=None):
     if 'cfgspecs' not in _CACHE:
         _CACHE['cfgspecs'] = configobj.ConfigObj(
-            _CONFIG_INI_FILE,
+            CONFIG_INI.split('\n'),
             list_values=False,
             interpolation=False,
             raise_errors=True,
@@ -95,7 +106,8 @@ def load_options(cfgfile=None):
             )
     if 'options' not in _CACHE:
         _CACHE['options'] = configobj.ConfigObj(
-            CONFIG_FILE if os.path.exists(CONFIG_FILE) else None,
+            (DEFAULT_USER_CONFIG_FILE
+             if os.path.exists(DEFAULT_USER_CONFIG_FILE) else None),
             configspec=_CACHE['cfgspecs'],
             file_error=False,
             raise_errors=True,
@@ -116,6 +128,15 @@ def _get_options_():
 
 
 def get_option(section, option=None):
+    """Get a config option
+
+    Example
+    -------
+    >>> xoa.get_option('plot', 'cmapdiv')
+    "cmo.balance"
+    >>> xoa.get_option('plot.cmapdiv')
+    "cmo.balance"
+    """
     options = _get_options_()
     if option is None:
         m = _RE_OPTION_MATCH(option)
@@ -131,11 +152,35 @@ def get_option(section, option=None):
     return value
 
 
-def set_options(section, **options):
-    options = _get_options_()
-    for option, value in options.items():
-        options[section][option] = value
-    options.validate(validate.Validator())
+class set_options(object):
+    """Set configuration options
+
+
+    Example
+    -------
+    ::
+        # Classic: for the session
+        xoa.set_option('plot', cmapdiv='cmo.balance', cmappos='cmo.amp')
+
+        # Context: temporary
+        with xoa.set_options('plot', cmapdiv='cmo.balance'):
+            print(xoa.get_option('plot.cmapdiv'))
+
+    """
+
+    def __init__(self, section, **options):
+        self.old_options = _get_options_()
+        options = configobj.ConfigObj(self.old_options)
+        for option, value in options.items():
+            options[section][option] = value
+        options.validate(validate.Validator())
+        _CACHE['options'] = options
+
+    def __enter__(self):
+        return _CACHE['options']
+
+    def __exit__(self, type, value, traceback):
+        _CACHE['options'] = self.old_options
 
 
 def print_options(specs=False):
@@ -147,26 +192,39 @@ def print_options(specs=False):
         Print option specifications instead
     """
     if specs:
-        with open(_CONFIG_INI_FILE) as f:
-            print(f.read())
+        print(CONFIG_INI.strip('\n'))
     else:
-        print('\n'.join(_get_options_().write()))
+        print('\n'.join(_get_options_().write()).strip('\n'))
+
+
+def _parse_requirements_(reqfile):
+    re_match_specs_match = re.compile(r'^(\w+)(\W+.+)?$').match
+    reqs = {}
+    with open(reqfile) as f:
+        for line in f:
+            line = line.strip().strip('\n')
+            if line and not line.startswith('#'):
+                m = re_match_specs_match(line)
+                if m:
+                    reqs[m.group(1)] = m.group(2)
+    return reqs
 
 
 def print_versions():
     """Print the versions of xoa and of some dependencies"""
-    print('xoa:', __version__)
-    for package in ['xarray', 'matplotlib', 'cartopy', 'xesmf']:
-        version = importlib.import_module(package).__version__
-        print(f'- {package}: {version}')
+    print('- xoa:', __version__)
+    for package in _parse_requirements_(_REQUIREMENTS_FILE):
+        pp = importlib.import_module(package)
+        if hasattr(pp, '__version__'):
+            print(f'- {package}: {pp.__version__}')
 
 
-def print_info():
+def print_info(opt_specs=True):
     """Print xoa related info"""
     print('# VERSIONS')
     print_versions()
     print('\n# FILES AND DIRECTORIES')
     print('xoa library dir:', os.path.dirname(__file__))
-    print('default config file:', CONFIG_FILE)
+    print('default config file:', DEFAULT_USER_CONFIG_FILE)
     print('\n# OPTIONS')
-    print_options()
+    print_options(specs=opt_specs)
