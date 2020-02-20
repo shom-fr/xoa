@@ -183,7 +183,7 @@ class set_options(object):
         _CACHE['options'] = self.old_options
 
 
-def print_options(specs=False):
+def show_options(specs=False):
     """Print current xoa configuration
 
     Parameters
@@ -210,7 +210,7 @@ def _parse_requirements_(reqfile):
     return reqs
 
 
-def print_versions():
+def show_versions():
     """Print the versions of xoa and of some dependencies"""
     print('- xoa:', __version__)
     for package in _parse_requirements_(_REQUIREMENTS_FILE):
@@ -219,12 +219,12 @@ def print_versions():
             print(f'- {package}: {pp.__version__}')
 
 
-def print_info(opt_specs=True):
+def show_info(opt_specs=True):
     """Print xoa related info"""
     print('# VERSIONS')
-    print_versions()
+    show_versions()
     print('\n# FILES AND DIRECTORIES')
     print('xoa library dir:', os.path.dirname(__file__))
     print('default config file:', DEFAULT_USER_CONFIG_FILE)
     print('\n# OPTIONS')
-    print_options(specs=opt_specs)
+    show_options(specs=opt_specs)
