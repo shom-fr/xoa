@@ -5,7 +5,7 @@ Naming convention tools
 """
 # Copyright or © or Copr. Shom/Ifremer/Actimar
 #
-# stephane.raynaud@actimarshom.fr, charria@ifremer.fr, wilkins@actimar.fr
+# stephane.raynaud@shom.fr, charria@ifremer.fr, wilkins@actimar.fr
 #
 # This software is a computer program whose purpose is to [describe
 # functionalities and technical features of your software].
@@ -37,6 +37,31 @@ Naming convention tools
 # knowledge of the CeCILL license and that you accept its terms.
 
 import re
+import os
+
+import appdirs
+
+from .__init__ import xoa_warn
+from .misc import ArgList, dict_merge
+
+_THISDIR = os.path.dirname(__file__)
+
+# Joint variables and coords config specification file
+_INIFILE = os.path.join(_THISDIR, 'cf.ini')
+
+# Base config file for CF specifications
+_CFGFILE = os.path.join(_THISDIR, 'cf.cfg')
+
+# File used for pickling cf specs
+_user_cache_dir = appdirs.user_cache_dir("xoa")
+_PYKFILE = os.path.join(_user_cache_dir, 'cf.pyk')
+
+# Argument passed to dict_merge to merge CF configs
+_CF_DICT_MERGE_KWARGS = dict(mergesubdicts=True, mergelists=True,
+                             skipnones=False, skipempty=False,
+                             overwriteempty=True, mergetuples=True)
+
+_CACHE = {}
 
 
 class SGLocator(object):
@@ -49,20 +74,28 @@ class SGLocator(object):
         which defaults to ``"{root}_{loc}"``
     """
 
-    formats = {'name': '{root}_{loc}',
-               'standard_name': '{root}_at_{loc}_location',
-               'long_name': '{root} at {loc} location'}
+    formats = {
+        "name": "{root}_{loc}",
+        "standard_name": "{root}_at_{loc}_location",
+        "long_name": "{root} at {loc} location",
+    }
 
     re_match = {
-        'standard_name': re.compile(
-            formats['standard_name'].format(
-                root=r'(?P<root>\w+)',
-                loc=r'(?P<loc>[a-zA-Z])'), re.I).match,
-        'long_name': re.compile(
-            formats['long_name'].format(
-                root=r'(?P<root>[\w ]+)',
-                loc=r'(?P<loc>[a-zA-Z])'), re.I).match
-        }
+        "standard_name": re.compile(
+            formats["standard_name"].format(
+                root=r"(?P<root>\w+)", loc=r"(?P<loc>[a-zA-Z])"
+            ),
+            re.I,
+        ).match,
+        "long_name": re.compile(
+            formats["long_name"].format(
+                root=r"(?P<root>[\w ]+)", loc=r"(?P<loc>[a-zA-Z])"
+            ),
+            re.I,
+        ).match,
+    }
+
+    valid_attrs = ('name', 'standard_name', 'long_name')
 
     def __init__(self, name_format=None):
 
@@ -73,11 +106,13 @@ class SGLocator(object):
 
         # The name case
         if name_format:
-            self.formats['name'] = name_format
-        self.re_match['name'] = re.compile(
-            self.formats['name'].format(root=r'(?P<root>\w+)',
-                                        loc=r'(?P<loc>[a-zA-Z])'),
-            re.I).match
+            self.formats["name"] = name_format
+        self.re_match["name"] = re.compile(
+            self.formats["name"].format(
+                root=r"(?P<root>\w+)", loc=r"(?P<loc>[a-zA-Z])"
+            ),
+            re.I,
+        ).match
 
     def parse_attr(self, attr, value):
         """Parse an attribute string to get its root and location
@@ -99,7 +134,7 @@ class SGLocator(object):
         m = self.re_match[attr](value)
         if m is None:
             return value, None
-        return m.group('root'), m.group('loc').lower()
+        return m.group("root"), m.group("loc").lower()
 
     def match_attr(self, attr, value, root, loc=None):
         """Check if an attribute is matching a location
@@ -110,7 +145,7 @@ class SGLocator(object):
             Attribute name
         root: str
         loc: letter or null
-            - None: any
+            - None or "any": any
             - letters: one of these locations
             - False or '': no location
 
@@ -123,20 +158,21 @@ class SGLocator(object):
         root = root.lower()
         if vroot.lower() != root:
             return False
-        if loc is None:
+        if loc is None or loc == "any":  # any loc
             return True
-        if not loc:
+        if not loc:  # not loc explicit
             return vloc is None
-        return vloc in loc
+        return vloc in loc  # one of these locs
 
-    def format_attr(self, attr, root, loc, standardize=True):
+    def format_attr(self, attr, value, loc, standardize=True):
         """Format a attribute at a specified location
 
         Parameters
         ----------
         attr: {'name', 'standard_name', 'long_name'}
             Attribute name
-        root: str
+        value: str
+            Current attribute value. It is parsed to get current ``root``.
         loc: False, letter
         standardize: bool
             If True, standardize ``root`` and ``loc`` values.
@@ -153,18 +189,674 @@ class SGLocator(object):
         ------
         str
         """
+        root = self.parse_attr(attr, value)[0]
         if standardize:
-            if attr == 'long_name':
-                root = root.capitalize().replace('_', ' ')
+            if attr == "long_name":
+                root = root.capitalize().replace("_", " ")
             else:
-                root = root.replace(' ', '_')
-                if attr == 'standard_name':
+                root = root.replace(" ", "_")
+                if attr == "standard_name":
                     root = root.lower()
         if not loc:
             return root
         if standardize:
-            if attr == 'long_name':
+            if attr == "long_name":
                 loc = loc.upper()
-            elif attr == 'standard_name':
+            elif attr == "standard_name":
                 loc = loc.lower()
         return self.formats[attr].format(root=root, loc=loc)
+
+    def format_dataarray(self, da, loc, standardize=True, attrs=None):
+        da = da.copy()
+        for attr in self.valid_attrs + tuple(attrs or ()):
+            if attr in attrs:
+                value = attrs[attr]
+            elif attr in da.attrs:
+                value = da.attrs[attr]
+            else:
+                continue
+            if attr in self.valid_attrs:
+                da.attrs[attr] = self.format_attr(attr, value, loc)
+            elif attr not in da.attrs:
+                da.attrs[attr] = value
+        return da
+
+
+class CFSpecs(object):
+    """CF specification manager
+
+    Parameters
+    ----------
+    cfg: str
+        A config file name or string or dict.
+        It must contain the "variables", "coords"  and "sglocator" sections.
+
+
+    Attributes
+    ----------
+    sglocator: :class:`SGLocator`
+        Used to manage stagerred grid locations
+    categories: list
+        Types of specs
+    """
+
+    def __init__(self, cfg):
+        self._cfgspecs = _get_cfgm_()._configspec.dict()
+        self._cfs = {}
+        catcls = {'coords': CFCoordSpecs,
+                  'variables': CFVarSpecs}
+        for category in self.categories:
+            self._cfs[category] = catcls[category](self)
+        self.load_cfg(cfg, update=False)
+
+    def load_cfg(self, cfg, update=True):
+        """Load a single or a list of configuration
+
+        Parameters
+        ----------
+        cfg: str or list
+            Single or a list of either:
+
+            - config file name,
+            - multiline config string,
+            - config dict,
+            - two-element tuple with the first item of one of the above types,
+              and second item as a cache key for faster reloading.
+        update: bool
+            Update the current configuration or replace it.
+        """
+        # Core cfg
+        cfgs = _load_cfgs_(cfg)
+
+        # merge
+        if update and hasattr(self, '_core_cfg'):
+            cfgs.append(self._core_cfg)
+        if len(cfgs) == 1:
+            self._core_cfg = cfgs[0]
+        else:
+            self._core_cfg = dict_merge(*cfgs, **_CF_DICT_MERGE_KWARGS)
+
+        # Setup
+        self._dict = self._core_cfg.copy()
+        self._sgl_settings = self._dict['sglocator']
+        self._sgl = SGLocator(**self._sgl_settings)
+
+        # Post process
+        self._post_process_()
+
+    def get_sglocator_at(self, new_loc):
+        if not hasattr(self, '_sgl_cache'):
+            self._sgl_cache = {}
+        if new_loc not in self._sgl_cache:
+            self._sgl_cache[new_loc] = self._sgl.to(new_loc)
+        return self._sgl_cache[new_loc]
+
+    def get_sgl_setting(self, option):
+        """Get a :attr:`sglocator` setting value"""
+        return self._sgl_settings.get(option)
+
+    @property
+    def categories(self):
+        return ['coords', 'variables']
+
+    @property
+    def sglocator(self):
+        return self._sgl
+
+    def __getitem__(self, category):
+        assert category in self.categories
+        return self._cfs[category]
+
+    def __contains__(self, category):
+        return category in self.categories
+
+    def __getattr__(self, name):
+        if '_cfs' in self.__dict__ and name in self.__dict__['_cfs']:
+            return self.__dict__['_cfs'][name]
+        raise AttributeError("'{}' object has no attribute '{}'".format(
+                self.__class__.__name__, name))
+
+    # def __str__(self):
+    #     return pformat(self._dict)
+
+#    def copy_and_update(self, cfg=None, specs=None):#, names=None):
+#        # Copy
+#        obj = self.__class__(cfg={})#names=names, inherit=inherit,
+##                             cfg={self.category: {}}, parent=parent)
+#        obj._dict = deepcopy(self._dict)
+#
+#        # Update
+#        if cfg:
+#            obj.register_from_cfg(cfg)
+#
+#        return obj
+#
+#    def copy(self):
+#        return self.copy_and_update()
+#
+#    __copy__ = copy
+#
+    def register_from_cfg(self, cfg):
+        """"Register new elements from a :class:`ConfigObj` instance
+        or a config file"""
+        self.load_cfg(cfg, update=True)
+
+    def _post_process_(self):
+
+        # Inits
+        items = {}
+        self._from_atlocs = {}
+        for category in self.categories:
+            items[category] = []
+            self._from_atlocs[category] = []
+
+        # Process
+        for category in self.categories:
+            self._from_atlocs[category] = []
+            for name in self[category].names:
+                for item in self._process_entry_(category, name):
+                    if item:
+                        pcat, pname, pspecs = item
+                        items[pcat].append((pname, pspecs))
+
+        # Refill
+        for category, contents in items.items():
+            self._dict[category].clear()
+            self._dict[category].update(items[category])
+
+    def _process_entry_(self, category, name):
+        """Process an entry
+
+        - Makes sure to have lists, except for 'axis' and 'inherit'
+        - Check geo coords
+        - Check inheritance
+        - Makes sure that coords specs have no 'coords' key
+        - Makes sure that specs key is the first entry of 'names'
+        - Add standard_name to list of names
+        - Check duplications to other locations ('toto' -> 'toto_u')
+
+        Yield
+        -----
+        category, name, entry
+        """
+        # Dict of entries for this category
+        entries = self._dict[category]
+
+        # Wrong entry!
+        if name not in entries:
+            yield
+
+        # Entry already generated with the atlocs key
+        if name in self._from_atlocs[category]:
+            yield
+        loc = self._sgl.set_loc_from_name(name)
+
+        # Get the specs as pure dict
+        if hasattr(entries[name], 'dict'):
+            entries[name] = entries[name].dict()
+        specs = entries[name]
+
+        # Ids
+        if name in specs['name']:
+            specs['name'].remove(name)
+        specs['name'].insert(0, name)
+
+        # Long name from name or standard_name
+        if not specs['long_name']:
+            if specs['standard_name']:
+                long_name = specs['standard_name'][0]
+            else:
+                long_name = name.title()
+            long_name = long_name.replace('_', ' ').capitalize()
+            specs['long_name'].append(long_name)
+
+        # Physloc must be the first atlocs
+        if 'physloc' in specs and 'atlocs' in specs:
+            p = specs['physloc']
+            if p:
+                if p in specs['atlocs']:
+                    specs['atlocs'].remove(p)
+                specs['atlocs'].insert(0, p)
+
+        # Coordinates and dimensions
+        if loc and ('coords' in specs or 'dims' in specs):
+            # copy location
+            key = 'coords' if 'coords' in specs else 'dims'
+            specs[key].setdefault('t', ['time'])
+            for axis in 'xyz':
+                if axis in specs[key]:
+                    if isinstance(specs[key][axis], dict):
+                        for domain in specs[key][axis]:
+                            specs[key][axis][domain] = self._sgl.format_attrs(
+                                    {'name': specs[key][axis][domain]})['name']
+#                            specs[key][axis][domain] = cp_suffix(
+#                                    name, specs[key][axis][domain],
+#                                    suffixes=suffixes)
+                    else:
+                        specs[key][axis] = self._sgl.format_attrs(
+                                {'name': specs[key][axis]})['name']
+
+        # Inherits from other specs (merge specs with dict_merge)
+        if 'inherit' in specs and specs['inherit']:
+            from_name = specs['inherit']
+            if ":" in from_name:
+                from_cat, from_name = from_name.split(':')[:2]
+            else:
+                from_cat = category
+            assert (from_cat != category or
+                    name != from_name), 'Cannot inherit cf specs from it self'
+            # to handle high level inheritance
+            for item in self._process_entry_(from_cat, from_name):
+                yield item
+            from_specs = None
+            to_scan = []
+            if 'inherit' in entries:
+                to_scan.append(self._inherit)
+            to_scan.append(entries)
+
+            for from_specs in to_scan:
+                if from_name in from_specs:
+
+                    # Merge
+                    entries[name] = specs = dict_merge(
+                            specs,
+                            from_specs[from_name], cls=dict,
+                            **_CF_DICT_MERGE_KWARGS)
+
+                    # Check compatibility of keys
+                    for key in list(specs.keys()):
+                        if key not in self._cfgspecs[category]['__many__']:
+                            del specs[key]
+            specs['inherit'] = None  # switch off inheritance now
+
+#                    break
+
+#        # Select
+#        if specs['select']:
+#            for key in specs['select']:
+#                try:
+#                    specs['select'] = eval(specs['select'])
+#                except:
+#                    pass
+
+        # Standard_names in names
+        if specs['standard_name']:
+            for standard_name in specs['standard_name']:
+                if standard_name not in specs['name']:
+                    specs['name'].append(standard_name)
+
+        yield category, name, specs
+
+
+class _CFCatSpecs_(object):
+    """Base class for loading variables and coords CF specifications"""
+    category = None
+
+    attrs_exclude = [
+        'name',
+        'inherit',
+        'coords',
+        'select',
+        'searchmode',
+        'cmap',
+        ]
+
+    attrs_first = [
+        'name',
+        'standard_name',
+        'long_name',
+        'units',
+        ]
+
+    search_category = None
+
+    def __init__(self, category, parent):
+        assert category in parent
+        self.parent = parent
+        self.category = category
+
+    def get_sgl_setting(self, option):
+        """Get the value of an setting option"""
+        return self.parent.get_sgl_setting(option)
+
+    @property
+    def sglocator(self):
+        return self.parent._sgl
+
+    @property
+    def _dict(self):
+        return self.parent._dict[self.category]
+
+    def __getitem__(self, key):
+        return self._dict[key]
+
+    def __iter__(self):
+        return self._dict.values
+
+    # def __len__(self):
+    #     return len(self._dict)
+
+    def __contains__(self, key):
+        return key in self._dict
+
+    # def __str__(self):
+    #     return pformat(self._dict)
+
+    def _validate_name_(self, name):
+        if name in self:
+            return name
+
+    def _assert_known_(self, name):
+        assert name in self, "Invalid entry name:" + name
+
+    @property
+    def names(self):
+        return list(self._dict.keys())
+
+    def items(self):
+        return self._dict.items()
+
+    def keys(self):
+        return self._dict.keys()
+
+    # def get_specs(self, name, mode="warning", at=None, **kwargs):
+    #     """Get the specs of cf item or xarray.DataArray
+
+    #     Parameters
+    #     ----------
+    #     name: str, xarray.DataArray
+    #     mode: "silent", "warning" or "error".
+    #     **kwargs
+    #         Passed to :meth:`is_obj_matching_any_specs`
+
+    #     Return
+    #     ------
+    #     dict or None
+    #     """
+    #     assert mode in ("silent", "warning", "error")
+    #     if name not in self:
+    #         if mode == 'error':
+    #             raise CFError("Can't get cf specs from: " +
+    #                           (name if name else 'dataarray'))
+    #         if mode == 'warn':
+    #             vcwarn("Invalid cf name: " + str(name))
+    #         return
+    #     specs = self[name]
+    #     if at:
+    #         specs = self.parent.get_sglocator_at(at).format_specs(specs)
+    #     return specs
+
+    def register(self, name, **specs):
+        """Register a new element from its name and explicit specs"""
+        data = {self.category: {name: specs}}
+        self.parent.register_from_cfg(data)
+
+    def register_from_cfg(self, cfg):
+        """Register new elements from a config specs"""
+        if isinstance(cfg, dict) and self.category not in cfg:
+            cfg = {self.category: cfg}
+        self.parent.register_from_cfg(cfg)
+
+    def get_attrs(self, name, select=None, exclude=None, mode="warning",
+                  add_name=False, at=None, **extra):
+        """Get the default attributes from cf specs
+
+        Parameters
+        ----------
+        name: str
+            Valid cf name
+        select: str, list
+            Include only these attributes
+        exclude: str, list
+            Exclude these attributes
+        mode: "silent", "warning" or "error".
+        add_name: bool
+            Add the cf name to the attributes
+        **extra
+          Extra params as included as extra attributes
+
+        Return
+        ------
+        dict
+        """
+
+        # Get specs
+        specs = self.get_specs(name, mode=mode) or {}
+
+        # Which attributes
+        attrs = {}
+        if exclude is None:
+            exclude = []
+        elif isinstance(exclude, str):
+            exclude = [exclude]
+        exclude.extend(self.attrs_exclude)
+        exclude.extend(extra.keys())
+        exclude = set(exclude)
+        keys = set(self.attrs_first)
+        set(specs.keys())
+        keys -= exclude
+        keys = keys.intersection(select)
+
+        # Loop
+        for key in keys:
+
+            # No lists or tuples
+            value = specs[key]
+            if isinstance(value, (list, tuple)):
+                if len(value) == 0:
+                    continue
+                value = value[0]
+
+            # Store it
+            attrs[key] = value
+
+        # Extra attributes
+        attrs.update(extra)
+        if add_name:
+            attrs['name'] = name
+
+        # Change location
+        if at:
+            attrs = self.parent.get_sglocator_at(at).format_attrs(attrs)
+
+        return attrs
+
+    def search(self, dsa, name=None, at="any", get="obj"):
+        """Search for a data_var or coord that maches given or any specs"""
+        if self.search_category:
+            objs = getattr(dsa, self.search_category)
+        else:
+            objs = dsa.keys() if hasattr(dsa, "keys") else dsa.coords
+        for obj in objs:
+            m = self.match(obj, name, at=at)
+            if m:
+                return obj if get == "obj" else (name if name else m)
+
+    def _get_match_specs_(self, name):
+        specs = self[name]
+        match_specs = {}
+        for sm in specs['searchmode']:
+            for attr in ('name', 'standard_name', 'long_name',
+                         'axis', 'units'):
+                if specs[attr] and attr[0] == sm:
+                    match_specs[attr] = specs[attr]
+        return match_specs
+
+    def match(self, da, name=None, at="any"):
+        """Check if da attributes match given or any specs"""
+        names = self.names if name is None else [name]
+        for name_ in names:
+            for attr, values in self._get_match_specs_(name_):
+                if attr in self.sglocator.valid_attrs and attr in da.attrs:
+                    if self.sglocator.match_attr(attr, da.attrs[attr], at=at):
+                        return True if name else name_
+        return False if name else None
+
+    def format(self, da, name=None, at=None):
+        if name is None:
+            name = self.search(da, at="any", get="name")
+        if name is None:
+            return da.copy()
+        return self.sglocator.format_datarray(
+            da, at=at, attrs=self.get_attrs(name))
+
+
+class CFVarSpecs(_CFCatSpecs_):
+
+    category = 'variables'
+    search_category = 'data_vars'
+
+    def __init__(self, parent):
+
+        _CFCatSpecs_.__init__(self, self.category, parent)
+
+
+class CFCoordSpecs(_CFCatSpecs_):
+
+    category = 'coords'
+    search_category = 'coords'
+
+    def __init__(self, parent):
+
+        _CFCatSpecs_.__init__(self, self.category, parent)
+
+
+def _load_cfgs_(cfgs):
+    """Load and validate several configurations"""
+    if 'cfgs' not in _CACHE:
+        _CACHE['cfgs'] = {}
+    al = ArgList(cfgs)
+    cfgm = _get_cfgm_()
+    cfgs = []
+    for cfg in al.get():
+
+        # get from it cache?
+        if isinstance(cfg, tuple):
+            cfg, cache_key = cfg
+            if cache_key in _CACHE['cfgs']:
+                cfgs.append(_CACHE['cfgs'][cache_key])
+                print('CFG FROM CACHE: '+cache_key)
+                continue
+        else:
+            cache_key = None
+
+        # load and validate
+        if isinstance(cfg, str) and cfg.strip().startswith('['):
+            cfg = cfg.split('\n')
+        cfgs.append(cfgm.load(cfg).dict())
+
+        # Cache it
+        if cache_key:
+            _CACHE['cfgs'][cache_key] = cfg
+
+    return cfgs
+
+
+def _get_cfgm_():
+    """Get a :class:`~xoa.cfgm.ConfigManager` instance to manage
+    coords and variables spécifications"""
+    if 'cfgm' not in _CACHE:
+        from .cfgm import ConfigManager
+        _CACHE['cfgm'] = ConfigManager(_INIFILE)
+    return _CACHE['cfgm']
+
+
+class set_cf_specs(object):
+    """Set the current CF specs"""
+
+    def __init__(self, cf_source):
+        assert isinstance(cf_source, CFSpecs)
+        self.old_specs = _CACHE.get('specs', None)
+        self.specs = cf_source
+
+    def __enter__(self):
+        return self.specs
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self._old_specs is None:
+            del _CACHE['specs']
+        else:
+            _CACHE['specs'] = self.old_specs
+
+
+def get_cf_specs(name=None, category=None, cache=True):
+    """Get the CF specifications for a target in a category
+
+    Parameters
+    ----------
+    name: str or None
+        A target name like "sst". If not provided, return all specs.
+    category: str or None
+        Select a category with "coords" or "variables".
+        If not provided, search first in "variables", then "coords".
+    cache: bool
+        Cache specs on disk with pickling for fast loading
+
+    Return
+    ------
+    dict or None
+        None is return if no specs are found
+    """
+    # Get the source of specs
+    if 'specs' in _CACHE:
+
+        # Try from disk cache
+        if cache:
+            import pickle
+            if os.path.exists(_PYKFILE) and (
+                    os.stat(_CFGFILE).st_mtime <
+                    os.stat(_PYKFILE).st_mtime):
+                try:
+                    with open(_PYKFILE, 'rb') as f:
+                        set_cf_specs(pickle.load(f))
+                except Exception as e:
+                    xoa_warn('Error while loading cached cf specs: ' +
+                             str(e.args))
+
+        # Compute it from scratch
+        if 'specs 'not in _CACHE:
+
+            # Setup
+            set_cf_specs(CFSpecs((_CFGFILE, 'default')))#??
+
+            # Cache it on disk
+            if cache:
+                try:
+                    cachedir = os.path.dirname(_PYKFILE)
+                    if not os.path.exists(cachedir):
+                        os.makedirs(cachedir)
+                    with open(_PYKFILE, 'wb') as f:
+                        pickle.dump(_CACHE['specs'], f)
+                except Exception as e:
+                    print(e.args)
+                    xoa_warn('Error while caching cf specs: '+str(e.args))
+
+    cf_source = _CACHE['specs']
+
+    # Select categories
+    if category is not None:
+        if isinstance(cf_source, CFSpecs):
+            cf_source = cf_source[category]
+        if name is None:
+            return cf_source
+        toscan = [cf_source]
+    else:
+        if name is None:
+            return cf_source
+        toscan = [cf_source['variables'], cf_source['coords']]
+
+    # Search
+    for ss in toscan:
+        if name in ss:
+            return ss[name]
+
+
+def get_cf_coord_specs(name=None):
+    """Shortcut to ``get_cf_specs(name=name, category='coords')``"""
+    return get_cf_specs(name=name, category='coords')
+
+
+def get_cf_var_specs(name=None):
+    """Shortcut to ``get_cf_specs(name=name, category='variables')``"""
+    return get_cf_specs(name=name, category='variables')
+
