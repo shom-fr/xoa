@@ -49,3 +49,24 @@ def test_cf_sglocator_match_attr(attr, root, loc, expected):
      ])
 def test_cf_sglocator_format_attr(attr, root, loc, expected):
     assert cf.SGLocator().format_attr(attr, root, loc) == expected
+
+
+@pytest.mark.parametrize(
+    "cache", ['ignore', 'rw', 'rw', 'ignore', 'clean', 'rw'])
+def test_cf_get_cfg_specs(cache):
+    assert isinstance(cf.get_cf_specs(cache=cache), cf.CFSpecs)
+
+
+def test_cf_get_cfg_specs_var():
+    specs = cf.get_cf_specs('temp', 'variables')
+    assert specs['name'][0] == 'temp'
+    assert specs['standard_name'][0] == 'sea_water_temperature'
+    assert specs['cmap'] == 'cmo.thermal'
+    new_specs = cf.get_cf_specs('temp')
+    assert new_specs is specs
+
+
+def test_cf_get_cfg_specs_var_inherit():
+    specs = cf.get_cf_specs('sst', 'variables')
+    assert specs['standard_name'][0] == 'sea_surface_temperature'
+    assert specs['units'][0] == 'degrees_celsius'

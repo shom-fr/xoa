@@ -38,6 +38,7 @@ Naming convention tools
 
 import re
 import os
+import pickle
 
 import appdirs
 
@@ -386,11 +387,6 @@ class CFSpecs(object):
         if name not in entries:
             yield
 
-        # Entry already generated with the atlocs key
-        if name in self._from_atlocs[category]:
-            yield
-        loc = self._sgl.set_loc_from_name(name)
-
         # Get the specs as pure dict
         if hasattr(entries[name], 'dict'):
             entries[name] = entries[name].dict()
@@ -409,32 +405,6 @@ class CFSpecs(object):
                 long_name = name.title()
             long_name = long_name.replace('_', ' ').capitalize()
             specs['long_name'].append(long_name)
-
-        # Physloc must be the first atlocs
-        if 'physloc' in specs and 'atlocs' in specs:
-            p = specs['physloc']
-            if p:
-                if p in specs['atlocs']:
-                    specs['atlocs'].remove(p)
-                specs['atlocs'].insert(0, p)
-
-        # Coordinates and dimensions
-        if loc and ('coords' in specs or 'dims' in specs):
-            # copy location
-            key = 'coords' if 'coords' in specs else 'dims'
-            specs[key].setdefault('t', ['time'])
-            for axis in 'xyz':
-                if axis in specs[key]:
-                    if isinstance(specs[key][axis], dict):
-                        for domain in specs[key][axis]:
-                            specs[key][axis][domain] = self._sgl.format_attrs(
-                                    {'name': specs[key][axis][domain]})['name']
-#                            specs[key][axis][domain] = cp_suffix(
-#                                    name, specs[key][axis][domain],
-#                                    suffixes=suffixes)
-                    else:
-                        specs[key][axis] = self._sgl.format_attrs(
-                                {'name': specs[key][axis]})['name']
 
         # Inherits from other specs (merge specs with dict_merge)
         if 'inherit' in specs and specs['inherit']:
@@ -471,13 +441,13 @@ class CFSpecs(object):
 
 #                    break
 
-#        # Select
-#        if specs['select']:
-#            for key in specs['select']:
-#                try:
-#                    specs['select'] = eval(specs['select'])
-#                except:
-#                    pass
+        # Select
+        if specs.get('select', None):
+            for key in specs['select']:
+                try:
+                    specs['select'] = eval(specs['select'])
+                except Exception:
+                    pass
 
         # Standard_names in names
         if specs['standard_name']:
@@ -747,7 +717,7 @@ def _load_cfgs_(cfgs):
 
         # Cache it
         if cache_key:
-            _CACHE['cfgs'][cache_key] = cfg
+            _CACHE['cfgs'][cache_key] = cfgs[-1]
 
     return cfgs
 
@@ -767,7 +737,7 @@ class set_cf_specs(object):
     def __init__(self, cf_source):
         assert isinstance(cf_source, CFSpecs)
         self.old_specs = _CACHE.get('specs', None)
-        self.specs = cf_source
+        _CACHE['specs'] = self.specs = cf_source
 
     def __enter__(self):
         return self.specs
@@ -779,7 +749,18 @@ class set_cf_specs(object):
             _CACHE['specs'] = self.old_specs
 
 
-def get_cf_specs(name=None, category=None, cache=True):
+def clean_cf_specs_cache():
+    """Clean the cf specs cahche file"""
+    if os.path.exists(_PYKFILE):
+        os.remove(_PYKFILE)
+
+
+def show_cf_specs_cache():
+    """Show the cf specs cahche file"""
+    print(_PYKFILE)
+
+
+def get_cf_specs(name=None, category=None, cache='rw'):
     """Get the CF specifications for a target in a category
 
     Parameters
@@ -797,12 +778,17 @@ def get_cf_specs(name=None, category=None, cache=True):
     dict or None
         None is return if no specs are found
     """
+    if cache is True:
+        cache = 'rw'
+    elif cache is False:
+        cache = 'ignore'
+    assert cache in ('ignore', 'rw', 'read', 'write', 'clean')
+
     # Get the source of specs
-    if 'specs' in _CACHE:
+    if 'specs' not in _CACHE:
 
         # Try from disk cache
-        if cache:
-            import pickle
+        if cache in ('read', 'w'):
             if os.path.exists(_PYKFILE) and (
                     os.stat(_CFGFILE).st_mtime <
                     os.stat(_PYKFILE).st_mtime):
@@ -814,13 +800,13 @@ def get_cf_specs(name=None, category=None, cache=True):
                              str(e.args))
 
         # Compute it from scratch
-        if 'specs 'not in _CACHE:
+        if 'specs' not in _CACHE:
 
             # Setup
-            set_cf_specs(CFSpecs((_CFGFILE, 'default')))#??
+            set_cf_specs(CFSpecs((_CFGFILE, 'default')))
 
             # Cache it on disk
-            if cache:
+            if cache in ('write', 'rw'):
                 try:
                     cachedir = os.path.dirname(_PYKFILE)
                     if not os.path.exists(cachedir):
@@ -828,8 +814,11 @@ def get_cf_specs(name=None, category=None, cache=True):
                     with open(_PYKFILE, 'wb') as f:
                         pickle.dump(_CACHE['specs'], f)
                 except Exception as e:
-                    print(e.args)
                     xoa_warn('Error while caching cf specs: '+str(e.args))
+
+    # Clean cache
+    if cache == 'clean':
+        clean_cf_specs_cache()
 
     cf_source = _CACHE['specs']
 
@@ -859,4 +848,3 @@ def get_cf_coord_specs(name=None):
 def get_cf_var_specs(name=None):
     """Shortcut to ``get_cf_specs(name=name, category='variables')``"""
     return get_cf_specs(name=name, category='variables')
-
