@@ -38,7 +38,7 @@ Miscellaneaous low level utilities
 
 import types
 
-from .__init___ import XoaError
+from .__init__ import XoaError
 
 
 def is_iterable(obj, nostr=True, nogen=True):

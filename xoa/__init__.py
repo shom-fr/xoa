@@ -86,7 +86,7 @@ class XoaConfigError(XoaError):
     pass
 
 
-def XoaWarning(UserWarning):
+class XoaWarning(UserWarning):
     pass
 
 

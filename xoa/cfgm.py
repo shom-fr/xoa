@@ -72,7 +72,7 @@ class VdtWarning(XoaWarning):
     pass
 
 
-class XoaValidateError(ValidateError):
+class XoaValidateError(ValidateError, XoaError):
     pass
 
 
