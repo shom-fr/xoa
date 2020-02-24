@@ -38,6 +38,8 @@ Miscellaneaous low level utilities
 
 import types
 
+from .__init___ import XoaError
+
 
 def is_iterable(obj, nostr=True, nogen=True):
     """Check if an object is iterable or not
@@ -59,6 +61,23 @@ def is_iterable(obj, nostr=True, nogen=True):
     if nostr:
         return not isinstance(obj, str)
     return True
+
+
+def dict_check_defaults(dd, **defaults):
+    """Check that a dictionary has some default values
+
+    Parameters
+    ----------
+    dd: dict
+        Dictionary to check
+    **defs: dict
+        Dictionary of default values
+    """
+    if defaults is None:
+        defaults = {}
+    for item in defaults.items():
+        dd.setdefault(*item)
+    return dd
 
 
 def dict_filter(kwargs, filters, defaults=None, copy=False, short=False,
@@ -128,6 +147,123 @@ def dict_filter(kwargs, filters, defaults=None, copy=False, short=False,
         for att, val in defaults.items():
             kwout.setdefault(att, val)
     return kwout
+
+
+def dict_merge(*dd, **kwargs):
+    """Merge dictionaries
+
+    First dictionaries have priority over next
+
+    Parameters
+    ----------
+    dd:
+        Argument are interpreted as dictionary to merge.
+        Those who are not dictionaries are skipped.
+    mergesubdicts: optional
+        Also merge dictionary items
+        (like in a tree) [default: True].
+    mergetuples: optional
+        Also merge tuple items [default: False].
+    mergelists: optional
+        Also merge list items [default: False].
+    unique: optional
+        Uniquify lists and tuples [default: True].
+    skipnones: optional
+        Skip Nones [default: True].
+    skipempty: optional
+        Skip everything is not converted to False
+        using bool [default: False].
+    cls: optional
+        Class to use. Default to the first class found in arguments
+        that is not a :class:`dict`, else defaults to :class:`dict`.
+
+    Example
+    -------
+    >>> d1 = dict(a=3, b=5)
+    >>> d2 = dict(a=5, c=7)
+    >>> print dict_merge(d1,d2)
+    {'a': 3, 'c': 7, 'b': 5}
+
+    """
+    # Options
+    mergesubdicts = kwargs.get('mergesubdicts', True)
+    mergelists = kwargs.get('mergelists', False)
+    mergetuples = kwargs.get('mergetuples', False)
+    unique = kwargs.get('unique', True)
+    skipnones = kwargs.get('skipnones', True)
+    overwriteempty = kwargs.get('overwriteempty', False)
+    cls = kwargs.get('cls')
+    dd = [_f for _f in dd if _f]
+
+    # Get the class
+    if cls is None:
+        cls = dict
+        for d in dd:
+            if d.__class__ is not dict:
+                cls = d.__class__
+                break
+
+    # Init
+    from configobj import Section, ConfigObj
+    if cls is Section:
+        for d in dd:
+            if isinstance(d, Section):
+                break
+        else:
+            raise XoaError("Can't initialise Section for merging")
+        outd = Section(d.parent, d.depth, d.main, name=d.name)
+    else:
+        outd = cls()
+
+    # Loop
+    for d in dd:
+        if not isinstance(d, dict):
+            continue
+
+        # Content
+        for key, val in d.items():
+            if skipnones and val is None:
+                continue
+            # Not set so we set
+            if key not in outd or (overwriteempty and isempty(outd[key])):
+                outd[key] = val
+            # Merge subdict
+            elif (mergesubdicts and isinstance(outd[key], dict)
+                    and isinstance(val, dict)):
+                outd[key] = dict_merge(outd[key], val, **kwargs)
+            # Merge lists
+            elif (mergelists and isinstance(outd[key], list)
+                    and isinstance(val, list)):
+                outd[key] += val
+                if unique:
+                    outd[key] = list(set((outd[key])))
+            # Merge tuples
+            elif (mergetuples and isinstance(outd[key], tuple)
+                    and isinstance(val, tuple)):
+                outd[key] += val
+                if unique:
+                    outd[key] = tuple(set(outd[key]))
+
+    # Comments for ConfigObj instances
+    if cls is ConfigObj:
+        if not outd.initial_comment and hasattr(d, 'initial_comment'):
+            outd.initial_comment = d.initial_comment
+        if not outd.final_comment and hasattr(d, 'final_comment'):
+            outd.final_comment = d.final_comment
+        if hasattr(d, 'inline_comments') and d.inline_comments:
+            outd.inline_comments = dict_merge(outd.inline_comments,
+                                              d.inline_comments,
+                                              overwriteempty=True)
+
+    return outd
+
+
+def isempty(x):
+    """Check if empty"""
+    try:
+        return not bool(x)
+    except Exception:
+        return False
 
 
 def match_string(ss, checks, ignorecase=True, transform=None):
