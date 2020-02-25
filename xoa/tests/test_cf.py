@@ -52,13 +52,13 @@ def test_cf_sglocator_format_attr(attr, root, loc, expected):
 
 
 @pytest.mark.parametrize(
-    "cache", ['ignore', 'rw', 'rw', 'ignore', 'clean', 'rw'])
+    "cache", ['ignore', 'write', 'rw', 'read', 'ignore', 'clean', 'rw'])
 def test_cf_get_cfg_specs(cache):
     assert isinstance(cf.get_cf_specs(cache=cache), cf.CFSpecs)
 
 
 def test_cf_get_cfg_specs_var():
-    specs = cf.get_cf_specs('temp', 'variables')
+    specs = cf.get_cf_specs('temp', 'data_vars')
     assert specs['name'][0] == 'temp'
     assert specs['standard_name'][0] == 'sea_water_temperature'
     assert specs['cmap'] == 'cmo.thermal'
@@ -67,6 +67,63 @@ def test_cf_get_cfg_specs_var():
 
 
 def test_cf_get_cfg_specs_var_inherit():
-    specs = cf.get_cf_specs('sst', 'variables')
+    specs = cf.get_cf_specs('sst', 'data_vars')
     assert specs['standard_name'][0] == 'sea_surface_temperature'
     assert specs['units'][0] == 'degrees_celsius'
+
+
+def test_cf_get_cfg_specs_coord():
+    specs = cf.get_cf_specs('lon', 'coords')
+    assert specs['name'][0] == 'lon'
+    assert 'longitude' in specs['name']
+    new_specs = cf.get_cf_specs('lon')
+    assert new_specs is specs
+
+
+def test_cf_get_cfg_specs_coord_inherit():
+    specs = cf.get_cf_specs('depth', 'coords')
+    assert specs['name'][0] == 'depth'
+    assert specs['long_name'][0] == 'Depth'
+
+
+@pytest.mark.parametrize(
+    "cfg,key,name",
+    [({'data_vars': {'temp': {'name': 'mytemp'}}}, 'temp', 'mytemp'),
+     ("[data_vars]\n[[sal]]\nname=mysal", "sal", "mysal")
+     ])
+def test_cf_cfspecs_load_cfg(cfg, key, name):
+    cfspecs = cf.get_cf_specs()
+    cfspecs.load_cfg(cfg)
+    assert name in cfspecs['data_vars'][key]['name']
+
+
+def test_cf_cfspecs_copy():
+    cfspecs0 = cf.get_cf_specs()
+    cfspecs1 = cfspecs0.copy()
+    assert id(cfspecs0._dict) != id(cfspecs1._dict)
+    assert (sorted(list(cfspecs0._dict['data_vars'])) ==
+            sorted(list(cfspecs1._dict['data_vars'])))
+    assert cfspecs0._dict['coords'] == cfspecs1._dict['coords']
+    assert (cfspecs0._dict['data_vars']['temp'] ==
+            cfspecs1._dict['data_vars']['temp'])
+    assert 'temp' in cfspecs1['data_vars']
+    assert 'temperature' in cfspecs1['data_vars']['temp']['name']
+
+
+def test_cf_set_cf_specs():
+    cf._CACHE.clear()
+    cfspecs = cf.get_cf_specs()
+    cf.set_cf_specs(cfspecs)
+    assert 'specs' in cf._CACHE
+    assert cf._CACHE['specs'] is cfspecs
+    assert cf.get_cf_specs() is cfspecs
+
+
+def test_cf_set_cf_specs_context():
+    cfspecs0 = cf.get_cf_specs()
+    cfspecs1 = cf.CFSpecs({'data_vars': {'temp': {'name': 'tempouille'}}})
+    assert cf.get_cf_specs() is cfspecs0
+    with cf.set_cf_specs(cfspecs1) as cfspecs:
+        assert cfspecs is cfspecs1
+        assert cf.get_cf_specs() is cfspecs1
+    assert cf.get_cf_specs() is cfspecs0
