@@ -43,17 +43,13 @@ from glob import glob
 from numpy.distutils.core import setup
 from numpy.distutils.misc_util import Configuration
 
-# Get some specs from __init__.py
-re_var_match = re.compile(r"^(__(\w+)__) = .+").match
+# xoa
+import xoa
+
+# Get some specs from xoa
 specs = {}
-valid_keys = ["version", "author", "email", "description"]
-with open(os.path.join(os.path.dirname(__file__), "xoa/__init__.py")) as f:
-    for line in f:
-        line = line[:-1].strip()
-        m = re_var_match(line)
-        if m and m.group(2) in valid_keys:
-            exec(line)
-            specs[m.group(2)] = locals()[m.group(1)]
+for key in ["version", "author", "email", "description"]:
+    specs[key] = getattr(xoa, f'__{key}__')
 specs["author_email"] = specs.pop("email")
 specs["long_description"] = specs.pop("description")
 
