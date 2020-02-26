@@ -52,9 +52,7 @@ __version__ = "0.1.0"
 __release__ = "0"
 __date__ = "2020-02-04"
 __author__ = "Shom/Ifremer/Actimar"
-__email__ = (
-    "stephane.raynaud@actimarshom.fr, charria@ifremer.fr, wilkins@actimar.fr"
-)
+__email__ = "stephane.raynaud@shom.fr, charria@ifremer.fr, wilkins@actimar.fr"
 __copyright__ = "Copyright (c) 2020 Shom/Ifremer/Actimar"
 __description__ = __doc__
 
