@@ -35,46 +35,50 @@
 
 # Imports
 import os
-import shutil
 import re
+import shutil
+from glob import glob
+
+# Setup
+from numpy.distutils.core import setup
+from numpy.distutils.misc_util import Configuration
 
 # Get some specs from __init__.py
-re_var_match = re.compile(r'^(__(\w+)__) = .+').match
+re_var_match = re.compile(r"^(__(\w+)__) = .+").match
 specs = {}
-valid_keys = ['version', 'author', 'email', 'description']
-with open(os.path.join(os.path.dirname(__file__), 'xoa/__init__.py')) as f:
+valid_keys = ["version", "author", "email", "description"]
+with open(os.path.join(os.path.dirname(__file__), "xoa/__init__.py")) as f:
     for line in f:
         line = line[:-1].strip()
         m = re_var_match(line)
         if m and m.group(2) in valid_keys:
             exec(line)
             specs[m.group(2)] = locals()[m.group(1)]
-specs['author_email'] = specs.pop('email')
-specs['long_description'] = specs.pop('description')
+specs["author_email"] = specs.pop("email")
+specs["long_description"] = specs.pop("description")
 
 # Infos
-specs.update(name="xoa",
-             description="Xarray-based Ocean Analysis library",
-             license="CeCiLL",
-             url="https://github.com/VACUMM/xoa",
-             classifiers=["Intended Audience :: Science/Research",
-                          "License :: CeCiLL",
-                          "Programming Language :: Python :: 2",
-                          "Topic :: Scientific/Engineering :: GIS",
-                          "Topic :: Scientific/Engineering :: Physics",
-                          "Topic :: Scientific/Engineering :: Mathematics",
-                          "Topic :: Scientific/Engineering :: Atmospheric Science",
-                          "Topic :: Software Development :: Libraries :: Python Modules",
-                          "Operating System :: POSIX",
-                          "Operating System :: UNIX",
-                          "Operating System :: MacOS :: MacOS X",
-                          ]
-             )
+specs.update(
+    name="xoa",
+    description="Xarray-based Ocean Analysis library",
+    license="CeCiLL",
+    url="https://github.com/VACUMM/xoa",
+    classifiers=[
+        "Intended Audience :: Science/Research",
+        "License :: CeCiLL",
+        "Programming Language :: Python :: 2",
+        "Topic :: Scientific/Engineering :: GIS",
+        "Topic :: Scientific/Engineering :: Physics",
+        "Topic :: Scientific/Engineering :: Mathematics",
+        "Topic :: Scientific/Engineering :: Atmospheric Science",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Operating System :: POSIX",
+        "Operating System :: UNIX",
+        "Operating System :: MacOS :: MacOS X",
+    ],
+)
 
-# Setup
-from numpy.distutils.core import setup
-from numpy.distutils.misc_util import Configuration
-from glob import glob
+
 def configuration():
 
     # Initialize
@@ -90,25 +94,22 @@ def configuration():
 
     # Add bin scripts
     scripts = []
-    for pat in ['*.py']:
-        pat = os.path.join(os.path.dirname(__file__), 'bin', pat)
+    for pat in ["*.py"]:
+        pat = os.path.join(os.path.dirname(__file__), "bin", pat)
         scripts.extend(glob(pat))
     config.add_scripts(*scripts)
 
     # Add extensions
-    config.add_extension('xoa._interp', ['src/interp.f90'])
+    config.add_extension("xoa._interp", ["src/interp.f90"])
 
     return config
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     # Setup config file
-    if not os.path.exists('setup.cfg'):
-        shutil.copy('setup.cfg.simple', 'setup.cfg')
+    if not os.path.exists("setup.cfg"):
+        shutil.copy("setup.cfg.simple", "setup.cfg")
 
     # Lauch setup
     setup(configuration=configuration, **specs)
-
-
-

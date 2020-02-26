@@ -37,35 +37,27 @@
 import inspect
 import os
 import re
-import sys
 import shutil
+import sys
 import traceback
+from argparse import Action as AP_Action
+from argparse import ArgumentParser
+from argparse import HelpFormatter as ArgHelpFormatter
+from argparse import _HelpAction
 from collections import OrderedDict
-from argparse import (
-    ArgumentParser,
-    HelpFormatter as ArgHelpFormatter,
-    _HelpAction,
-    Action as AP_Action,
-)
 from warnings import warn
 
-from configobj import ConfigObj, flatten_errors
-from validate import (
-    Validator,
-    ValidateError,
-    VdtTypeError,
-    VdtValueTooSmallError,
-    VdtValueTooBigError,
-    VdtMissingValue
-)
 import validate
+from configobj import ConfigObj, flatten_errors
+from validate import (ValidateError, Validator, VdtMissingValue, VdtTypeError,
+                      VdtValueTooBigError, VdtValueTooSmallError)
+
+from .__init__ import XoaError, XoaWarning, xoa_warn
 
 try:
     import numpy
 except ImportError:
     numpy = None
-
-from .__init__ import XoaWarning, XoaError, xoa_warn
 
 
 class VdtWarning(XoaWarning):
@@ -156,26 +148,30 @@ def _valwraplist_(validator):
         nmin = kwargs.pop("nmin", None)
         if nmin is not None and len(value) < int(nmin):
             raise VdtSizeError(
-                "Incorrect size: {}, at least {} values expected"
-                .format(len(value), nmin)
+                "Incorrect size: {}, at least {} values expected".format(
+                    len(value), nmin
+                )
             )
         nmax = kwargs.pop("nmax", None)
         if nmax is not None and len(value) > int(nmax):
             raise VdtSizeError(
-                "Incorrect size: {}, at most {} values expected"
-                .format(len(value), nmax)
+                "Incorrect size: {}, at most {} values expected".format(
+                    len(value), nmax
+                )
             )
         odd = validate.is_boolean(kwargs.pop("odd", False))
         if odd and not len(value) % 2:
             raise VdtSizeError(
-                "Incorrect size: {}, odd number of values expected"
-                .format(len(value))
+                "Incorrect size: {}, odd number of values expected".format(
+                    len(value)
+                )
             )
         even = validate.is_boolean(kwargs.pop("even", False))
         if even and len(value) % 2:
             raise VdtSizeError(
-                "Incorrect size: {}, even number of values expected"
-                .format(len(value))
+                "Incorrect size: {}, even number of values expected".format(
+                    len(value)
+                )
             )
 
         shape = kwargs.pop("shape", None)
@@ -187,15 +183,17 @@ def _valwraplist_(validator):
                     shape, vshape = list(map(int, shape)), numpy.shape(value)
                     if vshape != shape:
                         raise VdtSizeError(
-                            "Incorrect shape: {}, {} shape expected"
-                            .format(vshape, shape)
+                            "Incorrect shape: {}, {} shape expected".format(
+                                vshape, shape
+                            )
                         )
                 except Exception:
                     raise ValidateError(
                         "Cannot test value shape, this may be caused by "
-                        "an irregular array-like shape. Error was:\n{}"
-                        .format(traceback.format_exc())
+                        "an irregular array-like shape. Error was:\n{}".format(
+                            traceback.format_exc()
                         )
+                    )
 
         # Preserve tuple type
         istuple = isinstance(value, tuple)
@@ -326,6 +324,7 @@ def validator_cmap(value, default=None):
     if str(value) == "None":
         return None
     from .color import CmapAdapter
+
     # if isinstance(value, str) and value.startswith("["):
     #     value = eval(value)
     if isinstance(value, list):
@@ -362,6 +361,7 @@ def validator_path(value, default="", expand=None):
 def validator_pydatetime(value, default=None, fmt="%Y-%m-%dT%H:%M:%S"):
     """Parse value as a :class:`datetime.datetime` object"""
     import datetime
+
     if str(value) == "None":
         return None
     if value == "":
@@ -386,6 +386,7 @@ def validator_pydatetime(value, default=None, fmt="%Y-%m-%dT%H:%M:%S"):
 def validator_cdtime(value, min=None, max=None, default=None):
     """Validator of a date (compatible with :func:`cdtime.s2c`)"""
     import cdtime
+
     value = str(value).strip()
     if not value[0].isdigit():
         return value.upper()
@@ -405,6 +406,7 @@ def validator_timestamp(value, default=None):
     if str(value) == "None":
         return
     import pandas as pd
+
     return pd.Timestamp(value)
 
 
@@ -415,6 +417,7 @@ def validator_timedelta(value, default=None):
     if not isinstance(value, list) or len(value) != 2:
         raise VdtDateTimeError("Need value and unit")
     import pandas as pd
+
     return pd.Timedelta(float(value[0]), value[1])
 
 
@@ -425,6 +428,7 @@ def validator_timedelta64(value, default=None):
     if not isinstance(value, list) or len(value) != 2:
         raise VdtDateTimeError("Need value and unit")
     import numpy as np
+
     return np.timedelta64(float(value[0]), value[1])
 
 
@@ -451,6 +455,7 @@ def validator_daterange(value, default=None):
         raise VdtDateTimeError("Need startdate, end date and step")
     closed = None if len(value) == 3 else eval(value[3])
     import pandas as pd
+
     return pd.time_range(value[0], value[1], value[2], closed)
 
 
@@ -461,7 +466,8 @@ def validator_daterange64(value, default=None):
     if not isinstance(value, list) or len(value) != 3:
         raise VdtDateTimeError("Need startdate, end date and step")
     import numpy as np
-    return np.arange(value[0], value[1], dtype='M8[{}]'.format(value[2]))
+
+    return np.arange(value[0], value[1], dtype="M8[{}]".format(value[2]))
 
 
 def validator_eval(value, default=None, unchanged_if_failed=True):
@@ -480,6 +486,7 @@ def validator_color(value, default="k", alpha=False, as256=None):
     if str(value) == "None":
         return None
     from matplotlib.colors import ColorConverter
+
     CC = ColorConverter()
     if alpha:
         cc = CC.to_rgba
@@ -780,11 +787,7 @@ class ConfigManager(object):
         Otherwise use sec as a configspec, sec[key]
         """
         return get_spec(
-            (
-                self._configspec[sec]
-                if isinstance(sec, str)
-                else sec
-            )[key],
+            (self._configspec[sec] if isinstance(sec, str) else sec)[key],
             validator=self._validator,
         )
 
@@ -958,9 +961,7 @@ class ConfigManager(object):
                     else:
                         section = ""
                     msg = "Config value error: {}{}: {}".format(
-                        section,
-                        key,
-                        getattr(error, "message", error),
+                        section, key, getattr(error, "message", error),
                     )
 
                     # Raise explicit error
@@ -983,12 +984,16 @@ class ConfigManager(object):
             If ``True``, validate configs if they have a valid config spec.
         """
         if not isinstance(cfg, ConfigObj):
-            cfg = ConfigObj(cfg, configspec=self._configspec,
-                            encoding=self._encoding)  # , interpolation=False)
+            cfg = ConfigObj(
+                cfg, configspec=self._configspec, encoding=self._encoding
+            )  # , interpolation=False)
         if not isinstance(cfgpatch, ConfigObj):
             cfgpatch = ConfigObj(
-                cfgpatch, configspec=self._configspec, interpolation=False,
-                encoding=self._encoding)
+                cfgpatch,
+                configspec=self._configspec,
+                interpolation=False,
+                encoding=self._encoding,
+            )
         else:
             cfgpatch.interpolation = False
 
@@ -1193,7 +1198,7 @@ class ConfigManager(object):
                     nested=nested,
                     boolean_false=self._boolean_false,
                 )
-#                group.add_argument('--'+_cfg2optname_(key, nested), help=_shelp_(defaults, key))
+            #                group.add_argument('--'+_cfg2optname_(key, nested), help=_shelp_(defaults, key))
             else:
                 pass
 
@@ -1457,7 +1462,7 @@ def cfgargparse(
     )
 
 
-def opt2rst(shelp, prog=None, secfmt=':{secname}:', descname='Description'):
+def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
     """Convert --help str to rst
 
     This is useful for autodocumenting executable python scripts
@@ -1478,39 +1483,44 @@ def opt2rst(shelp, prog=None, secfmt=':{secname}:', descname='Description'):
     """
     rhelp = []
     multiline = False
-    s_param = r'(?:\{[\w,]+\}|\w+)'
-    s_sopt = rf'(?:-\w+(?: {s_param})?)'  # short option (-t)
+    s_param = r"(?:\{[\w,]+\}|\w+)"
+    s_sopt = rf"(?:-\w+(?: {s_param})?)"  # short option (-t)
     # long option (--toto)
-    s_lopt = rf'(?:--[\w\-]+(?:[= ]+{s_param})?)'
-    s_optsep = r'(?:, +)'  # option separator
-    s_desc = r'(?:  (.+))'
-    s_tot = (rf'^  (?:  )?((?:{s_sopt}|{s_lopt})(?:{s_optsep}'
-             rf'(?:{s_sopt}|{s_lopt}))*){s_desc}?$')
+    s_lopt = rf"(?:--[\w\-]+(?:[= ]+{s_param})?)"
+    s_optsep = r"(?:, +)"  # option separator
+    s_desc = r"(?:  (.+))"
+    s_tot = (
+        rf"^  (?:  )?((?:{s_sopt}|{s_lopt})(?:{s_optsep}"
+        rf"(?:{s_sopt}|{s_lopt}))*){s_desc}?$"
+    )
     re_opt = re.compile(s_tot).match
-    re_sec = re.compile(r'^(?:  )?([\w\s]+):(?: (.+))?$').match
+    re_sec = re.compile(r"^(?:  )?([\w\s]+):(?: (.+))?$").match
     secname = None
     for line in shelp.splitlines():
 
         # Sections
         m = re_sec(line)
-        if m and not line.lower().endswith('ex:'):
+        if m and not line.lower().endswith("ex:"):
 
             secname = m.group(1).title().strip()
 
             # Usage
-            if secname == 'Usage' and m.group(2) is not None:
+            if secname == "Usage" and m.group(2) is not None:
                 usage = m.group(2).strip()
                 if prog is None:
                     prog = os.path.basename(usage.split()[0])
-                rhelp.append(f'.. program:: {prog}\n')
+                rhelp.append(f".. program:: {prog}\n")
                 rhelp.extend(
-                    [secfmt.format(locals()),
-                     "\n\t.. code-block:: bash\n\n\t\t" + usage])
+                    [
+                        secfmt.format(locals()),
+                        "\n\t.. code-block:: bash\n\n\t\t" + usage,
+                    ]
+                )
                 multiline = True
             else:
-                rhelp.extend([secfmt.format(locals()), ''])
+                rhelp.extend([secfmt.format(locals()), ""])
                 if m.group(2) is not None:
-                    rhelp.extend(['', '\t'+m.group(2)])
+                    rhelp.extend(["", "\t" + m.group(2)])
                     multiline = True
             continue
 
@@ -1518,47 +1528,50 @@ def opt2rst(shelp, prog=None, secfmt=':{secname}:', descname='Description'):
         m = re_opt(line)
         if m:
 
-            rhelp.extend(['', '\t.. cmdoption:: '+m.group(1), ''])
+            rhelp.extend(["", "\t.. cmdoption:: " + m.group(1), ""])
             multiline = True
             if m.group(2) is not None:
-                rhelp.append('\t\t'+m.group(2).strip())
+                rhelp.append("\t\t" + m.group(2).strip())
 
-        elif (secname and secname.lower() == 'positional arguments'
-              and line.startswith(' '*2)):
+        elif (
+            secname
+            and secname.lower() == "positional arguments"
+            and line.startswith(" " * 2)
+        ):
 
             sline = line.split()
-            rhelp.extend(['', '\t.. cmdoption:: '+sline[0], ''])
+            rhelp.extend(["", "\t.. cmdoption:: " + sline[0], ""])
             multiline = True
             if len(sline) > 1:
-                rhelp.append('\t\t'+' '.join(sline[1:]))
+                rhelp.append("\t\t" + " ".join(sline[1:]))
 
-        elif multiline and len(line.strip()) and line.startswith(' '*3):
+        elif multiline and len(line.strip()) and line.startswith(" " * 3):
 
-            indent = '\t\t'
-            if secname == 'Usage':
-                indent += '\t'
-            rhelp.append(indent+line.strip())
+            indent = "\t\t"
+            if secname == "Usage":
+                indent += "\t"
+            rhelp.append(indent + line.strip())
         # elif secname==descname:
         #    rhelp.append('\t'+line)
 
         else:
 
-            indent = ''
+            indent = ""
             if secname and secname == descname:
-                indent += '\t'
-            rhelp.append(indent+line)
+                indent += "\t"
+            rhelp.append(indent + line)
             multiline = False
-            if secname == 'Usage':
+            if secname == "Usage":
                 secname = descname
-                rhelp.extend([secfmt.format(locals()), ''])
+                rhelp.extend([secfmt.format(locals()), ""])
 
-    return '\n'.join(rhelp)
+    return "\n".join(rhelp)
 
 
 def _opt2cfgname_(name, nested):
     cfgkey = name.replace("-", "_")
     if nested and cfgkey.startswith(nested + "_"):
-        cfgkey = cfgkey[len(nested + "_"):]
+        cfgkey = cfgkey[len(nested + "_") :]
     return cfgkey
 
 
@@ -1896,7 +1909,7 @@ def get_sec_names(cfg):
     return secnames[::-1]
 
 
-def get_cfg_path(cfg, entry=None, sep='.'):
+def get_cfg_path(cfg, entry=None, sep="."):
     """Get a string representing the path of a ConfigObj through sections
 
     Parameters

@@ -56,7 +56,7 @@ def is_iterable(obj, nostr=True, nogen=True):
 
     if not nogen and isinstance(obj, types.GeneratorType):
         return True
-    if not (hasattr(obj, '__len__') and callable(obj.__len__)):
+    if not (hasattr(obj, "__len__") and callable(obj.__len__)):
         return False
     if nostr:
         return not isinstance(obj, str)
@@ -80,8 +80,15 @@ def dict_check_defaults(dd, **defaults):
     return dd
 
 
-def dict_filter(kwargs, filters, defaults=None, copy=False, short=False,
-                keep=False, **kwadd):
+def dict_filter(
+    kwargs,
+    filters,
+    defaults=None,
+    copy=False,
+    short=False,
+    keep=False,
+    **kwadd,
+):
     """Filter out kwargs (typically extra calling keywords)
 
     Parameters
@@ -125,19 +132,19 @@ def dict_filter(kwargs, filters, defaults=None, copy=False, short=False,
     # Set initial items
     kwout = {}
     for filter_ in filters:
-        if not filter_.endswith('_') and filter_ in kwargs:
+        if not filter_.endswith("_") and filter_ in kwargs:
             if isinstance(kwargs[filter_], dict):
                 kwout.update(kwread(filter_))
             else:
                 kwout[filter_] = kwread(filter_)
-        if not short and not filter_.endswith('_'):
-            filter_ += '_'
+        if not short and not filter_.endswith("_"):
+            filter_ += "_"
         for att, val in kwargs.items():
             if att.startswith(filter_) and att != filter_:
                 if keep:
                     kwout[att] = kwread(att)
                 else:
-                    kwout[att[len(filter_):]] = kwread(att)
+                    kwout[att[len(filter_) :]] = kwread(att)
 
     # Add some items
     kwout.update(kwadd)
@@ -186,13 +193,13 @@ def dict_merge(*dd, **kwargs):
 
     """
     # Options
-    mergesubdicts = kwargs.get('mergesubdicts', True)
-    mergelists = kwargs.get('mergelists', False)
-    mergetuples = kwargs.get('mergetuples', False)
-    unique = kwargs.get('unique', True)
-    skipnones = kwargs.get('skipnones', True)
-    overwriteempty = kwargs.get('overwriteempty', False)
-    cls = kwargs.get('cls')
+    mergesubdicts = kwargs.get("mergesubdicts", True)
+    mergelists = kwargs.get("mergelists", False)
+    mergetuples = kwargs.get("mergetuples", False)
+    unique = kwargs.get("unique", True)
+    skipnones = kwargs.get("skipnones", True)
+    overwriteempty = kwargs.get("overwriteempty", False)
+    cls = kwargs.get("cls")
     dd = [_f for _f in dd if _f]
 
     # Get the class
@@ -205,6 +212,7 @@ def dict_merge(*dd, **kwargs):
 
     # Init
     from configobj import Section, ConfigObj
+
     if cls is Section:
         for d in dd:
             if isinstance(d, Section):
@@ -228,32 +236,41 @@ def dict_merge(*dd, **kwargs):
             if key not in outd or (overwriteempty and isempty(outd[key])):
                 outd[key] = val
             # Merge subdict
-            elif (mergesubdicts and isinstance(outd[key], dict)
-                    and isinstance(val, dict)):
+            elif (
+                mergesubdicts
+                and isinstance(outd[key], dict)
+                and isinstance(val, dict)
+            ):
                 outd[key] = dict_merge(outd[key], val, **kwargs)
             # Merge lists
-            elif (mergelists and isinstance(outd[key], list)
-                    and isinstance(val, list)):
+            elif (
+                mergelists
+                and isinstance(outd[key], list)
+                and isinstance(val, list)
+            ):
                 outd[key] += val
                 if unique:
                     outd[key] = list(set((outd[key])))
             # Merge tuples
-            elif (mergetuples and isinstance(outd[key], tuple)
-                    and isinstance(val, tuple)):
+            elif (
+                mergetuples
+                and isinstance(outd[key], tuple)
+                and isinstance(val, tuple)
+            ):
                 outd[key] += val
                 if unique:
                     outd[key] = tuple(set(outd[key]))
 
     # Comments for ConfigObj instances
     if cls is ConfigObj:
-        if not outd.initial_comment and hasattr(d, 'initial_comment'):
+        if not outd.initial_comment and hasattr(d, "initial_comment"):
             outd.initial_comment = d.initial_comment
-        if not outd.final_comment and hasattr(d, 'final_comment'):
+        if not outd.final_comment and hasattr(d, "final_comment"):
             outd.final_comment = d.final_comment
-        if hasattr(d, 'inline_comments') and d.inline_comments:
-            outd.inline_comments = dict_merge(outd.inline_comments,
-                                              d.inline_comments,
-                                              overwriteempty=True)
+        if hasattr(d, "inline_comments") and d.inline_comments:
+            outd.inline_comments = dict_merge(
+                outd.inline_comments, d.inline_comments, overwriteempty=True
+            )
 
     return outd
 
@@ -317,7 +334,7 @@ def match_string(ss, checks, ignorecase=True, transform=None):
     return ss in sss
 
 
-def match_attrs(obj, checks, name=True, ignorecase=True, transform=None):
+def match_attrs(obj, checks, ignorecase=True, transform=None):
     """Check that at least one of the attributes matches check list
 
     Parameters
@@ -330,9 +347,12 @@ def match_attrs(obj, checks, name=True, ignorecase=True, transform=None):
     if obj is None or checks is None:
         return False
     for attname, attchecks in checks.items():
-        if (hasattr(obj, attname) and
-            match_string(getattr(obj, attname), attchecks,
-                         ignorecase=ignorecase, transform=transform)):
+        if hasattr(obj, attname) and match_string(
+            getattr(obj, attname),
+            attchecks,
+            ignorecase=ignorecase,
+            transform=transform,
+        ):
             return True
     return False
 
@@ -400,13 +420,12 @@ class ArgTuple(object):
         self.argsi = argsi
 
     def get(self):
-        return (self.argsi, ) if self.single else self.argsi
+        return (self.argsi,) if self.single else self.argsi
 
     def put(self, argso):
         so = not isinstance(argso, tuple)
         if (so and self.single) or (not so and not self.single):
             return argso
         if so and not self.single:
-            return (argso, )
+            return (argso,)
         return argso[0]
-

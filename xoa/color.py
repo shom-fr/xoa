@@ -37,8 +37,8 @@ Colors and colormaps utilities
 
 import warnings
 
-import matplotlib.pyplot as plt
 import cmocean
+import matplotlib.pyplot as plt
 
 
 def crop_cmap(cmapin, vmin, vmax, pivot=0):

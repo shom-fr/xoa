@@ -12,22 +12,22 @@ from xoa import misc
 
 @pytest.mark.parametrize(
     "obj,expected",
-    [([], True),
-     ((), True),
-     ('', False),
-     ({}, True),
-     ({'d': 1}, True)])
+    [([], True), ((), True), ("", False), ({}, True), ({"d": 1}, True)],
+)
 def test_misc_is_iterable(obj, expected):
     assert misc.is_iterable(obj) is expected
 
 
 @pytest.mark.parametrize(
     "ss,checks,expected",
-    [("sst", "sst", True),
-     ("sst", ["xxx", "sst"], True),
-     ("sst", ["xxx", "yyy"], False),
-     ("sst", [re.compile(r'ss.$').match], True),
-     ("xst", [re.compile(r'ss.$').match], False),
-     ("sst", "sss", False)])
+    [
+        ("sst", "sst", True),
+        ("sst", ["xxx", "sst"], True),
+        ("sst", ["xxx", "yyy"], False),
+        ("sst", [re.compile(r"ss.$").match], True),
+        ("xst", [re.compile(r"ss.$").match], False),
+        ("sst", "sss", False),
+    ],
+)
 def test_misc_match_string(ss, checks, expected):
     assert misc.match_string(ss, checks) is expected
