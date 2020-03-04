@@ -560,14 +560,14 @@ class CFSpecs(object):
         if format_coords:
             coords = coords or {}
             for cname, cda in list(da.coords.items()):
-                del da.coords[cname]
                 cda = self.format_coord(
                     cda,
                     name=coords.get(cname),
                     loc=loc,
                     standardize=standardize,
                 )
-                da.coords[cda.name] = cda
+                da.coords[cname] = cda
+                da = da.rename({cname: cda.name})
 
         return da
 

@@ -306,8 +306,9 @@ def test_cf_cfspecs_format_coord(cf_name, in_name, in_attrs):
 )
 def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
 
-    lon = xr.DataArray(range(5), dims='lon', name='lon')
-    temp = xr.DataArray(range(20, 25), dims='lon', coords={'lon': lon},
+    lon = xr.DataArray(range(5), dims='xxx', name='xxx',
+                       attrs={'standard_name': 'longitude'})
+    temp = xr.DataArray(range(20, 25), dims='xxx', coords={'xxx': lon},
                         name=in_name, attrs=in_attrs)
     temp = cf.get_cf_specs().format_data_var(temp, cf_name)
     assert temp.name == "temp"
