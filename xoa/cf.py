@@ -395,9 +395,11 @@ class CFSpecs(object):
     def sglocator(self):
         return self._sgl
 
-    def __getitem__(self, category):
-        assert category in self.categories
-        return self._cfs[category]
+    def __getitem__(self, section):
+        assert section in self._dict
+        if section in self.categories:
+            return self._cfs[section]
+        return self._dict[section]
 
     def __contains__(self, category):
         return category in self.categories
@@ -612,10 +614,9 @@ class _CFCatSpecs_(object):
         "units",
     ]
 
-    def __init__(self, category, parent):
-        assert category in parent
+    def __init__(self, parent):
+        assert self.category in parent
         self.parent = parent
-        self.category = category
 
     @property
     def sglocator(self):
@@ -767,11 +768,14 @@ class _CFCatSpecs_(object):
             match_specs = [None]
 
         # Loops
-        assert get in ("name", "obj"), "'get' must be either 'name' or 'obj'"
+        assert get in ("name", "obj", "both"), (
+            "'get' must be either 'name' or 'obj' or 'both'")
         for match_arg in match_specs:
             for obj in objs.values():
                 m = self.match(obj, match_arg, loc=loc)
                 if m:
+                    if get == "both":
+                        return obj, name
                     return obj if get == "obj" else (name if name else m)
 
     def get_attrs(
@@ -854,18 +858,10 @@ class CFVarSpecs(_CFCatSpecs_):
 
     category = "data_vars"
 
-    def __init__(self, parent):
-
-        _CFCatSpecs_.__init__(self, self.category, parent)
-
 
 class CFCoordSpecs(_CFCatSpecs_):
 
     category = "coords"
-
-    def __init__(self, parent):
-
-        _CFCatSpecs_.__init__(self, self.category, parent)
 
 
 def _get_cfgm_():
@@ -996,3 +992,40 @@ def get_cf_coord_specs(name=None):
 def get_cf_var_specs(name=None):
     """Shortcut to ``get_cf_specs(name=name, category='data_vars')``"""
     return get_cf_specs(name=name, category="data_vars")
+
+
+class _CFAccessor_(object):
+    _category = None
+
+    def __init__(self, dsa):
+        self._cfspecs = get_cf_specs()
+        self._dsa = dsa
+
+    def get(self, name, loc="any"):
+        return self._cfspecs[self._category].search(
+            self._dsa, name=name, loc=loc, get="obj")
+
+    def __getattr__(self, attr):
+        if attr in self._cfspecs['accessors']['properties'][self._category]:
+            return self.get(attr)
+        return object.__getattribute__(self, attr)
+
+    def __getitem__(self, name):
+        return self.get(name)
+
+
+class DataArrayCFAccessor(_CFAccessor_):
+    _category = 'coords'
+
+
+class DatasetCFAccessor(_CFAccessor_):
+    _category = 'data_vars'
+
+
+def register_accessors(name='cf'):
+    """Register xarray accessors"""
+    # cfspecs = cfspecs or get_cf_specs()
+    # name = cfspecs['accessors']['name']
+    import xarray as xr
+    xr.register_dataarray_accessor(name)(DataArrayCFAccessor)
+    xr.register_dataset_accessor(name)(DatasetCFAccessor)

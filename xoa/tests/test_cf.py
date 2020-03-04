@@ -316,3 +316,29 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
     assert temp.units == "degrees_celsius"
 
     assert temp.lon.standard_name == "longitude"
+
+
+def test_cf_dataarraycfaccessor():
+    xr.register_dataarray_accessor('cf')(cf.DataArrayCFAccessor)
+
+    lon = xr.DataArray(range(5), dims='xxx', name='xxx',
+                       attrs={'standard_name': 'longitude'})
+    temp = xr.DataArray(range(20, 25), dims='xxx',
+                        coords={'xxx': lon}, name='temp')
+
+    assert temp.cf.lon.name == 'xxx'
+    assert temp.cf.lat is None
+
+
+def test_cf_datasetcfaccessor():
+    xr.register_dataset_accessor('cf')(cf.DatasetCFAccessor)
+
+    lon = xr.DataArray(range(5), dims='xxx', name='xxx',
+                       attrs={'standard_name': 'longitude'})
+    temp = xr.DataArray(range(20, 25), dims='xxx',
+                        coords={'xxx': lon}, name='yoyo',
+                        attrs={'standard_name': 'sea_water_temperature'})
+
+    ds = temp.to_dataset()
+    assert ds.cf.temp.name == 'yoyo'
+    assert ds.cf.sal is None
