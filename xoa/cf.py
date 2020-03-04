@@ -195,7 +195,7 @@ class SGLocator(object):
         value: str
             Current attribute value. It is parsed to get current ``root``.
         loc: {False, ""}, letter, None
-            If None, location is not changed;
+            If None, location is left unchanged;
             if a letter, it is set;
             else, it is removed.
         standardize: bool
@@ -215,7 +215,7 @@ class SGLocator(object):
         """
         if attr not in self.valid_attrs:
             return value
-        root, aloc = self.parse_attr(attr, value)
+        root, ploc = self.parse_attr(attr, value)
         if standardize:
             if attr == "long_name":
                 root = root.capitalize().replace("_", " ")
@@ -232,9 +232,13 @@ class SGLocator(object):
                 f"Invalid location: {loc}. "
                 f"Please one use of: {self.valid_locations}."
             )
-        elif loc is not None or aloc is None:
+        elif loc is False or loc == '':
+            ploc = None
+        elif loc is True or loc is None:
+            loc = ploc
+        loc = loc or ploc
+        if not loc:
             return root
-        loc = loc or aloc
         if standardize:
             if attr == "long_name":
                 loc = loc.upper()
@@ -531,8 +535,10 @@ class CFSpecs(object):
 
         yield category, name, specs
 
-    def format_coord(self, da, **kwargs):
-        return self.coords.format_dataarray(da, **kwargs)
+    def format_coord(self, da, name=None, loc=None, standardize=True):
+        """Format a coordinate variable"""
+        return self.coords.format_dataarray(
+            da, name=name, loc=loc, standardize=standardize)
 
     def format_data_var(
         self,
@@ -553,13 +559,13 @@ class CFSpecs(object):
             coords = coords or {}
             for cname, cda in list(da.coords.items()):
                 del da.coords[cname]
-                cda = self.format_dataarray(
+                cda = self.format_coord(
                     cda,
                     name=coords.get(cname),
                     loc=loc,
                     standardize=standardize,
                 )
-                da.coords[da.name] = cda
+                da.coords[cda.name] = cda
 
         return da
 
@@ -571,6 +577,18 @@ class CFSpecs(object):
             da = self.format_data_var(da, loc=loc, standardize=True)
             ds[da.name] = da
         return ds
+
+    def match_coord(self, da, name=None, loc="any"):
+        return self.coords.match(da, name=name, loc=loc)
+
+    def match_data_var(self, da, name=None, loc="any"):
+        return self.data_vars.match(da, name=name, loc=loc)
+
+    def search_coord(self, dsa, name=None, loc="any", get="obj"):
+        return self.coords.search(dsa, name=name, loc=loc, get=get)
+
+    def search_data_var(self, dsa, name=None, loc="any", get="obj"):
+        return self.data_vars.search(dsa, name=name, loc=loc, get=get)
 
 
 class _CFCatSpecs_(object):
@@ -671,6 +689,91 @@ class _CFCatSpecs_(object):
             cfg = {self.category: cfg}
         self.parent.register_from_cfg(cfg)
 
+    def _get_ordered_match_specs_(self, name):
+        specs = self[name]
+        match_specs = {}
+        for sm in specs["search_order"]:
+            for attr in (
+                "name",
+                "standard_name",
+                "long_name",
+                "axis",
+                "units",
+            ):
+                if attr in specs and specs[attr] and attr[0] == sm:
+                    match_specs[attr] = specs[attr]
+        return match_specs
+
+    def match(self, da, name=None, loc="any"):
+        """Check if da attributes match given or any specs
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        name: str, dict
+        loc: str, False
+        """
+        names = self.names if name is None else [name]
+        for name_ in names:
+
+            # Get match specs
+            if isinstance(name_, dict):
+                match_specs = name_
+            else:
+                match_specs = self._get_ordered_match_specs_(name_)
+
+            # Loop on match specs
+            for attr, refs in match_specs.items():
+                value = getattr(da, attr, None)
+                if value is None:
+                    continue
+                for ref in refs:
+                    if (
+                        attr in self.sglocator.valid_attrs
+                        and self.sglocator.match_attr(
+                            attr, value, ref, loc=loc
+                        )
+                    ) or match_string(value, ref, ignorecase=True):
+                        return True if name else name_
+        return False if name else None
+
+    def search(self, dsa, name=None, loc="any", get="obj"):
+        """Search for a data_var or coord that maches given or any specs
+
+        Parameters
+        ----------
+        dsa: DataArray or Dataset
+        name: str, dict
+        loc: "any", str
+        get: {"obj", "name"}
+            When found, get the object found or its name.
+
+        Returns
+        -------
+        None or str or object
+        """
+        # Get target objects
+        if self.category:
+            objs = getattr(dsa, self.category)
+        else:
+            objs = dsa.keys() if hasattr(dsa, "keys") else dsa.coords
+
+        # Get match specs
+        if name:  # Explicit name so we loop on search specs
+            match_specs = []
+            for attr, refs in self._get_ordered_match_specs_(name).items():
+                match_specs.append({attr: refs})
+        else:
+            match_specs = [None]
+
+        # Loops
+        assert get in ("name", "obj"), "'get' must be either 'name' or 'obj'"
+        for match_arg in match_specs:
+            for obj in objs.values():
+                m = self.match(obj, match_arg, loc=loc)
+                if m:
+                    return obj if get == "obj" else (name if name else m)
+
     def get_attrs(
         self, name, select=None, exclude=None, errors="warn", loc=None, **extra
     ):
@@ -732,82 +835,12 @@ class _CFCatSpecs_(object):
 
         return attrs
 
-    def search(self, dsa, name=None, loc="any", get="obj"):
-        """Search for a data_var or coord that maches given or any specs"""
-        # Get target objects
-        if self.category:
-            objs = getattr(dsa, self.category)
-        else:
-            objs = dsa.keys() if hasattr(dsa, "keys") else dsa.coords
-
-        # Get match specs
-        if name:  # Explicit name so we loop on search specs
-            match_specs = []
-            for attr, refs in self._get_ordered_match_specs_(name).items():
-                match_specs.append({attr: refs})
-        else:
-            match_specs = [None]
-
-        # Loops
-        for match_arg in match_specs:
-            for obj in objs:
-                m = self.match(obj, match_arg, loc=loc)
-                if m:
-                    return obj if get == "obj" else (name if name else m)
-
-    def _get_ordered_match_specs_(self, name):
-        specs = self[name]
-        match_specs = {}
-        for sm in specs["search_order"]:
-            for attr in (
-                "name",
-                "standard_name",
-                "long_name",
-                "axis",
-                "units",
-            ):
-                if specs[attr] and attr[0] == sm:
-                    match_specs[attr] = specs[attr]
-        return match_specs
-
-    def match(self, da, name=None, loc="any"):
-        """Check if da attributes match given or any specs
-
-        Parameters
-        ----------
-        da: xarray.DataArray
-        name: str, dict
-        loc: str, False
-        """
-        names = self.names if name is None else [name]
-        for name_ in names:
-
-            # Get match specs
-            if isinstance(name, dict):
-                match_specs = name
-            else:
-                match_specs = self._get_ordered_match_specs_(name_)
-
-            # Loop on match specs
-            for attr, refs in match_specs.items():
-                value = getattr(da, attr, None)
-                if value is None:
-                    continue
-                for ref in refs:
-                    if (
-                        attr in self.sglocator.valid_attrs
-                        and self.sglocator.match_attr(
-                            attr, value, ref, loc=loc
-                        )
-                    ) or match_string(value, ref, ignorecase=True):
-                        return True if name else name_
-        return False if name else None
-
     def format_dataarray(self, da, name=None, loc=None, standardize=True):
         if name is None:
             name = self.match(da, loc="any")
         if name is None:
             return da.copy()
+        assert name in self.names
         return self.sglocator.format_dataarray(
             da,
             loc=loc,

@@ -8,6 +8,7 @@ Test the :mod:`xoa.cf` module
 import pytest
 
 from xoa import cf
+import xarray as xr
 
 
 @pytest.mark.parametrize(
@@ -74,7 +75,7 @@ def test_cf_sglocator_format_attrs_no_loc():
         "str_attr": "good",
     }
 
-    fmt_attrs = cf.SGLocator().format_attrs(attrs)
+    fmt_attrs = cf.SGLocator().format_attrs(attrs, loc='')
     assert fmt_attrs["name"] == "u"
     assert fmt_attrs["standard_name"] == "banana"
     assert fmt_attrs["long_name"] == "Banana"
@@ -100,7 +101,6 @@ def test_cf_sglocator_format_attrs_with_loc():
 
 
 def test_cf_sglocator_format_dataarray():
-    import xarray as xr
 
     lon = xr.DataArray(range(5), dims="lon")
     banana = xr.DataArray(
@@ -110,9 +110,7 @@ def test_cf_sglocator_format_dataarray():
         name="banana",
         attrs={"standard_name": "banana", "taste": "good"},
     )
-    print(banana)
     banana_fmt = cf.SGLocator().format_dataarray(banana, "p")
-    print(banana_fmt)
     assert banana_fmt.name == "banana_p"
     assert banana_fmt.standard_name == "banana_at_p_location"
     assert banana_fmt.taste == "good"
@@ -202,21 +200,119 @@ def test_cf_set_cf_specs_context():
     assert cf.get_cf_specs() is cfspecs0
 
 
-@pytest.mark.parametrize("ename", [None, "lon"])
+@pytest.mark.parametrize("cf_name", [None, "lon"])
 @pytest.mark.parametrize(
-    "name,attrs",
+    "in_name,in_attrs",
+    [
+        ("lon", None),
+        ("xxx", {"standard_name": "longitude"}),
+        ("xxx", {"standard_name": "longitude_at_t_location"}),
+        ("xxx", {"units": "degree_east"}),
+    ],
+)
+def test_cf_cfspecs_match_coord(cf_name, in_name, in_attrs):
+
+    lon = xr.DataArray(range(5), dims=in_name, name=in_name, attrs=in_attrs)
+    res = cf.get_cf_specs().match_coord(lon, cf_name)
+    if cf_name is None:
+        assert res == 'lon'
+    else:
+        assert res is True
+
+
+@pytest.mark.parametrize("cf_name", ["lon", None])
+@pytest.mark.parametrize(
+    "in_name,in_attrs",
+    [
+        ("lon", None),
+        ("xxx", {"standard_name": "longitude"}),
+        ("xxx", {"standard_name": "longitude_at_t_location"}),
+        ("xxx", {"units": "degree_east"}),
+    ],
+)
+def test_cf_cfspecs_search_coord(cf_name, in_name, in_attrs):
+
+    lon = xr.DataArray(range(5), dims=in_name, name=in_name, attrs=in_attrs)
+    temp = xr.DataArray(range(20, 25), dims=in_name,
+                        coords={in_name: lon}, name='temp')
+    res = cf.get_cf_specs().search_coord(temp, cf_name, get="name")
+    assert res == 'lon'
+
+
+@pytest.mark.parametrize("cf_name", ["temp", None])
+@pytest.mark.parametrize(
+    "in_name,in_attrs",
+    [
+        ("temp", None),
+        ("xxx", {"standard_name": "sea_water_temperature"}),
+    ],
+)
+def test_cf_cfspecs_match_data_var(cf_name, in_name, in_attrs):
+
+    lon = xr.DataArray(range(5), dims='lon', name='lon')
+    temp = xr.DataArray(range(20, 25), dims='lon', coords={'lon': lon},
+                        name=in_name, attrs=in_attrs)
+    res = cf.get_cf_specs().match_data_var(temp, cf_name)
+    if cf_name is None:
+        assert res == 'temp'
+    else:
+        assert res is True
+
+
+@pytest.mark.parametrize("cf_name", ["temp", None])
+@pytest.mark.parametrize(
+    "in_name,in_attrs",
+    [
+        ("temp", None),
+        ("xxx", {"standard_name": "sea_water_temperature"}),
+    ],
+)
+def test_cf_cfspecs_search_data_var(cf_name, in_name, in_attrs):
+
+    lon = xr.DataArray(range(5), dims='lon', name='lon')
+    temp = xr.DataArray(range(20, 25), dims='lon', coords={'lon': lon},
+                        name=in_name, attrs=in_attrs)
+    ds = temp.to_dataset()
+    assert cf.get_cf_specs().search_data_var(
+        ds, cf_name, get="name") == 'temp'
+
+
+@pytest.mark.parametrize("cf_name", [None, "lon"])
+@pytest.mark.parametrize(
+    "in_name,in_attrs",
     [
         ("lon", None),
         ("xxx", {"standard_name": "longitude"}),
         ("xxx", {"units": "degree_east"}),
     ],
 )
-def test_cf_cfspecs_format_coord(ename, name, attrs):
-    import xarray as xr
+def test_cf_cfspecs_format_coord(cf_name, in_name, in_attrs):
 
-    lon = xr.DataArray(range(5), dims=name, name=name, attrs=attrs)
-    lon = cf.get_cf_specs().format_coord(lon, ename)
+    lon = xr.DataArray(range(5), dims=in_name, name=in_name, attrs=in_attrs)
+    lon = cf.get_cf_specs().format_coord(lon, cf_name)
     assert lon.name == "lon"
     assert lon.standard_name == "longitude"
     assert lon.long_name == "Longitude"
     assert lon.units == "degrees_east"
+
+
+@pytest.mark.parametrize("cf_name", [None, "temp"])
+@pytest.mark.parametrize(
+    "in_name,in_attrs",
+    [
+        ("temp", None),
+        ("xxx", {"standard_name": "sea_water_temperature"}),
+    ],
+)
+def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
+
+    lon = xr.DataArray(range(5), dims='lon', name='lon')
+    temp = xr.DataArray(range(20, 25), dims='lon', coords={'lon': lon},
+                        name=in_name, attrs=in_attrs)
+    temp = cf.get_cf_specs().format_data_var(temp, cf_name)
+    assert temp.name == "temp"
+    assert temp.standard_name == "sea_water_temperature"
+    assert temp.long_name == "Temperature"
+    assert temp.units == "degrees_celsius"
+
+    assert temp.lon.standard_name == "longitude"
