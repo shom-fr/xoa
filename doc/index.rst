@@ -5,12 +5,12 @@ Documentation
 -------------
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    install
    configure
    usages
-   lib/index
+   api
    changes
 
 

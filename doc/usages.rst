@@ -1,3 +1,6 @@
 Usages
 ======
 
+.. toctree::
+
+    usages.cf
