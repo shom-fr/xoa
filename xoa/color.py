@@ -71,19 +71,33 @@ class CmapAdapter(object):
         The colormap to adapt
     specs: str, None
         Transformation specifications or None.
-        When a string, it must have the format "<type><value>", where
-        type is "piv" or "cyc", and value is convertible to a float.
-        If "piv", that colormap expects typically diverging, and cropped
+
+        When a string, it must have the format ``"<type><value>"``, where
+        type is ``"piv"`` or ``"cyc"``, and value is convertible to a float.
+
+        If type is ``"piv"``, that colormap is expected typically
+        to be **diverging**, and is cropped
         using :func:`crop_cmap`, after min and max value are set with
         :meth:`set_vlim`.
-        If "cyc", min is set to 0 and max to "value", and the colormap is
-        expected to be circular, like "cmo.phase".
+
+        If type is ``"cyc"``, min is set to 0 and max to ``value``,
+        and the colormap is
+        expected to be **circular**, like ``"cmo.phase"``.
 
     Example
     -------
-    >>> cma = CmapAdapter('cmo.balance', 'piv0')
-    >>> cma.set_vlim(data.min(), data.max())
-    >>> plt.pcolormesh(xx, yy, data, **cma.get_dict())
+    .. ipython:: python
+
+        @suppress
+        from xoa.color import CmapAdapter
+        @suppress
+        import matplotlib.pyplot as plt, numpy as np
+        cma = CmapAdapter('cmo.balance', 'piv0')
+        data = np.arange(100).reshape(10, 10) - 20
+        cma.set_vlim(data.min(), data.max())
+        plt.contourf(data, **cma.get_dict());
+        @savefig api.color.cmapadapter.png
+        plt.colorbar();
     """
 
     def __init__(self, cmap, specs=None):

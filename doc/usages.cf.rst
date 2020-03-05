@@ -13,7 +13,7 @@ It has two intents:
 
 Accessing the current specifications
 ====================================
-Scanning and formatting actions are based on specifications, and module natively include a configuration for various oceanographic, sea surface and atmospheric variables and coordinates. A distinction is made between data variables ``data_vars`` and coordinates ``coords``, like in :mod:`xarray`.
+Scanning and formatting actions are based on specifications, and this module natively includes a default configuration for various oceanographic, sea surface and atmospheric variables and coordinates. A distinction is made between data variables ``data_vars`` and coordinates ``coords``, like in :mod:`xarray`.
 
 Getting the current specifications for data variables and coordinates:
 

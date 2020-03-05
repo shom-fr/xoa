@@ -12,6 +12,7 @@ Documentation
    usages
    api
    changes
+   appendix
 
 
 Indices and tables

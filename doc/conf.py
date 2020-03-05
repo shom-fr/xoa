@@ -73,5 +73,7 @@ autosummary_generate = True
 
 # %% Intersphinx
 intersphinx_mapping = {
-    'xarray': ('http://xarray.pydata.org/en/stable/', None)
+    'xarray': ('http://xarray.pydata.org/en/stable/', None),
+    'cmocean': ('https://matplotlib.org/cmocean/', None),
+    'configobj': ('https://configobj.readthedocs.io/en/latest/', None)
     }
