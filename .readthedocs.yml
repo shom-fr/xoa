@@ -11,10 +11,15 @@ formats: all
 # Optionally set the version of Python and requirements required to build your docs
 python:
   version: 3.7
+  system_packages: true
   install:
     - method: pip
       path: .
-    
+
+# Build
+build:
+  image: latest
+
 # Conda
 conda:
     environment: env/environment.doc.yml
