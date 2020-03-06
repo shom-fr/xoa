@@ -60,6 +60,9 @@ _RE_OPTION_MATCH = re.compile(r"^(\w+)\W(\w+)$").match
 
 #: Specifications of configuration options
 CONFIG_INI = """
+[accessors]
+cf=boolean(default=True) # automatically load the CF acessors?
+
 [plot]
 cmapdiv = string(default="cmo.balance") # defaut diveging colormap
 cmappos = string(default="cmo.amp")     # default positive colormap
@@ -161,12 +164,24 @@ def get_option(section, option=None):
 class set_options(object):
     """Set configuration options
 
+    Parameters
+    ----------
+    section: str, None
+    **options: dict
+        If a key is in the format "<section>.<option>", then the section
+        is overwritten.
+
 
     Example
     -------
-    ::
+    .. ipython:: python
+
         # Classic: for the session
-        xoa.set_option('plot', cmapdiv='cmo.balance', cmappos='cmo.amp')
+        xoa.set_options('plot', cmapdiv='cmo.balance', cmappos='cmo.amp')
+
+        # With dict
+        opts = {"plot.cmapdiv": "cmo.balance"}
+        xoa.set_options(**opts)
 
         # Context: temporary
         with xoa.set_options('plot', cmapdiv='cmo.balance'):
@@ -174,13 +189,22 @@ class set_options(object):
 
     """
 
-    def __init__(self, section, **options):
+    def __init__(self, section=None, **options):
         self.old_options = _get_options_()
-        options = configobj.ConfigObj(self.old_options)
+        opts = configobj.ConfigObj(self.old_options)
         for option, value in options.items():
-            options[section][option] = value
+            m = _RE_OPTION_MATCH(option)
+            if m:
+                sec, option = m.groups()
+                opts[sec][option] = value
+            else:
+                if section is None:
+                    raise XoaConfigError(
+                        "You must specify the section explicitly or "
+                        "through the the option name")
+                opts[section][option] = value
         options.validate(validate.Validator())
-        _CACHE["options"] = options
+        _CACHE["options"] = opts
 
     def __enter__(self):
         return _CACHE["options"]
