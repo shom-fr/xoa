@@ -328,7 +328,7 @@ def dict_merge(*dd, **kwargs):
             if skipnones and val is None:
                 continue
             # Not set so we set
-            if key not in outd or (overwriteempty and isempty(outd[key])):
+            if key not in outd or (overwriteempty and is_empty(outd[key])):
                 outd[key] = val
             # Merge subdict
             elif (
