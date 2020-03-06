@@ -60,28 +60,29 @@ def get_axis_slices(ndim, axis, **kwargs):
         length of ndim, and can be used has a slice for the array
         (see exedges =ample).
 
-        - "all": Select everything.
-        - "first"/"last": First and last.
-        - "firstp1": Second element.
-        - "firstp2": Third element.
-        - "lastm1": Element before the last one.
-        - "lastm2": Second element before the last one.
-        - "firsts": All but the last.
-        - "lasts": All but the first.
-        - "firstsm1": All but the last two.
-        - "lastsp1": All but the first two.
-        - "mid": All but the first and last.
+        - ``"all"``: Select everything.
+        - ``"first"``/``"last"``: First and last.
+        - ``"firstp1"``: Second element.
+        - ``"firstp2"``: Third element.
+        - ``"lastm1"``: Element before the last one.
+        - ``"lastm2"``: Second element before the last one.
+        - ``"firsts"``: All but the last.
+        - ``"lasts"``: All but the first.
+        - ``"firstsm1"``: All but the last two.
+        - ``"lastsp1"``: All but the first two.
+        - ``"mid"``: All but the first and last.
 
     Example
     -------
     .. ipython:: python
 
         @suppress
-        import numpy as np
-        var = np.arange(2*3*4).reshape(2, 3, 4)
-        ss = get_axis_slices(var, axis=0)
-        var_north = var[ss['last']]
-        var_south = var[ss['first']]
+        import numpy as np, pprint
+        @suppress
+        from xoa.misc import get_axis_slices
+
+        var = np.arange(2*5*4).reshape(2, 5, 4)
+        pprint.pprint(get_axis_slices(var, axis=1))
     """
     if not isinstance(ndim, int):
         ndim = np.ndim(ndim)
@@ -200,14 +201,13 @@ def dict_filter(
 
     Example
     -------
-    >>> kwargs = {'basemap':'f', 'basemap_fillcontinents':True,
-    ... 'quiet':False,'basemap_plot':False}
-    >>> print kwfilter(kwargs,'basemap',
-    ... defaults=dict(drawcoastlines=True,plot=True), good=True)
-    {'plot': False, 'fillcontinents': True, 'good': True, 'basemap': 'f',
-    'drawcoastlines': True}
-    >>> print kwargs
-    {'quiet': False}
+    .. ipython:: python
+
+        @suppress
+        from xoa.misc import dict_filter
+        kwargs = {'basemap':'f', 'basemap_fillcontinents':True, 'quiet':False,'basemap_plot':False}
+        print(dict_filter(kwargs,'basemap', defaults=dict(drawcoastlines=True,plot=True), good=True))
+        print(kwargs)
 
     Return
     ------
@@ -231,7 +231,7 @@ def dict_filter(
                 kwout[filter_] = kwread(filter_)
         if not short and not filter_.endswith("_"):
             filter_ += "_"
-        for att, val in kwargs.items():
+        for att, val in list(kwargs.items()):
             if att.startswith(filter_) and att != filter_:
                 if keep:
                     kwout[att] = kwread(att)
@@ -278,10 +278,13 @@ def dict_merge(*dd, **kwargs):
 
     Example
     -------
-    >>> d1 = dict(a=3, b=5)
-    >>> d2 = dict(a=5, c=7)
-    >>> print dict_merge(d1,d2)
-    {'a': 3, 'c': 7, 'b': 5}
+    .. ipython:: python
+
+        @suppress
+        from xoa.misc import dict_merge
+        d1 = dict(a=3, b=5, e=[1, 2])
+        d2 = dict(a=5, c=7, e=[3, 4])
+        print(dict_merge(d1, d2, mergelists=True))
 
     """
     # Options
@@ -367,7 +370,7 @@ def dict_merge(*dd, **kwargs):
     return outd
 
 
-def isempty(x):
+def is_empty(x):
     """Check if empty"""
     try:
         return not bool(x)
@@ -388,10 +391,13 @@ def match_string(ss, checks, ignorecase=True, transform=None):
 
     Example
     -------
-    >>> match_string('sst', 'sst')
-    True
-    >>> match_string('sst', [re.compile(r'ss.$').match])
-    True
+    .. ipython:: python
+
+        @suppress
+        from xoa.misc import match_string
+        import re
+        match_string('sst', 'sst')
+        match_string('sst', [re.compile(r'ss.$').match])
 
     Return
     ------
@@ -454,19 +460,22 @@ class ArgList(object):
 
     Examples
     --------
-    >>> a = 'a'
-    >>> al = ArgList(a)
-    >>> al.get() # input for function as list
-    ['a']
-    >>> al.put(['aa']) # output as input
-    'aa'
+    .. ipython:: python
 
-    >>> a = ['a','b']
-    >>> al = ArgList(a)
-    >>> al.get()
-    ['a', 'b']
-    >>> al.put(['aa'])
-    ['aa']
+        @suppress
+        from xoa.misc import ArgList
+
+        # Scalar
+        a = 'a'
+        al = ArgList(a)
+        al.get() # input for function as tuple
+        al.put(['aa']) # output as input
+
+        # Iterable
+        a = ('a','b')
+        al = ArgList(a)
+        al.get()
+        al.put(['aa'])
 
     """
 
@@ -489,21 +498,24 @@ class ArgList(object):
 class ArgTuple(object):
     """Utility to always manage arguments as tuple and return results as input
 
-    :Examples:
+    Examples
+    --------
+    .. ipython:: python
 
-        >>> a = 'a'
-        >>> al = ArgTuple(a)
-        >>> al.get() # input for function as tuple
-        ['a']
-        >>> al.put(['aa']) # output as input
-        'aa'
+        @suppress
+        from xoa.misc import ArgTuple
 
-        >>> a = ['a','b']
-        >>> al = ArgTuple(a)
-        >>> al.get()
-        ['a', 'b']
-        >>> al.put(['aa'])
-        ['aa']
+        # Scalar
+        a = 'a'
+        al = ArgTuple(a)
+        al.get() # input for function as tuple
+        al.put(('aa',)) # output as input
+
+        # Iterable
+        a = ('a','b')
+        al = ArgTuple(a)
+        al.get()
+        al.put(('aa',))
 
     """
 

@@ -59,7 +59,7 @@ __description__ = __doc__
 _RE_OPTION_MATCH = re.compile(r"^(\w+)\W(\w+)$").match
 
 #: Specifications of configuration options
-CONFIG_INI = """
+CONFIG_SPECS = """
 [accessors]
 cf=boolean(default=True) # automatically load the CF acessors?
 
@@ -95,14 +95,44 @@ class XoaWarning(UserWarning):
 
 
 def xoa_warn(message):
-    """Issue a :class:`XoaWarning` warning"""
+    """Issue a :class:`XoaWarning` warning
+
+    Example
+    -------
+    .. ipython:: python
+        :okwarning:
+
+        @suppress
+        import xoa
+        xoa.xoa_warn('Be careful!')
+    """
     warnings.warn(message, XoaWarning, stacklevel=2)
 
 
 def load_options(cfgfile=None):
+    """Load specified options
+
+    Parameters
+    ----------
+    cfgfile: file, list(str), dict
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import xoa
+        # Dict
+        xoa.load_options({'plot': {'cmappos': 'mycmap'}})
+
+        # Lines
+        optlines = "[plot]\\n cmappos=mycmap".split('\\n')
+        xoa.load_options(optlines)
+    """
+
     if "cfgspecs" not in _CACHE:
         _CACHE["cfgspecs"] = configobj.ConfigObj(
-            CONFIG_INI.split("\n"),
+            CONFIG_SPECS.split("\n"),
             list_values=False,
             interpolation=False,
             raise_errors=True,
@@ -122,7 +152,7 @@ def load_options(cfgfile=None):
         )
     if cfgfile:
         _CACHE["options"].merge(
-            configobj.Configobj(
+            configobj.ConfigObj(
                 cfgfile, file_error=True, raise_errors=True, list_values=True
             )
         )
@@ -140,14 +170,16 @@ def get_option(section, option=None):
 
     Example
     -------
-    >>> xoa.get_option('plot', 'cmapdiv')
-    "cmo.balance"
-    >>> xoa.get_option('plot.cmapdiv')
-    "cmo.balance"
+    .. ipython:: python
+
+        @suppress
+        import xoa
+        print(xoa.get_option('plot', 'cmapdiv'))
+        print(xoa.get_option('plot.cmapdiv'))
     """
     options = _get_options_()
     if option is None:
-        m = _RE_OPTION_MATCH(option)
+        m = _RE_OPTION_MATCH(section)
         if m:
             section, option = m.groups()
         else:
@@ -176,6 +208,9 @@ class set_options(object):
     -------
     .. ipython:: python
 
+        @suppress
+        import xoa
+
         # Classic: for the session
         xoa.set_options('plot', cmapdiv='cmo.balance', cmappos='cmo.amp')
 
@@ -184,33 +219,79 @@ class set_options(object):
         xoa.set_options(**opts)
 
         # Context: temporary
-        with xoa.set_options('plot', cmapdiv='cmo.balance'):
-            print(xoa.get_option('plot.cmapdiv'))
+        with xoa.set_options('plot', cmapdiv='cmo.delta'):
+            print('within context:', xoa.get_option('plot.cmapdiv'))
+        print('after context:', xoa.get_option('plot.cmapdiv'))
 
     """
 
     def __init__(self, section=None, **options):
-        self.old_options = _get_options_()
-        opts = configobj.ConfigObj(self.old_options)
+        # Fromat before being ingested
+        self.old_options = _CACHE.get("options")
+        del _CACHE["options"]
+        opts = {}
         for option, value in options.items():
             m = _RE_OPTION_MATCH(option)
             if m:
                 sec, option = m.groups()
-                opts[sec][option] = value
             else:
                 if section is None:
                     raise XoaConfigError(
                         "You must specify the section explicitly or "
                         "through the the option name")
-                opts[section][option] = value
-        options.validate(validate.Validator())
-        _CACHE["options"] = opts
+                sec = section
+            opts.setdefault(sec, {})[option] = value
+
+        # Ingest options
+        load_options(opts)
 
     def __enter__(self):
         return _CACHE["options"]
 
     def __exit__(self, type, value, traceback):
-        _CACHE["options"] = self.old_options
+        if self.old_options:
+            _CACHE["options"] = self.old_options
+        else:
+            del _CACHE["options"]
+
+
+def set_option(option, value):
+    """Set a single option using the flat format, i.e ``section.option``
+
+    Parameters
+    ----------
+    option: str
+        Option name in the ``section.option`` format
+    value:
+        Value to set
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import xoa
+        xoa.set_option('plot.cmapdiv', 'cmo.balance');
+    """
+    return set_options(None, **{option: value})
+
+
+def reset_options():
+    """Restore options to their default values
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import xoa
+        print(xoa.get_option('plot.cmapdiv'))
+        xoa.set_options('plot', cmapdiv='mycmap')
+        print(xoa.get_option('plot.cmapdiv'))
+        xoa.reset_options()
+        print(xoa.get_option('plot.cmapdiv'))
+    """
+    del _CACHE['options']
 
 
 def show_options(specs=False):
@@ -220,11 +301,21 @@ def show_options(specs=False):
     ----------
     specs: bool
         Print option specifications instead
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import xoa
+        xoa.show_options()
+        xoa.show_options(specs=True)
     """
     if specs:
-        print(CONFIG_INI.strip("\n"))
+        print(CONFIG_SPECS.strip("\n"))
     else:
-        print("\n".join(_get_options_().write()).strip("\n"))
+        print("\n".join(_get_options_().write())
+              .strip("\n").replace('#', ' #'))
 
 
 def _parse_requirements_(reqfile):
@@ -241,16 +332,43 @@ def _parse_requirements_(reqfile):
 
 
 def show_versions():
-    """Print the versions of xoa and of some dependencies"""
+    """Print the versions of xoa and of some dependencies
+
+    Example
+    -------
+    .. ipython:: python
+        :okexcept:
+
+        @suppress
+        import xoa
+        xoa.show_versions()
+    """
     print("- xoa:", __version__)
     for package in _parse_requirements_(_REQUIREMENTS_FILE):
-        pp = importlib.import_module(package)
+        try:
+            pp = importlib.import_module(package)
+            if hasattr(pp, "__version__"):
+                version = pp.__version__
+            else:
+                version = "UNKNOWN"
+        except ImportError:
+            version = 'ERROR'
         if hasattr(pp, "__version__"):
-            print(f"- {package}: {pp.__version__}")
+            print(f"- {package}: {version}")
 
 
 def show_info(opt_specs=True):
-    """Print xoa related info"""
+    """Print xoa related info
+
+    Example
+    -------
+    .. ipython:: python
+        :okexcept:
+
+        @suppress
+        import xoa
+        xoa.show_info()
+    """
     print("# VERSIONS")
     show_versions()
     print("\n# FILES AND DIRECTORIES")

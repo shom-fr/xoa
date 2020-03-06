@@ -402,7 +402,7 @@ def validator_cdtime(value, min=None, max=None, default=None):
 
 
 def validator_timestamp(value, default=None):
-    """Validator of date as parsable by :func:`pandas.Timestamp"""
+    """Validator of date as parsable by :func:`pandas.Timestamp`"""
     if str(value) == "None":
         return
     import pandas as pd
@@ -411,7 +411,7 @@ def validator_timestamp(value, default=None):
 
 
 def validator_timedelta(value, default=None):
-    """Validator of date as parsable by :func:`pandas.Timedelta"""
+    """Validator of date as parsable by :func:`pandas.Timedelta`"""
     if str(value) == "None":
         return
     if not isinstance(value, list) or len(value) != 2:
@@ -422,7 +422,7 @@ def validator_timedelta(value, default=None):
 
 
 def validator_timedelta64(value, default=None):
-    """Validator of date as parsable by :func:`numpy.timedelta64"""
+    """Validator of date as parsable by :func:`numpy.timedelta64`"""
     if str(value) == "None":
         return
     if not isinstance(value, list) or len(value) != 2:
@@ -668,8 +668,21 @@ __doc__ = __doc__.format(" ".join(_for_doc))
 def register_config_validator(**kwargs):
     """Add a new configobj validator function
 
-    :Example:
-    >>> register_config_validator(level=is_level)
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        from xoa.cfgm import register_config_validator
+
+        def upper_string(mystr, default=""):
+            mystr = str(mystr)
+            if mystr == "None":
+                mystr = ""
+            return str(mystr).upper()
+
+        register_config_validator(upper_string=upper_string)
+
     """
     VALIDATOR_SPECS.update(**kwargs)
     _update_registry_()
@@ -689,7 +702,7 @@ class ConfigManager(object):
 
     See also
     --------
-    :class:`configobj.ConfigObj` and :class:`validate.Validator`
+    :class:`configobj.ConfigObj`, :class:`validate.Validator`
 
     """
 
@@ -710,7 +723,7 @@ class ConfigManager(object):
         ----------
         cfgspecfile: optional
             The specification file to be used with this.
-        validator: optional
+        validator: :class:`validate.Validator`
             A custom :class:`validate.Validator`
             to use or a mapping dict of validator functions.
         interpolation: optional
@@ -796,11 +809,11 @@ class ConfigManager(object):
 
         Parameters
         ----------
-        nocomments: optional
+        nocomments: boolean
             Do not include option comments in config file.
             If equal to 2, remove section comments too.
         interpolation: optional
-            if True, interpolate values.
+            If True, interpolate values.
 
         Return
         ------
@@ -839,7 +852,8 @@ class ConfigManager(object):
 
         Return
         ------
-        A :class:`~configobj.ConfigObj` instance
+        :class:`~configobj.ConfigObj`
+            A :class:`~configobj.ConfigObj` instance
 
         See also
         --------
@@ -1998,7 +2012,7 @@ def cfg2rst(cfg, mode="basic", optrole="confopt", secrole="confsec", **kwargs):
 
     Return
     ------
-    string
+    str
     """
     if isinstance(cfg, ConfigManager):
         if mode == "specs":

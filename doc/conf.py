@@ -77,3 +77,14 @@ intersphinx_mapping = {
     'cmocean': ('https://matplotlib.org/cmocean/', None),
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None)
     }
+
+# %% confopt and confsec directives
+
+
+def setup(app):
+    app.add_object_type('confopt', 'confopt',
+                        objname='configuration option',
+                        indextemplate='pair: %s; configuration option')
+    app.add_object_type('confsec', 'confsec',
+                        objname='configuration section',
+                        indextemplate='pair: %s; configuration section')
