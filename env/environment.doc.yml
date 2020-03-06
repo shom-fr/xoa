@@ -5,14 +5,16 @@ channels:
 
 dependencies:
   - python>=3
-  - configobj
   - cartopy
   - matplotlib
   - nbsphinx
   - pandas
   - scipy
-  - sphinx
-  - sphinx_rtd_theme
   - xarray
   - xesmf
+  - pip:
+      - sphinx_rtd_theme
+      - sphinx
+      - nbsphinx
+      - configobj
 

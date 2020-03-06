@@ -40,6 +40,98 @@ import types
 
 from .__init__ import XoaError
 
+import numpy as np
+
+
+def get_axis_slices(ndim, axis, **kwargs):
+    """Get standard slices for an axis of a ndim array
+
+    Parameters
+    ----------
+    ndim:
+        The number of dimensions. It can also be
+        a tuple (like an array shape) or an array.
+    axis:
+        Index of the axis.
+
+    Return
+    ------
+    A dictionary of tuples of slices. All tuples have a
+        length of ndim, and can be used has a slice for the array
+        (see exedges =ample).
+
+        - "all": Select everything.
+        - "first"/"last": First and last.
+        - "firstp1": Second element.
+        - "firstp2": Third element.
+        - "lastm1": Element before the last one.
+        - "lastm2": Second element before the last one.
+        - "firsts": All but the last.
+        - "lasts": All but the first.
+        - "firstsm1": All but the last two.
+        - "lastsp1": All but the first two.
+        - "mid": All but the first and last.
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import numpy as np
+        var = np.arange(2*3*4).reshape(2, 3, 4)
+        ss = get_axis_slices(var, axis=0)
+        var_north = var[ss['last']]
+        var_south = var[ss['first']]
+    """
+    if not isinstance(ndim, int):
+        ndim = np.ndim(ndim)
+    sel = [slice(None)]*ndim
+    selmid = list(sel)
+    selmid[axis] = slice(1, -1)
+    selmid = tuple(selmid)
+    sellasts = list(sel)
+    sellasts[axis] = slice(1, None)
+    sellasts = tuple(sellasts)
+    selfirsts = list(sel)
+    selfirsts[axis] = slice(0, -1)
+    selfirsts = tuple(selfirsts)
+    sellastsp1 = list(sel)
+    sellastsp1[axis] = slice(2, None)
+    sellastsp1 = tuple(sellastsp1)
+    selfirstsm1 = list(sel)
+    selfirstsm1[axis] = slice(0, -2)
+    selfirstsm1 = tuple(selfirstsm1)
+    sellast = list(sel)
+    sellast[axis] = -1
+    sellast = tuple(sellast)
+    selfirst = list(sel)
+    selfirst[axis] = 0
+    selfirst = tuple(selfirst)
+    sellastm1 = list(sel)
+    sellastm1[axis] = -2
+    sellastm1 = tuple(sellastm1)
+    sellastm2 = list(sel)
+    sellastm2[axis] = -3
+    sellastm2 = tuple(sellastm2)
+    selfirstp1 = list(sel)
+    selfirstp1[axis] = 1
+    selfirstp1 = tuple(selfirstp1)
+    selfirstp2 = list(sel)
+    selfirstp2[axis] = 2
+    selfirstp2 = tuple(selfirstp2)
+    if kwargs:
+        for key, val in kwargs.items():
+            if isinstance(val, (list, tuple)):
+                val = slice(*val)
+            ksel = list(sel)
+            ksel[axis] = val
+            kwargs[key] = ksel
+    return dict(all=sel, mid=selmid, lasts=sellasts, firsts=selfirsts,
+                lastsp1=sellastsp1, firstsm1=selfirstsm1,
+                last=sellast, first=selfirst, lastm1=sellastm1,
+                firstp1=selfirstp1,
+                lastm2=sellastm2, firstp2=selfirstp2, **kwargs)
+
 
 def is_iterable(obj, nostr=True, nogen=True):
     """Check if an object is iterable or not
@@ -144,7 +236,7 @@ def dict_filter(
                 if keep:
                     kwout[att] = kwread(att)
                 else:
-                    kwout[att[len(filter_) :]] = kwread(att)
+                    kwout[att[len(filter_):]] = kwread(att)
 
     # Add some items
     kwout.update(kwadd)
