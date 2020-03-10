@@ -7,9 +7,10 @@ Test the :mod:`xoa.cf` module
 # from unittest.mock import Mock
 import pytest
 
-from xoa import cf
+import numpy as np
 import xarray as xr
 
+from xoa import cf
 
 @pytest.mark.parametrize(
     "attr,value,expected",
@@ -317,6 +318,54 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
     assert temp.units == "degrees_celsius"
 
     assert temp.lon.standard_name == "longitude"
+
+
+def test_cf_cfspecs_coords_get_axis():
+    cfspecs = cf.get_cf_specs().coords
+
+    # from attrs
+    depth = xr.DataArray([1], dims='aa', attrs={'axis': 'z'})
+    assert cfspecs.get_axis(depth) == 'Z'
+
+    # from CF specs
+    depth = xr.DataArray([1], dims='aa',
+                         attrs={'standard_name': 'ocean_layer_depth'})
+    assert cfspecs.get_axis(depth) == 'Z'
+
+
+def test_cf_cfspecs_coords_search_dim():
+    cfspecs = cf.get_cf_specs().coords
+
+    # from name
+    temp = xr.DataArray(np.arange(2*3).reshape(1, 2, 3),
+                        dims=('aa', 'ny', 'x'))
+    assert cfspecs.search_dim(temp, 'y') == 'ny'
+    assert cfspecs.search_dim(temp) is None
+
+    # from explicit axis attribute
+    depth = xr.DataArray([1], dims='aa', attrs={'axis': 'z'})
+    temp.coords['aa'] = depth
+    assert cfspecs.search_dim(temp, 'z') == 'aa'
+    assert cfspecs.search_dim(temp)is None
+
+    # from known coordinate
+    del temp.coords['aa'].attrs['axis']
+    temp.coords['aa'].attrs['standard_name'] = 'ocean_layer_depth'
+    assert cfspecs.search_dim(temp, 'z') == 'aa'
+    assert cfspecs.search_dim(temp) is None
+
+    # subcoords
+    level = xr.DataArray(np.arange(2), dims='level')
+    depth = xr.DataArray(np.arange(2*3).reshape(2, 3),
+                         dims=('level', 'x'), name='depth',
+                         coords={'level': level})
+    assert cfspecs.search_dim(depth) == ('level', 'z')
+    assert cfspecs.search_dim(depth.level) == ('level', 'z')
+    depth = depth.rename(level='aa')
+    depth.aa.attrs['axis'] = 'Z'
+    assert cfspecs.search_dim(depth) == ('aa', 'z')
+
+    assert cfspecs.search_dim(xr.DataArray([5], dims='bb')) == ('bb', None)
 
 
 def test_cf_dataarraycfaccessor():

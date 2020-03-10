@@ -186,7 +186,7 @@ class SGLocator(object):
         return vloc in loc  # one of these locs
 
     def format_attr(self, attr, value, loc, standardize=True):
-        """Format a attribute at a specified location
+        """Format a single attribute at a specified location
 
         Parameters
         ----------
@@ -194,7 +194,7 @@ class SGLocator(object):
             Attribute name
         value: str
             Current attribute value. It is parsed to get current ``root``.
-        loc: {False, ""}, letter, None
+        loc: {True, None}, letter, {False, ""}
             If None, location is left unchanged;
             if a letter, it is set;
             else, it is removed.
@@ -250,7 +250,7 @@ class SGLocator(object):
         """Copy and format a dict of attributes"""
         attrs = attrs.copy()
         for attr, value in attrs.items():
-            if attr in self.valid_attrs:
+            if attr in self.valid_attrs and attr != 'name':
                 attrs[attr] = self.format_attr(
                     attr, value, loc, standardize=standardize
                 )
@@ -407,6 +407,8 @@ class CFSpecs(object):
     def __getattr__(self, name):
         if "_cfs" in self.__dict__ and name in self.__dict__["_cfs"]:
             return self.__dict__["_cfs"][name]
+        if name == "dims":
+            return self._dict['dims']
         raise AttributeError(
             "'{}' object has no attribute '{}'".format(
                 self.__class__.__name__, name
@@ -443,6 +445,12 @@ class CFSpecs(object):
         for category, contents in items.items():
             self._dict[category].clear()
             self._dict[category].update(items[category])
+
+        # Updates allowed dimensions
+        for coord_specs in self._dict['coords'].values():
+            if coord_specs['axis']:
+                axis = coord_specs['axis'].lower()
+                self._dict['dims'][axis].extend(coord_specs['name'])
 
     def _process_entry_(self, category, name):
         """Process an entry
@@ -487,6 +495,8 @@ class CFSpecs(object):
 
         # Inherits from other specs (merge specs with dict_merge)
         if "inherit" in specs and specs["inherit"]:
+
+            # From what?
             from_name = specs["inherit"]
             if ":" in from_name:
                 from_cat, from_name = from_name.split(":")[:2]
@@ -495,30 +505,45 @@ class CFSpecs(object):
             assert (
                 from_cat != category or name != from_name
             ), "Cannot inherit cf specs from it self"
-            # to handle high level inheritance
+
+            # Parents must be already processed
             for item in self._process_entry_(from_cat, from_name):
                 yield item
-            from_specs = None
-            to_scan = []
-            if "inherit" in entries:
-                to_scan.append(self._inherit)
-            to_scan.append(entries)
 
-            for from_specs in to_scan:
-                if from_name in from_specs:
+            # Inherit with merging
+            entries[name] = specs = dict_merge(
+                specs,
+                self._dict[from_cat][from_name],
+                cls=dict,
+                **_CF_DICT_MERGE_KWARGS,
+            )
 
-                    # Merge
-                    entries[name] = specs = dict_merge(
-                        specs,
-                        from_specs[from_name],
-                        cls=dict,
-                        **_CF_DICT_MERGE_KWARGS,
-                    )
+            # Check compatibility of keys
+            for key in list(specs.keys()):
+                if key not in self._cfgspecs[category]["__many__"]:
+                    del specs[key]
 
-                    # Check compatibility of keys
-                    for key in list(specs.keys()):
-                        if key not in self._cfgspecs[category]["__many__"]:
-                            del specs[key]
+            # to_scan = []
+            # if "inherit" in entries: #?
+            #     to_scan.append(self._inherit)
+            # to_scan.append(entries)
+
+            # for from_specs in to_scan:
+            #     if from_name in from_specs:
+
+            #         # Merge
+            #         print('mergee', specs, from_specs[from_name])
+            #         entries[name] = specs = dict_merge(
+            #             specs,
+            #             from_specs[from_name],
+            #             cls=dict,
+            #             **_CF_DICT_MERGE_KWARGS,
+            #         )
+
+            #         # Check compatibility of keys
+            #         for key in list(specs.keys()):
+            #             if key not in self._cfgspecs[category]["__many__"]:
+            #                 del specs[key]
             specs["inherit"] = None  # switch off inheritance now
 
         # Select
@@ -659,7 +684,7 @@ class _CFCatSpecs_(object):
         return self._dict.keys()
 
     def get_specs(self, name, errors="warn"):
-        """Get the specs of cf item or xarray.DataArray
+        """Get the specs of acf item
 
         Parameters
         ----------
@@ -678,6 +703,10 @@ class _CFCatSpecs_(object):
                 xoa_warn("Invalid cf name: " + str(name))
             return
         return self._dict[name]
+
+    @property
+    def dims(self):
+        return self.parent._dict['dims']
 
     def register(self, name, **specs):
         """Register a new element from its name and explicit specs"""
@@ -711,8 +740,13 @@ class _CFCatSpecs_(object):
         Parameters
         ----------
         da: xarray.DataArray
-        name: str, dict
-        loc: str, False
+        name: str, dict, None
+        loc: str, False, "any"
+
+        Return
+        ------
+        bool, str
+            True or False if name is provided, else found name or None
         """
         names = self.names if name is None else [name]
         for name_ in names:
@@ -745,6 +779,7 @@ class _CFCatSpecs_(object):
         ----------
         dsa: DataArray or Dataset
         name: str, dict
+            A CF name. If not provided, all CF names are scaned.
         loc: "any", str
         get: {"obj", "name"}
             When found, get the object found or its name.
@@ -774,9 +809,10 @@ class _CFCatSpecs_(object):
             for obj in objs.values():
                 m = self.match(obj, match_arg, loc=loc)
                 if m:
+                    name = name if name else m
                     if get == "both":
                         return obj, name
-                    return obj if get == "obj" else (name if name else m)
+                    return obj if get == "obj" else name
 
     def get_attrs(
         self, name, select=None, exclude=None, errors="warn", loc=None, **extra
@@ -786,7 +822,7 @@ class _CFCatSpecs_(object):
         Parameters
         ----------
         name: str
-            Valid cf name
+            Valid CF name
         select: str, list
             Include only these attributes
         exclude: str, list
@@ -840,6 +876,14 @@ class _CFCatSpecs_(object):
         return attrs
 
     def format_dataarray(self, da, name=None, loc=None, standardize=True):
+        """Format a DataArray's name and attributes
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        name: str, None
+            A CF name. If not provided, it guessed with :meth:`search`.
+        """
         if name is None:
             name = self.match(da, loc="any")
         if name is None:
@@ -863,6 +907,87 @@ class CFCoordSpecs(_CFCatSpecs_):
 
     category = "coords"
 
+    def get_axis(self, coord, upper=True):
+        """Get the axis attribute, either directly or from match Cf coord
+
+        Parameters
+        ----------
+        coord: xarray.DataArray
+        upper: bool
+            Upper case?
+
+        Return
+        ------
+        {"X", "Y", "Z", "T", "F"}, None
+
+        """
+        axis = None
+        if "axis" in coord.attrs:
+            axis = coord.attrs["axis"]
+        else:
+            cfname = self.match(coord)
+            if cfname:
+                axis = self[cfname]["axis"]
+        if axis is not None:
+            if upper:
+                return axis.upper()
+            return axis.lower()
+
+    def search_dim(self, da, dim_type=None, loc="any"):
+        """Search a dataarray for a dimension name according to its type
+
+        First, scan the dimension names.
+        Then, look for coordinates: either it has an 'axis' attribute,
+        or it a known CF coordinate.
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        dim_type: {"x", "y", "z", "t", "f"}, None
+            When
+        loc: "any", letter
+            Staggered grid location
+
+        Return
+        ------
+        str, (str, str)
+            Dim name OR, (dim name, dim_type) if dim_type is None
+        """
+        if dim_type is not None:
+            dim_type = dim_type.lower()
+        else:
+            da_axis = self.get_axis(da, upper=False)
+
+        # From dimension names
+        for dim in da.dims:
+            pname, ploc = self.sglocator.parse_attr('name', dim)
+            if loc != "any" and ploc and loc and loc != ploc:
+                continue
+            dim_types = (self.dims.keys()
+                         if not dim_type and not da_axis else
+                         [dim_type or da_axis])
+            for dt in dim_types:
+                if pname.lower() in self.dims[dt]:
+                    if dim_type is not None:
+                        return dim
+                    if da.ndim == 1 or da_axis:
+                        return dim, dt
+
+        # From coordinates
+        for coord in da.coords.values():
+            if coord.ndim == 1 and coord.name in da.dims:
+                co_axis = self.get_axis(coord, upper=False)
+                if co_axis:
+                    if dim_type and co_axis == dim_type:
+                        return coord.name
+                    if dim_type is None and da_axis and (
+                            da_axis == co_axis):
+                        return coord.name, co_axis
+
+        # Fallback
+        if dim_type is None and da.ndim == 1:
+            return da.dims[0], da_axis
+
 
 def _get_cfgm_():
     """Get a :class:`~xoa.cfgm.ConfigManager` instance to manage
@@ -872,6 +997,71 @@ def _get_cfgm_():
 
         _CACHE["cfgm"] = ConfigManager(_INIFILE)
     return _CACHE["cfgm"]
+
+
+def _same_attr_(da0, da1, attr):
+    return (attr in da0.attrs and attr in da1.attrs and
+            da0.attrs[attr].lower() == da1.attrs[attr].lower())
+
+
+def are_similar(da0, da1):
+    """Check if two DataArrays are similar
+
+    Verifications are performed in the following order:
+
+    - ``standard_name`` attribute,
+    - ``cf_name`` as the results of ``da.cf.name``.
+    - ``name`` attribute.
+    - ``long_name`` attribute.
+
+    Parameters
+    ----------
+    da0: xarray.DataArray
+    da1: xarray.DataArray
+
+    Return
+    ------
+    bool
+    """
+    # Standard name
+    if _same_attr_(da0, da1, "standard_name"):
+        return True
+
+    # Cf name
+    if (da0.cf.name and da1.cf.name and da0.cf.name == da1.cf.name):
+        return True
+
+    # Name
+    if da0.name and da0.name and da0.name == da1.name:
+        return True
+
+    # Long name
+    return _same_attr_(da0, da1, "long_name")
+
+
+def search_similar(dsa, da):
+    """Search in ds for a similar DataArray
+
+    See :func:`is_similar` for what means "similar".
+
+    Parameters
+    ----------
+    dsa: xarray.Dataset, xarray.DataArray
+        Dataset that must be scanned.
+    da: xarray.DataArray
+        Array that must be compared to the content of ``ds``
+
+    Return
+    ------
+    xarray.DataArray or None
+    """
+    import xarray as xr
+    targets = list(da.coords.values())
+    if isinstance(dsa, xr.Dataset):
+        targets = list(da.data_vars.values()) + targets
+    for ds_da in targets:
+        if are_similar(ds_da, da):
+            return ds_da
 
 
 class set_cf_specs(object):
@@ -1017,15 +1207,56 @@ class _CFAccessor_(object):
 class DataArrayCFAccessor(_CFAccessor_):
     _category = 'coords'
 
+    @property
+    def name(self):
+        if not hasattr(self, '_name'):
+            self._name = self._cfspecs.match(self._dsa)
+        return self._name
+
+    @property
+    def dim(self):
+        try:
+            return self._cfspecs.coords.search_dim(self._dsa)[0]
+        except XoaError:
+            return
+
+    def get_dim(self, dim_type):
+        dim_type = dim_type.lower()
+        if not hasattr(self, '_dims'):
+            self._dims = {}
+            if dim_type not in self._dims:
+                self._dims[dim_type] = self._cfspecs.coords.search_dim(
+                    self._dsa, dim_type)
+        return self._dims[dim_type]
+
+    @property
+    def xdim(self):
+        return self.get_dim("x")
+
+    @property
+    def ydim(self):
+        return self.get_dim("y")
+
+    @property
+    def zdim(self):
+        return self.get_dim("z")
+
+    @property
+    def tdim(self):
+        return self.get_dim("t")
+
 
 class DatasetCFAccessor(_CFAccessor_):
     _category = 'data_vars'
 
 
-def register_accessors(name='cf'):
+def register_cf_accessors(name='cf'):
     """Register xarray accessors"""
     # cfspecs = cfspecs or get_cf_specs()
     # name = cfspecs['accessors']['name']
     import xarray as xr
     xr.register_dataarray_accessor(name)(DataArrayCFAccessor)
     xr.register_dataset_accessor(name)(DatasetCFAccessor)
+
+
+register_cf_accessors()
