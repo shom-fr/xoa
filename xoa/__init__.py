@@ -357,6 +357,22 @@ def show_versions():
             print(f"- {package}: {version}")
 
 
+def show_paths():
+    """Print some xoa paths"""
+    print("- xoa library dir:", os.path.dirname(__file__))
+    from . import cf
+    asterix = False
+    for label, path in [("user config file", DEFAULT_USER_CONFIG_FILE),
+                        ("user CF specs file", cf.USER_CF_FILE),
+                        ("user CF cache file", cf.USER_CF_CACHE_FILE)]:
+        if not os.path.exists(path):
+            asterix = True
+            path = path + " [*]"
+        print("-", label+":", path)
+    if asterix:
+        print("*: file not present")
+
+
 def show_info(opt_specs=True):
     """Print xoa related info
 
@@ -372,7 +388,6 @@ def show_info(opt_specs=True):
     print("# VERSIONS")
     show_versions()
     print("\n# FILES AND DIRECTORIES")
-    print("xoa library dir:", os.path.dirname(__file__))
-    print("default config file:", DEFAULT_USER_CONFIG_FILE)
+    show_paths()
     print("\n# OPTIONS")
     show_options(specs=opt_specs)
