@@ -39,6 +39,7 @@ Naming convention tools
 import os
 import pickle
 import re
+import operator
 
 import appdirs
 
@@ -53,9 +54,13 @@ _INIFILE = os.path.join(_THISDIR, "cf.ini")
 # Base config file for CF specifications
 _CFGFILE = os.path.join(_THISDIR, "cf.cfg")
 
-# File used for pickling cf specs
 _user_cache_dir = appdirs.user_cache_dir("xoa")
-_PYKFILE = os.path.join(_user_cache_dir, "cf.pyk")
+
+#: User cache file for cf specs
+USER_CF_CACHE_FILE = os.path.join(_user_cache_dir, "cf.pyk")
+
+#: User CF config file
+USER_CF_FILE = os.path.join(appdirs.user_config_dir("xoa"), "cf.cfg")
 
 # Argument passed to dict_merge to merge CF configs
 _CF_DICT_MERGE_KWARGS = dict(
@@ -299,6 +304,10 @@ class CFSpecs(object):
         It may contain the "data_vars", "coords"  and "sglocator" sections.
         When a list is provided, specs are merged with the firsts having
         priority over the lasts.
+    default: bool
+        Load also the default internal specs
+    user: bool
+        Load also the user specs stored in :data:`USER_CF_FILE`
 
 
     Attributes
@@ -309,7 +318,7 @@ class CFSpecs(object):
         Types of specs
     """
 
-    def __init__(self, cfg=None):
+    def __init__(self, cfg=None, default=True, user=True):
 
         # Initialiase categories
         self._cfs = {}
@@ -320,10 +329,48 @@ class CFSpecs(object):
         # Load config
         self._dict = None
         self._cfgspecs = _get_cfgm_().specs.dict()
+        self._cfgs = []
+        self._load_default = default
+        self._load_user = user
         self.load_cfg(cfg)
 
-    def load_cfg(self, cfg=None, update=True, cache=True):
-        """Load a single or a list of configuration
+    def _load_cfg_as_dict_(self, cfg, cache):
+        """Load a single cfg, validate it and return it as a dict"""
+        # Config manager to get defaults and validation
+        cfgm = _get_cfgm_()
+
+        # Get it from cache
+        cache = cache and ((isinstance(cfg, str) and '\n' not in cfg) or
+                           isinstance(cfg, tuple))
+        if cache:
+            # Init cache
+            if "cfgs" not in _CACHE:
+                _CACHE["cfgs"] = {}
+            if isinstance(cfg, str):
+                cache_key = cfg
+            else:
+                cache_key, cfg = cfg
+            if cache_key in _CACHE["cfgs"]:
+                print("CFG FROM CACHE: " + cfg)
+                return _CACHE["cfgs"][cfg]
+
+        # Check input type
+        if isinstance(cfg, str) and '\n' in cfg:
+            cfg = cfg.split("\n")
+        elif isinstance(cfg, CFSpecs):
+            cfg = cfg._dict
+
+        # Load, validate and convert to dict
+        cfg_dict = cfgm.load(cfg).dict()
+
+        # Cache it
+        if cache:
+            _CACHE["cfgs"][cache_key] = cfg_dict
+
+        return cfg_dict
+
+    def load_cfg(self, cfg=None, cache=True):
+        """Load a single or a list of configurations
 
         Parameters
         ----------
@@ -335,44 +382,28 @@ class CFSpecs(object):
             - config dict,
             - two-element tuple with the first item of one of the above types,
               and second item as a cache key for faster reloading.
-        update: bool
-            Update the current configuration or replace it.
+        cache: bool
+            Cache in memory loaded configs
+
         """
         # Get the list of validated configurations
-        cfgm = _get_cfgm_()
-        cfgs = [cfg] if not isinstance(cfg, list) else cfg
-        if update:
-            cfgs.append(self._dict)
-        cfgs = [cfg for cfg in cfgs if cfg is not None]
-        if not cfgs:
-            cfgs = [None]
-        if cache and "cfgs" not in _CACHE:
-            _CACHE["cfgs"] = {}
-        for i, cfg in enumerate(cfgs):
+        to_load = []
+        if cfg:
+            if not isinstance(cfg, list):
+                cfg = [cfg]
+            to_load.extend([c for c in cfg if c])
+        if self._load_user and os.path.exists(USER_CF_FILE):
+            to_load.append(USER_CF_FILE)
+        if self._load_default:
+            to_load.append(_CFGFILE)
+        if not to_load:
+            to_load = [None]
 
-            # get from it cache?
-            if isinstance(cfg, tuple):
-                cfg, cache_key = cfg
-                if cache and cache_key in _CACHE["cfgs"]:
-                    cfgs.append(_CACHE["cfgs"][cache_key])
-                    print("CFG FROM CACHE: " + cache_key)
-                    continue
-            else:
-                cache_key = None
+        # Load them
+        dicts = [self._load_cfg_as_dict_(cfg, cache) for cfg in to_load]
 
-            # load and validate
-            if isinstance(cfg, str) and cfg.strip().startswith("["):
-                cfg = cfg.split("\n")
-            elif isinstance(cfg, CFSpecs):
-                cfg = cfg._dict
-            cfgs[i] = cfgm.load(cfg).dict()
-
-            # cache it
-            if cache and cache_key:
-                _CACHE["cfgs"][cache_key] = cfgs[-1]
-
-        # Merge
-        self._dict = dict_merge(*cfgs, **_CF_DICT_MERGE_KWARGS)
+        # Merge them
+        self._dict = dict_merge(*dicts, **_CF_DICT_MERGE_KWARGS)
 
         # SG locator
         self._sgl_settings = self._dict["sglocator"]
@@ -418,9 +449,8 @@ class CFSpecs(object):
     # def __str__(self):
     #     return pformat(self._dict)
 
-    def register_from_cfg(self, cfg):
-        """"Register new elements from a :class:`ConfigObj` instance
-        or a config file"""
+    def set_specs_from_cfg(self, cfg):
+        """Update or create specs from a config"""
         self.load_cfg(cfg, update=True)
 
     def _post_process_(self):
@@ -614,6 +644,12 @@ class CFSpecs(object):
     def search_coord(self, dsa, name=None, loc="any", get="obj"):
         return self.coords.search(dsa, name=name, loc=loc, get=get)
 
+    def search_dim(self, da, dim_type, loc="any"):
+        return self.coords.search_dim(da, dim_type, loc=loc)
+
+    def search_coord_from_dim(self, da, dim):
+        return self.coords.search_dim(da, dim)
+
     def search_data_var(self, dsa, name=None, loc="any", get="obj"):
         return self.data_vars.search(dsa, name=name, loc=loc, get=get)
 
@@ -708,13 +744,13 @@ class _CFCatSpecs_(object):
     def dims(self):
         return self.parent._dict['dims']
 
-    def register(self, name, **specs):
-        """Register a new element from its name and explicit specs"""
+    def set_specs(self, name, **specs):
+        """Update or create specs for an item"""
         data = {self.category: {name: specs}}
         self.parent.register_from_cfg(data)
 
-    def register_from_cfg(self, cfg):
-        """Register new elements from a config specs"""
+    def set_specs_from_cfg(self, cfg):
+        """Update or create specs for several item with a config specs"""
         if isinstance(cfg, dict) and self.category not in cfg:
             cfg = {self.category: cfg}
         self.parent.register_from_cfg(cfg)
@@ -907,18 +943,20 @@ class CFCoordSpecs(_CFCatSpecs_):
 
     category = "coords"
 
-    def get_axis(self, coord, upper=True):
-        """Get the axis attribute, either directly or from match Cf coord
+    def get_dim_type(self, coord, lower=True):
+        """Get the dimension type, either from axis attr or from match Cf coord
+
+        .. note:: The ``axis`` is the uppercase version of the ``dim_type``
 
         Parameters
         ----------
         coord: xarray.DataArray
-        upper: bool
-            Upper case?
+        lower: bool
+            Lower case?
 
         Return
         ------
-        {"X", "Y", "Z", "T", "F"}, None
+        {"x", "y", "z", "t", "f"}, None
 
         """
         axis = None
@@ -929,9 +967,9 @@ class CFCoordSpecs(_CFCatSpecs_):
             if cfname:
                 axis = self[cfname]["axis"]
         if axis is not None:
-            if upper:
-                return axis.upper()
-            return axis.lower()
+            if lower:
+                return axis.lower()
+            return axis.upper()
 
     def search_dim(self, da, dim_type=None, loc="any"):
         """Search a dataarray for a dimension name according to its type
@@ -956,7 +994,7 @@ class CFCoordSpecs(_CFCatSpecs_):
         if dim_type is not None:
             dim_type = dim_type.lower()
         else:
-            da_axis = self.get_axis(da, upper=False)
+            da_axis = self.get_dim_type(da, upper=False)
 
         # From dimension names
         for dim in da.dims:
@@ -976,7 +1014,7 @@ class CFCoordSpecs(_CFCatSpecs_):
         # From coordinates
         for coord in da.coords.values():
             if coord.ndim == 1 and coord.name in da.dims:
-                co_axis = self.get_axis(coord, upper=False)
+                co_axis = self.get_dim_type(coord)
                 if co_axis:
                     if dim_type and co_axis == dim_type:
                         return coord.name
@@ -987,6 +1025,60 @@ class CFCoordSpecs(_CFCatSpecs_):
         # Fallback
         if dim_type is None and da.ndim == 1:
             return da.dims[0], da_axis
+
+    def search_from_dim(self, da, dim):
+        """Search a dataarray for a coordinate from a dimension name
+
+        It first searches for a coordinate with the same name and that is
+        the only one having this dimension.
+        Then look for coordinates with the same type like x, y, etc.
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        dim: str
+
+        Return
+        ------
+        xarray.DataArray, None
+            An coordinate array or None
+        """
+
+        assert dim in da.dims, 'Invalid dimension'
+        dim_type = None
+
+        # Coord as dim only
+        if dim in da.coords:
+
+            # Check if another coordinate has this dim
+            for coord in da.coords.values():
+                if dim in coord.dims:
+                    break
+            else:
+                return da.coords[dim]
+
+            # Get the dim_type if any
+            dim_type = self.get_dim_type(da.coords[dim])
+
+        # Get dim_type from known dim name
+        if dim_type is None:
+            pname, ploc = self.sglocator.parse_attr('name', dim)
+            for dim_type, dim_names in self.dims.items():
+                if pname.lower() in dim_names:
+                    break
+
+        # Nothing to do there
+        if dim_type is None:
+            return
+
+        # Look for a coordinate with this dim_type
+        for coord in sorted(da.coords.values(),
+                            key=operator.attrgetter('ndim'),
+                            reverse=True):
+            if dim in coord.dims:
+                coord_dim_type = self.get_dim_type(coord)
+                if coord_dim_type and coord_dim_type == dim_type:
+                    return coord
 
 
 def _get_cfgm_():
@@ -1082,15 +1174,15 @@ class set_cf_specs(object):
             _CACHE["specs"] = self.old_specs
 
 
-def clean_cf_specs_cache():
-    """Clean the cf specs cahche file"""
-    if os.path.exists(_PYKFILE):
-        os.remove(_PYKFILE)
+def clean_cf_cache():
+    """Remove the cf specs cache file"""
+    if os.path.exists(USER_CF_CACHE_FILE):
+        os.remove(USER_CF_CACHE_FILE)
 
 
-def show_cf_specs_cache():
-    """Show the cf specs cahche file"""
-    print(_PYKFILE)
+def show_cf_cache():
+    """Show the cf specs cache file"""
+    print(USER_CF_CACHE_FILE)
 
 
 def get_cf_specs(name=None, category=None, cache="rw"):
@@ -1122,11 +1214,12 @@ def get_cf_specs(name=None, category=None, cache="rw"):
 
         # Try from disk cache
         if cache in ("read", "w"):
-            if os.path.exists(_PYKFILE) and (
-                os.stat(_CFGFILE).st_mtime < os.stat(_PYKFILE).st_mtime
+            if os.path.exists(USER_CF_CACHE_FILE) and (
+                os.stat(_CFGFILE).st_mtime <
+                os.stat(USER_CF_CACHE_FILE).st_mtime
             ):
                 try:
-                    with open(_PYKFILE, "rb") as f:
+                    with open(USER_CF_CACHE_FILE, "rb") as f:
                         set_cf_specs(pickle.load(f))
                 except Exception as e:
                     xoa_warn(
@@ -1137,22 +1230,22 @@ def get_cf_specs(name=None, category=None, cache="rw"):
         if "specs" not in _CACHE:
 
             # Setup
-            set_cf_specs(CFSpecs((_CFGFILE, "default")))
+            set_cf_specs(CFSpecs())
 
             # Cache it on disk
             if cache in ("write", "rw"):
                 try:
-                    cachedir = os.path.dirname(_PYKFILE)
+                    cachedir = os.path.dirname(USER_CF_CACHE_FILE)
                     if not os.path.exists(cachedir):
                         os.makedirs(cachedir)
-                    with open(_PYKFILE, "wb") as f:
+                    with open(USER_CF_CACHE_FILE, "wb") as f:
                         pickle.dump(_CACHE["specs"], f)
                 except Exception as e:
                     xoa_warn("Error while caching cf specs: " + str(e.args))
 
     # Clean cache
     if cache == "clean":
-        clean_cf_specs_cache()
+        clean_cf_cache()
 
     cf_source = _CACHE["specs"]
 
@@ -1174,14 +1267,14 @@ def get_cf_specs(name=None, category=None, cache="rw"):
             return ss[name]
 
 
-def get_cf_coord_specs(name=None):
-    """Shortcut to ``get_cf_specs(name=name, category='coords')``"""
-    return get_cf_specs(name=name, category="coords")
+# def get_cf_coord_specs(name=None):
+#     """Shortcut to ``get_cf_specs(name=name, category='coords')``"""
+#     return get_cf_specs(name=name, category="coords")
 
 
-def get_cf_var_specs(name=None):
-    """Shortcut to ``get_cf_specs(name=name, category='data_vars')``"""
-    return get_cf_specs(name=name, category="data_vars")
+# def get_cf_var_specs(name=None):
+#     """Shortcut to ``get_cf_specs(name=name, category='data_vars')``"""
+#     return get_cf_specs(name=name, category="data_vars")
 
 
 class _CFAccessor_(object):
@@ -1190,6 +1283,10 @@ class _CFAccessor_(object):
     def __init__(self, dsa):
         self._cfspecs = get_cf_specs()
         self._dsa = dsa
+
+    def set_cf_specs(self, cfspecs):
+        assert isinstance(cfspecs, CFSpecs)
+        self._cfspecs = cfspecs
 
     def get(self, name, loc="any"):
         return self._cfspecs[self._category].search(

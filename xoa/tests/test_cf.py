@@ -320,17 +320,17 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
     assert temp.lon.standard_name == "longitude"
 
 
-def test_cf_cfspecs_coords_get_axis():
+def test_cf_cfspecs_coords_get_dim_type():
     cfspecs = cf.get_cf_specs().coords
 
     # from attrs
     depth = xr.DataArray([1], dims='aa', attrs={'axis': 'z'})
-    assert cfspecs.get_axis(depth) == 'Z'
+    assert cfspecs.get_dim_type(depth) == 'z'
 
     # from CF specs
     depth = xr.DataArray([1], dims='aa',
                          attrs={'standard_name': 'ocean_layer_depth'})
-    assert cfspecs.get_axis(depth) == 'Z'
+    assert cfspecs.get_dim_type(depth) == 'z'
 
 
 def test_cf_cfspecs_coords_search_dim():
@@ -366,6 +366,41 @@ def test_cf_cfspecs_coords_search_dim():
     assert cfspecs.search_dim(depth) == ('aa', 'z')
 
     assert cfspecs.search_dim(xr.DataArray([5], dims='bb')) == ('bb', None)
+
+
+def test_cf_cfspecs_coords_search_from_dim():
+
+    lon = xr.DataArray([1, 2], dims='lon')
+    level = xr.DataArray([1, 2, 3], dims='aa',
+                         attrs={'standard_name': 'ocean_sigma_coordinate'})
+    mem = xr.DataArray(range(3), dims='mem')
+    temp = xr.DataArray(np.zeros((mem.size, level.size, lon.size)),
+                        dims=('mem', 'aa', 'lon'),
+                        coords={'mem': mem, 'aa': level, 'lon': lon})
+
+    cfspecs = cf.get_cf_specs().coords
+
+    # Direct coordinate
+    assert cfspecs.search_from_dim(temp, 'aa').name == 'aa'
+
+    # Depth coordinate from thanks to dim_type of 1D coordinate
+    depth = xr.DataArray(np.ones((level.size, lon.size)),
+                         dims=('aa', 'lon'),
+                         coords={'aa': level, 'lon': lon})
+    temp.coords['depth'] = depth
+    assert cfspecs.search_from_dim(temp, 'aa').name == 'depth'
+
+    # Cannot get dim_type
+    del temp.coords['aa']
+    assert cfspecs.search_from_dim(temp, 'aa') is None
+
+    # Cen get dim_type back from name
+    temp = temp.rename(aa='level')
+    assert cfspecs.search_from_dim(temp, 'level').name == 'depth'
+
+    # Nothing identifiable
+    temp = xr.DataArray([3], dims='banana')
+    assert cfspecs.search_from_dim(temp, "banana") is None
 
 
 def test_cf_dataarraycfaccessor():
