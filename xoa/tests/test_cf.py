@@ -5,12 +5,14 @@ Test the :mod:`xoa.cf` module
 """
 
 # from unittest.mock import Mock
+import warnings
 import pytest
 
 import numpy as np
 import xarray as xr
 
 from xoa import cf
+
 
 @pytest.mark.parametrize(
     "attr,value,expected",
@@ -23,6 +25,23 @@ from xoa import cf
 )
 def test_cf_sglocator_parse_attr(attr, value, expected):
     assert cf.SGLocator().parse_attr(attr, value) == expected
+
+
+@pytest.mark.parametrize(
+    "attr,value,expected",
+    [
+        ("standard_name", "my_var_at_t_location",
+         ("my_var_at_t_location", None)),
+        ("standard_name", "my_var_at_u_location", ("my_var", "u")),
+        ("long_name", "My var at RHO location", ("My var", "rho")),
+        ("long_name", "My var at rho location", ("My var", "rho")),
+        ("name", "myvarrho", ("myvar", "rho")),
+    ],
+)
+def test_cf_sglocator_parse_attr_with_valid_locations(attr, value, expected):
+    assert cf.SGLocator(valid_locations=['u', 'rho'],
+                        name_format="{root}{loc}",
+                        ).parse_attr(attr, value) == expected
 
 
 @pytest.mark.parametrize(
@@ -71,13 +90,13 @@ def test_cf_sglocator_format_attrs_no_loc():
     attrs = {
         "name": "u_u",
         "standard_name": "banana_at_t_location",
-        "long_name": "Banana",
+        "long_name": "Banana at T location",
         "int_attr": 10,
         "str_attr": "good",
     }
 
     fmt_attrs = cf.SGLocator().format_attrs(attrs, loc='')
-    assert fmt_attrs["name"] == "u"
+    assert fmt_attrs["name"] == "u_u"
     assert fmt_attrs["standard_name"] == "banana"
     assert fmt_attrs["long_name"] == "Banana"
     for attr in ("int_attr", "str_attr"):
@@ -94,7 +113,7 @@ def test_cf_sglocator_format_attrs_with_loc():
     }
 
     fmt_attrs = cf.SGLocator().format_attrs(attrs, loc="f")
-    assert fmt_attrs["name"] == "u_f"
+    assert fmt_attrs["name"] == "u_u"
     assert fmt_attrs["standard_name"] == "banana_at_f_location"
     assert fmt_attrs["long_name"] == "Banana at F location"
     for attr in ("int_attr", "str_attr"):
@@ -149,6 +168,7 @@ def test_cf_get_cfg_specs_coord():
 
 def test_cf_get_cfg_specs_coord_inherit():
     specs = cf.get_cf_specs("depth", "coords")
+    print(specs)
     assert specs["name"][0] == "depth"
     assert specs["long_name"][0] == "Depth"
 
@@ -346,7 +366,7 @@ def test_cf_cfspecs_coords_search_dim():
     depth = xr.DataArray([1], dims='aa', attrs={'axis': 'z'})
     temp.coords['aa'] = depth
     assert cfspecs.search_dim(temp, 'z') == 'aa'
-    assert cfspecs.search_dim(temp)is None
+    assert cfspecs.search_dim(temp) is None
 
     # from known coordinate
     del temp.coords['aa'].attrs['axis']
@@ -404,7 +424,11 @@ def test_cf_cfspecs_coords_search_from_dim():
 
 
 def test_cf_dataarraycfaccessor():
-    xr.register_dataarray_accessor('cf')(cf.DataArrayCFAccessor)
+    with warnings.catch_warnings():
+        warnings.simplefilter(
+            "ignore",
+            xr.core.extensions.AccessorRegistrationWarning)
+        xr.register_dataarray_accessor('cf')(cf.DataArrayCFAccessor)
 
     lon = xr.DataArray(range(5), dims='xxx', name='xxx',
                        attrs={'standard_name': 'longitude'})
@@ -416,7 +440,11 @@ def test_cf_dataarraycfaccessor():
 
 
 def test_cf_datasetcfaccessor():
-    xr.register_dataset_accessor('cf')(cf.DatasetCFAccessor)
+    with warnings.catch_warnings():
+        warnings.simplefilter(
+            "ignore",
+            xr.core.extensions.AccessorRegistrationWarning)
+        xr.register_dataset_accessor('cf')(cf.DatasetCFAccessor)
 
     lon = xr.DataArray(range(5), dims='xxx', name='xxx',
                        attrs={'standard_name': 'longitude'})

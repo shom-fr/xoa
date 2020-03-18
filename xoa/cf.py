@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Naming convention tools
+Naming convention tools for reading and formatting variables
 """
 # Copyright or © or Copr. Shom/Ifremer/Actimar
 #
@@ -40,10 +40,11 @@ import os
 import pickle
 import re
 import operator
+import warnings
 
 import appdirs
 
-from .__init__ import XoaError, xoa_warn
+from .__init__ import XoaError, xoa_warn, get_option
 from .misc import dict_merge, match_string
 
 _THISDIR = os.path.dirname(__file__)
@@ -79,17 +80,31 @@ class XoaCFError(XoaError):
     pass
 
 
+def _compile_sg_match_(re_match, attrs, formats, root_patterns,
+                       location_pattern):
+    for attr in attrs:
+        root_pattern = root_patterns[attr]
+        re_match[attr] = re.compile(
+            formats[attr].format(
+                root=rf"(?P<root>{root_pattern})",
+                loc=rf"(?P<loc>{location_pattern})"
+            ),
+            re.I,
+        ).match
+
+
 class SGLocator(object):
     """Staggered grid location parsing and formatting utility
 
     Parameters
     ----------
     name_format: str
-        A string containing the string patterns ``{root}`` and ``{loc}}``,
+        A string containing the string patterns ``{root}`` and ``{loc}``,
         which defaults to ``"{root}_{loc}"``
-    valid_locations: str
-        Valid location letters that are checked when parsing
+    valid_locations: list(str), None
+        Valid location strings that are used when parsing
     """
+    valid_attrs = ("name", "standard_name", "long_name")
 
     formats = {
         "name": "{root}_{loc}",
@@ -97,22 +112,17 @@ class SGLocator(object):
         "long_name": "{root} at {loc} location",
     }
 
-    re_match = {
-        "standard_name": re.compile(
-            formats["standard_name"].format(
-                root=r"(?P<root>\w+)", loc=r"(?P<loc>[a-zA-Z])"
-            ),
-            re.I,
-        ).match,
-        "long_name": re.compile(
-            formats["long_name"].format(
-                root=r"(?P<root>[\w ]+)", loc=r"(?P<loc>[a-zA-Z])"
-            ),
-            re.I,
-        ).match,
-    }
+    root_patterns = {
+        "name": r"\w+",
+        "standard_name": r"\w+",
+        "long_name": r"[\w ]+"
+        }
 
-    valid_attrs = ("name", "standard_name", "long_name")
+    location_pattern = "[a-z]+"
+
+    re_match = {}
+    _compile_sg_match_(re_match, valid_attrs, formats, root_patterns,
+                       location_pattern)
 
     def __init__(self, name_format=None, valid_locations=None):
 
@@ -121,18 +131,28 @@ class SGLocator(object):
         self.re_match = self.re_match.copy()
         self._name_format = name_format
         if valid_locations:
-            valid_locations = "".join([s.lower() for s in valid_locations])
+            valid_locations = list(valid_locations)
         self.valid_locations = valid_locations
 
-        # The name case
+        # Formats and regexps
+        to_recompile = set()
         if name_format:
+            for pat in ("{root}", "{loc}"):
+                if pat not in name_format:
+                    raise XoaCFError("name_format must contain strings "
+                                     "{root} and {loc}: "+name_format)
+            if len(name_format) == 10:
+                xoa_warn('No separator found in "name_format" and '
+                         'and no "valid_locations" specified: '
+                         f'{name_format}. This leads to ambiguity during '
+                         'regular expression parsing.')
             self.formats["name"] = name_format
-        self.re_match["name"] = re.compile(
-            self.formats["name"].format(
-                root=r"(?P<root>\w+)", loc=r"(?P<loc>[a-zA-Z])"
-            ),
-            re.I,
-        ).match
+            to_recompile.add("name")
+        if self.valid_locations:
+            self.location_pattern = "|".join(self.valid_locations)
+            to_recompile.update(("name", "standard_name", "long_name"))
+        _compile_sg_match_(self.re_match, to_recompile, self.formats,
+                           self.root_patterns, self.location_pattern)
 
     def parse_attr(self, attr, value):
         """Parse an attribute string to get its root and location
@@ -148,17 +168,28 @@ class SGLocator(object):
         ------
         str
             Root
-        letter or None
-            Location
+        str, None
+            Lower case location
+
+        Example
+        -------
+        .. ipython:: python
+
+            @suppress
+            from xoa.cf import SGLocator
+            sg = SGLocator(name_format="{root}_{loc}")
+            sg.parse_attr("name", "super_banana_t")
+            sg.parse_attr("standard_name", "super_banana_at_rhum_location")
+            sg.parse_attr("standard_name", "super_banana_at_rhum_place")
+
+            sg = SGLocator(valid_locations=["u", "rho"])
+            sg.parse_attr("name", "super_banana_t")
+            sg.parse_attr("name", "super_banana_rho")
         """
         m = self.re_match[attr](value)
         if m is None:
             return value, None
-        root = m.group("root")
-        loc = m.group("loc").lower()
-        if self.valid_locations and loc not in self.valid_locations:
-            return value, None
-        return root, loc
+        return m.group("root"), m.group("loc").lower()
 
     def match_attr(self, attr, value, root, loc=None):
         """Check if an attribute is matching a location
@@ -206,17 +237,20 @@ class SGLocator(object):
         standardize: bool
             If True, standardize ``root`` and ``loc`` values.
 
-        Example
-        -------
-        >>> sg = SGLocator()
-        >>> sg.format_attr('standard_name', 'sea_water_temperature', 't')
-        'sea_water_temperature_at_t_location'
-        >>> sg.format_attr('standard_name', 'sea_water_temperature', False)
-        'sea_water_temperature'
-
         Return
         ------
         str
+
+        Example
+        -------
+        .. ipython:: python
+
+            @suppress
+            from xoa.cf import SGLocator
+            sg = SGLocator()
+            print(sg.format_attr('standard_name', 'sea_water_temperature', 't'))
+            print(sg.format_attr('standard_name', 'sea_water_temperature', False))
+
         """
         if attr not in self.valid_attrs:
             return value
@@ -234,8 +268,8 @@ class SGLocator(object):
             and loc.lower() not in self.valid_locations
         ):
             raise XoaCFError(
-                f"Invalid location: {loc}. "
-                f"Please one use of: {self.valid_locations}."
+                "Invalid location: {}. Please one use of: {}.".format(
+                    loc, ', '.join(self.valid_locations))
             )
         elif loc is False or loc == '':
             ploc = None
@@ -252,7 +286,39 @@ class SGLocator(object):
         return self.formats[attr].format(root=root, loc=loc)
 
     def format_attrs(self, attrs, loc=None, standardize=True):
-        """Copy and format a dict of attributes"""
+        """Copy and format a dict of attributes
+
+        Parameters
+        ----------
+        attrs: dict
+        loc: string, None
+        standardize: bool
+        loc: {True, None}, letter, {False, ""}
+            If None, location is left unchanged;
+            if a letter, it is set;
+            else, it is removed.
+        standardize: bool
+            If True, standardize ``root`` and ``loc`` values.
+
+        Return
+        ------
+        dict
+
+        Example
+        -------
+        .. ipython:: python
+
+            @suppress
+            from xoa.cf import SGLocator
+            sg = SGLocator()
+            attrs = dict(standard_name='sea_water_temperature_at_t_location',
+                         long_name='sea_water_temperature',
+                         other_attr=23.)
+            sg.format_attrs(attrs, loc='t') # force t loc
+            sg.format_attrs(attrs) # keep loc
+            sg.format_attrs(attrs, loc=False) # force no loc
+
+        """
         attrs = attrs.copy()
         for attr, value in attrs.items():
             if attr in self.valid_attrs and attr != 'name':
@@ -322,7 +388,7 @@ class CFSpecs(object):
 
         # Initialiase categories
         self._cfs = {}
-        catcls = {"coords": CFCoordSpecs, "data_vars": CFVarSpecs}
+        catcls = {"data_vars": CFVarSpecs, "coords": CFCoordSpecs}
         for category in self.categories:
             self._cfs[category] = catcls[category](self)
 
@@ -334,12 +400,27 @@ class CFSpecs(object):
         self._load_user = user
         self.load_cfg(cfg)
 
-    def _load_cfg_as_dict_(self, cfg, cache):
-        """Load a single cfg, validate it and return it as a dict"""
+    def _load_cfg_as_dict_(self, cfg, cache=None):
+        """Load a single cfg, validate it and return it as a dict
+
+        When the config source is a tuple or a file name, the loaded config
+        is in-memory cached by default. The cache key is the first item
+        of the tuple or the file name.
+
+        Parameters
+        ----------
+        cf: str, tuple, dict, CFSpecs
+            Config source
+        cache: bool
+            Use in-memory cache system?
+
+        """
         # Config manager to get defaults and validation
         cfgm = _get_cfgm_()
 
         # Get it from cache
+        if cache is None:
+            cache = get_option("cache.cf")
         cache = cache and ((isinstance(cfg, str) and '\n' not in cfg) or
                            isinstance(cfg, tuple))
         if cache:
@@ -351,7 +432,7 @@ class CFSpecs(object):
             else:
                 cache_key, cfg = cfg
             if cache_key in _CACHE["cfgs"]:
-                print("CFG FROM CACHE: " + cfg)
+                # print("CFG FROM CACHE: " + cfg)
                 return _CACHE["cfgs"][cfg]
 
         # Check input type
@@ -369,7 +450,7 @@ class CFSpecs(object):
 
         return cfg_dict
 
-    def load_cfg(self, cfg=None, cache=True):
+    def load_cfg(self, cfg=None, cache=None):
         """Load a single or a list of configurations
 
         Parameters
@@ -382,8 +463,9 @@ class CFSpecs(object):
             - config dict,
             - two-element tuple with the first item of one of the above types,
               and second item as a cache key for faster reloading.
-        cache: bool
-            Cache in memory loaded configs
+        cache: bool, None
+            In in-memory cache system?
+            Defaults to option boolean :xoaoption:`cache.cf`.
 
         """
         # Get the list of validated configurations
@@ -413,14 +495,14 @@ class CFSpecs(object):
         self._post_process_()
 
     def copy(self):
-        return CFSpecs(self)
+        return CFSpecs(self, default=False, user=False)
 
     def __copy__(self):
         return self.copy()
 
     @property
     def categories(self):
-        return ["coords", "data_vars"]
+        return ["data_vars", "coords"]
 
     @property
     def sglocator(self):
@@ -457,14 +539,11 @@ class CFSpecs(object):
 
         # Inits
         items = {}
-        self._from_atlocs = {}
         for category in self.categories:
             items[category] = []
-            self._from_atlocs[category] = []
 
         # Process
         for category in self.categories:
-            self._from_atlocs[category] = []
             for name in self[category].names:
                 for item in self._process_entry_(category, name):
                     if item:
@@ -472,11 +551,11 @@ class CFSpecs(object):
                         items[pcat].append((pname, pspecs))
 
         # Refill
-        for category, contents in items.items():
+        for category in items:
             self._dict[category].clear()
             self._dict[category].update(items[category])
 
-        # Updates allowed dimensions
+        # Updates valid dimensions
         for coord_specs in self._dict['coords'].values():
             if coord_specs['axis']:
                 axis = coord_specs['axis'].lower()
@@ -500,19 +579,20 @@ class CFSpecs(object):
         # Dict of entries for this category
         entries = self._dict[category]
 
-        # Wrong entry!
-        if name not in entries:
-            yield
+        # # Wrong entry!
+        # if name not in entries:
+        #     print('bad name', name)
+        #     yield
+
+        # # Already processed
+        # if "processed" in entries[name] and name=='temp':
+        #     print('already processed', name)
+        #     yield
 
         # Get the specs as pure dict
         if hasattr(entries[name], "dict"):
             entries[name] = entries[name].dict()
         specs = entries[name]
-
-        # Ids
-        if name in specs["name"]:
-            specs["name"].remove(name)
-        specs["name"].insert(0, name)
 
         # Long name from name or standard_name
         if not specs["long_name"]:
@@ -553,28 +633,12 @@ class CFSpecs(object):
                 if key not in self._cfgspecs[category]["__many__"]:
                     del specs[key]
 
-            # to_scan = []
-            # if "inherit" in entries: #?
-            #     to_scan.append(self._inherit)
-            # to_scan.append(entries)
-
-            # for from_specs in to_scan:
-            #     if from_name in from_specs:
-
-            #         # Merge
-            #         print('mergee', specs, from_specs[from_name])
-            #         entries[name] = specs = dict_merge(
-            #             specs,
-            #             from_specs[from_name],
-            #             cls=dict,
-            #             **_CF_DICT_MERGE_KWARGS,
-            #         )
-
-            #         # Check compatibility of keys
-            #         for key in list(specs.keys()):
-            #             if key not in self._cfgspecs[category]["__many__"]:
-            #                 del specs[key]
             specs["inherit"] = None  # switch off inheritance now
+
+        # Names
+        if name in specs["name"]:
+            specs["name"].remove(name)
+        specs["name"].insert(0, name)
 
         # Select
         if specs.get("select", None):
@@ -590,6 +654,10 @@ class CFSpecs(object):
                 if standard_name not in specs["name"]:
                     specs["name"].append(standard_name)
 
+        # if name=="depth":
+        #     print('>>>>',category, specs['name'])
+
+        specs['processed'] = True
         yield category, name, specs
 
     def format_coord(self, da, name=None, loc=None, standardize=True):
@@ -994,7 +1062,7 @@ class CFCoordSpecs(_CFCatSpecs_):
         if dim_type is not None:
             dim_type = dim_type.lower()
         else:
-            da_axis = self.get_dim_type(da, upper=False)
+            da_axis = self.get_dim_type(da)
 
         # From dimension names
         for dim in da.dims:
@@ -1195,14 +1263,21 @@ def get_cf_specs(name=None, category=None, cache="rw"):
     category: str or None
         Select a category with "coords" or "data_vars".
         If not provided, search first in "data_vars", then "coords".
-    cache: bool
-        Cache specs on disk with pickling for fast loading
+    cache: str, bool, None
+        Cache specs on disk with pickling for fast loading.
+        If ``None``, it defaults to boolean option :xoaoption:`cache.cf`.
+        Possible string values: ``"ignore"``, ``"rw"``, ``"read"``,
+        ``"write"``, ``"clean"``.
+        If ``True``, it is set to ``"rw"``.
+        If ``False``, it is set to ``"ignore"``.
 
     Return
     ------
     dict or None
         None is return if no specs are found
     """
+    if cache is None:
+        cache = get_option('cf.cache')
     if cache is True:
         cache = "rw"
     elif cache is False:
@@ -1352,8 +1427,12 @@ def register_cf_accessors(name='cf'):
     # cfspecs = cfspecs or get_cf_specs()
     # name = cfspecs['accessors']['name']
     import xarray as xr
-    xr.register_dataarray_accessor(name)(DataArrayCFAccessor)
-    xr.register_dataset_accessor(name)(DatasetCFAccessor)
+    with warnings.catch_warnings():
+        warnings.simplefilter(
+            "ignore",
+            xr.core.extensions.AccessorRegistrationWarning)
+        xr.register_dataarray_accessor(name)(DataArrayCFAccessor)
+        xr.register_dataset_accessor(name)(DatasetCFAccessor)
 
 
 register_cf_accessors()
