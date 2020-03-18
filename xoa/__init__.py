@@ -60,14 +60,17 @@ _RE_OPTION_MATCH = re.compile(r"^(\w+)\W(\w+)$").match
 
 #: Specifications of configuration options
 CONFIG_SPECS = """
-[accessors]
-cf=boolean(default=True) # automatically load the CF acessors?
+[accessors] # xarray accessors
+cf=boolean(default=True) # automatically load the CF accessors?
 
-[plot]
-cmapdiv = string(default="cmo.balance") # defaut diveging colormap
+[plot] # plot parameters
+cmapdiv = string(default="cmo.balance") # defaut diverging colormap
 cmappos = string(default="cmo.amp")     # default positive colormap
 cmapneg = string(default="cmo.tempo_r") # default negative colormap
 cmapcyc = string(default="cmo.phase")   # default cyclic colormap
+
+[cache] # cache systems
+cf=boolean(default=True) # use the xoa.cf in memory and file caches
 """
 
 #: Default xoa user configuration file

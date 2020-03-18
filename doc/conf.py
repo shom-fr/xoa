@@ -10,14 +10,15 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.insert(0, os.path.join(os.path.abspath(
+    os.path.dirname(__file__)), 'ext'))
 
 
 # %% Project information
 
-project = 'Xoa'
+project = 'xoa'
 copyright = '2020, Shom/Ifremer/Actimar'
 author = 'Shom/Ifremer/Actimar'
 
@@ -39,9 +40,11 @@ extensions = [
     'sphinx.ext.viewcode',
     "sphinx.ext.extlinks",
     "sphinx.ext.mathjax",
+    "sphinx.ext.githubpages",
     "IPython.sphinxext.ipython_directive",
     "IPython.sphinxext.ipython_console_highlighting",
-    'nbsphinx'
+    'nbsphinx',
+    'genoptions'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -78,13 +81,22 @@ intersphinx_mapping = {
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None)
     }
 
-# %% confopt and confsec directives
+# %% genoptions
+genoptions_table = 'genoptions/table.txt'
+genoptions_declarations = 'genoptions/declarations.txt'
+
+
+# %% User directives
 
 
 def setup(app):
-    app.add_object_type('confopt', 'confopt',
-                        objname='configuration option',
-                        indextemplate='pair: %s; configuration option')
-    app.add_object_type('confsec', 'confsec',
-                        objname='configuration section',
-                        indextemplate='pair: %s; configuration section')
+    app.add_object_type(
+        'xoaoption', 'xoaoption',
+        objname='xoa configuration flat option',
+        indextemplate='pair: %s; xoa configuration flat option')
+    # app.add_object_type('xoaconfopt', 'xoaconfopt',
+    #                     objname='xoa configuration option',
+    #                     indextemplate='pair: %s; xoa configuration option')
+    # app.add_object_type('xoaconfsec', 'xoaconfsec',
+    #                     objname='xoa configuration section',
+    #                     indextemplate='pair: %s; xoa configuration section')

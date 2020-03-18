@@ -5,8 +5,10 @@ API
     :toctree: api
 
     xoa
-    xoa.cf
     xoa.misc
+    xoa.cf
+    xoa.coords
     xoa.color
     xoa.grid
     xoa.cfgm
+    xoa.cli

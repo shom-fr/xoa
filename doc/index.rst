@@ -11,6 +11,7 @@ Documentation
    configure
    usages
    api
+   cli
    changes
    appendix
 

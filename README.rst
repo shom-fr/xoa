@@ -8,7 +8,7 @@ xoa - xarray-based ocean analysis library
 Sources and help
 -----------------
 
-Source are available on the Xoa `github page <https://github.com/VACUMM/xoa>`_.
+Source are available on the xoa `github page <https://github.com/VACUMM/xoa>`_.
 Here you can also post tickets for requests and issues.
 
 

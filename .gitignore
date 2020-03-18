@@ -131,3 +131,4 @@ dmypy.json
 # Sphinx
 doc/api/
 doc/savefig/
+doc/genoptions/
