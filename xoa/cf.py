@@ -420,7 +420,7 @@ class CFSpecs(object):
 
         # Get it from cache
         if cache is None:
-            cache = get_option("cache.cf")
+            cache = get_option("cf.cache")
         cache = cache and ((isinstance(cfg, str) and '\n' not in cfg) or
                            isinstance(cfg, tuple))
         if cache:
@@ -712,11 +712,11 @@ class CFSpecs(object):
     def search_coord(self, dsa, name=None, loc="any", get="obj"):
         return self.coords.search(dsa, name=name, loc=loc, get=get)
 
-    def search_dim(self, da, dim_type, loc="any"):
-        return self.coords.search_dim(da, dim_type, loc=loc)
+    def search_dim(self, da, dim_type=None, loc="any"):
+        return self.coords.search_dim(da, dim_type=dim_type, loc=loc)
 
     def search_coord_from_dim(self, da, dim):
-        return self.coords.search_dim(da, dim)
+        return self.coords.search_from_dim(da, dim)
 
     def search_data_var(self, dsa, name=None, loc="any", get="obj"):
         return self.data_vars.search(dsa, name=name, loc=loc, get=get)
@@ -1120,7 +1120,7 @@ class CFCoordSpecs(_CFCatSpecs_):
 
             # Check if another coordinate has this dim
             for coord in da.coords.values():
-                if dim in coord.dims:
+                if coord.name != dim and dim in coord.dims:
                     break
             else:
                 return da.coords[dim]
@@ -1277,7 +1277,7 @@ def get_cf_specs(name=None, category=None, cache="rw"):
         None is return if no specs are found
     """
     if cache is None:
-        cache = get_option('cf.cache')
+        cache = get_option('cache.cf')
     if cache is True:
         cache = "rw"
     elif cache is False:

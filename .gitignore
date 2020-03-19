@@ -132,3 +132,6 @@ dmypy.json
 doc/api/
 doc/savefig/
 doc/genoptions/
+
+# misc
+setup.cfg

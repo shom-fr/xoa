@@ -10,11 +10,11 @@ from .__init__ import (
     show_info, show_versions, show_paths, show_options)
 
 
-def main(argv=None):
+def get_parser(formatter_class=argparse.ArgumentDefaultsHelpFormatter):
 
     parser = argparse.ArgumentParser(
         description="xoa interface",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        formatter_class=formatter_class)
     subparsers = parser.add_subparsers(help='sub-command help')
 
     parser_info = subparsers.add_parser('info', help='info about xoa')
@@ -23,6 +23,12 @@ def main(argv=None):
                              default='all')
     parser_info.set_defaults(func=main_info)
 
+    return parser
+
+
+def main(argv=None, formatter_class=argparse.ArgumentDefaultsHelpFormatter):
+
+    parser = get_parser(formatter_class=formatter_class)
     args = parser.parse_args(argv)
     args.func(parser, args)
 

@@ -12,3 +12,4 @@ API
     xoa.grid
     xoa.cfgm
     xoa.cli
+    xoa._interp

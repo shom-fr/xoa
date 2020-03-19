@@ -34,13 +34,19 @@ Inline settings
 ---------------
 
 You can change options within your code with
-the :class:`xoa.set_options` class.
+the :class:`xoa.set_option` function and the :class:`xoa.set_options` class::
 
-This also works as a context like in this example::
+    xoa.set_option("plot.cmapdiv", "cmo.balance")  # single option
+    xoa.set_options("plot", cmapdiv="cmo.balance", cmappos="cmo.amp")  # several options
 
-    with xoa.set_option("plot", cmapdiv="cmo.balance"):
+:class:`xoa.set_options` can be used as a context manager to temporarily
+change options within a block::
+
+    with xoa.set_options("plot", cmapdiv="cmo.balance"):
 
         # you code with temporary settings
+
+    # back to previous options
 
 Getting options
 ===============
