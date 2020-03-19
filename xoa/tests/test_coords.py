@@ -2,7 +2,6 @@
 """
 Test the :mod:`xoa.coords` module
 """
-import re
 
 import pytest
 import numpy as np
@@ -11,34 +10,57 @@ import xarray as xr
 from xoa import coords
 
 
-def test_coords_flush_work_dim_right():
+@pytest.mark.parametrize(
+    "inshape,indims,tdims,odims",
+    [
+        ((1, 2), ('y', 'x'), ("x", "t", "y"), ("x", "y")),
+        ((1, 3, 2), ('y', 't', 'x'), (Ellipsis, "x", "e", "y"),
+         ("t", "x", "y")),
+    ],
+)
+def test_coords_transpose_compat(inshape, indims, tdims, odims):
+    da = xr.DataArray(np.ones(inshape), dims=indims)
+    assert coords.transpose_compat(da, tdims).dims == odims
 
 
-    dep0 = xr.DataArray([-100., 0.], dims='nz', name='nz')
-    dep1 = xr.DataArray([-1000., -50, 0.], dims='nk', name='nk')
-    lon = xr.DataArray(range(4), dims='lon')
-    mem = xr.DataArray(range(2), dims='mem')
-    time = xr.DataArray(range(1), dims='time')
+def test_coords_dimflusher1d():
+
+    nz0 = 5
+    nz1 = 7
+    nlon = 4
+    nmem = 2
+    dep0 = xr.DataArray(np.linspace(-100., 0., nz0), dims='nz', name='nz')
+    dep1 = xr.DataArray(np.linspace(-1000., 0., nz1), dims='nk', name='nk')
+    lon = xr.DataArray(range(nlon), dims='lon')
+    mem = xr.DataArray(range(nmem), dims='mem')
 
     da = xr.DataArray(np.ones((mem.size, dep0.size, lon.size)),
                       dims=('mem', 'nz', 'lon'),
                       coords=(mem, dep0, lon))
-    # coord = dep1
+
+    # 1d -> 1d
+    coord = dep1
+    dfl = coords.DimFlusher1D(da, coord)
+    assert dfl.da_in_data.shape == (nmem*nlon, nz0)
+    assert dfl.coord_in_data.shape == (1, nz0)
+    assert dfl.coord_out_data.shape == (1, nz1)
+    assert dfl.work_dims == ("mem", "lon", "nk")
+    assert dfl.work_shape == (nmem, nlon, nz1)
+    da_out_data = np.ones((nmem*nlon, nz1))
+    da_out = dfl.get_back(da_out_data)
+    assert da_out.coords["nk"].shape == (nz1,)
     # fda, fcoord = coords.flush_work_dim_right(da, coord)
     # assert fda.dims == ('mem', 'lon', 'nz')
     # assert fcoord.dims == ('nk', )
 
-    coord = xr.DataArray(np.ones((dep1.size, lon.size)),
-                         dims=('nk', 'lon'),
-                         attrs={'standard_name': 'ocean_layer_depth'})
+    # coord = xr.DataArray(np.ones((dep1.size, lon.size)),
+    #                       dims=('nk', 'lon'),
+    #                       attrs={'standard_name': 'ocean_layer_depth'})
     # fda, fcoord = coords.flush_work_dim_right(da, coord)
     # assert fda.dims == ('mem', 'lon', 'nz')
     # assert fcoord.dims == ('lon', 'nk')
-    print(da[0, :, 0])
-    da1d = da[0, :, 0]
-    del da1d.coords['lon'], da1d.coords['mem']
-    print(da1d)
-    fda, fcoord = coords.flush_work_dim_right(da1d, coord)
-    assert fda.dims == ('lon', 'nz')
-    assert fcoord.dims == ('lon', 'nk')
-
+    # da1d = da[0, :, 0]
+    # del da1d.coords['lon'], da1d.coords['mem']
+    # fda, fcoord = coords.flush_work_dim_right(da1d, coord)
+    # assert fda.dims == ('lon', 'nz')
+    # assert fcoord.dims == ('lon', 'nk')
