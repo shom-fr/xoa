@@ -10,6 +10,7 @@ API
     xoa.coords
     xoa.color
     xoa.grid
+    xoa.regrid
     xoa.cfgm
     xoa.cli
     xoa._interp
