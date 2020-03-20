@@ -248,8 +248,8 @@ class SGLocator(object):
             @suppress
             from xoa.cf import SGLocator
             sg = SGLocator()
-            print(sg.format_attr('standard_name', 'sea_water_temperature', 't'))
-            print(sg.format_attr('standard_name', 'sea_water_temperature', False))
+            sg.format_attr('standard_name', 'sea_water_temperature', 't')
+            sg.format_attr('standard_name', 'sea_water_temperature', False)
 
         """
         if attr not in self.valid_attrs:
@@ -375,13 +375,6 @@ class CFSpecs(object):
     user: bool
         Load also the user specs stored in :data:`USER_CF_FILE`
 
-
-    Attributes
-    ----------
-    sglocator: :class:`SGLocator`
-        Used to manage stagerred grid locations
-    categories: list
-        Types of specs
     """
 
     def __init__(self, cfg=None, default=True, user=True):
@@ -502,10 +495,12 @@ class CFSpecs(object):
 
     @property
     def categories(self):
+        """List of cf specs categories"""
         return ["data_vars", "coords"]
 
     @property
     def sglocator(self):
+        """:class:`SGLocator` instance"""
         return self._sgl
 
     def __getitem__(self, section):
@@ -749,6 +744,7 @@ class _CFCatSpecs_(object):
 
     @property
     def sglocator(self):
+        """:class:`SGLocator` instance"""
         return self.parent.sglocator
 
     @property

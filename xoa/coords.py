@@ -206,5 +206,6 @@ class DimFlusher1D(object):
         da_out[self.coord_out_name] = self.coord_out
         da_out.attrs.update(self.da_in.attrs)
         da_out.coords.update(self.extra_coords)
+        da_out.name = self.da_in.name
 
         return da_out

@@ -21,8 +21,8 @@ Getting the current specifications for data variables and coordinates:
 
     from xoa import cf
     cfspecs = cf.get_cf_specs()
-    print(cfspecs.data_vars.names[:3])
-    print(cfspecs.coords.names[:3])
+    cfspecs.data_vars.names[:3]
+    cfspecs.coords.names[:3]
 
 Data variables
 --------------

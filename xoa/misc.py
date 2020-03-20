@@ -37,10 +37,50 @@ Miscellaneaous low level utilities
 # knowledge of the CeCILL license and that you accept its terms.
 
 import types
+from enum import EnumMeta
 
 from .__init__ import XoaError
 
 import numpy as np
+
+
+class DefaultEnumMeta(EnumMeta):
+    """Enum meta-class that support default value and None
+
+    When the item is not provided or equal to ``None``, the first
+    declared item is returned
+
+    Inspired from: https://stackoverflow.com/questions/44867597/is-there-a-way-to-specify-a-default-value-for-python-enums
+
+    Example
+    -------
+    .. ipython:: python
+
+        @from xoa.misc import DefaultEnumMeta
+        from enum import IntEnum
+
+        class regrid_methods(IntEnum, metaclass=DefaultEnumMeta):
+            linear = 1
+            nearest = 0
+            cellave = -1
+
+        print(regrid_methods())
+        print(regrid_methods(None))
+        print(regrid_methods(1))
+        print(regrid_methods[None])
+        print(regrid_methods['linear'])
+    """
+    default = None
+
+    def __call__(cls, value=None, *args, **kwargs):
+        if value is None:
+            return next(iter(cls))
+        return super().__call__(value, *args, **kwargs)
+
+    def __getitem__(cls, name):
+        if name is None:
+            return next(iter(cls))
+        return cls._member_map_[name]
 
 
 def get_axis_slices(ndim, axis, **kwargs):

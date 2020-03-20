@@ -25,12 +25,16 @@ class _intchoices_(IntEnum):
 
 class regrid1d_methods(_intchoices_, metaclass=misc.DefaultEnumMeta):
     """Supported :func:`regrid1d` methods"""
+    #: Linear iterpolation
     linear = 1
     interp = 1  # compat
     # nearest = 0
+    #: Cubic iterpolation
     cubic = 2
+    #: Hermitian iterpolation
     hermit = 3
     hermitian = 3
+    #: Cell-averaging or conservative regridding
     cellave = -1
     # cellerr = -2
 
