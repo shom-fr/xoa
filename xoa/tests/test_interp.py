@@ -158,7 +158,7 @@ def test_interp_linear4dto1dxx():
     np.testing.assert_almost_equal(vo_interp[0], vo_truth)
 
 
-def test_interp_interp1d():
+def test_interp_linear1d():
 
     # coords
     nx = 17
@@ -174,35 +174,35 @@ def test_interp_interp1d():
     vari[int(nx/3):int(2*nx/3), int(nyi/3):int(2*nyi/3)] = np.nan
 
     # nearest
-    varon = _interp.interp1d(vari, yi, yo, 0, extrap=0)
+    varon = _interp.linear1d(vari, yi, yo, 0, extrap=0)
     assert not np.isnan(varon).all()
-    yyon = _interp.interp1d(yyi, yi, yo, 0, extrap=0)
-    xxon = _interp.interp1d(xxi, yi, yo, 0, extrap=0)
+    yyon = _interp.linear1d(yyi, yi, yo, 0, extrap=0)
+    xxon = _interp.linear1d(xxi, yi, yo, 0, extrap=0)
     varon_true = vfunc(y=yyon, x=xxon)
     varon_true[np.isnan(varon)] = np.nan
     np.testing.assert_allclose(varon_true, varon)
 
     # linear
     yyo, xxo = np.meshgrid(yo, x)
-    varol = _interp.interp1d(vari, yi, yo, 1, extrap=0)
+    varol = _interp.linear1d(vari, yi, yo, 1, extrap=0)
     assert not np.isnan(varol).all()
     varol_true = vfunc(y=yyo, x=xxo)
     varol_true[np.isnan(varol)] = np.nan
     np.testing.assert_allclose(varol_true, varol)
 
     # cubic
-    varoh = _interp.interp1d(vari, yi, yo, 3, extrap=0)
+    varoh = _interp.linear1d(vari, yi, yo, 3, extrap=0)
     assert not np.isnan(varoh).all()
     assert np.nanmax(varoh) <= np.nanmax(vari)
     assert np.nanmin(varoh) >= np.nanmin(vari)
 
     # extrap
-    varole = _interp.interp1d(vari, yi, yo, 1, extrap=2)
+    varole = _interp.linear1d(vari, yi, yo, 1, extrap=2)
     vv = vari[-1, ~np.isnan(vari[-1])]
     np.testing.assert_allclose(varole[-1, [0, -1]], vv[[0, -1]])
 
 
-def test_interp_interp1dx():
+def test_interp_linear1dx():
 
     # coords
     nx = 17
@@ -222,35 +222,35 @@ def test_interp_interp1dx():
     # vari[:] = yyi
 
     # nearest
-    varon = _interp.interp1dx(vari, yyi, yo, 0, extrap=0)
+    varon = _interp.linear1dx(vari, yyi, yo, 0, extrap=0)
     assert not np.isnan(varon).all()
-    yyon = _interp.interp1dx(yyi, yyi, yo, 0, extrap=0)
-    xxon = _interp.interp1dx(xxi, yyi, yo, 0, extrap=0)
+    yyon = _interp.linear1dx(yyi, yyi, yo, 0, extrap=0)
+    xxon = _interp.linear1dx(xxi, yyi, yo, 0, extrap=0)
     varon_true = vfunc(y=yyon, x=xxon)
     varon_true[np.isnan(varon)] = np.nan
     np.testing.assert_allclose(varon_true, varon)
 
     # linear
     yyo, xxo = np.meshgrid(yo, x)
-    varol = _interp.interp1dx(vari, yyi, yo, 1, extrap=0)
+    varol = _interp.linear1dx(vari, yyi, yo, 1, extrap=0)
     assert not np.isnan(varol).all()
     varol_true = vfunc(y=yyo, x=xxo)
     varol_true[np.isnan(varol)] = np.nan
     np.testing.assert_allclose(varol_true, varol)
 
     # cubic
-    varoh = _interp.interp1dx(vari, yyi, yo, 3, extrap=0)
+    varoh = _interp.linear1dx(vari, yyi, yo, 3, extrap=0)
     assert not np.isnan(varoh).all()
     assert np.nanmax(varoh) <= np.nanmax(vari)
     assert np.nanmin(varoh) >= np.nanmin(vari)
 
     # extrap
-    varole = _interp.interp1dx(vari, yyi, yo, 1, extrap=2)
+    varole = _interp.linear1dx(vari, yyi, yo, 1, extrap=2)
     vv = vari[-1, ~np.isnan(vari[-1])]
     np.testing.assert_allclose(varole[-1, [0, -1]], vv[[0, -1]])
 
 
-def test_interp_interp1dxx():
+def test_interp_linear1dxx():
 
     # coords
     nx = 17
@@ -273,30 +273,30 @@ def test_interp_interp1dxx():
     # vari[:] = yyi
 
     # nearest
-    varon = _interp.interp1dxx(vari, yyi, yyo, 0, extrap=0)
+    varon = _interp.linear1dxx(vari, yyi, yyo, 0, extrap=0)
     assert not np.isnan(varon).all()
-    yyon = _interp.interp1dxx(yyi, yyi, yyo, 0, extrap=0)
-    xxon = _interp.interp1dxx(xxi, yyi, yyo, 0, extrap=0)
+    yyon = _interp.linear1dxx(yyi, yyi, yyo, 0, extrap=0)
+    xxon = _interp.linear1dxx(xxi, yyi, yyo, 0, extrap=0)
     varon_true = vfunc(y=yyon, x=xxon)
     varon_true[np.isnan(varon)] = np.nan
     np.testing.assert_allclose(varon_true, varon)
 
     # linear
     xxo = np.resize(x, (nyo, nx)).T
-    varol = _interp.interp1dxx(vari, yyi, yyo, 1, extrap=0)
+    varol = _interp.linear1dxx(vari, yyi, yyo, 1, extrap=0)
     assert not np.isnan(varol).all()
     varol_true = vfunc(y=yyo, x=xxo)
     varol_true[np.isnan(varol)] = np.nan
     np.testing.assert_allclose(varol_true, varol)
 
     # cubic
-    varoh = _interp.interp1dxx(vari, yyi, yyo, 3, extrap=0)
+    varoh = _interp.linear1dxx(vari, yyi, yyo, 3, extrap=0)
     assert not np.isnan(varoh).all()
     assert np.nanmax(varoh) <= np.nanmax(vari)
     assert np.nanmin(varoh) >= np.nanmin(vari)
 
     # extrap
-    varole = _interp.interp1dxx(vari, yyi, yyo, 1, extrap=2)
+    varole = _interp.linear1dxx(vari, yyi, yyo, 1, extrap=2)
     vv = vari[-1, ~np.isnan(vari[-1])]
     np.testing.assert_allclose(varole[-1, [0, -1]], vv[[0, -1]])
 

@@ -35,7 +35,8 @@
 ! ================================== 1D =======================================
 ! =============================================================================
 
-subroutine interp1d(vari, yi, varo, yo, method, nx, nyi, nyo, extrap)
+subroutine linear1d(vari, yi, varo, yo, method, nx, nyi, nyo, extrap, &
+                    & bias, tension)
     ! Interpolation along the second axis (y)
     !
     ! - vari: input variable
@@ -44,6 +45,8 @@ subroutine interp1d(vari, yi, varo, yo, method, nx, nyi, nyo, extrap)
     ! - yo: output y axis
     ! - method: 0 = nearest, 1 = linear, 2 = cubic, 3 = hermit
     ! - extrap: 0 = do not extrapolate, 1 = top, -1 = bottom, 2 = both
+    ! - bias: for the hermit method, optional
+    ! - tension: for the hermit method, optional
     !
     ! See: http://local.wasp.uwa.edu.au/~pbourke/miscellaneous/interpolation/
 
@@ -55,20 +58,19 @@ subroutine interp1d(vari, yi, varo, yo, method, nx, nyi, nyo, extrap)
     real(kind=8), intent(in) :: yi(nyi), yo(nyo)
     real(kind=8), intent(out) :: varo(nx,nyo)
     integer, intent(in), optional :: extrap
+    real(kind=8), intent(in), optional :: tension, bias
 
     ! Internal
     integer :: iyi,iyo
     real(kind=8) :: dy0,dy1,yi0,yi1,mu,m1
-    real(kind=8) :: tension,bias,a0,a1,a2,a3 ! Hermit
-    real(kind=8),allocatable :: vc0(:),vc1(:)
+    real(kind=8) :: a0,a1,a2,a3 ! Hermit
+    real(kind=8), allocatable :: vc0(:),vc1(:)
     logical :: bmask(nx,nyi)
 
     ! Initialisation
     m1 = -1d0
     varo = sqrt(m1)
     if(method>1) allocate(vc0(nx),vc1(nx))
-    bias = 0.
-    tension = 0.
     bmask = isnan(vari)
 
     ! Loop on input grid
@@ -201,9 +203,10 @@ subroutine interp1d(vari, yi, varo, yo, method, nx, nyi, nyo, extrap)
     endif
 
 
-end subroutine interp1d
+end subroutine linear1d
 
-subroutine interp1dx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap)
+subroutine linear1dx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap, &
+                     & bias, tension)
     ! Interpolation along the second axis (y)
     !
     ! - vari: input variable
@@ -212,6 +215,8 @@ subroutine interp1dx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap)
     ! - yo: output y axis
     ! - method: 0 = nearest, 1 = linear, 2 = cubic, 3 = hermit
     ! - extrap: 0 = do not extrapolate, 1 = top, -1 = bottom, 2 = both
+    ! - bias: for the hermit method, optional
+    ! - tension: for the hermit method, optional
     !
     ! See: http://local.wasp.uwa.edu.au/~pbourke/miscellaneous/interpolation/
 
@@ -223,11 +228,11 @@ subroutine interp1dx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap)
     real(kind=8), intent(in) :: yi(nxb,nyi), yo(nyo)
     real(kind=8), intent(out) :: varo(nx,nyo)
     integer, intent(in), optional :: extrap
+    real(kind=8), intent(in), optional :: tension, bias
 
     ! Internal
     integer :: iyi,iyo,ib
     real(kind=8) :: dy0(nxb),dy1(nxb)
-    real(kind=8) :: tension,bias !
     real(kind=8) :: m1, mu(nxb)
     real(kind=8),allocatable :: vc0(:),vc1(:),a0(:),a1(:),a2(:),a3(:)
     integer :: ix0,ix1
@@ -240,8 +245,6 @@ subroutine interp1dx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap)
     varo = sqrt(m1)
     if(method>1) allocate(vc0(nxb),vc1(nxb))
     if(method==3)allocate(a0(nxb),a1(nxb),a2(nxb),a3(nxb))
-    bias = 0.
-    tension = 0.
 
     ! Loop on input grid
     do iyi = 1, nyi-1
@@ -356,9 +359,10 @@ subroutine interp1dx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap)
     if(method>1) deallocate(vc0,vc1)
     if(method==3)deallocate(a0,a1,a2,a3)
 
-end subroutine interp1dx
+end subroutine linear1dx
 
-subroutine interp1dxx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap)
+subroutine linear1dxx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap, &
+                      & bias, tension)
     ! Interpolation along the second axis (y)
     !
     ! - vari: input variable
@@ -367,6 +371,8 @@ subroutine interp1dxx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap)
     ! - yo: output y axis
     ! - method: 0 = nearest, 1 = linear, 2 = cubic, 3 = hermit
     ! - extrap: 0 = do not extrapolate, 1 = top, -1 = bottom, 2 = both
+    ! - bias: for the hermit method, optional
+    ! - tension: for the hermit method, optional
     !
     ! See: http://local.wasp.uwa.edu.au/~pbourke/miscellaneous/interpolation/
 
@@ -378,12 +384,12 @@ subroutine interp1dxx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap)
     real(kind=8), intent(in) :: yi(nxb,nyi), yo(nxb,nyo)
     real(kind=8), intent(out) :: varo(nx,nyo)
     integer, intent(in), optional :: extrap
+    real(kind=8), intent(in), optional :: tension, bias
 
     ! Internal
     integer :: iyi,iyo,ib
     real(kind=8) :: dy0(nxb),dy1(nxb)
-    real(kind=8) :: tension, bias, m1 !
-    real(kind=8) :: mu(nxb)
+    real(kind=8) :: m1, mu(nxb)
     real(kind=8),allocatable :: vc0(:),vc1(:),a0(:),a1(:),a2(:),a3(:)
     integer :: ix0,ix1
     logical :: bitv(nxb)
@@ -392,8 +398,6 @@ subroutine interp1dxx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap)
     ! Initialisation
     if(method>1) allocate(vc0(nxb),vc1(nxb))
     if(method==3)allocate(a0(nxb),a1(nxb),a2(nxb),a3(nxb))
-    bias = 0d0
-    tension = 0d0
     m1 = -1d0
     varo = sqrt(m1)
 
@@ -510,7 +514,7 @@ subroutine interp1dxx(vari, yi, varo, yo, method, nx, nxb, nyi, nyo, extrap)
     if(method>1) deallocate(vc0,vc1)
     if(method==3)deallocate(a0,a1,a2,a3)
 
-end subroutine interp1dxx
+end subroutine linear1dxx
 
 subroutine extrap1d(vari, varo, extrap, nx, ny)
     ! Extrapolate valid data to the top and/or bottom

@@ -100,6 +100,7 @@ def configuration():
     config.add_scripts(*scripts)
 
     # Add extensions
+    os.environ['LDFLAGS'] = "-shared"
     config.add_extension("xoa._interp", ["src/interp.f90"])
 
     return config
@@ -109,7 +110,7 @@ if __name__ == "__main__":
 
     # Setup config file
     if not os.path.exists("setup.cfg"):
-        shutil.copy("setup.cfg.simple", "setup.cfg")
+        shutil.copy("setup.cfg.default", "setup.cfg")
 
     # Lauch setup
     setup(configuration=configuration, **specs)
