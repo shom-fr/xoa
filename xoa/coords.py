@@ -148,15 +148,35 @@ class DimFlusher1D(object):
 
         # Transpose to push work dim right
         da_in = da_in.transpose(
-            Ellipsis, *(cdims0 + [self._dim0]))
+            Ellipsis, *(cdims0 + [self._dim0]), transpose_coords=True)
         coord_out = coord_out.transpose(
             Ellipsis, *(cdims0 + [self._dim1]))
 
         # Broadcast data array
-        if da_in.ndim < coord_out.ndim:
+        # - data var
+        if set(da_in.dims[:-1]) < set(coord_out.dims[:-1]):
             da_in = da_in.broadcast_like(coord_out,
                                          exclude=(self._dim0, self._dim1))
+        # - input coordinate
+        # if (set(coord_out.dims[:-1])set(da_in.coords[coord_in_name].dims[:-1])
+        #         < set(coord_out.dims[:-1])):
+        if coord_out.ndim > 1 and set(coord_out.dims[:-1]) not in set(da_in.coords[coord_in_name].dims[:-1]):
+
+        #set(coord_out.dims[:-1]) > set(da_in.coords[coord_in_name].dims[:-1]):
+            if da_in.coords[coord_in_name].ndim == 1:
+                coord_in_name, old_coord_in_name = (
+                    coord_in_name + '_dimflush1d', coord_in_name)
+            else:
+                old_coord_in_name = coord_in_name
+            da_in.coords[coord_in_name] = (
+                da_in.coords[old_coord_in_name].broadcast_like(
+                    coord_out, exclude=(self._dim0, self._dim1)))
         coord_in = da_in.coords[coord_in_name]
+        # - output coordinate
+        if (coord_out.ndim > 1 and
+                set(coord_in.dims[:-1]) > set(coord_out.dims[:-1])):
+            coord_out = coord_out.broadcast_like(
+                coord_in, exclude=(self._dim0, self._dim1))
 
         # Info reverse transfoms
         # - input coords that doesn't have dim0 inside and must copied

@@ -36,7 +36,11 @@ def test_coords_dimflusher1d():
 
     da = xr.DataArray(np.ones((mem.size, dep0.size, lon.size)),
                       dims=('mem', 'nz', 'lon'),
-                      coords=(mem, dep0, lon))
+                      coords=(mem, dep0, lon),
+                      attrs={'long_name': 'Big banana'})
+    coord_out = xr.DataArray(np.ones((dep1.size, lon.size)),
+                             dims=('nk', 'lon'), name='mydepth',
+                             attrs={'standard_name': 'ocean_layer_depth'})
 
     # 1d -> 1d
     coord = dep1
@@ -49,18 +53,29 @@ def test_coords_dimflusher1d():
     da_out_data = np.ones((nmem*nlon, nz1))
     da_out = dfl.get_back(da_out_data)
     assert da_out.coords["nk"].shape == (nz1,)
-    # fda, fcoord = coords.flush_work_dim_right(da, coord)
-    # assert fda.dims == ('mem', 'lon', 'nz')
-    # assert fcoord.dims == ('nk', )
+    assert da_out.long_name == "Big banana"
 
-    # coord = xr.DataArray(np.ones((dep1.size, lon.size)),
-    #                       dims=('nk', 'lon'),
-    #                       attrs={'standard_name': 'ocean_layer_depth'})
-    # fda, fcoord = coords.flush_work_dim_right(da, coord)
-    # assert fda.dims == ('mem', 'lon', 'nz')
-    # assert fcoord.dims == ('lon', 'nk')
-    # da1d = da[0, :, 0]
-    # del da1d.coords['lon'], da1d.coords['mem']
-    # fda, fcoord = coords.flush_work_dim_right(da1d, coord)
-    # assert fda.dims == ('lon', 'nz')
-    # assert fcoord.dims == ('lon', 'nk')
+    # 1d -> nd
+    dfl = coords.DimFlusher1D(da, coord_out)
+    assert dfl.da_in_data.shape == (nmem*nlon, nz0)
+    assert dfl.coord_in_data.shape == (nlon, nz0)
+    assert dfl.coord_out_data.shape == (nlon, nz1)
+    assert dfl.work_dims == ("mem", "lon", "nk")
+    assert dfl.work_shape == (nmem, nlon, nz1)
+    da_out_data = np.ones((nmem*nlon, nz1))
+    da_out = dfl.get_back(da_out_data)
+    assert da_out.coords["mydepth"].dims == ("nk", "lon")
+
+    # nd -> nd
+    coord_in = xr.DataArray(np.ones((nmem, dep0.size)),
+                            dims=('mem', 'nz'))
+    da.coords['dep'] = coord_in
+    dfl = coords.DimFlusher1D(da, coord_out)
+    assert dfl.da_in_data.shape == (nmem*nlon, nz0)
+    assert dfl.coord_in_data.shape == (nmem*nlon, nz0)
+    assert dfl.coord_out_data.shape == (nmem*nlon, nz1)
+    assert dfl.work_dims == ("mem", "lon", "nk")
+    assert dfl.work_shape == (nmem, nlon, nz1)
+    da_out_data = np.ones((nmem*nlon, nz1))
+    da_out = dfl.get_back(da_out_data)
+    assert da_out.coords["mydepth"].dims == ("nk", "lon")

@@ -5,11 +5,14 @@ List of xoa options
 ===================
 
 Some options are accessible to alter the default behavior of xoa.
-These options are of particular type and have a default value,
+These options are of particular **type** and have a **default value**,
 as shown in the following table.
 
 .. include:: genoptions/table.txt
 
+.. note:: The xoa configuration system is based on the
+    `configobj <https://configobj.readthedocs.io/en/latest/configobj.html>`_
+    package.
 
 Setting options
 ===============
@@ -17,10 +20,10 @@ Setting options
 Permanent settings
 ------------------
 
-You permanently change default settings by editing
-your xoa configuration file, which is typicall here on linux:
+You can permanently change default settings by editing
+the xoa user configuration file, which is typicall here on linux:
 :file:`~/.local/share/xoa/xoa.cfg`.
-Use the following command to make sure this file is at
+Use the following command to see if this file is at
 this place:
 
 .. code-block:: bash
@@ -28,12 +31,12 @@ this place:
     $ xoa info paths
 
 This file is organised in sections, which correspond to the
-string before the dot "." in the options name.
+string before the dot "." in the flat options name.
 
 Inline settings
 ---------------
 
-You can change options within your code with
+You can change options from python with
 the :class:`xoa.set_option` function and the :class:`xoa.set_options` class::
 
     xoa.set_option("plot.cmapdiv", "cmo.balance")  # single option
@@ -60,12 +63,12 @@ Default options are printable with the following command:
 
     $ xoa info options
 
-Options are printed organised in sections.
+Options are organised in sections.
 
-From your code
---------------
+From python
+-----------
 
-You the :func:`xoa.get_option` function to access a single option::
+You can use the :func:`xoa.get_option` function to access a single option::
 
     cmap = xoa.get_option('plot.cmapdiv') # flat mode
     cmap = xoa.get_option('plot', 'cmapdiv') # section mode
