@@ -1,21 +1,73 @@
+# Inspired from Cartopy conf
 version: 2.1
+
+apt-run:  &apt-install
+  name: Install apt packages
+  command: |
+    apt-get -qq update
+    apt-get install -y \
+      gcc \
+      g++ \
+      make
 
 orbs:
   python: circleci/python@0.2.1
 
+env-run:  &env-setup
+  name: Setup conda environment
+  command: |
+    conda config --set always_yes yes --set changeps1 no --set show_channel_urls yes
+    conda create -n test-environment python=$PYTHON_VERSION
+    conda config --add channels conda-forge
+
+deps-run: &deps-install
+  name: Install python dependencies
+  command: |
+    conda install -n test-environment --quiet \
+        python>=3 \
+        xarray \
+        pandas \
+        matplotlib \
+        cartopy \
+        xesmf \
+        configobj \
+        scipy \
+        sphinx \
+        sphinx_rtd_theme \
+    conda list -n test-environment
+
+cp-run: &cp-install
+  name: Install xoa
+  command: |
+    source activate test-environment
+    pip install -ve .
+
+doc-run: &doc-build
+  name: Build documentation
+  command: |
+    source activate test-environment
+    cd doc
+    make html
+
 jobs:
-  build-and-test:
-    executor: python/default
+  docs-python3:
+    docker:
+      - image: continuumio/miniconda3:latest
     steps:
       - checkout
-      - python/load-cache
-      - python/install-deps
-      - python/save-cache
+      - run: *apt-install
       - run:
-          command: ./manage.py test
-          name: Test
+          <<: *env-setup
+          environment:
+            PYTHON_VERSION: 3
+      - run: *deps-install
+      - run: *cp-install
+      - run: *doc-build
+      - store_artifacts:
+          path: doc/_build/html
 
 workflows:
-  main:
+  version: 2
+  build:
     jobs:
-      - build-and-test
+      - docs-python3
