@@ -458,7 +458,7 @@ class CFSpecs(object):
               and second item as a cache key for faster reloading.
         cache: bool, None
             In in-memory cache system?
-            Defaults to option boolean :xoaoption:`cache.cf`.
+            Defaults to option boolean :xoaoption:`cf.cache`.
 
         """
         # Get the list of validated configurations
@@ -1261,7 +1261,7 @@ def get_cf_specs(name=None, category=None, cache="rw"):
         If not provided, search first in "data_vars", then "coords".
     cache: str, bool, None
         Cache specs on disk with pickling for fast loading.
-        If ``None``, it defaults to boolean option :xoaoption:`cache.cf`.
+        If ``None``, it defaults to boolean option :xoaoption:`cf.cache`.
         Possible string values: ``"ignore"``, ``"rw"``, ``"read"``,
         ``"write"``, ``"clean"``.
         If ``True``, it is set to ``"rw"``.
@@ -1273,7 +1273,7 @@ def get_cf_specs(name=None, category=None, cache="rw"):
         None is return if no specs are found
     """
     if cache is None:
-        cache = get_option('cache.cf')
+        cache = get_option('cf.cache')
     if cache is True:
         cache = "rw"
     elif cache is False:

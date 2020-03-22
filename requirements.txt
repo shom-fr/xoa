@@ -1,8 +1,8 @@
-python>=3
-xarray
-pandas
-matplotlib
 cartopy
-xesmf
 configobj
+matplotlib
+pandas
+python>=3
 scipy
+xarray
+xesmf

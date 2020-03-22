@@ -56,7 +56,8 @@ class DefaultEnumMeta(EnumMeta):
     -------
     .. ipython:: python
 
-        @from xoa.misc import DefaultEnumMeta
+        @suppress
+        from xoa.misc import DefaultEnumMeta
         from enum import IntEnum
 
         class regrid_methods(IntEnum, metaclass=DefaultEnumMeta):
@@ -64,11 +65,11 @@ class DefaultEnumMeta(EnumMeta):
             nearest = 0
             cellave = -1
 
-        print(regrid_methods())
-        print(regrid_methods(None))
-        print(regrid_methods(1))
-        print(regrid_methods[None])
-        print(regrid_methods['linear'])
+        regrid_methods()
+        regrid_methods(None)
+        regrid_methods(1)
+        regrid_methods[None]
+        regrid_methods['linear']
     """
     default = None
 
@@ -205,6 +206,16 @@ def dict_check_defaults(dd, **defaults):
         Dictionary to check
     **defs: dict
         Dictionary of default values
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        from xoa.misc import dict_check_defaults
+
+        dd = dict(color='blue')
+        dict_check_defaults(dd, color='red', size=10)
     """
     if defaults is None:
         defaults = {}
@@ -246,8 +257,8 @@ def dict_filter(
         @suppress
         from xoa.misc import dict_filter
         kwargs = {'basemap':'f', 'basemap_fillcontinents':True, 'quiet':False,'basemap_plot':False}
-        print(dict_filter(kwargs,'basemap', defaults=dict(drawcoastlines=True,plot=True), good=True))
-        print(kwargs)
+        dict_filter(kwargs,'basemap', defaults=dict(drawcoastlines=True,plot=True), good=True)
+        kwargs
 
     Return
     ------
