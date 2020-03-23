@@ -24,16 +24,17 @@ deps-run: &deps-install
   name: Install python dependencies
   command: |
     conda install -n test-environment --quiet \
-        python>=3 \
-        xarray \
-        pandas \
-        matplotlib \
         cartopy \
-        xesmf \
         configobj \
+        ipython \
+        matplotlib \
+        nbsphinx \
+        pandas \
         scipy \
+        xarray \
+        xesmf \
         sphinx \
-        sphinx_rtd_theme \
+        sphinx_rtd_theme
     conda list -n test-environment
 
 cp-run: &cp-install
