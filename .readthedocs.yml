@@ -18,7 +18,7 @@ python:
 
 # Build
 build:
-  image: latest
+  image: stable
 
 # Conda
 conda:

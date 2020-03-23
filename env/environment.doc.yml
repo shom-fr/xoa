@@ -5,13 +5,14 @@ channels:
 
 dependencies:
   - python>=3
+  - pip
   - cartopy
   - matplotlib
-  - nbsphinx
   - pandas
   - scipy
   - xarray
   - xesmf
+  - ipython
   - pip:
       - sphinx_rtd_theme
       - sphinx
