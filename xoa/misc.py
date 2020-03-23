@@ -56,7 +56,8 @@ class DefaultEnumMeta(EnumMeta):
     -------
     .. ipython:: python
 
-        @from xoa.misc import DefaultEnumMeta
+        @suppress
+        from xoa.misc import DefaultEnumMeta
         from enum import IntEnum
 
         class regrid_methods(IntEnum, metaclass=DefaultEnumMeta):
@@ -69,6 +70,7 @@ class DefaultEnumMeta(EnumMeta):
         print(regrid_methods(1))
         print(regrid_methods[None])
         print(regrid_methods['linear'])
+        print(regrid_methods['celleave'])
     """
     default = None
 
