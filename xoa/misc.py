@@ -70,7 +70,7 @@ class DefaultEnumMeta(EnumMeta):
         print(regrid_methods(1))
         print(regrid_methods[None])
         print(regrid_methods['linear'])
-        print(regrid_methods['celleave'])
+        print(regrid_methods['cellave'])
     """
     default = None
 
