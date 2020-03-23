@@ -24,6 +24,7 @@ deps-run: &deps-install
   name: Install python dependencies
   command: |
     conda install -n test-environment --quiet \
+        appdirs \
         cartopy \
         configobj \
         gfortran_linux-64 \
