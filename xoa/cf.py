@@ -655,10 +655,12 @@ class CFSpecs(object):
         specs['processed'] = True
         yield category, name, specs
 
-    def format_coord(self, da, name=None, loc=None, standardize=True):
+    def format_coord(self, da, name=None, loc=None, standardize=True,
+                     rename_dim=True):
         """Format a coordinate variable"""
         return self.coords.format_dataarray(
-            da, name=name, loc=loc, standardize=standardize)
+            da, name=name, loc=loc, standardize=standardize,
+            rename_dim=rename_dim)
 
     def format_data_var(
         self,
@@ -683,20 +685,42 @@ class CFSpecs(object):
                     name=coords.get(cname),
                     loc=loc,
                     standardize=standardize,
+                    rename_dim=False,
                 )
                 da.coords[cname] = cda
                 da = da.rename({cname: cda.name})
 
         return da
 
-    def format_dataset(self, ds, loc=None, standardize=True):
+    def format_dataset(self, ds, loc=None, standardize=True,
+                       format_coords=True):
         """Auto-format a whole xarray.Dataset"""
         ds = ds.copy()
-        for name, da in ds.items():
+        for name, da in list(ds.items()):
             del ds[name]
-            da = self.format_data_var(da, loc=loc, standardize=True)
+            da = self.format_data_var(da, loc=loc, standardize=True,
+                                      format_coords=False)
+            # print('ds',ds)
             ds[da.name] = da
+        if format_coords:
+            for cname, cda in list(ds.coords.items()):
+                del ds[cname]
+                cda = self.format_coord(cda, loc=loc, standardize=True,
+                                        rename_dim=False)
+                if cda.ndim == 1 and cname == cda.dims[0]:
+                    ds.coords[cname] = cda
+                    ds = ds.rename({cname: cda.name})
+                else:
+                    ds.coords[cda.name] = cda
+
         return ds
+
+    def auto_format(self, dsa, loc=None, standardize=True):
+        """Auto-format the xarray.Dataset or xarray.DataArray"""
+        if hasattr(dsa, "data_vars"):
+            return self.format_dataset(dsa, loc=loc, standardize=standardize,
+                                       format_coords=True)
+        return self.format_dataarray(dsa, loc=loc, standardize=standardize)
 
     def match_coord(self, da, name=None, loc="any"):
         return self.coords.match(da, name=name, loc=loc)
@@ -704,8 +728,9 @@ class CFSpecs(object):
     def match_data_var(self, da, name=None, loc="any"):
         return self.data_vars.match(da, name=name, loc=loc)
 
-    def search_coord(self, dsa, name=None, loc="any", get="obj"):
-        return self.coords.search(dsa, name=name, loc=loc, get=get)
+    def search_coord(self, dsa, name=None, loc="any", get="obj", single=True):
+        return self.coords.search(dsa, name=name, loc=loc, get=get,
+                                  single=single)
 
     def search_dim(self, da, dim_type=None, loc="any"):
         return self.coords.search_dim(da, dim_type=dim_type, loc=loc)
@@ -713,8 +738,16 @@ class CFSpecs(object):
     def search_coord_from_dim(self, da, dim):
         return self.coords.search_from_dim(da, dim)
 
-    def search_data_var(self, dsa, name=None, loc="any", get="obj"):
-        return self.data_vars.search(dsa, name=name, loc=loc, get=get)
+    def search_data_var(self, dsa, name=None, loc="any", get="obj",
+                        single=True):
+        return self.data_vars.search(dsa, name=name, loc=loc, get=get,
+                                     single=single)
+
+    def search(self, dsa, name=None, loc="any", get="obj",
+               single=True):
+        category = "data_vars" if hasattr(dsa, "data_vars") else "coords"
+        return self[category].search(dsa, name=name, loc=loc, get=get,
+                                     single=single)
 
 
 class _CFCatSpecs_(object):
@@ -872,7 +905,7 @@ class _CFCatSpecs_(object):
                         return True if name else name_
         return False if name else None
 
-    def search(self, dsa, name=None, loc="any", get="obj"):
+    def search(self, dsa, name=None, loc="any", get="obj", single=True):
         """Search for a data_var or coord that maches given or any specs
 
         Parameters
@@ -883,11 +916,16 @@ class _CFCatSpecs_(object):
         loc: "any", str
         get: {"obj", "name"}
             When found, get the object found or its name.
+        single: bool
+            If True, return the first item found or None.
+            If False, return a possible empty list of found items.
+            A warning is emitted when set to True and multiple item are found.
 
         Returns
         -------
         None or str or object
         """
+
         # Get target objects
         if self.category:
             objs = getattr(dsa, self.category)
@@ -905,14 +943,28 @@ class _CFCatSpecs_(object):
         # Loops
         assert get in ("name", "obj", "both"), (
             "'get' must be either 'name' or 'obj' or 'both'")
+        found = []
+        found_objs = []
         for match_arg in match_specs:
             for obj in objs.values():
                 m = self.match(obj, match_arg, loc=loc)
                 if m:
+                    if obj in found_objs:
+                        continue
+                    found_objs.append(obj)
                     name = name if name else m
                     if get == "both":
-                        return obj, name
-                    return obj if get == "obj" else name
+                        found.append((obj, name))
+                    else:
+                        found.append(obj if get == "obj" else name)
+
+        # Return
+        if not single:
+            return found
+        if len(found) > 1:
+            xoa_warn("Multiple items found while you requested a single one")
+        if found:
+            return found[0]
 
     def get_attrs(
         self, name, select=None, exclude=None, errors="warn", loc=None, **extra
@@ -975,7 +1027,8 @@ class _CFCatSpecs_(object):
 
         return attrs
 
-    def format_dataarray(self, da, name=None, loc=None, standardize=True):
+    def format_dataarray(self, da, name=None, loc=None, standardize=True,
+                         rename_dim=True):
         """Format a DataArray's name and attributes
 
         Parameters
@@ -983,19 +1036,34 @@ class _CFCatSpecs_(object):
         da: xarray.DataArray
         name: str, None
             A CF name. If not provided, it guessed with :meth:`search`.
+        loc: str
+        standardize: bool
+        rename_dim: bool
+            For a 1D array, rename the dimension if it has the same name
+            as the array.
+
         """
+        # Get name
         if name is None:
             name = self.match(da, loc="any")
         if name is None:
             return da.copy()
         assert name in self.names
-        return self.sglocator.format_dataarray(
+
+        # Format array
+        new_da = self.sglocator.format_dataarray(
             da,
             loc=loc,
             name=name,
-            attrs=self.get_attrs(name),
+            attrs=self.get_attrs(name, loc=loc),
             standardize=standardize,
         )
+
+        # Rename dim if axis coordinate
+        if (rename_dim and da.name is not None and da.ndim == 1 and
+                da.name == da.dims[0]):
+            new_da = new_da.rename({da.name: new_da.name})
+        return new_da
 
 
 class CFVarSpecs(_CFCatSpecs_):
@@ -1356,12 +1424,14 @@ class _CFAccessor_(object):
         self._dsa = dsa
 
     def set_cf_specs(self, cfspecs):
+        """Set the :class:`CFSpecs` using by this accessor"""
         assert isinstance(cfspecs, CFSpecs)
         self._cfspecs = cfspecs
 
-    def get(self, name, loc="any"):
+    def get(self, name, loc="any", single=True):
+        """Search for a CF item with :meth:`CFSpecs.search`"""
         return self._cfspecs[self._category].search(
-            self._dsa, name=name, loc=loc, get="obj")
+            self._dsa, name=name, loc=loc, get="obj", single=single)
 
     def __getattr__(self, attr):
         if attr in self._cfspecs['accessors']['properties'][self._category]:
@@ -1370,6 +1440,11 @@ class _CFAccessor_(object):
 
     def __getitem__(self, name):
         return self.get(name)
+
+    def auto_format(self, loc=None, standardize=True):
+        """Auto-format attributes with :meth:`CFSpecs.auto_format`"""
+        return self._cfspecs.auto_format(self._dsa, loc=loc,
+                                         standardize=standardize)
 
 
 class DataArrayCFAccessor(_CFAccessor_):
