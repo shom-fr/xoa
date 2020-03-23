@@ -6,9 +6,9 @@ apt-run:  &apt-install
   command: |
     apt-get -qq update
     apt-get install -y \
-      gcc \
-      g++ \
       make
+      # gcc \
+      # g++ \
 
 orbs:
   python: circleci/python@0.2.1
@@ -26,6 +26,7 @@ deps-run: &deps-install
     conda install -n test-environment --quiet \
         cartopy \
         configobj \
+        gfortran_linux-64 \
         ipython \
         matplotlib \
         nbsphinx \
@@ -41,6 +42,7 @@ cp-run: &cp-install
   name: Install xoa
   command: |
     source activate test-environment
+    echo $FC
     pip install -ve .
 
 doc-run: &doc-build
