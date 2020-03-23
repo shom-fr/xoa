@@ -15,7 +15,7 @@ Here you can also post tickets for requests and issues.
 License
 -------
 
-Xoa is published under the CeCiLL license,
+xoa is published under the CeCiLL license,
 which is compatible with well known GPL license,
 and is a property of Shom, Ifremer and Actimar.
 
