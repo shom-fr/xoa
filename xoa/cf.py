@@ -819,7 +819,8 @@ class _CFCatSpecs_(object):
             return name
 
     def _assert_known_(self, name):
-        assert name in self, "Invalid entry name:" + name
+        if name not in self._dict:
+            raise XoaCFError(f"Invalid {self.category} CF specs name: "+name)
 
     @property
     def names(self):
@@ -896,7 +897,11 @@ class _CFCatSpecs_(object):
         bool, str
             True or False if name is provided, else found name or None
         """
-        names = self.names if name is None else [name]
+        if name:
+            self._assert_known_(name)
+            names = [name]
+        else:
+            names = self.names
         for name_ in names:
 
             # Get match specs
@@ -949,6 +954,7 @@ class _CFCatSpecs_(object):
 
         # Get match specs
         if name:  # Explicit name so we loop on search specs
+            self._assert_known_(name)
             match_specs = []
             for attr, refs in self._get_ordered_match_specs_(name).items():
                 match_specs.append({attr: refs})
