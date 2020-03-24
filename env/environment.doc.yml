@@ -18,4 +18,6 @@ dependencies:
       - sphinx
       - nbsphinx
       - configobj
+      - sphinxcontrib-programoutput
+      - sphinx-argparse
 

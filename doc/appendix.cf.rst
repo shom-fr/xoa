@@ -13,6 +13,9 @@ See `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_.
 .. literalinclude:: ../xoa/cf.ini
     :language: ini
 
+
+.. _appendix.cf.default:
+
 The default configuration
 -------------------------
 

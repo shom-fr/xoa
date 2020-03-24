@@ -41,6 +41,7 @@ import pickle
 import re
 import operator
 import warnings
+import pprint
 
 import appdirs
 
@@ -494,6 +495,15 @@ class CFSpecs(object):
         return self.copy()
 
     @property
+    def dict(self):
+        """Dictionary copy of the specs"""
+        return self._dict.copy()
+
+    def pprint(self, **kwargs):
+        """Pretty print the specs as dict using :func:`pprint.pprint`"""
+        pprint.pprint(self.dict, **kwargs)
+
+    @property
     def categories(self):
         """List of cf specs categories"""
         return ["data_vars", "coords"]
@@ -528,7 +538,12 @@ class CFSpecs(object):
 
     def set_specs_from_cfg(self, cfg):
         """Update or create specs from a config"""
-        self.load_cfg(cfg, update=True)
+        self.load_cfg(cfg)
+
+    def set_specs(self, category, name, **specs):
+        """Update or create specs for an item"""
+        data = {category: {name: specs}}
+        self.load_cfg(data)
 
     def _post_process_(self):
 
@@ -841,16 +856,16 @@ class _CFCatSpecs_(object):
     def dims(self):
         return self.parent._dict['dims']
 
-    def set_specs(self, name, **specs):
+    def set_specs(self, item, **specs):
         """Update or create specs for an item"""
-        data = {self.category: {name: specs}}
-        self.parent.register_from_cfg(data)
+        data = {self.category: {item: specs}}
+        self.parent.load_cfg(data)
 
     def set_specs_from_cfg(self, cfg):
         """Update or create specs for several item with a config specs"""
         if isinstance(cfg, dict) and self.category not in cfg:
             cfg = {self.category: cfg}
-        self.parent.register_from_cfg(cfg)
+        self.parent.load_cfg(cfg)
 
     def _get_ordered_match_specs_(self, name):
         specs = self[name]
