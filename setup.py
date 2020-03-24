@@ -94,7 +94,7 @@ def configuration():
 
     # Add bin scripts
     scripts = []
-    for pat in ["*.py"]:
+    for pat in ["xoa", "*.py"]:
         pat = os.path.join(os.path.dirname(__file__), "bin", pat)
         scripts.extend(glob(pat))
     config.add_scripts(*scripts)
