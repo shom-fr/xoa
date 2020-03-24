@@ -36,7 +36,9 @@ deps-run: &deps-install
         xarray \
         xesmf \
         sphinx \
-        sphinx_rtd_theme
+        sphinx_rtd_theme \
+        sphinx-argparse \
+        sphinxcontrib-programoutput
     conda list -n test-environment
 
 cp-run: &cp-install
