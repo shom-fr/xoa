@@ -898,7 +898,8 @@ class _CFCatSpecs_(object):
             True or False if name is provided, else found name or None
         """
         if name:
-            self._assert_known_(name)
+            if isinstance(name, str):
+                self._assert_known_(name)
             names = [name]
         else:
             names = self.names
@@ -954,7 +955,8 @@ class _CFCatSpecs_(object):
 
         # Get match specs
         if name:  # Explicit name so we loop on search specs
-            self._assert_known_(name)
+            if isinstance(name, str):
+                self._assert_known_(name)
             match_specs = []
             for attr, refs in self._get_ordered_match_specs_(name).items():
                 match_specs.append({attr: refs})

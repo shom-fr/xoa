@@ -168,7 +168,6 @@ def test_cf_get_cfg_specs_coord():
 
 def test_cf_get_cfg_specs_coord_inherit():
     specs = cf.get_cf_specs("depth", "coords")
-    print(specs)
     assert specs["name"][0] == "depth"
     assert specs["long_name"][0] == "Depth"
 
