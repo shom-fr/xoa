@@ -57,6 +57,9 @@ doc-run: &doc-build
 
 jobs:
   docs-python3:
+    branches:
+      ignore:
+        - gh-pages
     docker:
       - image: continuumio/miniconda3:latest
     steps:
@@ -75,9 +78,9 @@ jobs:
 workflows:
   version: 2
   build:
-    branches:
-      ignore:
-        - gh-pages
     jobs:
       - docs-python3
+          filters:
+            ignore:
+              - gh-pages
 

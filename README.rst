@@ -26,10 +26,11 @@ License
 
 xoa is a property of Shom, Ifremer and Actimar,
 and is published under the CeCiLL license,
-which is compatible with well known GPL license,.
+which is compatible with well known GPL license.
 
 
 Contacts
 --------
 
 * Stéphane Raynaud <stephane.raynaud (at) shom.fr>
+
