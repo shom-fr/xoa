@@ -4,20 +4,21 @@ channels:
   - conda-forge
 
 dependencies:
-  - python>=3
-  - pip
+  - appdirs
   - cartopy
+  - ipython
   - matplotlib
   - pandas
+  - pip
+  - python>=3
   - scipy
   - xarray
   - xesmf
-  - ipython
   - pip:
-      - sphinx_rtd_theme
-      - sphinx
-      - nbsphinx
       - configobj
-      - sphinxcontrib-programoutput
+      - nbsphinx
+      - sphinx
+      - sphinx_rtd_theme
       - sphinx-argparse
+      - sphinxcontrib-programoutput
 

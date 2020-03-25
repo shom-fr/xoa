@@ -65,10 +65,13 @@ class DefaultEnumMeta(EnumMeta):
             nearest = 0
             cellave = -1
 
-        regrid_methods()
-        regrid_methods(None)
+        regrid_methods
+        str(regrid_methods)
+        regrid_methods.rst
+        regrid_methods() # default method
+        regrid_methods(None) # default method
         regrid_methods(1)
-        regrid_methods[None]
+        regrid_methods[None] # default method
         regrid_methods['linear']
         regrid_methods['cellave']
 
@@ -84,6 +87,18 @@ class DefaultEnumMeta(EnumMeta):
         if name is None:
             return next(iter(cls))
         return cls._member_map_[name]
+
+    def __str__(cls):
+        return ", ".join([f"{name}|{number}"
+                          for name, number in cls._member_map_.items()])
+
+    def __repr__(cls):
+        return f"{cls.__name__}: {cls}"
+
+    @property
+    def rst(cls):
+        return " ".join([f'``"{name}"|{number}``'
+                         for name, number in cls._member_map_.items()])
 
 
 def get_axis_slices(ndim, axis, **kwargs):

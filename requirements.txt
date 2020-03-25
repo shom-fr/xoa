@@ -1,3 +1,4 @@
+appdirs
 cartopy
 configobj
 matplotlib
@@ -6,3 +7,4 @@ python>=3
 scipy
 xarray
 xesmf
+

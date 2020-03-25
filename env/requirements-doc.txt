@@ -1,0 +1,17 @@
+appdirs
+cartopy
+configobj
+gfortran_linux-64
+ipython
+matplotlib
+nbsphinx
+pandas
+pip
+scipy
+xarray
+xesmf
+sphinx
+sphinx_rtd_theme
+sphinx-argparse
+sphinxcontrib-programoutput
+

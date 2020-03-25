@@ -39,8 +39,52 @@ class regrid1d_methods(_intchoices_, metaclass=misc.DefaultEnumMeta):
     # cellerr = -2
 
 
+class extrap_modes(_intchoices_, metaclass=misc.DefaultEnumMeta):
+    """Supported extrapolation modes"""
+    #: No extrapolation
+    no = 0
+    none = 0
+    #: Above (after)
+    above = 1
+    #: Below (before)
+    below = -1
+    #: Both below and above
+    both = 2
+    all = 2
+
+
 def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
              conserv=False, extrap=0):
+    """Regrid along a single dimension
+
+    The input and output coordinates may vary along other dimensions,
+    which useful for instance for vertical interpolation in coastal
+    ocean models.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Array to interpolate
+    coord: xarray.DataArray
+        Output coordinate
+    method: str, int
+        Regridding method as one of the following: {regrid1d_methods.rst}
+    dim:  str, tuple(str), None
+        Dimension on which to operate. If a string, it is expected to
+        be the same dimension for both input and output coordinates.
+        Else, provide a two-element tuple: ``(dim_coord_in, dim_coord_out)``.
+    coord_in_name: str, None
+        Name of the input coordinate array, which must be known of ``da``
+    conserv: bool
+        Use conservative regridding when using ``cellave`` method.
+    extrap: str, int
+        Extrapolation mode as one of the following: {extrap_modes.rst}
+
+    Returns
+    -------
+    xarray.DataArray
+        Regridded array with ``coord`` as new coordinate array.
+    """
 
     # Array manager
     dfl = coords.DimFlusher1D(da, coord, dim=dim,
@@ -80,3 +124,6 @@ def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
 
     # Reform back
     return dfl.get_back(varo)
+
+
+regrid1d.__doc__ = regrid1d.__doc__.format(**locals())
