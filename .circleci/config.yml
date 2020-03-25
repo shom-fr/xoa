@@ -52,7 +52,7 @@ doc-run: &doc-build
   name: Build documentation
   command: |
     source activate test-environment
-    cd doc
+    cd docs
     make html
 
 jobs:
@@ -70,7 +70,7 @@ jobs:
       - run: *cp-install
       - run: *doc-build
       - store_artifacts:
-          path: doc/_build/html
+          path: docs/_build/html
 
 workflows:
   version: 2
