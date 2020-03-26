@@ -3,8 +3,6 @@
 """
 Regridding utilities
 """
-from enum import IntEnum
-
 
 from .__init__ import XoaError
 from . import misc
@@ -17,15 +15,9 @@ class XoaRegridError(XoaError):
     pass
 
 
-class _intchoices_(IntEnum):
-
-    def __str__(self):
-        return self.name
-
-
-class regrid1d_methods(_intchoices_, metaclass=misc.DefaultEnumMeta):
+class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     """Supported :func:`regrid1d` methods"""
-    #: Linear iterpolation
+    #: Linear iterpolation (default)
     linear = 1
     interp = 1  # compat
     # nearest = 0
@@ -39,9 +31,9 @@ class regrid1d_methods(_intchoices_, metaclass=misc.DefaultEnumMeta):
     # cellerr = -2
 
 
-class extrap_modes(_intchoices_, metaclass=misc.DefaultEnumMeta):
+class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     """Supported extrapolation modes"""
-    #: No extrapolation
+    #: No extrapolation (default)
     no = 0
     none = 0
     #: Above (after)
@@ -68,7 +60,8 @@ def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
     coord: xarray.DataArray
         Output coordinate
     method: str, int
-        Regridding method as one of the following: {regrid1d_methods.rst}
+        Regridding method as one of the following:
+        {regrid1d_methods.rst_with_links}
     dim:  str, tuple(str), None
         Dimension on which to operate. If a string, it is expected to
         be the same dimension for both input and output coordinates.
@@ -78,7 +71,8 @@ def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
     conserv: bool
         Use conservative regridding when using ``cellave`` method.
     extrap: str, int
-        Extrapolation mode as one of the following: {extrap_modes.rst}
+        Extrapolation mode as one of the following:
+        {extrap_modes.rst_with_links}
 
     Returns
     -------

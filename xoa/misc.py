@@ -37,7 +37,7 @@ Miscellaneaous low level utilities
 # knowledge of the CeCILL license and that you accept its terms.
 
 import types
-from enum import EnumMeta
+from enum import IntEnum, EnumMeta
 
 from .__init__ import XoaError
 
@@ -62,11 +62,13 @@ class DefaultEnumMeta(EnumMeta):
 
         class regrid_methods(IntEnum, metaclass=DefaultEnumMeta):
             linear = 1
+            bilinear = 1
             nearest = 0
             cellave = -1
 
         regrid_methods
         str(regrid_methods)
+        regrid_methods.get_rst(with_links=True, link_module="xoa.tutu")
         regrid_methods.rst
         regrid_methods() # default method
         regrid_methods(None) # default method
@@ -88,17 +90,52 @@ class DefaultEnumMeta(EnumMeta):
             return next(iter(cls))
         return cls._member_map_[name]
 
+    def _get_groups_(cls):
+        groups = {}
+        for name, number in cls._member_map_.items():
+            groups.setdefault(number, []).append(name)
+        return groups
+
+    def _get_choices_(cls, es=""):
+        choices = []
+        for number, names in cls._get_groups_().items():
+            cc = [f"{number:d}"] + [f'"{name}"' for name in names]
+            choices.append(es + "|".join(cc) + es)
+        return choices
+
     def __str__(cls):
-        return ", ".join([f"{name}|{number}"
-                          for name, number in cls._member_map_.items()])
+        return ", ".join(cls._get_choices_())
 
     def __repr__(cls):
         return f"{cls.__name__}: {cls}"
 
+    def get_rst(cls, with_links=False, link_module=None):
+        if with_links:
+            choices = []
+            prefix = ((link_module+".") if link_module else "")
+            prefix += cls.__name__ + "."
+            for number, names in cls._get_groups_().items():
+                attr = names[0]
+                choice = "|".join([f"{number:d}"] +
+                                  [f'"{name}"' for name in names])
+                choices.append(f":attr:`{choice}<{prefix}{attr}>`")
+            return ", ".join(choices)
+        else:
+            return ", ".join(cls._get_choices_("``"))
+
     @property
     def rst(cls):
-        return " ".join([f'``"{name}"|{number}``'
-                         for name, number in cls._member_map_.items()])
+        return cls.get_rst()
+
+    @property
+    def rst_with_links(cls):
+        return cls.get_rst(with_links=True)
+
+
+class IntEnumChoices(IntEnum):
+
+    def __str__(self):
+        return self.name
 
 
 def get_axis_slices(ndim, axis, **kwargs):
