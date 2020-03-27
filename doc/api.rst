@@ -6,9 +6,10 @@ API
 
     xoa
     xoa.misc
+    xoa.color
     xoa.cf
     xoa.coords
-    xoa.color
+    xoa.sigma
     xoa.grid
     xoa.regrid
     xoa.cfgm

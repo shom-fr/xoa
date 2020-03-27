@@ -83,6 +83,12 @@ intersphinx_mapping = {
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None)
     }
 
+# %% Napoleon
+napoleon_use_admonition_for_examples = True
+napoleon_use_admonition_for_notes = True
+napoleon_use_admonition_for_references = True
+napoleon_use_rtype = False
+
 # %% genoptions
 genoptions_table = 'genoptions/table.txt'
 genoptions_declarations = 'genoptions/declarations.txt'
@@ -90,15 +96,16 @@ genoptions_declarations = 'genoptions/declarations.txt'
 
 # %% User directives
 
-
 def setup(app):
+
     app.add_object_type(
         'xoaoption', 'xoaoption',
-        objname='xoa configuration flat option',
-        indextemplate='pair: %s; xoa configuration flat option')
-    # app.add_object_type('xoaconfopt', 'xoaconfopt',
-    #                     objname='xoa configuration option',
-    #                     indextemplate='pair: %s; xoa configuration option')
-    # app.add_object_type('xoaconfsec', 'xoaconfsec',
-    #                     objname='xoa configuration section',
-    #                     indextemplate='pair: %s; xoa configuration section')
+        objname='xoa flat configuration option',
+        indextemplate='pair: %s; xoa flat configuration option')
+
+    app.add_object_type('confopt', 'confopt',
+                        objname='configuration option',
+                        indextemplate='pair: %s; configuration option')
+    app.add_object_type('confsec', 'confsec',
+                        objname='configuration section',
+                        indextemplate='pair: %s; configuration section')

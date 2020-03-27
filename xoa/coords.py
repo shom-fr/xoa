@@ -50,7 +50,7 @@ def transpose_compat(da, dims):
     ----------
     da: xarray.DataArray
         Array to tranpose
-    dims: tuple(str)
+    dims: tuple(str), xarray.DataArray
         Target dimensions
 
     Return
@@ -58,6 +58,8 @@ def transpose_compat(da, dims):
     xarray.DataArray
         Transposed array
     """
+    if hasattr(dims, 'dims'):
+        dims = dims.dims
     odims = ()
     for dim in dims:
         if not isinstance(dim, str) or dim in da.dims:
