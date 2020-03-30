@@ -16,22 +16,31 @@ def get_lon(da):
 
 def get_lat(da):
     """Get the latitude coordinate"""
-    return cf.get_cf_specs().search_coord(da, 'lat')
+    return cf.get_cf_specs().search(da, 'lat')
 
 
 def get_depth(da):
     """Get the depth coordinate"""
-    return cf.get_cf_specs().search_coord(da, 'depth')
+    return cf.get_cf_specs().search(da, 'depth')
 
 
 def get_altitude(da):
     """Get the altitude coordinate"""
-    return cf.get_cf_specs().search_coord(da, 'altitude')
+    return cf.get_cf_specs().search(da, 'altitude')
 
 
-def get_level(da, with_level=False):
+def get_level(da):
     """Get the level coordinate"""
-    return cf.get_cf_specs().search_coord(da, 'level')
+    return cf.get_cf_specs().search(da, 'level')
+
+
+def get_height(da):
+    """Get either depth or altitude"""
+    cfspecs = cf.get_cf_specs()
+    height = cfspecs.search(da, 'depth')
+    if height is None:
+        height = cfspecs.search(da, 'altitude')
+    return height
 
 
 def get_coords(da, coord_names):
@@ -42,7 +51,7 @@ def get_coords(da, coord_names):
 
 
 def transpose_compat(da, dims):
-    """Transpose array with compatible dimensions
+    """Transpose an array with compatible dimensions
 
     Incompatible dimensions are ignored
 
@@ -51,19 +60,38 @@ def transpose_compat(da, dims):
     da: xarray.DataArray
         Array to tranpose
     dims: tuple(str), xarray.DataArray
-        Target dimensions
+        Target dimensions or array with dimensions
 
     Return
     ------
     xarray.DataArray
         Transposed array
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import xarray as xr, numpy as np
+        @suppress
+        from xoa.coords import transpose_compat
+        a = xr.DataArray(np.ones((2, 3, 4)), dims=('y', 'x', 't'))
+        b = xr.DataArray(np.ones((10, 3, 2)), dims=('m', 'y', 'x'))
+        transpose_compat(a, ('y', 'x')).dims
+        transpose_compat(a, b.dims).dims
+        transpose_compat(a, b).dims  # same as with b.dims
     """
     if hasattr(dims, 'dims'):
         dims = dims.dims
     odims = ()
+    with_ell = False
     for dim in dims:
-        if not isinstance(dim, str) or dim in da.dims:
+        if dim is Ellipsis:
+            with_ell = True
+        elif dim in da.dims:
             odims += dim,
+    if not with_ell and set(odims) < set(da.dims):
+        odims = (...,) + odims
     return da.transpose(*odims)
 
 
