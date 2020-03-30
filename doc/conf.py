@@ -87,7 +87,7 @@ intersphinx_mapping = {
 napoleon_use_admonition_for_examples = True
 napoleon_use_admonition_for_notes = True
 napoleon_use_admonition_for_references = True
-napoleon_use_rtype = False
+napoleon_use_rtype = True
 
 # %% genoptions
 genoptions_table = 'genoptions/table.txt'

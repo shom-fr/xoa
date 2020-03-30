@@ -192,6 +192,60 @@ class SGLocator(object):
             return value, None
         return m.group("root"), m.group("loc").lower()
 
+    def get_location(self, da):
+        """Parse datarray name and attribute to find location
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Dataarray to scan
+
+        Returns
+        None, str
+            ``None`` if no location is found, else the correspoing string
+
+        Raises
+        ------
+        XoaCFError
+            When locations parsed from name and attributes are conflicting.
+            Thus, this method method is a way check location consistency.
+        """
+        loc = None
+        src = []
+
+        # Name
+        if da.name:
+            loc = self.parse_attr("name", da.name)[1]
+            src.append("name")
+
+        # Standard name
+        if "standard_name" in da.attrs:
+            loc_ = self.parse_attr("standard_name", da.standard_name)[1]
+            if loc_:
+                if loc and loc_ != loc:
+                    raise XoaCFError(
+                        "The location parsed from standard_name attribute "
+                        f"[{loc_}] conflicts the location parsed from the "
+                        f"name [{loc}]")
+                else:
+                    loc = loc_
+                    src.append("standard_name")
+
+        # Long name
+        if "long_name" in da.attrs:
+            loc_ = self.parse_attr("long_name", da.long_name)[1]
+            if loc_:
+                if loc and loc_ != loc:
+                    src = ' and '.join(src)
+                    raise XoaCFError(
+                        "The location parsed from long_name attribute "
+                        f"[{loc_}] conflicts the location parsed from the "
+                        f"{src} [{loc}]")
+                else:
+                    loc = loc_
+
+        return loc
+
     def match_attr(self, attr, value, root, loc=None):
         """Check if an attribute is matching a location
 

@@ -45,6 +45,54 @@ def test_cf_sglocator_parse_attr_with_valid_locations(attr, value, expected):
 
 
 @pytest.mark.parametrize(
+    "name,standard_name,long_name,loc",
+    [
+     ("u_t", None, None, "t"),
+     (None, "u_at_t_location", None, "t"),
+     (None, None, "U at T location", "t"),
+     ("u_t", "_at_t_location", "U at T location", "t"),
+     ("u", "u_at_t_location", None, "t"),
+     ("u", "u", "U", None)
+     ],
+    )
+def test_cf_sglocator_get_location(name, standard_name, long_name, loc):
+
+    da = xr.DataArray(0)
+    if name:
+        da.name = name
+    if standard_name:
+        da.attrs["standard_name"] = standard_name
+    if long_name:
+        da.attrs["long_name"] = long_name
+
+    parsed_loc = cf.SGLocator().get_location(da)
+    assert parsed_loc == loc
+
+
+@pytest.mark.parametrize(
+    "name,standard_name,long_name",
+    [
+     ("u_t", "u_at_u_location", None),
+     (None, "u_at_t_location", "U at U location"),
+     ("u_u", None, "U at T location"),
+     ("u_u", "u_at_w_location", "U at T location"),
+     ],
+    )
+def test_cf_sglocator_get_location_error(name, standard_name, long_name):
+
+    da = xr.DataArray(0)
+    if name:
+        da.name = name
+    if standard_name:
+        da.attrs["standard_name"] = standard_name
+    if long_name:
+        da.attrs["long_name"] = long_name
+
+    with pytest.raises(cf.XoaCFError) as excinfo:
+        cf.SGLocator().get_location(da)
+
+
+@pytest.mark.parametrize(
     "attr,root,loc,expected",
     [
         ("standard_name", "my_var", "t", True),
