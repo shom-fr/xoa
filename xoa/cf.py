@@ -323,9 +323,13 @@ class SGLocator(object):
         attrs = attrs.copy()
         for attr, value in attrs.items():
             if attr in self.valid_attrs and attr != 'name':
-                attrs[attr] = self.format_attr(
-                    attr, value, loc, standardize=standardize
-                )
+                if isinstance(value, list):
+                    value = [self.format_attr(
+                        attr, v, loc, standardize=standardize) for v in value]
+                else:
+                    value = self.format_attr(
+                        attr, value, loc, standardize=standardize)
+                attrs[attr] = value
         return attrs
 
     def format_dataarray(
@@ -341,7 +345,10 @@ class SGLocator(object):
         name: str, None
             Substitute for dataarray name
         attrs: str, None
-            Substitute for dataarray attributes
+            Substitute for dataarray attributes.
+            If ``standard_name`` and ``long_name`` values are a list,
+            and if the dataarray has its attribute included in the list,
+            it is left unchanged since it is considered compatible.
 
         Return
         ------
@@ -349,6 +356,19 @@ class SGLocator(object):
         """
         da = da.copy()
         if attrs is not None:
+            attrs = attrs.copy()
+
+            # List case: check if we skip, else keep the first
+            for attr, roots in list(attrs.items()):
+                if isinstance(roots, list):
+                    if attr in da.attrs and attr in self.valid_attrs:
+                        for root in roots:
+                            if self.match_attr(
+                                    attr, da.attrs[attr], root, loc="any"):
+                                del attrs[attr]
+                    else:
+                        attrs[attr] = roots[0]
+
             da.attrs.update(attrs)
         da.attrs.update(
             self.format_attrs(da.attrs, loc, standardize=standardize)
@@ -759,10 +779,18 @@ class CFSpecs(object):
                                      single=single)
 
     def search(self, dsa, name=None, loc="any", get="obj",
-               single=True):
-        category = "data_vars" if hasattr(dsa, "data_vars") else "coords"
-        return self[category].search(dsa, name=name, loc=loc, get=get,
-                                     single=single)
+               single=True, categories=None):
+        """Search for a dataarray with data_vars and/or coords"""
+        if not categories:
+            categories = (self.categories if hasattr(dsa, "data_vars")
+                          else ["coords"])
+        else:
+            categories = self.categories
+        for category in categories:
+            res = self[category].search(dsa, name=name, loc=loc, get=get,
+                                        single=single)
+            if res is not None:
+                return res
 
 
 class _CFCatSpecs_(object):
@@ -972,9 +1000,9 @@ class _CFCatSpecs_(object):
             for obj in objs.values():
                 m = self.match(obj, match_arg, loc=loc)
                 if m:
-                    if obj in found_objs:
+                    if id(obj) in found_objs:
                         continue
-                    found_objs.append(obj)
+                    found_objs.append(id(obj))
                     name = name if name else m
                     if get == "both":
                         found.append((obj, name))
@@ -990,7 +1018,8 @@ class _CFCatSpecs_(object):
             return found[0]
 
     def get_attrs(
-        self, name, select=None, exclude=None, errors="warn", loc=None, **extra
+        self, name, select=None, exclude=None, errors="warn", loc=None,
+        multi=False, standardize=True, **extra
     ):
         """Get the default attributes from cf specs
 
@@ -1003,6 +1032,9 @@ class _CFCatSpecs_(object):
         exclude: str, list
             Exclude these attributes
         mode: "silent", "warning" or "error".
+        multi: bool
+            Get standard_name and long_name attribute as a list of possible
+            values
         **extra
           Extra params as included as extra attributes
 
@@ -1034,10 +1066,11 @@ class _CFCatSpecs_(object):
 
             # No lists or tuples
             value = specs[key]
-            if isinstance(value, (list, tuple)):
+            if isinstance(value, list):
                 if len(value) == 0:
                     continue
-                value = value[0]
+                if not multi or key not in ("standard_name", "long_name"):
+                    value = value[0]
 
             # Store it
             attrs[key] = value
@@ -1046,7 +1079,8 @@ class _CFCatSpecs_(object):
         attrs.update(extra)
 
         # Finalize and optionally change location
-        attrs = self.parent.sglocator.format_attrs(attrs, loc=loc)
+        attrs = self.parent.sglocator.format_attrs(
+            attrs, loc=loc, standardize=standardize)
 
         return attrs
 
@@ -1078,7 +1112,8 @@ class _CFCatSpecs_(object):
             da,
             loc=loc,
             name=name,
-            attrs=self.get_attrs(name, loc=loc),
+            attrs=self.get_attrs(
+                name, loc=None, standardize=False, multi=True),
             standardize=standardize,
         )
 
