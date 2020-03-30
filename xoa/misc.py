@@ -44,38 +44,37 @@ from .__init__ import XoaError
 import numpy as np
 
 
-class DefaultEnumMeta(EnumMeta):
-    """Enum meta-class that support default value and None
+class XEnumMeta(EnumMeta):
+    """Exented version ofnum meta-class
 
-    When the item is not provided or equal to ``None``, the first
-    declared item is returned
+    This version supports:
 
-    Inspired from: https://stackoverflow.com/questions/44867597/is-there-a-way-to-specify-a-default-value-for-python-enums
+    - :meth:`__contains__` (``in``) with strings
+    - a better :meth:`__str__` (``str()``) method
+    - a :meth:`get_rst` methods and :attr`str` and
+      :attr:`rst_with_links` properties.
 
     Example
     -------
     .. ipython:: python
 
         @suppress
-        from xoa.misc import DefaultEnumMeta
+        from xoa.misc import XEnumMeta
         from enum import IntEnum
 
-        class regrid_methods(IntEnum, metaclass=DefaultEnumMeta):
+        class regrid_methods(IntEnum, metaclass=XEnumMeta):
             linear = 1
             bilinear = 1
             nearest = 0
             cellave = -1
 
         regrid_methods
+        'linear' in regrid_methods
+        'xxx' in regrid_methods
+        1 in regrid_methods
         str(regrid_methods)
         regrid_methods.get_rst(with_links=True, link_module="xoa.tutu")
         regrid_methods.rst
-        regrid_methods() # default method
-        regrid_methods(None) # default method
-        regrid_methods(1)
-        regrid_methods[None] # default method
-        regrid_methods['linear']
-        regrid_methods['cellave']
 
     """
     default = None
@@ -85,10 +84,10 @@ class DefaultEnumMeta(EnumMeta):
             return next(iter(cls))
         return super().__call__(value, *args, **kwargs)
 
-    def __getitem__(cls, name):
-        if name is None:
-            return next(iter(cls))
-        return cls._member_map_[name]
+    def __contains__(cls, value):
+        if isinstance(value, str):
+            return value in list(cls._member_map_.keys())
+        return super().__call__(value)
 
     def _get_groups_(cls):
         groups = {}
@@ -130,6 +129,49 @@ class DefaultEnumMeta(EnumMeta):
     @property
     def rst_with_links(cls):
         return cls.get_rst(with_links=True)
+
+
+class DefaultEnumMeta(XEnumMeta):
+    """Enum meta-class that support default value and None
+
+    When the item is not provided or equal to ``None``, the first
+    declared item is returned
+
+    Inspired from: https://stackoverflow.com/questions/44867597/is-there-a-way-to-specify-a-default-value-for-python-enums
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        from xoa.misc import DefaultEnumMeta
+        from enum import IntEnum
+
+        class regrid_methods(IntEnum, metaclass=DefaultEnumMeta):
+            linear = 1
+            bilinear = 1
+            nearest = 0
+            cellave = -1
+
+        regrid_methods() # default method
+        regrid_methods(None) # default method
+        regrid_methods(1)
+        regrid_methods[None] # default method
+        regrid_methods['linear']
+        regrid_methods['cellave']
+
+    """
+    default = None
+
+    def __call__(cls, value=None, *args, **kwargs):
+        if value is None:
+            return next(iter(cls))
+        return super().__call__(value, *args, **kwargs)
+
+    def __getitem__(cls, name):
+        if name is None:
+            return next(iter(cls))
+        return cls._member_map_[name]
 
 
 class IntEnumChoices(IntEnum):
