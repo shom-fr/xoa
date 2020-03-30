@@ -9,21 +9,27 @@ This follows the CF conventions for
 """
 import re
 
+import numpy as np
+
 from .__init__ import XoaError, xoa_warn
 from . import misc
 from . import cf
+from . import coords as xcoords
 
 #: To convert from formula terms to CF names
 FORMULA_TERMS_TO_CF_NAMES = {
-    'C': 'cs',
+    'c': 'cs',  # C
     's': 'sig',
     'eta': 'ssh',
     'depth': 'bathy',
     'depth_c': 'hc',
-    'a': 'sigmas',
-    'b': 'sigmab'
+    'a': 'thetas',
+    'b': 'thetab'
     }
 
+
+class XoaCFError(XoaError):
+    pass
 
 # def atmosphere_sigma_to_altitude(sig, oro, topheight):
 #     """Convert from sigma [0, 1] to altitude in an atmopsheric model
@@ -58,7 +64,7 @@ FORMULA_TERMS_TO_CF_NAMES = {
 #         altitude, "altitude", format_coords=False)
 
 
-def atmosphere_sigma_to_pressures(sig, ps, ptop):
+def atmosphere_sigma_to_pressures(sig, ps, ptop, cache=None):
     """Convert from sigma [0, 1] to altitude in an atmopsheric model
 
     Source: `Ocean sigma coordinate  <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#_atmosphere_sigma_coordinate>`_
@@ -95,7 +101,7 @@ def atmosphere_sigma_to_pressures(sig, ps, ptop):
     return cf.get_cf_specs().format_data_var(p, "plev", format_coords=False)
 
 
-def ocean_sigma_to_depths(sig, ssh, bathy):
+def ocean_sigma_to_depths(sig, ssh, bathy, cache=None):
     """Convert from sigma [-1, 0] to negative depths in an ocean model
 
     Source: `Ocean sigma coordinate <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#_ocean_sigma_coordinate>`_
@@ -126,13 +132,44 @@ def ocean_sigma_to_depths(sig, ssh, bathy):
     """
     # Compute
     z = sig * (bathy + ssh)
-    p += eta
+    z += ssh
 
     # Format
     return cf.get_cf_specs().format_data_var(z, "depth", format_coords=False)
 
 
-def ocean_s_to_depths(sig, ssh, bathy, hc, thetas, thetab, cs=None):
+def get_cs(sig, thetas, thetab, cs_type=None):
+    """Get a s-coordinate stretching curve
+
+    Parameters
+    ----------
+    sig: xarray.DataArray
+        Sigma coordinates range from 0 to 1 (:math:`s` | ``s``)
+    thetas: xarray.DataArray
+        Surface control parameter (:math:`a` | ``a``)
+    thetab: xarray.DataArray
+        Bottom control parameter (:math:`b` | ``b``)
+    cs_type: str, None
+        Stretching type:
+            ``None`` (default):
+
+             .. math::
+
+                 C & = (1-b)*\\frac{\\sinh(a*s)}{\\sinh(a)} +  b*\\left[\\frac{\\tanh(a*(s+0.5))}{2*\\tanh(0.5*a)} - 0.5\\right]
+
+    Returns
+    -------
+    xarray.DataArray
+        Stretching curve (:math:`C` | ``C``)
+    """
+    s, a, b = sig, thetas, thetab
+    cs = np.sinh(s*a) * (1-b) / np.sinh(a)
+    cs += b * (np.tanh(a*(s+0.5))/(2*np.tanh(0.5*a))-0.5)
+    return cs
+
+
+def ocean_s_to_depths(sig, ssh, bathy, hc, thetas, thetab, cs=None,
+                      cs_type=None, cache=None):
     """Convert from s [-1, 0] to depths in an ocean model
 
     Source: `Ocean s-coordinate <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#_ocean_s_coordinate>`_
@@ -160,29 +197,51 @@ def ocean_s_to_depths(sig, ssh, bathy, hc, thetas, thetab, cs=None):
     bathy: xarray.DataArray
         Positive sea floor depth (:math:`h` | ``depth``)
     hc: xarray.DataArray
-        Positive critical depth (:math:`h_c` | ``hc``)
+        Positive critical depth (:math:`h_c` | ``depth_c``)
     thetas: xarray.DataArray
         Surface control parameter (:math:`a` | ``a``)
     thetab: xarray.DataArray
         Bottom control parameter (:math:`b` | ``b``)
     cs: xarray.DataArray, None
         Stretching curve, which defaults to the formula above
-        (:math:`C` | ``C``)
+        computed by :func:`get_cs` (:math:`C` | ``C``)
+    cs_type: str, None
+        Stretching type (see :func:`get_cs`)
+    cache: dict
+        Dict variable that stores intermediate results to be used
+        from call to call.
 
     Returns
     -------
     xarray.DataArray
         Negative depth below surface in m (:math:`z`)
     """
-    # Compute
-    #TODO: ocean_s_to_depths
-    z = sig * (ssh + bathy)
-    p += eta
+    s, a, b = sig, thetas, thetab
+
+    # Check cache first
+    if cache:
+        cs = cache['cs']
+        zconst = cache['zconst']
+
+    else:  # Compute
+
+        # Stetching curve
+        if cs is None:
+            cs = get_cs(sig, thetas, thetab, cs_type)
+
+        # Constant part of the formula
+        zconst = sig * hc
+        zconst += cs*(bathy-hc)
+
+        # Store in cache
+        if isinstance(cache, dict):
+            cache.update(cs=cs, zconst=zconst)
+
+    # Final computation
+    z = (sig+1) * ssh
 
     # Format
     return cf.get_cf_specs().format_data_var(z, "depth", format_coords=False)
-
-
 
 
 def _ds_search_ci_(ds, name):
@@ -238,67 +297,182 @@ def parse_formula_terms_attr(attr):
     for item in _re_ft_split_terms(attr):
         item = _re_ft_split_item(item)
         if len(item) != 2:
-            xoa_warn('Malformed formula_terms attribute: '+attr)
-        else:
-            terms[item[0]] = item[1]
+            raise XoaCFError("Malformed formula_terms attribute: "+attr)
+        terms[item[0]] = item[1]
     return terms
 
 
-def get_sigma_terms(ds, loc="any"):
+# class sigma_types(misc.IntEnumChoices, metaclass=misc.XEnumMeta):
+#     """Supported sigma/s coordinates types"""
+#     #: Atmosphere sigma coordinate
+#     atmosphere_sigma = 1
+#     atmosphere_sigma_coordinate = 1
+#     #: Ocean sigma coordinate
+#     ocean_sigma = -1
+#     ocean_sigma_coordinate = -1
+#     #: Ocean s coordinate
+#     ocean_s = -2
+#     ocean_s_coordinate = -2
+#     #: Generic ocean s coordinate of form 1
+#     ocean_s_g1 = -3
+#     ocean_s_coordinate_g1 = -3
+#     #: Generic ocean s coordinate of form 2
+#     ocean_s_g2 = -4
+#     ocean_s_coordinate_g2 = -4
+
+
+_STANDARD_NAME_TO_FUNC = {
+    "atmosphere_sigma_coordinate": atmosphere_sigma_to_pressures,
+    "ocean_sigma_coordinate": ocean_sigma_to_depths,
+    "ocean_s_coordinate": ocean_s_to_depths
+    }
+
+
+def get_sigma_terms(ds, loc=None, rename=False):
     """Get sigma terms from a dataset as another dataset
 
     It operates like this:
 
-    1. Search for the CF level variable.
-    2. Parse its ``formula_terms`` attribute.
-    3. Create a new dataset with all these terms, properly renamed.
+    1. Search for the sigma variables.
+    2. Parse their ``formula_terms`` attribute.
+    3. Create a dict for each locations from names in datasets to
+       :mod:`xoa.cf` compliant names that are also used in conversion
+       functions.
 
     Parameters
     ----------
     ds: xarray.Dataset
-    loc: str, "any"
-        Staggered grid location
+    loc: str, {"any", None}
+        Staggered grid location.
+        If any or None, results for all locations are returned.
 
     Returns
     -------
-    xarray.Dataset
+    dict, dict of dict
+        A dict is generated for a given sigma variable,
+        whose keys are array names, like ``"sc_r"``,
+        and values are :mod:`~xoa.cf` names, like ``"sig"``.
+        If ``loc`` is ``"any"`` or ``None``,
+        each dict is embedded in a master dict
+        whose keys are staggered grid location. If no location is found,
+        the key is set ``None``.
+
+    Raises
+    ------
+    XoaCFError
+        In case of:
+
+        - inconsistent staggered grid location in dataarrays
+          as checked by :meth:`xoa.cf.SGLocator.get_location`
+        - no standard_name in sigma/s variable
+        - a malformed formula
+        - a formula term variable that is not found in the dataset
+        - an unknown formula term name
     """
-    # Get sigma
+    # Get sigma arrays
     cfspecs = cf.get_cf_specs()
-    sigma = cfspecs.search(ds, 'sigma_level', loc=loc)
-    if sigma is None or "formula_terms" not in sigma.attrs:
-        return
+    single = loc not in ("any", None)
+    sigs = cfspecs.search(ds, 'sig', loc=loc, single=False)
+    terms = {}
+    for sig in sigs:
 
-    # Get requested terms
-    terms = parse_formula_terms_attr(sigma.formula_terms)
+        # Check standard_name
+        if "standard_name" not in sig.attrs:
+            raise XoaCFError("No standard_name attribute found in sigma/s "
+                             "variable name: "+sig.name)
+        elif sig.standard_name not in _STANDARD_NAME_TO_FUNC:
+            raise XoaCFError("Sigma/s coordinate not supported: " +
+                             sig.standard_name + ". Supported coordinates: "
+                             + " ".join(_STANDARD_NAME_TO_FUNC.keys()))
 
-    # Rename terms
-    ds = ds.rename({sigma.name: "sigma_level"})
-    for term_name, da_name_ in terms.items():
-        da_name = _ds_search_ci_(ds, da_name_)
-        if da_name is None:
-            xoa_warn("Formula term dataarray not found: " + da_name_)
-        ds = ds.rename({da_name: term_name})
+        # Get location
+        loc = cf.get_cf_specs().sglocator.get_location(sig)
+
+        # Get formula terms
+        if "formula_terms" not in sig.attrs:
+            raise XoaCFError(f"Sigma/s type variable {sig.name} "
+                             "has no formula_term attribute")
+        formula_terms = parse_formula_terms_attr(sig.formula_terms)
+
+        # Check terms
+        subterms = {sig.name: "sig"}
+        for fname, vname_ in formula_terms.items():
+
+            # Real name
+            vname = _ds_search_ci_(ds, vname_)
+            if vname is None:
+                raise XoaCFError("Formula array not found: "+vname_)
+
+            # xoa.cf name
+            if fname.lower() not in FORMULA_TERMS_TO_CF_NAMES:
+                raise XoaCFError("Unknown formula term name: "+fname)
+            cf_name = FORMULA_TERMS_TO_CF_NAMES[fname.lower()]
+            terms[loc][vname] = cf_name
+
+        terms[loc] = subterms
+
+    if single:
+        return subterms if sigs else None
+    return terms
+
+
+    # # Rename terms in dict or ds
+    # ds = ds.rename({sigma.name: "sig"})
+    # for term_name, da_name_ in terms.items():
+    #     da_name = _ds_search_ci_(ds, da_name_)
+    #     if da_name is None:
+    #         xoa_warn("Formula term dataarray not found: " + da_name_)
+    #     ds = ds.rename({da_name: term_name})
+    # return ds
+
+
+def decode_cf(ds, rename=False):
+    """Compute heights from sigma-like variable in a dataset
+
+    If the dataset is not found to have sigma-like coordinates,
+    a simple copy of the dataset is returned.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        Dataset that contains everything needed to compute heights
+    rename: bool
+        Rename and format arrays ot make them compliant with
+        :mod:`xoa.cf`
+    """
+    # Init
+    ds = ds.copy()
+    cfspecs = cf.get_cf_specs()
+
+    # Decode formula terms
+    all_terms = get_sigma_terms(ds, loc=None)
+
+    # Loop on locations
+    for loc, terms in all_terms.items():
+
+        # Args: keys are cf names, values ara dataarrays
+        kwargs = {}
+        for vname, cf_name in terms.items():
+            kwargs[cf_name] = ds[vname]
+
+        # Compute depth/altitude/pressure
+        func = _STANDARD_NAME_TO_FUNC[kwargs["sig"].standard_name]
+        cache = {}
+        kwargs['cache'] = cache
+        height = func(**kwargs)
+
+        # Format
+        height = cfspecs.sglocator.format_datarray(height, loc)
+
+        # Transpose if approriate
+        for da in ds.data_vars.values():
+            if set(da.dims) in set(da.dims):
+                height = xcoords.transpose_compat(height, da)
+                break
+
+        ds[height.name] = height
+
     return ds
-
-
-class sigma_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
-    """Supported sigma/s coordinates types"""
-    #: Atmosphere sigma coordinate
-    atmosphere_sigma = 1
-    atmosphere_sigma_coordinate = 1
-    #: Ocean sigma coordinate
-    ocean_sigma = -1
-    ocean_sigma_coordinate = -1
-    #: Ocean s coordinate
-    ocean_s = -2
-    ocean_s_coordinates = -2
-    #: Generic ocean s coordinate of form 1
-    ocean_s_g1 = -3
-    ocean_s_coordinate_g1 = -3
-    #: Generic ocean s coordinate of form 2
-    ocean_s_g2 = -4
-    ocean_s_coordinate_g2 = -4
 
 
 def _sigma2coord_(sig, zremote, zref, sigma_type,
