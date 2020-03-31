@@ -811,6 +811,8 @@ class CFSpecs(object):
                                        format_coords=True)
         return self.format_dataarray(dsa, loc=loc, standardize=standardize)
 
+    __call__ = auto_format
+
     def match_coord(self, da, name=None, loc="any"):
         return self.coords.match(da, name=name, loc=loc)
 
@@ -1557,6 +1559,8 @@ class _CFAccessor_(object):
         """Auto-format attributes with :meth:`CFSpecs.auto_format`"""
         return self._cfspecs.auto_format(self._dsa, loc=loc,
                                          standardize=standardize)
+
+    __call__ = auto_format
 
 
 class DataArrayCFAccessor(_CFAccessor_):
