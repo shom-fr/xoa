@@ -214,7 +214,7 @@ class set_options(object):
     .. ipython:: python
 
         @suppress
-        from xoa import set_options
+        from xoa import set_options, get_option
 
         # Classic: for the session
         set_options('plot', cmapdiv='cmo.balance', cmappos='cmo.amp')
@@ -225,8 +225,8 @@ class set_options(object):
 
         # Context: temporary
         with set_options('plot', cmapdiv='cmo.delta'):
-            print('within context:', xoa.get_option('plot.cmapdiv'))
-        print('after context:', xoa.get_option('plot.cmapdiv'))
+            print('within context:', get_option('plot.cmapdiv'))
+        print('after context:', get_option('plot.cmapdiv'))
 
     """
 
