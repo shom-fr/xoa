@@ -81,6 +81,9 @@ _REQUIREMENTS_FILE = os.path.join(
     os.path.dirname(__file__), "..", "requirements.txt"
 )
 
+# Directory of sample files
+_SAMPLE_DIR = os.path.join(os.path.dirname(__file__), '_samples')
+
 _CACHE = {}
 
 
@@ -105,8 +108,8 @@ def xoa_warn(message):
         :okwarning:
 
         @suppress
-        import xoa
-        xoa.xoa_warn('Be careful!')
+        from xoa import xoa_warn
+        xoa_warn('Be careful!')
     """
     warnings.warn(message, XoaWarning, stacklevel=2)
 
@@ -123,13 +126,13 @@ def load_options(cfgfile=None):
     .. ipython:: python
 
         @suppress
-        import xoa
+        from xoa import load_options
         # Dict
-        xoa.load_options({'plot': {'cmappos': 'mycmap'}})
+        load_options({'plot': {'cmappos': 'mycmap'}})
 
         # Lines
         optlines = "[plot]\\n cmappos=mycmap".split('\\n')
-        xoa.load_options(optlines)
+        load_options(optlines)
     """
 
     if "cfgspecs" not in _CACHE:
@@ -175,9 +178,9 @@ def get_option(section, option=None):
     .. ipython:: python
 
         @suppress
-        import xoa
-        print(xoa.get_option('plot', 'cmapdiv'))
-        print(xoa.get_option('plot.cmapdiv'))
+        from xoa import get_option
+        print(get_option('plot', 'cmapdiv'))
+        print(get_option('plot.cmapdiv'))
     """
     options = _get_options_()
     if option is None:
@@ -211,17 +214,17 @@ class set_options(object):
     .. ipython:: python
 
         @suppress
-        import xoa
+        from xoa import set_options
 
         # Classic: for the session
-        xoa.set_options('plot', cmapdiv='cmo.balance', cmappos='cmo.amp')
+        set_options('plot', cmapdiv='cmo.balance', cmappos='cmo.amp')
 
         # With dict
         opts = {"plot.cmapdiv": "cmo.balance"}
-        xoa.set_options(**opts)
+        set_options(**opts)
 
         # Context: temporary
-        with xoa.set_options('plot', cmapdiv='cmo.delta'):
+        with set_options('plot', cmapdiv='cmo.delta'):
             print('within context:', xoa.get_option('plot.cmapdiv'))
         print('after context:', xoa.get_option('plot.cmapdiv'))
 
@@ -272,8 +275,8 @@ def set_option(option, value):
     .. ipython:: python
 
         @suppress
-        import xoa
-        xoa.set_option('plot.cmapdiv', 'cmo.balance');
+        from xoa import set_option
+        set_option('plot.cmapdiv', 'cmo.balance');
     """
     return set_options(None, **{option: value})
 
@@ -286,12 +289,12 @@ def reset_options():
     .. ipython:: python
 
         @suppress
-        import xoa
-        print(xoa.get_option('plot.cmapdiv'))
-        xoa.set_options('plot', cmapdiv='mycmap')
-        print(xoa.get_option('plot.cmapdiv'))
-        xoa.reset_options()
-        print(xoa.get_option('plot.cmapdiv'))
+        from xoa import get_option, set_options, reset_options
+        print(get_option('plot.cmapdiv'))
+        set_options('plot', cmapdiv='mycmap')
+        print(get_option('plot.cmapdiv'))
+        reset_options()
+        print(get_option('plot.cmapdiv'))
     """
     del _CACHE['options']
 
@@ -309,9 +312,9 @@ def show_options(specs=False):
     .. ipython:: python
 
         @suppress
-        import xoa
-        xoa.show_options()
-        xoa.show_options(specs=True)
+        from xoa import show_options
+        show_options()
+        show_options(specs=True)
     """
     if specs:
         print(CONFIG_SPECS.strip("\n"))
@@ -342,8 +345,8 @@ def show_versions():
         :okexcept:
 
         @suppress
-        import xoa
-        xoa.show_versions()
+        from xoa import show_versions
+        show_versions()
     """
     print("- xoa:", __version__)
     for package in _parse_requirements_(_REQUIREMENTS_FILE):
@@ -360,7 +363,17 @@ def show_versions():
 
 
 def show_paths():
-    """Print some xoa paths"""
+    """Print some xoa paths
+
+    Example
+    -------
+    .. ipython:: python
+        :okexcept:
+
+        @suppress
+        from xoa import show_paths
+        show_paths()
+    """
     print("- xoa library dir:", os.path.dirname(__file__))
     from . import cf
     asterix = False
@@ -371,6 +384,7 @@ def show_paths():
             asterix = True
             path = path + " [*]"
         print("-", label+":", path)
+    print("- data samples:", " ".join(get_data_sample()))
     if asterix:
         print("*: file not present")
 
@@ -384,8 +398,8 @@ def show_info(opt_specs=True):
         :okexcept:
 
         @suppress
-        import xoa
-        xoa.show_info()
+        from xoa import show_info
+        show_info()
     """
     print("# VERSIONS")
     show_versions()
@@ -393,3 +407,47 @@ def show_info(opt_specs=True):
     show_paths()
     print("\n# OPTIONS")
     show_options(specs=opt_specs)
+
+
+def get_data_sample(filename=None):
+    """Get the absolute path to a sample file
+
+    Parameters
+    ----------
+    filename: str, None
+        Sample name of the sample. If ommited, a list of available sample
+        name is returned.
+
+    Returns
+    -------
+    str OR list(str)
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        from xoa import get_data_sample
+        get_data_sample("croco.south-africa.nc")
+        get_data_sample()
+    """
+    filenames = os.listdir(_SAMPLE_DIR)
+    if filename is None:
+        return filenames
+    if filename not in filenames:
+        raise XoaError("Invalid data sample: "+filename)
+    return os.path.join(_SAMPLE_DIR, filename)
+
+
+def show_data_samples():
+    """Print the list of data samples
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        from xoa import show_data_samples
+        show_data_samples()
+    """
+    print(' '.join(get_data_sample()))

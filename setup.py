@@ -99,6 +99,9 @@ def configuration():
         scripts.extend(glob(pat))
     config.add_scripts(*scripts)
 
+    # Add data samples
+    config.add_data_dir('xoa/_samples')
+
     # Add extensions
     os.environ['LDFLAGS'] = "-shared"
     config.add_extension("xoa._interp", ["src/interp.f90"])
