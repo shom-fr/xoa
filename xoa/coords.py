@@ -88,6 +88,7 @@ def transpose_compat(da, dims):
     for dim in dims:
         if dim is Ellipsis:
             with_ell = True
+            odims += dim,
         elif dim in da.dims:
             odims += dim,
     if not with_ell and set(odims) < set(da.dims):
