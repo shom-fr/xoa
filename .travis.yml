@@ -26,3 +26,6 @@ install:
   - export PYTHONPATH=$PWD:$PYTHONPATH
 
 script: pytest
+
+notifications:
+  slack: vacumm:OxIMd7NdZ53dkohTcbyWVwc2
