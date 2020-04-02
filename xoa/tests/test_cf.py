@@ -168,20 +168,96 @@ def test_cf_sglocator_format_attrs_with_loc():
         assert fmt_attrs[attr] == attrs[attr]
 
 
-def test_cf_sglocator_format_dataarray():
+@pytest.mark.parametrize(
+    "value0, value1, loc, value",
+    [
+     ("sst", None, "t", "sst_t"),
+     (None, "sst", "t", "sst_t"),
+     ("sst", "sss", "t", "sss_t"),
+     ("sst_x", "sss_y", "t", "sss_t"),
+     ("sst_t", None, None, "sst_t"),
+     (None, "sst_t", None, "sst_t"),
+     ("sst_x", "sss_y", None, "sss_y"),
+     ("sst_x", "sss", None, "sss_x"),
+     ("sst", "sss_y", None, "sss_y"),
+     ]
+)
+def test_cf_sglocator_merge_attr(value0, value1, loc, value):
+    out = cf.SGLocator().merge_attr("name", value0, value1, loc)
+    assert out == value
+
+
+@pytest.mark.parametrize(
+    "isn, psn, osn, loc",
+    [
+     ("sst", None, "sst", None),
+     (None, "sst", "sst", None),
+     ("sst", "temp", "temp", None),
+     ("sst_at_t_location", "temp_at_u_location", "temp_at_u_location", None),
+     ("sst", "temp", "temp_at_u_location", "u"),
+     ("sst_at_t_location", "temp_at_x_location", "temp_at_u_location", "u"),
+     ]
+)
+def test_cf_sglocator_patch_attrs(isn, psn, osn, loc):
+
+    iattrs = {"units": "m", "color": "blue"}
+    patch = {"cmap": "viridis", "mylist": [1, 2], "units": "cm"}
+    if isn:
+        iattrs["standard_name"] = isn
+    if psn:
+        patch["standard_name"] = psn
+
+    oattrs = cf.SGLocator().patch_attrs(iattrs, patch, loc=loc)
+
+    assert oattrs["units"] == "cm"
+    assert oattrs["color"] == "blue"
+    assert oattrs["cmap"] == "viridis"
+    assert oattrs["mylist"] == [1, 2]
+
+    assert oattrs.get("standard_name") == osn
+
+
+@pytest.mark.parametrize(
+    "floc,fname,fattrs,out_name,out_standard_name",
+    [
+     ("p", None, None, "banana_p", "banana_at_p_location"),
+     (None, None, None, "banana_t", "banana"),
+     ("p", "sst", {"standard_name": "potatoe"},
+      "sst_p", "potatoe_at_p_location"),
+     ('x', "sst", {"standard_name": ["potatoe", "banana"]},
+      "sst_x", "banana_at_x_location"),
+     (None, "sst_q", {"standard_name": ["potatoe"]},
+      "sst_q", "potatoe"),
+     (None, "sst", {"standard_name": ["potatoe"]},
+      "sst_t", "potatoe")
+     ]
+)
+def test_cf_sglocator_format_dataarray(
+        floc, fname, fattrs, out_name, out_standard_name):
 
     lon = xr.DataArray(range(5), dims="lon")
     banana = xr.DataArray(
         lon + 20,
         dims="lon",
         coords=[lon],
-        name="banana",
+        name="banana_t",
         attrs={"standard_name": "banana", "taste": "good"},
     )
-    banana_fmt = cf.SGLocator().format_dataarray(banana, "p")
-    assert banana_fmt.name == "banana_p"
-    assert banana_fmt.standard_name == "banana_at_p_location"
+    banana_fmt = cf.SGLocator().format_dataarray(
+        banana, floc, name=fname, attrs=fattrs)
+    assert banana_fmt.name == out_name
+    assert banana_fmt.standard_name == out_standard_name
     assert banana_fmt.taste == "good"
+
+
+def test_cf_sglocator_format_dataarray_no_copy_no_rename():
+    banana = xr.DataArray(1, name="banana_t",
+                          attrs={"standard_name": "banana"})
+    banana_fmt = cf.SGLocator().format_dataarray(
+        banana, "p", copy=False, rename=False)
+    assert banana_fmt is banana
+    assert banana_fmt.name == "banana_t"
+    assert banana_fmt.standard_name == "banana_at_p_location"
 
 
 @pytest.mark.parametrize(
@@ -364,6 +440,17 @@ def test_cf_cfspecs_format_coord(cf_name, in_name, in_attrs):
     assert lon.units == "degrees_east"
 
 
+def test_cf_cfspecs_format_coord_unknown():
+    coord = xr.DataArray(range(5), name='foo')
+    cfspecs = cf.get_cf_specs()
+
+    coord_fmt = cfspecs.format_coord(coord, rename=False)
+    assert coord_fmt is None
+
+    coord_fmt = cfspecs.format_coord(coord, rename=True)
+    assert coord_fmt.name == "foo"
+
+
 @pytest.mark.parametrize("cf_name", [None, "temp"])
 @pytest.mark.parametrize(
     "in_name,in_attrs",
@@ -385,6 +472,27 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
     assert temp.units == "degrees_celsius"
 
     assert temp.lon.standard_name == "longitude"
+
+
+def test_cf_cfspecs_format_data_var_loc():
+    temp = xr.DataArray(0, name='xtemp_t',
+                        attrs={'standard_name': 'banana_at_x_location'})
+    cfspecs = cf.get_cf_specs()
+
+    temp_fmt = cfspecs.format_data_var(temp, "temp", format_coords=False)
+    assert temp_fmt.name == "temp_t"
+    assert temp_fmt.standard_name == "sea_water_temperature_at_x_location"
+
+
+def test_cf_cfspecs_format_data_var_unkown():
+    da = xr.DataArray(range(5), name='foo')
+    cfspecs = cf.get_cf_specs()
+
+    da_fmt = cfspecs.format_data_var(da, rename=False)
+    assert da_fmt is None
+
+    da_fmt = cfspecs.format_data_var(da, rename=True)
+    assert da_fmt.name == "foo"
 
 
 def test_cf_cfspecs_coords_get_dim_type():

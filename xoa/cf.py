@@ -305,8 +305,11 @@ class SGLocator(object):
             sg = SGLocator()
             sg.format_attr('standard_name', 'sea_water_temperature', 't')
             sg.format_attr('standard_name', 'sea_water_temperature', False)
+            sg.format_attr('name', 'banana_t', None)
 
         """
+        if value is None:
+            return value
         if attr not in self.valid_attrs:
             return value
         root, ploc = self.parse_attr(attr, value)
@@ -346,8 +349,6 @@ class SGLocator(object):
         Parameters
         ----------
         attrs: dict
-        loc: string, None
-        standardize: bool
         loc: {True, None}, letter, {False, ""}
             If None, location is left unchanged;
             if a letter, it is set;
@@ -372,7 +373,6 @@ class SGLocator(object):
             sg.format_attrs(attrs, loc='t') # force t loc
             sg.format_attrs(attrs) # keep loc
             sg.format_attrs(attrs, loc=False) # force no loc
-
         """
         attrs = attrs.copy()
         for attr, value in attrs.items():
@@ -386,16 +386,127 @@ class SGLocator(object):
                 attrs[attr] = value
         return attrs
 
+    def merge_attr(self, attr, value0, value1, loc=None, standardize=True):
+        """Merge two attribute values taking care of location
+
+        Parameters
+        ----------
+        attr: {'name', 'standard_name', 'long_name'}
+            Attribute name
+        value0: str, None
+            First attribute value
+        value1: str, None
+            Second attribute value, which is prioritary over the first one
+        loc: letters, {"any", None} or {"", False}
+            - letters: one of these locations
+            - None or "any": any
+            - False or '': no location
+
+        Returns
+        -------
+        str, None
+
+        Example
+        -------
+        .. ipython:: python
+
+            @suppress
+            from xoa.cf import SGLocator
+            sg = SGLocator()
+            sg.merge_attr('name', 'temp_t', 'mytemp')
+            sg.merge_attr('name', 'temp', 'mytemp_t')
+            sg.merge_attr('name', 'temp_u', 'mytemp_t', 'v')
+        """
+        assert attr in self.valid_attrs
+        if value0 is None and value1 is None:
+            return
+        if value0 is None:
+            return self.format_attr(attr, value1, loc, standardize=standardize)
+        if value1 is None:
+            return self.format_attr(attr, value0, loc, standardize=standardize)
+
+        if loc in (None, "any"):
+            loc0 = self.parse_attr(attr, value0)[1]
+            loc1 = self.parse_attr(attr, value1)[1]
+            if loc1 is not None:
+                loc = loc1
+            elif loc0 is not None:
+                loc = loc0
+        return self.format_attr(attr, value1, loc, standardize=standardize)
+
+    def patch_attrs(self, attrs, patch, loc=None, standardize=True):
+        """Patch a dict of attribute with another dict taking care of loc
+
+        Parameters
+        ----------
+        attrs: dict
+            Dictionary of attributes to patch
+        patch: dict
+            Patch to apply
+        loc: {None, "any"}, letter, {False, ""}
+            If None, location is left unchanged;
+            if a letter, it is set;
+            else, it is removed.
+        standardize: bool
+            If True, standardize ``root`` and ``loc`` values.
+
+        Returns
+        -------
+        dict
+            A new dictionary of attributes
+
+        See also
+        --------
+        merge_attr
+        """
+        attrs = attrs.copy()
+
+        # Loop on attributes
+        for attr, value in patch.items():
+            if value is None:
+                continue
+
+            # Attr with loc
+            if attr in self.valid_attrs:
+
+                # List
+                if isinstance(value, list):
+                    if attr in attrs:
+                        for val in value:
+                            if self.match_attr(
+                                    attr, attrs[attr], val, loc=None):
+                                value = attrs[attr]  # don't change, it's ok
+                                break
+                        else:
+                            value = value[0]
+                    else:
+                        value = value[0]
+
+                # Location
+                value = self.merge_attr(
+                    attr, attrs.get(attr, None), value, loc,
+                    standardize=standardize)
+
+            if value is not None:
+                attrs[attr] = value
+
+        return attrs
+
     def format_dataarray(
-        self, da, loc=None, standardize=True, name=None, attrs=None
+        self, da, loc=None, standardize=True, name=None, attrs=None,
+        rename=True, copy=True
     ):
         """Format name and attributes of copy of DataArray
 
         Parameters
         ----------
         da: xarray.DataArray
-        loc: str, {None, False}
+        loc: {True, None}, letter, {False, ""}
+            If None, location is left unchanged;
+            if a letter, it is set;
+            else, it is removed.
         standardize: bool
+            If True, standardize ``root`` and ``loc`` values.
         name: str, None
             Substitute for dataarray name
         attrs: str, None
@@ -403,35 +514,35 @@ class SGLocator(object):
             If ``standard_name`` and ``long_name`` values are a list,
             and if the dataarray has its attribute included in the list,
             it is left unchanged since it is considered compatible.
+        rename:
+            Prevent renaming the array
+        copy: bool
+            Make sure to work on a copy
 
         Return
         ------
         xarray.DataArray
+
+        See also
+        --------
+        format_attrs
+        patch_attrs
         """
-        da = da.copy()
-        if attrs is not None:
-            attrs = attrs.copy()
+        if copy:
+            da = da.copy()
 
-            # List case: check if we skip, else keep the first
-            for attr, roots in list(attrs.items()):
-                if isinstance(roots, list):
-                    if attr in da.attrs and attr in self.valid_attrs:
-                        for root in roots:
-                            if self.match_attr(
-                                    attr, da.attrs[attr], root, loc="any"):
-                                del attrs[attr]
-                    else:
-                        attrs[attr] = roots[0]
+        # Attributes
+        if da.attrs:
+            da.attrs.update(self.format_attrs(
+                da.attrs, loc, standardize=standardize))
+        if attrs:
+            da.attrs.update(self.patch_attrs(da.attrs, attrs, loc,
+                                             standardize=standardize))
 
-            da.attrs.update(attrs)
-        da.attrs.update(
-            self.format_attrs(da.attrs, loc, standardize=standardize)
-        )
-        if name:
-            da.name = name
-        da.name = self.format_attr(
-            "name", da.name, loc, standardize=standardize
-        )
+        # Name
+        if rename:
+            da.name = self.merge_attr("name", da.name, name, loc)
+
         return da
 
 
@@ -744,63 +855,133 @@ class CFSpecs(object):
         specs['processed'] = True
         yield category, name, specs
 
-    def format_coord(self, da, name=None, loc=None, standardize=True,
-                     rename_dim=True):
-        """Format a coordinate variable"""
+    def format_coord(self, da, name=None, loc=None, copy=True,
+                     standardize=True, rename=True, rename_dim=True):
+        """Format a coordinate variable
+
+        See also
+        --------
+        CFCoordSpecs.format_dataarray
+        """
         return self.coords.format_dataarray(
-            da, name=name, loc=loc, standardize=standardize,
-            rename_dim=rename_dim)
+            da, name=name, loc=loc, copy=copy, standardize=standardize,
+            rename=rename, rename_dim=rename_dim)
 
     def format_data_var(
         self,
         da,
         name=None,
-        coords=None,
+        rename=True,
         format_coords=True,
+        coords=None,
         loc=None,
         standardize=True,
+        copy=True
     ):
+        """Format array name and attributes according to currents CF specs
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        name: str, None
+            CF name. If None, it is guessed.
+        rename: bool
+            Not only format attribute, but also rename arrays,
+            thus making a copies.
+        format_coords: bool
+            Also format coords.
+        coords: dict, None
+            Dict whose keys are coord names, and values are CF coord names.
+            Used only if ``format_coords`` is True.
+        standardize: bool
+        copy: bool
+            Make sure to work on a copy of the array.
+            Note that a copy is always returned when ``rename`` is True.
+
+        Returns
+        -------
+        xarray.DataArray
+            Formatted array
+
+        See also
+        --------
+        CFCoordSpecs.format_dataarray
+        CFVarSpecs.format_dataarray
+        """
+        # Copy
+        if copy:
+            da = da.copy()
+
+        # Init rename dict
+        rename_args = {}
+
         # Data var
-        da = self.data_vars.format_dataarray(
-            da, loc=loc, standardize=standardize
+        new_name = self.data_vars.format_dataarray(
+            da, name=name, loc=loc, standardize=standardize,
+            rename=False, copy=False
         )
+        if rename and new_name:
+            da.name = new_name
 
         # Coordinates
         if format_coords:
             coords = coords or {}
             for cname, cda in list(da.coords.items()):
-                cda = self.format_coord(
+                rename_args[cda.name] = self.format_coord(
                     cda,
                     name=coords.get(cname),
                     loc=loc,
                     standardize=standardize,
-                    rename_dim=False,
+                    rename=False,
+                    copy=False
                 )
-                da.coords[cname] = cda
-                da = da.rename({cname: cda.name})
+
+        # Final renaming
+        if rename and rename_args:
+            da = da.rename(rename_args)
+
+        # Return the guessed name
+        if not rename and name is None:
+            return new_name
 
         return da
 
-    def format_dataset(self, ds, loc=None, standardize=True,
-                       format_coords=True):
+    def format_dataset(self, ds, loc=None, rename=True, standardize=True,
+                       format_coords=True, coords=None, copy=True):
         """Auto-format a whole xarray.Dataset"""
-        ds = ds.copy()
+        # Copy
+        if copy:
+            ds = ds.copy()
+
+        # Init rename dict
+        rename_args = {}
+
+        # Data arrays
         for name, da in list(ds.items()):
-            del ds[name]
-            da = self.format_data_var(da, loc=loc, standardize=True,
-                                      format_coords=False)
-            # print('ds',ds)
-            ds[da.name] = da
+            new_name = self.format_data_var(
+                da, loc=loc, rename=False, standardize=True,
+                format_coords=False, copy=False)
+            if rename and new_name:
+                rename_args[da.name] = new_name
+
+        # Coordinates
         if format_coords:
             for cname, cda in list(ds.coords.items()):
-                del ds[cname]
-                cda = self.format_coord(cda, loc=loc, standardize=True,
-                                        rename_dim=False)
-                if cda.ndim == 1 and cname == cda.dims[0]:
-                    ds.coords[cname] = cda
-                    ds = ds.rename({cname: cda.name})
-                else:
-                    ds.coords[cda.name] = cda
+                new_name = self.format_coord(
+                    cda, loc=loc, standardize=True, rename=False,
+                    rename_dim=False, copy=False)
+                if rename:
+                    rename_args[cda.name] = new_name
+
+                # if cda.ndim == 1 and cname == cda.dims[0]:
+                #     ds.coords[cname] = cda
+                #     ds = ds.rename({cname: cda.name})
+                # else:
+                #     ds.coords[cda.name] = cda
+
+        # Final renaming
+        if rename and rename_args:
+            ds = ds.rename(rename_args)
 
         return ds
 
@@ -1140,43 +1321,69 @@ class _CFCatSpecs_(object):
 
         return attrs
 
-    def format_dataarray(self, da, name=None, loc=None, standardize=True,
-                         rename_dim=True):
+    def format_dataarray(self, da, name=None, loc=None, rename=True,
+                         standardize=True, rename_dim=True, copy=True):
         """Format a DataArray's name and attributes
 
         Parameters
         ----------
         da: xarray.DataArray
         name: str, None
-            A CF name. If not provided, it guessed with :meth:`search`.
+            A CF name. If not provided, it guessed with :meth:`match`.
         loc: str
+        rename: bool
+            Rename arrays
         standardize: bool
         rename_dim: bool
             For a 1D array, rename the dimension if it has the same name
             as the array.
+            Note that it is set to False, if ``rename`` is False.
+
+        Returns
+        -------
+        xarray.DataArray, str, None
+            The formatted array or copy of it.
+            The CF name, given or matching, if rename if False; and None
+            if not matching.
 
         """
+        if rename:
+            copy = True
+        if copy:
+            da = da.copy()
+
         # Get name
         if name is None:
             name = self.match(da, loc="any")
         if name is None:
-            return da.copy()
+            if not rename:
+                return
+            return da.copy() if copy else None
         assert name in self.names
 
         # Format array
+        old_name = da.name
+        cf_attrs = self.get_attrs(
+            name, loc=None, standardize=False, multi=True)
         new_da = self.sglocator.format_dataarray(
             da,
             loc=loc,
             name=name,
-            attrs=self.get_attrs(
-                name, loc=None, standardize=False, multi=True),
+            attrs=cf_attrs,
             standardize=standardize,
+            rename=rename,
+            copy=False,
         )
 
+        # Return renaming name not renaming
+        if not rename:
+            return self.sglocator.merge_attr("name", da.name, name, loc)
+
         # Rename dim if axis coordinate
-        if (rename_dim and da.name is not None and da.ndim == 1 and
-                da.name == da.dims[0]):
-            new_da = new_da.rename({da.name: new_da.name})
+        rename_dim = rename and rename_dim
+        if (rename_dim and old_name is not None and da.ndim == 1 and
+                old_name == da.dims[0]):
+            new_da = new_da.rename({old_name: new_da.name})
         return new_da
 
 
@@ -1545,6 +1752,11 @@ class _CFAccessor_(object):
     def get(self, name, loc="any", single=True):
         """Search for a CF item with :meth:`CFSpecs.search`"""
         return self._cfspecs[self._category].search(
+            self._dsa, name=name, loc=loc, get="obj", single=single)
+
+    def get_coord(self, name, loc="any", single=True):
+        """Search for a CF coord with :meth:`CFCoordSpecs.search`"""
+        return self._cfspecs.coords.search(
             self._dsa, name=name, loc=loc, get="obj", single=single)
 
     def __getattr__(self, attr):

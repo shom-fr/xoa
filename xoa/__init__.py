@@ -424,14 +424,17 @@ def get_data_sample(filename=None):
 
     Example
     -------
-    .. ipython:: python
+    .. .ipython:: python
 
         @suppress
         from xoa import get_data_sample
         get_data_sample("croco.south-africa.nc")
         get_data_sample()
     """
-    filenames = os.listdir(_SAMPLE_DIR)
+    if not os.path.exists(_SAMPLE_DIR):
+        filenames = []
+    else:
+        filenames = os.listdir(_SAMPLE_DIR)
     if filename is None:
         return filenames
     if filename not in filenames:
