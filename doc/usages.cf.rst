@@ -1,3 +1,5 @@
+.. _usages.cf:
+
 Using the :mod:`xoa.cf` module
 ##############################
 
@@ -23,7 +25,8 @@ for various oceanographic, sea surface and atmospheric variables and coordinates
 A distinction is made between data variables ``data_vars``
 and coordinates ``coords``, like in :mod:`xarray`.
 
-Getting the current specifications for data variables and coordinates:
+Getting the current specifications for data variables and coordinates
+with the :func:`~xoa.cf.get_cf_specs` function:
 
 .. ipython:: python
 
@@ -33,6 +36,9 @@ Getting the current specifications for data variables and coordinates:
     cfspecs["data_vars"] is cfspecs.coords
     cfspecs.data_vars.names[:3]
     cfspecs.coords.names[:3]
+
+See the appendix :ref:`appendix.cf.default` for the
+list of available default specifications.
 
 Data variables
 --------------
@@ -45,7 +51,7 @@ Data variables
 
 Description of specification keys:
 
-.. list-table:: CF specs for ``data_vars``
+.. list-table:: CF specs for :ref:`appendix.cf.data_vars`
 
     * - Key
       - Type
@@ -91,7 +97,7 @@ Coordinates
 
 Description of specification keys:
 
-.. list-table:: CF specs for ``coords``
+.. list-table:: CF specs for :ref:`appendix.cf.coords`
 
     * - Key
       - Type
@@ -147,9 +153,9 @@ Check if they match known or explicit CF items:
 
     cfspecs.coords.match(lon, "lon") # explicit
     cfspecs.coords.match(lon, "lat") # explicit
-    cfspecs.coords.match(lon)
-    cfspecs.data_vars.match(temp)
-    cfspecs.data_vars.match(sal)
+    cfspecs.coords.match(lon) # any known
+    cfspecs.data_vars.match(temp) # any known
+    cfspecs.data_vars.match(sal) # any known
 
 Search for known CF items:
 
@@ -165,6 +171,13 @@ You can also search for coordinates in datasets, for instance like this:
 .. ipython:: python
 
     cfspecs.coords.search(ds, "lon")
+
+.. seealso::
+    - CF items:
+      :cfcoord:`lon` :cfcoord:`lat` :cfdatavar:`temp` :cfdatavar:`sal`
+    - Methods: :meth:`xoa.cf.CFCoordSpecs.match`
+      :meth:`xoa.cf.CFVarSpecs.match` :meth:`xoa.cf.CFSpecs.search`
+      :meth:`xoa.cf.CFCoordSpecs.search` :meth:`xoa.cf.CFVarSpecs.search`
 
 Formatting
 ==========
@@ -191,6 +204,10 @@ as soon as the ``format_coords`` keyword is ``True``.
     ds2.temp
     ds2.lon
 
+.. seealso::
+    :meth:`xoa.cf.CFSpecs.format_coord`
+    :meth:`xoa.cf.CFSpecs.format_data_var`
+    :meth:`xoa.cf.CFSpecs.auto_format`
 
 Using the accessors
 ===================
@@ -211,8 +228,25 @@ Here are some example of usage:
     temp
     temp.cf.get("lon")
     ds.cf.get("temp")
+    ds.cf.lon
+    ds.cf.coords.lon  # specific search = ds.cf.coords.get("lon")
+    ds.cf.temp
+    ds.cf["temp"].name
+    ds.cf.data_vars.temp.name  # specific search = ds.cf.coords.get("temp")
+    ds.cf.data_vars.bathy is None # returns None when not found
+    ds.cf.temp.cf.lon.name  # chaining
     ds.cf.auto_format()
 
+As you can see, accessing an accessor attribute or item make an
+implicit call to :class:`~xoa.cf.DataArrayCFAccessor.get`.
+The root accessor attr:`cf` agive accessor to
+two sub-accessors, :attr:`~xoa.cf.DatasetCFAccessor.data_vars`
+and :attr:`~xoa.cf.DatasetCFAccessor.coords`,
+for being able to specialize the searches.
+
+.. seealso::
+    :class:`xoa.cf.DataArrayCFAccessor`
+    :class:`xoa.cf.DatasetCFAccessor`
 
 Changing the CF specs
 =====================
@@ -265,7 +299,7 @@ Alternatively, a :class:`xoa.cf.CFSpecs` instance can be loaded
 with the :meth:`~xoa.cf.CfSpecs.load_cfg` method, as explained below.
 
 Create new specs from scratch
-=============================
+-----------------------------
 
 To create new specs, you must instantiate the :class:`xoa.cf.CFSpecs` class,
 with an input type as those presented above:

@@ -20,6 +20,7 @@ roles = {
     "coords": "cfcoord"
     }
 
+
 def genrst(app):
 
     srcdir = app.env.srcdir
@@ -45,11 +46,12 @@ def genrst(app):
                 os.makedirs(decdir)
 
             # Single declaration file
+            role = roles[cfcat]
             with open(os.path.join(decdir, cfname+".rst"), "w") as f:
                 title = f':attr:`~xoa.cf.CFSpecs.{cfcat}` [``"{cfname}"``]'
                 title += "\n" + len(title) * "="
                 rst = title + "\n\n"
-                rst += f".. cfdatavar:: {cfname}\n\n"
+                rst += f".. {role}:: {cfname}\n\n"
                 rst += "\t.. list-table::\n\n"
                 for key, value in cfspecs[cfcat][cfname].items():
                     if isinstance(value, list):
@@ -62,7 +64,6 @@ def genrst(app):
                 f.write(rst)
 
             # Append to table
-            role = roles[cfcat]
             rst_tables[cfcat] += f"    * - :{role}:`{cfname}`\n"
             rst_tables[cfcat] += "      - {}\n".format(
                 cfspecs[cfcat][cfname]["long_name"][0])
@@ -75,8 +76,8 @@ def genrst(app):
         for cfcat in rst_tables.keys():
 
             title = cat_titles[cfcat]
-            title = title + "\n" + len(title)*"^" + "\n\n"
-            f.write(title)
+            title = title + "\n" + len(title)*"^"
+            f.write(f".. _appendix.cf.{cfcat}:\n\n" + title + "\n\n")
             f.write(rst_toctrees[cfcat]+"\n")
             f.write(rst_tables[cfcat]+"\n\n")
 

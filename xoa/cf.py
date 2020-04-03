@@ -2,6 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Naming convention tools for reading and formatting variables
+
+.. rubric:: Usage
+
+See the :ref:`usages.cf` section.
+
 """
 # Copyright or © or Copr. Shom/Ifremer/Actimar
 #
@@ -1205,7 +1210,7 @@ class CFSpecs(object):
                                      single=single)
 
     def search(self, dsa, name=None, loc="any", get="obj",
-               single=True, categories=None):
+               single=True, categories=None, errors="raise"):
         """Search for a dataarray with data_vars and/or coords"""
         if not categories:
             categories = (self.categories if hasattr(dsa, "data_vars")
@@ -1214,9 +1219,13 @@ class CFSpecs(object):
             categories = self.categories
         for category in categories:
             res = self[category].search(dsa, name=name, loc=loc, get=get,
-                                        single=single)
+                                        single=single, errors=errors)
             if res is not None:
                 return res
+
+    def get(self, dsa, name):
+        """A shortcut to :meth:`search` with an explicit name"""
+        return self.search(dsa, name)
 
 
 class _CFCatSpecs_(object):
@@ -1272,9 +1281,13 @@ class _CFCatSpecs_(object):
         if name in self:
             return name
 
-    def _assert_known_(self, name):
+    def _assert_known_(self, name, errors="raise"):
         if name not in self._dict:
-            raise XoaCFError(f"Invalid {self.category} CF specs name: "+name)
+            if errors == "raise":
+                raise XoaCFError(
+                    f"Invalid {self.category} CF specs name: "+name)
+            return False
+        return True
 
     @property
     def names(self):
@@ -1387,7 +1400,8 @@ class _CFCatSpecs_(object):
                         return True if name else name_
         return False if name else None
 
-    def search(self, dsa, name=None, loc="any", get="obj", single=True):
+    def search(self, dsa, name=None, loc="any", get="obj", single=True,
+               errors="raise"):
         """Search for a data_var or coord that maches given or any specs
 
         Parameters
@@ -1405,6 +1419,7 @@ class _CFCatSpecs_(object):
             If True, return the first item found or None.
             If False, return a possible empty list of found items.
             A warning is emitted when set to True and multiple item are found.
+        errors: {"raise", "ignore"}
 
         Returns
         -------
@@ -1420,7 +1435,8 @@ class _CFCatSpecs_(object):
         # Get match specs
         if name:  # Explicit name so we loop on search specs
             if isinstance(name, str):
-                self._assert_known_(name)
+                if not self._assert_known_(name, errors):
+                    return
             match_specs = []
             for attr, refs in self._get_ordered_match_specs_(name).items():
                 match_specs.append({attr: refs})
@@ -1452,6 +1468,10 @@ class _CFCatSpecs_(object):
             xoa_warn("Multiple items found while you requested a single one")
         if found:
             return found[0]
+
+    def get(self, dsa, name):
+        """Call to :meth:`search` with an explicit name and ignoring errors"""
+        return self.search(dsa, name, errors="ignore")
 
     def get_attrs(
         self, name, select=None, exclude=None, errors="warn", loc=None,
@@ -1947,6 +1967,8 @@ class _CFAccessor_(object):
     def __init__(self, dsa):
         self._cfspecs = get_cf_specs()
         self._dsa = dsa
+        self._coords = None
+        self._data_vars = None
 
     def set_cf_specs(self, cfspecs):
         """Set the :class:`CFSpecs` using by this accessor"""
@@ -1955,18 +1977,20 @@ class _CFAccessor_(object):
 
     def get(self, name, loc="any", single=True):
         """Search for a CF item with :meth:`CFSpecs.search`"""
-        return self._cfspecs[self._category].search(
-            self._dsa, name=name, loc=loc, get="obj", single=single)
+        kwargs = dict(name=name, loc=loc, get="obj", single=single,
+                      errors="ignore")
+        if self._category is None:
+            return self._cfspecs.search(self._dsa, **kwargs)
+        return self._cfspecs[self._category].search(self._dsa, **kwargs)
 
     def get_coord(self, name, loc="any", single=True):
         """Search for a CF coord with :meth:`CFCoordSpecs.search`"""
         return self._cfspecs.coords.search(
-            self._dsa, name=name, loc=loc, get="obj", single=single)
+            self._dsa, name=name, loc=loc, get="obj", single=single,
+            errors="ignore")
 
-    def __getattr__(self, attr):
-        if attr in self._cfspecs['accessors']['properties'][self._category]:
-            return self.get(attr)
-        return object.__getattribute__(self, attr)
+    def __getattr__(self, name):
+        return self.get(name)
 
     def __getitem__(self, name):
         return self.get(name)
@@ -1978,8 +2002,24 @@ class _CFAccessor_(object):
 
     __call__ = auto_format
 
+    @property
+    def coords(self):
+        """Sub-accessor for coords only"""
+        if self._coords is None:
+            self._coords = _CoordAccessor_(self._dsa)
+            self._coords.set_cf_specs(self._cfspecs)
+        return self._coords
 
-class DataArrayCFAccessor(_CFAccessor_):
+    @property
+    def data_vars(self):
+        """Sub-accessor for data_vars only"""
+        if self._data_vars is None:
+            self._data_vars = _DataVarAccessor__(self._dsa)
+            self._data_vars.set_cf_specs(self._cfspecs)
+        return self._data_vars
+
+
+class _CoordAccessor_(_CFAccessor_):
     _category = 'coords'
 
     @property
@@ -2021,8 +2061,16 @@ class DataArrayCFAccessor(_CFAccessor_):
         return self.get_dim("t")
 
 
+class _DataVarAccessor__(_CFAccessor_):
+    _category = "data_vars"
+
+
 class DatasetCFAccessor(_CFAccessor_):
-    _category = 'data_vars'
+    pass
+
+
+class DataArrayCFAccessor(_CoordAccessor_):
+    pass
 
 
 def register_cf_accessors(name='cf'):

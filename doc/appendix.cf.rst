@@ -3,6 +3,11 @@
 CF specs and defaults
 =====================
 
+This appendix refers to the searching and formatting specifications
+for data variables and coordinates, and related tools,
+available in the :mod:`xoa.cf` module.
+Their usage is introduced in the :ref:`usages.cf` section.
+
 .. _appendix.cf.default:
 
 The default configuration
