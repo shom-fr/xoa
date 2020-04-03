@@ -1,4 +1,4 @@
-"""Generatefiles to declare and list xoa options"""
+"""Generate files to declare and list xoa options"""
 
 import os
 import logging
@@ -83,6 +83,11 @@ def genrst(app):
 
 
 def setup(app):
+
+    app.add_object_type(
+        'xoaoption', 'xoaoption',
+        objname='xoa flat configuration option',
+        indextemplate='pair: %s; xoa flat configuration option')
 
     app.add_config_value('genoptions_table',
                          'genoptions/table.txt', 'html')

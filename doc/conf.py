@@ -45,6 +45,7 @@ extensions = [
     "IPython.sphinxext.ipython_console_highlighting",
     'nbsphinx',
     'genoptions',
+    'gencfspecs',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput'
 ]
@@ -97,11 +98,6 @@ genoptions_declarations = 'genoptions/declarations.txt'
 # %% User directives
 
 def setup(app):
-
-    app.add_object_type(
-        'xoaoption', 'xoaoption',
-        objname='xoa flat configuration option',
-        indextemplate='pair: %s; xoa flat configuration option')
 
     app.add_object_type('confopt', 'confopt',
                         objname='configuration option',

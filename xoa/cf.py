@@ -1257,10 +1257,10 @@ class _CFCatSpecs_(object):
         return self.get_specs(key)
 
     def __iter__(self):
-        return self._dict.values
+        return iter(self._dict)
 
-    # def __len__(self):
-    #     return len(self._dict)
+    def __len__(self):
+        return len(self._dict)
 
     def __contains__(self, key):
         return key in self._dict
