@@ -254,10 +254,10 @@ class SGLocator(object):
         attr: {'name', 'standard_name', 'long_name'}
             Attribute name
         root: str
-        loc: letters, {"any", None} or {"", False}
-            - letters: one of these locations
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
             - None or "any": any
-            - False or '': no location
+            - False or '"": no location
 
         Return
         ------
@@ -285,9 +285,9 @@ class SGLocator(object):
             Attribute name
         value: str
             Current attribute value. It is parsed to get current ``root``.
-        loc: {True, None}, letter, {False, ""}
+        loc: {True, None}, str, {False, ""}
             If None, location is left unchanged;
-            if a letter, it is set;
+            if a str, it is set;
             else, it is removed.
         standardize: bool
             If True, standardize ``root`` and ``loc`` values.
@@ -857,7 +857,31 @@ class CFSpecs(object):
 
     def format_coord(self, da, name=None, loc=None, copy=True,
                      standardize=True, rename=True, rename_dim=True):
-        """Format a coordinate variable
+        """Format a coordinate array
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        name: str, None
+            A CF name. If not provided, it guessed with :meth:`match`.
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
+        rename: bool
+            Rename arrays
+        standardize: bool
+        rename_dim: bool
+            For a 1D array, rename the dimension if it has the same name
+            as the array.
+            Note that it is set to False, if ``rename`` is False.
+
+        Returns
+        -------
+        xarray.DataArray, str, None
+            The formatted array or copy of it.
+            The CF name, given or matching, if rename if False; and None
+            if not matching.
 
         See also
         --------
@@ -885,6 +909,10 @@ class CFSpecs(object):
         da: xarray.DataArray
         name: str, None
             CF name. If None, it is guessed.
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
         rename: bool
             Not only format attribute, but also rename arrays,
             thus making a copies.
@@ -986,7 +1014,13 @@ class CFSpecs(object):
         return ds
 
     def auto_format(self, dsa, loc=None, standardize=True):
-        """Auto-format the xarray.Dataset or xarray.DataArray"""
+        """Auto-format the xarray.Dataset or xarray.DataArray
+
+        See also
+        --------
+        format_dataarray
+        format_dataset
+        """
         if hasattr(dsa, "data_vars"):
             return self.format_dataset(dsa, loc=loc, standardize=standardize,
                                        format_coords=True)
@@ -995,23 +1029,178 @@ class CFSpecs(object):
     __call__ = auto_format
 
     def match_coord(self, da, name=None, loc="any"):
+        """Check if an array matches a given or any coord specs
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        name: str, dict, None
+            Cf name.
+            If None, all names are used.
+            If a dict, name is interpreted as an explicit set of
+            specifications.
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
+
+        See also
+        --------
+        CFCoordSpecs.match
+        """
         return self.coords.match(da, name=name, loc=loc)
 
     def match_data_var(self, da, name=None, loc="any"):
+        """Check if an array matches given or any data_var specs
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        name: str, dict, None
+            Cf name.
+            If None, all names are used.
+            If a dict, name is interpreted as an explicit set of
+            specifications.
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
+
+        See also
+        --------
+        CFVarSpecs.match
+        """
         return self.data_vars.match(da, name=name, loc=loc)
 
     def search_coord(self, dsa, name=None, loc="any", get="obj", single=True):
+        """Search for a coord that maches given or any specs
+
+        Parameters
+        ----------
+        dsa: DataArray or Dataset
+        name: str, dict
+            A CF name. If not provided, all CF names are scaned.
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
+        get: {"obj", "name"}
+            When found, get the object found or its name.
+        single: bool
+            If True, return the first item found or None.
+            If False, return a possible empty list of found items.
+            A warning is emitted when set to True and multiple item are found.
+
+        Returns
+        -------
+        None or str or object
+
+        Example
+        -------
+        .. ipython:: python
+
+            @suppress
+            from xoa.cf import get_cf_specs
+            @suppress
+            import xarray as xr, numpy as np
+            lon = xr.DataArray([2, 3], dims='foo',
+                               attrs={'standard_name': 'longitude'})
+            data = xr.DataArray([0, 1], dims=('foo'), coords=[lon])
+            cfspecs = get_cf_specs()
+            cfspecs.search_coord(data, "lon")
+            cfspecs.search_coord(data, "lon", get="name")
+            cfspecs.search_coord(data, "lat")
+
+        See also
+        --------
+        search_data_var
+        CFCoordSpecs.search
+        """
         return self.coords.search(dsa, name=name, loc=loc, get=get,
                                   single=single)
 
     def search_dim(self, da, dim_type=None, loc="any"):
+        """Search for a dimension from its type
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        dim_type: None, {"x", "y", "z", "t", "f"}
+            Dimension type
+        loc:
+            Location
+
+        See also
+        --------
+        CFCoordSpecs.search_dim
+        """
         return self.coords.search_dim(da, dim_type=dim_type, loc=loc)
 
     def search_coord_from_dim(self, da, dim):
+        """Search a dataarray for a coordinate from a dimension name
+
+        It first searches for a coordinate with the same name and that is
+        the only one having this dimension.
+        Then look for coordinates with the same type like x, y, etc.
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        dim: str
+
+        Return
+        ------
+        xarray.DataArray, None
+            An coordinate array or None
+        """
         return self.coords.search_from_dim(da, dim)
 
     def search_data_var(self, dsa, name=None, loc="any", get="obj",
                         single=True):
+        """Search for a data_var that maches given or any specs
+
+        Parameters
+        ----------
+        dsa: DataArray or Dataset
+        name: str, dict
+            A CF name. If not provided, all CF names are scaned.
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
+        get: {"obj", "name"}
+            When found, get the object found or its name.
+        single: bool
+            If True, return the first item found or None.
+            If False, return a possible empty list of found items.
+            A warning is emitted when set to True and multiple item are found.
+
+        Returns
+        -------
+        None or str or object
+
+        Example
+        -------
+        .. ipython:: python
+
+            @suppress
+            from xoa.cf import get_cf_specs
+            @suppress
+            import xarray as xr, numpy as np
+            data = xr.DataArray(
+                [0, 1], dims=('x'),
+                attrs={'standard_name': 'sea_water_temperature'})
+            ds = xr.Dataset({'foo': data})
+            cfspecs = get_cf_specs()
+            cfspecs.search_data_var(ds, "temp")
+            cfspecs.search_data_var(ds, "temp", get="name")
+            cfspecs.search_data_var(ds, "sal")
+
+        See also
+        --------
+        search_coord
+        CFVarSpecs.search
+        """
         return self.data_vars.search(dsa, name=name, loc=loc, get=get,
                                      single=single)
 
@@ -1155,7 +1344,14 @@ class _CFCatSpecs_(object):
         ----------
         da: xarray.DataArray
         name: str, dict, None
-        loc: str, False, "any"
+            Cf name.
+            If None, all names are used.
+            If a dict, name is interpreted as an explicit set of
+            specifications.
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
 
         Return
         ------
@@ -1199,7 +1395,10 @@ class _CFCatSpecs_(object):
         dsa: DataArray or Dataset
         name: str, dict
             A CF name. If not provided, all CF names are scaned.
-        loc: "any", str
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
         get: {"obj", "name"}
             When found, get the object found or its name.
         single: bool
@@ -1330,7 +1529,10 @@ class _CFCatSpecs_(object):
         da: xarray.DataArray
         name: str, None
             A CF name. If not provided, it guessed with :meth:`match`.
-        loc: str
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
         rename: bool
             Rename arrays
         standardize: bool
@@ -1388,11 +1590,13 @@ class _CFCatSpecs_(object):
 
 
 class CFVarSpecs(_CFCatSpecs_):
+    """CF specification for data_vars"""
 
     category = "data_vars"
 
 
 class CFCoordSpecs(_CFCatSpecs_):
+    """CF specification for coords"""
 
     category = "coords"
 
