@@ -24,4 +24,3 @@ Fortran wrappers
 .. genfortran::
 
     xoa._interp Interpolation routines
-

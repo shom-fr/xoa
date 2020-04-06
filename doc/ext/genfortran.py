@@ -4,10 +4,10 @@ import os
 import logging
 import importlib
 
-from docutils.statemachine import string2lines
-from sphinx.util.docutils import SphinxDirective
-
-import xoa.cf
+from docutils import nodes
+from docutils.statemachine import string2lines, StringList
+from sphinx import addnodes
+from sphinx.util.docutils import SphinxDirective, switch_source_input
 
 
 path_pat_mod_dir = os.path.join("{gendir}", "{mod_name}")
@@ -26,12 +26,46 @@ class GenFortran(SphinxDirective):
     required_arguments = 0
     has_content = True
 
+    def get_table(self, items):
+        """Inspired from autosummary code"""
+        table_spec = addnodes.tabular_col_spec()
+        table_spec['spec'] = r'\X{1}{2}\X{1}{2}'
+
+        real_table = nodes.table('', classes=['longtable'])
+        group = nodes.tgroup('', cols=2)
+        real_table.append(group)
+        group.append(nodes.colspec('', colwidth=10))
+        group.append(nodes.colspec('', colwidth=90))
+        body = nodes.tbody('')
+        group.append(body)
+
+        for mod_name, mod_desc in items:
+            source, line = self.state_machine.get_source_and_line()
+            row = nodes.row('')
+            for text in (f":mod:`{mod_name}`", mod_desc):
+                node = nodes.paragraph('')
+                vl = StringList()
+                vl.append(text, '%s:%d:<tonq>' % (source, line))
+                with switch_source_input(self.state, vl):
+                    self.state.nested_parse(vl, 0, node)
+                    try:
+                        if isinstance(node[0], nodes.paragraph):
+                            node = node[0]
+                    except IndexError:
+                        pass
+                    row.append(nodes.entry('', node))
+            body.append(row)
+
+        return real_table
+
     def run(self):
 
         srcdir = self.env.srcdir
         gendir = os.path.join(srcdir, "genfortran")
-        rst_entry_toctree = ".. toctree::\n\t:hidden:\n\n"
         rst_entry_table = ".. list-table::\n\n"
+
+        toctree_entries = []
+        table_entries = []
 
         # Get names
         for mod_name_desc in self.content:
@@ -71,22 +105,25 @@ class GenFortran(SphinxDirective):
                 f.write(rst_toctree+"\n\n")
                 f.write(rst_table)
 
-            # Complete entry points
-            rst_entry_toctree += f"\tgenfortran/{mod_name}/index\n"
-            rst_entry_table += f"\t* - :mod:`{mod_name}`\n"
-            rst_entry_table += f"\t  - {description}\n"
+            # Append entry points
+            toctree_entries.append(f"genfortran/{mod_name}/index")
+            table_entries.append((mod_name, description))
 
-        # Write entry point
-        rst_entry = rst_entry_toctree + "\n\n" + rst_entry_table + "\n"
-        print(rst_entry)
-        source = self.state_machine.input_lines.source(
-            self.lineno - self.state_machine.input_offset - 1)
-        include_lines = string2lines(rst_entry, convert_whitespace=1)
-        self.state_machine.insert_input(include_lines, source)
+        # Create entry point
+        nodes = []
+        if toctree_entries:
 
-        return []
+            tocnode = addnodes.toctree(glob=None, hidden=True)
+            tocnode['includefiles'] = toctree_entries
+            tocnode['entries'] = [(None, en) for en in toctree_entries]
+            nodes.append(tocnode)
 
-import numpy.f2py
+            nodes.append(self.get_table(table_entries))
+
+
+
+        return nodes
+
 
 def setup(app):
 
