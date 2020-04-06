@@ -120,8 +120,6 @@ class GenFortran(SphinxDirective):
 
             nodes.append(self.get_table(table_entries))
 
-
-
         return nodes
 
 
