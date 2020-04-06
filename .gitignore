@@ -133,6 +133,7 @@ doc/api/
 doc/savefig/
 doc/genoptions/
 doc/gencfspecs/
+doc/genfortran/
 my/
 
 # misc

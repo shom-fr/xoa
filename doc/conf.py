@@ -46,6 +46,7 @@ extensions = [
     'nbsphinx',
     'genoptions',
     'gencfspecs',
+    'genfortran',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput'
 ]

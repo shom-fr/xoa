@@ -1,6 +1,9 @@
 API
 ===
 
+Python
+------
+
 .. autosummary::
     :toctree: api
 
@@ -14,5 +17,11 @@ API
     xoa.regrid
     xoa.cfgm
     xoa.cli
-    xoa._interp
+
+Fortran wrappers
+----------------
+
+.. genfortran::
+
+    xoa._interp Interpolation routines
 
