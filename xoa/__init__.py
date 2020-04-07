@@ -454,3 +454,20 @@ def show_data_samples():
         show_data_samples()
     """
     print(' '.join(get_data_sample()))
+
+
+def register_accessors(cf=True):
+    """Register xarray accessors
+
+    Parameters
+    ----------
+    cf: bool
+        Register the :mod:`xoa.cf` accessors
+
+    See also
+    --------
+    xoa.cf.register_cf_accessors
+    """
+    if cf:
+        from .cf import register_cf_accessors
+        register_cf_accessors()

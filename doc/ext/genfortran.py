@@ -118,7 +118,6 @@ def parse_and_generate(app):
                 m = re_directive_match(line)
                 if m:
                     indent = m.group('indent')
-                    print('inside!')
                     continue
                 if indent is None:
                     continue

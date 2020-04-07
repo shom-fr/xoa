@@ -226,16 +226,20 @@ Here are some example of usage:
 .. ipython:: python
 
     temp
-    temp.cf.get("lon")
-    ds.cf.get("temp")
-    ds.cf.lon
+    temp.cf.get("lon") # access by .get
+    ds.cf.get("temp") # access by .get
+    ds.cf.lon # access by attribute
     ds.cf.coords.lon  # specific search = ds.cf.coords.get("lon")
-    ds.cf.temp
-    ds.cf["temp"].name
+    ds.cf.temp # access by attribute
+    ds.cf["temp"].name # access by item
     ds.cf.data_vars.temp.name  # specific search = ds.cf.coords.get("temp")
     ds.cf.data_vars.bathy is None # returns None when not found
     ds.cf.temp.cf.lon.name  # chaining
-    ds.cf.auto_format()
+    ds.cf.temp.cf.name # CF name, not real name
+    ds.cf.temp.cf.attrs # attributes, merged with CF attrs
+    ds.cf.temp.cf.standard_name # single attribute
+    ds.mytemp.cf.auto_format() # or ds.temp.cf()
+    ds.cf.auto_format() # or ds.cf()
 
 As you can see, accessing an accessor attribute or item make an
 implicit call to :class:`~xoa.cf.DataArrayCFAccessor.get`.

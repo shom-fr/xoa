@@ -592,6 +592,7 @@ def test_cf_dataarraycfaccessor():
 
     assert temp.cf.lon.name == 'xxx'
     assert temp.cf.lat is None
+    assert temp.cf.lon.cf.name == "lon"
 
 
 def test_cf_datasetcfaccessor():

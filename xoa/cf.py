@@ -464,7 +464,11 @@ class SGLocator(object):
         --------
         merge_attr
         """
+        # Reloc if needed
         attrs = attrs.copy()
+        if attrs:
+            attrs.update(self.format_attrs(
+                attrs, loc, standardize=standardize))
 
         # Loop on attributes
         for attr, value in patch.items():
@@ -537,12 +541,12 @@ class SGLocator(object):
             da = da.copy()
 
         # Attributes
-        if da.attrs:
-            da.attrs.update(self.format_attrs(
-                da.attrs, loc, standardize=standardize))
         if attrs:
             da.attrs.update(self.patch_attrs(da.attrs, attrs, loc,
                                              standardize=standardize))
+        else:
+            da.attrs.update(self.format_attrs(
+                da.attrs, loc, standardize=standardize))
 
         # Name
         if rename:
@@ -702,6 +706,10 @@ class CFSpecs(object):
     def sglocator(self):
         """:class:`SGLocator` instance"""
         return self._sgl
+
+    @property
+    def cfgspecs(self):
+        return self._cfgspecs
 
     def __getitem__(self, section):
         assert section in self._dict
@@ -1029,7 +1037,7 @@ class CFSpecs(object):
         if hasattr(dsa, "data_vars"):
             return self.format_dataset(dsa, loc=loc, standardize=standardize,
                                        format_coords=True)
-        return self.format_dataarray(dsa, loc=loc, standardize=standardize)
+        return self.format_data_var(dsa, loc=loc, standardize=standardize)
 
     __call__ = auto_format
 
@@ -1048,6 +1056,11 @@ class CFSpecs(object):
             - str: one of these locations
             - None or "any": any
             - False or '"": no location
+
+        Returns
+        -------
+        bool, str
+            True or False if name is provided, else found name or None
 
         See also
         --------
@@ -1071,11 +1084,64 @@ class CFSpecs(object):
             - None or "any": any
             - False or '"": no location
 
+        Returns
+        -------
+        bool, str
+            True or False if name is provided, else found name or None
+
         See also
         --------
         CFVarSpecs.match
         """
         return self.data_vars.match(da, name=name, loc=loc)
+
+    @staticmethod
+    def get_category(da):
+        """Guess if a datarray belongs to data_vars or coords
+
+        It belongs to coords if one of its dimensions or
+        coordinates has its name.
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+
+        Returns
+        -------
+        str
+        """
+        if da.name is not None and (da.name in da.dims or
+                                    da.name in da.coords):
+            return "coords"
+        return "data_vars"
+
+    def match(self, da, loc="any"):
+        """Check if an array matches any data_var or coord specs
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
+
+        Return
+        ------
+        str, None
+            Category
+        str, None
+            Name
+        """
+        category = self.get_category(da)
+        categories = list(self.categories)
+        if category != categories[0]:
+            categories = categories[::-1]
+        for category in categories:
+            name = self[category].match(da, loc=loc)
+            if name:
+                return category, name
+        return None, None
 
     def search_coord(self, dsa, name=None, loc="any", get="obj", single=True):
         """Search for a coord that maches given or any specs
@@ -1962,13 +2028,14 @@ def get_cf_specs(name=None, category=None, cache="rw"):
 
 
 class _CFAccessor_(object):
-    _category = None
+    _search_category = None
 
     def __init__(self, dsa):
         self._cfspecs = get_cf_specs()
         self._dsa = dsa
         self._coords = None
         self._data_vars = None
+        self._cache = {}
 
     def set_cf_specs(self, cfspecs):
         """Set the :class:`CFSpecs` using by this accessor"""
@@ -1979,9 +2046,9 @@ class _CFAccessor_(object):
         """Search for a CF item with :meth:`CFSpecs.search`"""
         kwargs = dict(name=name, loc=loc, get="obj", single=single,
                       errors="ignore")
-        if self._category is None:
+        if self._search_category is None:
             return self._cfspecs.search(self._dsa, **kwargs)
-        return self._cfspecs[self._category].search(self._dsa, **kwargs)
+        return self._cfspecs[self._search_category].search(self._dsa, **kwargs)
 
     def get_coord(self, name, loc="any", single=True):
         """Search for a CF coord with :meth:`CFCoordSpecs.search`"""
@@ -2020,13 +2087,7 @@ class _CFAccessor_(object):
 
 
 class _CoordAccessor_(_CFAccessor_):
-    _category = 'coords'
-
-    @property
-    def name(self):
-        if not hasattr(self, '_name'):
-            self._name = self._cfspecs.match(self._dsa)
-        return self._name
+    _search_category = 'coords'
 
     @property
     def dim(self):
@@ -2062,7 +2123,7 @@ class _CoordAccessor_(_CFAccessor_):
 
 
 class _DataVarAccessor__(_CFAccessor_):
-    _category = "data_vars"
+    _search_category = "data_vars"
 
 
 class DatasetCFAccessor(_CFAccessor_):
@@ -2070,7 +2131,31 @@ class DatasetCFAccessor(_CFAccessor_):
 
 
 class DataArrayCFAccessor(_CoordAccessor_):
-    pass
+
+    @property
+    def name(self):
+        if 'name' not in self._cache:
+            category, name = self._cfspecs.match(self._dsa)
+            self._cache["category"] = category
+            self._cache["name"] = name
+        return self._cache["name"]
+
+    @property
+    def attrs(self):
+        if "attrs" not in self._cache:
+            if self.name:
+                cf_attrs = self._cfspecs[self._cache["category"]].get_attrs(
+                    self._cache["name"], multi=True)
+                self._cache["attrs"] = self._cfspecs.sglocator.patch_attrs(
+                    self._dsa.attrs, cf_attrs)
+            else:
+                self._cache["attrs"] = {}
+        return self._cache["attrs"]
+
+    def __getattr__(self, attr):
+        if self.name and self.attrs and attr in self.attrs:
+            return self._cache["attrs"][attr]
+        return _CoordAccessor_.__getattr__(self, attr)
 
 
 def register_cf_accessors(name='cf'):
@@ -2084,6 +2169,3 @@ def register_cf_accessors(name='cf'):
             xr.core.extensions.AccessorRegistrationWarning)
         xr.register_dataarray_accessor(name)(DataArrayCFAccessor)
         xr.register_dataset_accessor(name)(DatasetCFAccessor)
-
-
-register_cf_accessors()
