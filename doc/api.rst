@@ -4,7 +4,7 @@ API
 Python
 ------
 
-.. .autosummary::
+.. autosummary::
     :toctree: api
 
     xoa
