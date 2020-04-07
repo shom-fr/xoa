@@ -54,7 +54,6 @@ doc-run: &doc-build
     source activate test-environment
     cd doc
     make html
-    make html
 
 jobs:
   docs-python3:

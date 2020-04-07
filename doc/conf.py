@@ -95,6 +95,8 @@ napoleon_use_rtype = True
 genoptions_table = 'genoptions/table.txt'
 genoptions_declarations = 'genoptions/declarations.txt'
 
+# %% genfortran
+genfortran_src_files = ["api.rst"]
 
 # %% User directives
 
