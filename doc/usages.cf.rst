@@ -14,16 +14,18 @@ It has two intents:
   :class:`xarray.DataArray` or a :class:`xarray.Dataset`,
   by scanning name and attributes like ``units`` and ``standard_name``.
 * Formatting :class:`xarray.DataArray` variables or coordinates with
-  unique name and ``standard_name`` and ``long_name`` attributes,
-  with support of staggered grid location syntax.
+  unique ``name``, and ``standard_name``, ``long_name`` and ``units``
+  attributes, with support of staggered grid location syntax.
 
 Accessing the current specifications
 ====================================
 Scanning and formatting actions are based on specifications,
-and this module natively includes a default configuration
+and this module natively includes a
+:ref:`default configuration <appendix.cf.default>`
 for various oceanographic, sea surface and atmospheric variables and coordinates.
-A distinction is made between data variables ``data_vars``
-and coordinates ``coords``, like in :mod:`xarray`.
+A distinction is made between
+data variables (:ref:`data_vars <appendix.cf.data_vars>`)
+and coordinates (:ref:`coords <appendix.cf.coords>`), like in :mod:`xarray`.
 
 Getting the current specifications for data variables and coordinates
 with the :func:`~xoa.cf.get_cf_specs` function:
@@ -213,7 +215,7 @@ Using the accessors
 ===================
 
 Accessors for :class:`xarray.Dataset` and :class:`xarray.DataArray`
-can be registerd with the :func:`xoa.cf.register_cf_accessors`:
+can be registered with the :func:`xoa.cf.register_cf_accessors`:
 
 .. ipython:: python
 
@@ -221,7 +223,7 @@ can be registerd with the :func:`xoa.cf.register_cf_accessors`:
 
 These accessors make it easy to use some of the :class:`xoa.cf.CFSpecs`
 capabilities.
-Here are some example of usage:
+Here are examples of use:
 
 .. ipython:: python
 
@@ -243,7 +245,7 @@ Here are some example of usage:
 
 As you can see, accessing an accessor attribute or item make an
 implicit call to :class:`~xoa.cf.DataArrayCFAccessor.get`.
-The root accessor attr:`cf` agive accessor to
+The root accessor :attr:`cf` agive accessor to
 two sub-accessors, :attr:`~xoa.cf.DatasetCFAccessor.data_vars`
 and :attr:`~xoa.cf.DatasetCFAccessor.coords`,
 for being able to specialize the searches.

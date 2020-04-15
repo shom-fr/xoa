@@ -102,6 +102,8 @@ genfortran_src_files = ["api.rst"]
 
 def setup(app):
 
+    app.add_css_file('custom.css')
+
     app.add_object_type('confopt', 'confopt',
                         objname='configuration option',
                         indextemplate='pair: %s; configuration option')

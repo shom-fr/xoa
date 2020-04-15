@@ -3,7 +3,7 @@
 Terrain following parametric coordinates
 
 This follows the CF conventions for
-`Parametric Vertical Coordinates<http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#parametric-v-coord>`_.
+`Parametric Vertical Coordinates <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#parametric-v-coord>`_.
 
 
 """

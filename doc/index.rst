@@ -1,20 +1,30 @@
 
 .. include:: ../README.rst
 
-Content
--------
-
 .. toctree::
+   :caption: Setup
+   :hidden:
    :maxdepth: 1
 
    install
    configure
+
+.. toctree::
+   :caption: Help and reference
+   :maxdepth: 1
+   :hidden:
+
    usages
    api
    cli
+
+.. toctree::
+   :caption: More
+   :maxdepth: 1
+   :hidden:
+
    changes
    appendix
-
 
 Indices and tables
 ------------------

@@ -1,15 +1,16 @@
 name: xoa
+
 channels:
   - conda-forge
   - defaults
+
 dependencies:
   - appdirs
-  - cartopy
+  #- cartopy
   - configobj
   - libgfortran
-  - matplotlib
-  - pandas
+  - matplotlib-base
   - python>=3
-  - scipy
+  #- scipy
   - xarray
   - xesmf
