@@ -456,18 +456,26 @@ def show_data_samples():
     print(' '.join(get_data_sample()))
 
 
-def register_accessors(cf=True):
+def register_accessors(cf=True, sigma=True):
     """Register xarray accessors
 
     Parameters
     ----------
-    cf: bool
+    cf: bool, str
         Register the :mod:`xoa.cf` accessors
+    sigma: bool, str
+        Register the :mod:`xoa.sigma` accessor
 
     See also
     --------
     xoa.cf.register_cf_accessors
+    xoa.sigma.register_sigma_accessor
     """
     if cf:
         from .cf import register_cf_accessors
-        register_cf_accessors()
+        kw = {"name": cf} if isinstance(cf, str) else {}
+        register_cf_accessors(**kw)
+    if sigma:
+        from .sigma import register_sigma_accessor
+        kw = {"name": sigma} if isinstance(sigma, str) else {}
+        register_sigma_accessor()
