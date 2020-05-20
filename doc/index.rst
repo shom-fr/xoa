@@ -2,7 +2,7 @@
 .. include:: ../README.rst
 
 .. toctree::
-   :caption: Setup
+   :caption: Getting Started
    :hidden:
    :maxdepth: 1
 
@@ -10,20 +10,23 @@
    configure
 
 .. toctree::
-   :caption: Help and reference
+   :caption: User Guide
    :maxdepth: 1
    :hidden:
 
-   usages
-   api
+   usages.cf
    cli
+   examples
+
 
 .. toctree::
-   :caption: More
+   :caption: Reference
    :maxdepth: 1
    :hidden:
 
+   api
    changes
+   roadmap
    appendix
 
 Indices and tables

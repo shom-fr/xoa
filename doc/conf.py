@@ -80,9 +80,13 @@ autosummary_generate = True
 
 # %% Intersphinx
 intersphinx_mapping = {
-    'xarray': ('http://xarray.pydata.org/en/stable/', None),
     'cmocean': ('https://matplotlib.org/cmocean/', None),
-    'configobj': ('https://configobj.readthedocs.io/en/latest/', None)
+    'configobj': ('https://configobj.readthedocs.io/en/latest/', None),
+    'numpy': ("https://docs.scipy.org/doc/numpy/", None),
+    'proplot': ('https://proplot.readthedocs.io/en/latest/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
+    'xarray': ('http://xarray.pydata.org/en/stable/', None),
+    'xesmf': ("https://xesmf.readthedocs.io/en/latest/", None)
     }
 
 # %% Napoleon
