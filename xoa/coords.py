@@ -34,7 +34,7 @@ def get_level(da):
     return cf.get_cf_specs().search(da, 'level')
 
 
-def get_height(da):
+def get_vertical(da):
     """Get either depth or altitude"""
     cfspecs = cf.get_cf_specs()
     height = cfspecs.search(da, 'depth')
@@ -93,7 +93,8 @@ def transpose_compat(da, dims):
             odims += dim,
     if not with_ell and set(odims) < set(da.dims):
         odims = (...,) + odims
-    return da.transpose(*odims)
+    kw = dict(transpose_coords=True)
+    return da.transpose(*odims, **kw)
 
 
 class DimFlusher1D(object):
