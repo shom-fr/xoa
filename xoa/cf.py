@@ -1283,11 +1283,18 @@ class CFSpecs(object):
                           else ["coords"])
         else:
             categories = self.categories
+        if not single:
+            found = []
         for category in categories:
             res = self[category].search(dsa, name=name, loc=loc, get=get,
                                         single=single, errors=errors)
-            if res is not None:
+            if not single:
+                res = [r for r in res if r not in found]
+                found.extend(res)
+            elif res is not None:
                 return res
+        if not single:
+            return found
 
     def get(self, dsa, name):
         """A shortcut to :meth:`search` with an explicit name"""
