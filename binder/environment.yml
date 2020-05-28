@@ -5,6 +5,7 @@ channels:
 dependencies:
   - appdirs
   #- cartopy
+  - cmocean
   - configobj
   - libgfortran
   - matplotlib-base
