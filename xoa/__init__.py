@@ -415,7 +415,7 @@ def get_data_sample(filename=None):
     Parameters
     ----------
     filename: str, None
-        Sample name of the sample. If ommited, a list of available sample
+        Name of the sample. If ommited, a list of available samples
         name is returned.
 
     Returns
@@ -430,6 +430,11 @@ def get_data_sample(filename=None):
         from xoa import get_data_sample
         get_data_sample("croco.south-africa.nc")
         get_data_sample()
+
+    See also
+    --------
+    show_data_samples
+    open_data_sample
     """
     if not os.path.exists(_SAMPLE_DIR):
         filenames = []
@@ -442,6 +447,40 @@ def get_data_sample(filename=None):
     return os.path.join(_SAMPLE_DIR, filename)
 
 
+def open_data_sample(filename):
+    """Open a data sample with :func:`xarray.open_dataset`
+
+    A shortcut to::
+
+        xr.open_dataset(get_data_sample(filename))
+
+    Parameters
+    ----------
+    filename: str
+        File name of the sample
+
+    Returns
+    -------
+    xarray.Dataset
+
+    Example
+    -------
+    .. .ipython:: python
+
+        @suppress
+        from xoa import open_data_sample
+        open_data_sample("croco.south-africa.nc")
+
+
+    See also
+    --------
+    get_data_sample
+    show_data_samples
+    """
+    import xarray as xr
+    return xr.open_dataset(get_data_sample(filename))
+
+
 def show_data_samples():
     """Print the list of data samples
 
@@ -452,6 +491,11 @@ def show_data_samples():
         @suppress
         from xoa import show_data_samples
         show_data_samples()
+
+    See also
+    --------
+    get_data_samples
+    open_data_sample
     """
     print(' '.join(get_data_sample()))
 
