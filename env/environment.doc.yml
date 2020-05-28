@@ -7,7 +7,7 @@ dependencies:
   - appdirs
   - cartopy
   - ipython
-  - matplotlib
+  - matplotlib-base
   - pandas
   - pip
   - python>=3

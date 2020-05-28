@@ -2,6 +2,8 @@ xoa - xarray-based ocean analysis library
 =========================================
 
 
+.. image:: https://mybinder.org/badge_logo.svg
+    :target: https://mybinder.org/v2/gh/VACUMM/xoa/master?filepath=doc%2Fexamples
 .. image:: https://travis-ci.org/VACUMM/xoa.svg?branch=master
     :target: https://travis-ci.org/VACUMM/xoa
 .. image:: https://circleci.com/gh/VACUMM/xoa/tree/master.svg?style=shield

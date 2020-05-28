@@ -1,7 +1,7 @@
 appdirs
 cartopy
 configobj
-matplotlib
+matplotlib-base
 pandas
 python>=3
 scipy

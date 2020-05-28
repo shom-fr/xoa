@@ -1,9 +1,11 @@
 appdirs
 cartopy
+cmocean
 configobj
 gfortran_linux-64
 ipython
-matplotlib
+jupyter_client
+matplotlib-base
 nbsphinx
 pandas
 pip
