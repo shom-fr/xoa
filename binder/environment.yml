@@ -1,0 +1,14 @@
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - appdirs
+  #- cartopy
+  - configobj
+  - libgfortran
+  - matplotlib-base
+  - python>=3
+  #- scipy
+  - xarray
+  - xesmf
