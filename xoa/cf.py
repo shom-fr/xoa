@@ -1525,9 +1525,9 @@ class _CFCatSpecs_(object):
             for obj in objs.values():
                 m = self.match(obj, match_arg, loc=loc)
                 if m:
-                    if id(obj) in found_objs:
+                    if obj.name in found_objs:
                         continue
-                    found_objs.append(id(obj))
+                    found_objs.append(obj.name)
                     name = name if name else m
                     if get == "both":
                         found.append((obj, name))
