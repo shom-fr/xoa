@@ -508,7 +508,7 @@ def register_accessors(cf=True, sigma=True):
     cf: bool, str
         Register the :mod:`xoa.cf` accessors
     sigma: bool, str
-        Register the :mod:`xoa.sigma` accessor
+        Register the :mod:`xoa.decode_sigma` accessor
 
     See also
     --------

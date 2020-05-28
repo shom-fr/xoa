@@ -635,7 +635,7 @@ class SigmaAccessor(object):
     Example
     -------
     >>> ds = xr.open_dataset('croco.nc')
-    >>> ds = ds.sigma.decode()
+    >>> ds = ds.decode_sigma()
     """
 
     def __init__(self, ds):
@@ -654,7 +654,7 @@ class SigmaAccessor(object):
         return get_sigma_terms(self._ds, loc=loc, rename=rename)
 
 
-def register_sigma_accessor(name='sigma'):
+def register_sigma_accessor(name='decode_sigma'):
     """Register xarray accessors"""
     import xarray as xr
     with warnings.catch_warnings():
