@@ -604,7 +604,6 @@ def decode_cf_sigma(ds, rename=False, errors="raise"):
         func = getattr(sigma_module, sigma_type)
         cache = {}
         kwargs['cache'] = cache
-        # print('kwargs', kwargs.keys())
         height = func(**kwargs)
 
         # Format
@@ -629,21 +628,33 @@ def decode_cf_sigma(ds, rename=False, errors="raise"):
 
 
 class SigmaAccessor(object):
+    """Dataset accessor to compute depths from sigma-like coordinates
+
+    This follows the CF cnventions.
+
+    Example
+    -------
+    >>> ds = xr.open_dataset('croco.nc')
+    >>> ds = ds.sigma.decode()
+    """
 
     def __init__(self, ds):
-
         self._ds = ds
 
     def decode(self, rename=False, errors="raise"):
-
+        """Call :func:`decode_cf_sigma` on the dataset"""
         return decode_cf_sigma(self._ds, rename=rename, errors=errors)
 
-    def get_sigma_terms(self, loc=None, rename=False):
+    def __call__(self):
+        """Shortcut to :meth:`decode`"""
+        return self.decode()
 
+    def get_sigma_terms(self, loc=None, rename=False):
+        """Call :func:`get_sigma_terms` on the dataset"""
         return get_sigma_terms(self._ds, loc=loc, rename=rename)
 
 
-def register_sigma_accessors(name='sig'):
+def register_sigma_accessor(name='sigma'):
     """Register xarray accessors"""
     import xarray as xr
     with warnings.catch_warnings():
