@@ -76,6 +76,7 @@ specs.update(
         "Operating System :: UNIX",
         "Operating System :: MacOS :: MacOS X",
     ],
+    packages=['xoa']
 )
 
 
