@@ -13,3 +13,6 @@ dependencies:
   #- scipy
   - xarray
   - xesmf
+  - pip:
+    - https://github.com/VACUMM/xoa.git
+
