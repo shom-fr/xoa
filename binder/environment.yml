@@ -9,10 +9,10 @@ dependencies:
   - configobj
   - libgfortran
   - matplotlib-base
+  - pip
   - python>=3
   #- scipy
   - xarray
   - xesmf
   - pip:
-    - https://github.com/VACUMM/xoa.git
-
+    - https://github.com/VACUMM/xoa/archive/master.zip
