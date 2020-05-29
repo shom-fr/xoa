@@ -109,7 +109,7 @@ def configuration():
     return config
 
 
-if __name__ == "__main__":
+def main():
 
     # Setup config file
     if not os.path.exists("setup.cfg"):
@@ -117,3 +117,7 @@ if __name__ == "__main__":
 
     # Lauch setup
     setup(configuration=configuration, **specs)
+
+if __name__ == "__main__":
+
+    main()

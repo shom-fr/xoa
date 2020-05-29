@@ -3,6 +3,9 @@
 Practical examples
 ==================
 
+The following examples integrate several aspects of xoa.
+They are available in the sources as jupyter notebooks.
+
 .. rubric:: Binder
 
 .. image:: https://mybinder.org/badge_logo.svg
@@ -10,6 +13,8 @@ Practical examples
 
 Click on the badge above to run these examples interactively
 on `mybinder <http://mybinder.org>`_!
+
+.. warning:: Binder setup may take a while, so be patient.
 
 
 .. rubric:: Content
