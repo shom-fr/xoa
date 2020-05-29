@@ -30,6 +30,7 @@ deps-run: &deps-install
         configobj \
         gfortran_linux-64 \
         ipython \
+        ipykernel \
         jupyter_client \
         matplotlib \
         nbsphinx \
