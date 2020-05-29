@@ -2,16 +2,19 @@ name: xoa-rtd
 
 channels:
   - conda-forge
+  - defaults
 
 dependencies:
   - appdirs
   - cartopy
+  - gfortran_linux-64
   - ipython
+  - jupyter_client
   - matplotlib-base
   - pandas
   - pip
   - python>=3
-  - scipy
+  #- scipy
   - xarray
   - xesmf
   - pip:
