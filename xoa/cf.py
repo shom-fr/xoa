@@ -1731,6 +1731,7 @@ class CFCoordSpecs(_CFCatSpecs_):
         Parameters
         ----------
         da: xarray.DataArray
+            Data or coordinate array
         dim_type: {"x", "y", "z", "t", "f"}, None
             When
         loc: "any", letter
