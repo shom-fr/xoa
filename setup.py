@@ -102,7 +102,7 @@ def configuration():
 
     # Add data samples
     config.add_data_dir('xoa/_samples')
-    config.add_data_files(("xoa", ["cf.ini", "cf.cfg"]))
+    config.add_data_files("xoa/cf.ini", "xoa/cf.cfg")
 
     # Add extensions
     os.environ['LDFLAGS'] = "-shared"
