@@ -35,6 +35,7 @@
 
 # Imports
 import os
+import sys
 import re
 import shutil
 from glob import glob
@@ -107,6 +108,18 @@ def configuration():
     # Add extensions
     os.environ['LDFLAGS'] = "-shared"
     config.add_extension("xoa._interp", ["src/interp.f90"])
+
+    # Env vars
+    if "READTHEDOCS" in os.environ:
+        for name, suffix in[
+                ("FC", "gfortran"),
+                ("F90", "gfortran"),
+                ("F77", "gfortran"),
+                ("AR", "ar"),
+                ("GCC", "gcc"),
+                ("LD", "ld")]:
+            os.environ[name] = os.path.join(
+                sys.prefix, "bin", "x86_64-conda_cos6-linux-gnu-"+suffix)
 
     return config
 
