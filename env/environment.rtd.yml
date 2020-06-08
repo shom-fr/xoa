@@ -7,9 +7,10 @@ channels:
 dependencies:
   - appdirs
   - cartopy
-  - gfortran_linux-64
+  - fortran-compiler
   - ipython
   - jupyter_client
+  - libgfortran
   - matplotlib-base
   - pandas
   - pip
