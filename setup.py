@@ -120,6 +120,11 @@ def configuration():
                 ("LD", "ld")]:
             os.environ[name] = os.path.join(
                 sys.prefix, "bin", "x86_64-conda_cos6-linux-gnu-"+suffix)
+        libdir = os.path.join(sys.prefix, "lib")
+        os.environ["LDFLAGS"] = (
+            "-Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro "
+            "-Wl,-z,now -Wl,--disable-new-dtags -Wl,--gc-sections "
+            f"-Wl,-rpath,{libdir} -Wl,-rpath-link,{libdir} -L{libdir}")
 
     return config
 
