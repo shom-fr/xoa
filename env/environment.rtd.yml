@@ -7,15 +7,15 @@ channels:
 dependencies:
   - appdirs
   - cartopy
+  - cmocean
   - fortran-compiler
   - ipython
+  - ipykernel
   - jupyter_client
   - libgfortran
   - matplotlib-base
-  - pandas
   - pip
   - python>=3
-  #- scipy
   - xarray
   - xesmf
   - pip:
