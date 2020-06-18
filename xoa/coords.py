@@ -2,6 +2,7 @@
 """
 Coordinates and dimensions utilities
 """
+from collections.abc import Mapping
 
 import xarray as xr
 
@@ -98,21 +99,22 @@ def transpose(da, dims, mode='compat'):
         # classic
         transpose(a, (Ellipsis, 'y', 'x'), mode='classic')
         # insert
-        transpose(a, ('m', 'y', 'x', 'z'), mod='insert')
-        transpose(a, b, mod='insert')
+        transpose(a, ('m', 'y', 'x', 'z'), mode='insert')
+        transpose(a, b, mode='insert')
         # resize
-        transpose(a, b, mod='resize')
-        transpose(a, b.sizes, mod='resize') # with dict
+        transpose(a, b, mode='resize')
+        transpose(a, b.sizes, mode='resize') # with dict
         # compat mode
-        transpose(a, ('y', 'x'), 'compat').dims
-        transpose(a, b.dims, 'compat')).dims
-        transpose(a, b, 'compat')).dims  # same as with b.dims
+        transpose(a, ('y', 'x'), mode='compat').dims
+        transpose(a, b.dims, mode='compat').dims
+        transpose(a, b, mode='compat').dims  # same as with b.dims
     """
     # Inits
+    print(type(dims))
     if hasattr(dims, 'dims'):
         sizes = dims.sizes
         dims = dims.dims
-    elif isinstance(dims, dict):
+    elif isinstance(dims, Mapping):
         sizes = dims
         dims = list(dims.keys())
     else:
@@ -139,8 +141,9 @@ def transpose(da, dims, mode='compat'):
             odims += dim,
         elif mode == "resize":
             if sizes is None or dim not in sizes:
-                xoa_warn(f"New dim '{dim}' in transposition is set to one"
-                         " since no size provided for this dim")
+                print(sizes is None, dim not in sizes)
+                xoa_warn(f"new dim '{dim}' in transposition is set to one"
+                         " since no size is provided to it")
                 size = 1
             else:
                 size = sizes[dim]

@@ -37,7 +37,7 @@ SIGMA_COORDINATE_TYPES = (
     )
 
 
-class XoaCFError(XoaError):
+class XoaSigmaError(cf.XoaCFError):
     pass
 
 
@@ -288,8 +288,8 @@ def ocean_s_coordinate_g1(sig, ssh, bathy, hc, thetas=None, thetab=None,
         # Stetching curve
         if cs is None:
             if None in (thetas, thetab):
-                raise XoaCFError("thetas and thetas must be provided when "
-                                 "cs is not")
+                raise XoaSigmaError("thetas and thetas must be provided when "
+                                    "cs is not")
             cs = get_cs(sig, thetas, thetab, cs_type)
 
         # Constant part of the formula
@@ -372,8 +372,8 @@ def ocean_s_coordinate_g2(sig, ssh, bathy, hc, thetas=None, thetab=None,
         # Stetching curve
         if cs is None:
             if None in (thetas, thetab):
-                raise XoaCFError("thetas and thetas must be provided when "
-                                 "cs is not")
+                raise XoaSigmaError(
+                    "thetas and thetas must be provided when cs is not")
             cs = get_cs(sig, thetas, thetab, cs_type)
 
         # Constant part of the formula
@@ -445,7 +445,7 @@ def decode_formula_terms(attr):
     for item in _re_ft_split_terms(attr):
         item = _re_ft_split_item(item)
         if len(item) != 2:
-            raise XoaCFError("Malformed formula_terms attribute: "+attr)
+            raise XoaSigmaError("Malformed formula_terms attribute: "+attr)
         terms[item[0]] = item[1]
     return terms
 
@@ -484,7 +484,7 @@ def get_sigma_terms(ds, loc=None, rename=False):
 
     Raises
     ------
-    XoaCFError
+    XoaSigmaError
         In case of:
 
         - inconsistent staggered grid location in dataarrays
@@ -503,19 +503,19 @@ def get_sigma_terms(ds, loc=None, rename=False):
 
         # Check standard_name and get loc
         if "standard_name" not in sig.attrs:
-            raise XoaCFError("No standard_name attribute found in sigma/s "
-                             "variable name: "+sig.name)
+            raise XoaSigmaError("No standard_name attribute found in sigma/s "
+                                "variable name: "+sig.name)
         standard_name, loc = cf.get_cf_specs().sglocator.parse_attr(
             "standard_name", sig.standard_name)
         if standard_name not in SIGMA_COORDINATE_TYPES:
-            raise XoaCFError("Sigma/s coordinate not supported: " +
-                             standard_name + ". Supported coordinates: "
-                             + " ".join(SIGMA_COORDINATE_TYPES))
+            raise XoaSigmaError("Sigma/s coordinate not supported: " +
+                                standard_name + ". Supported coordinates: "
+                                + " ".join(SIGMA_COORDINATE_TYPES))
 
         # Get formula terms
         if "formula_terms" not in sig.attrs:
-            raise XoaCFError(f"Sigma/s type variable {sig.name} "
-                             "has no formula_term attribute")
+            raise XoaSigmaError(f"Sigma/s type variable {sig.name} "
+                                "has no formula_term attribute")
         formula_terms = decode_formula_terms(sig.formula_terms)
 
         # Check terms
@@ -525,12 +525,12 @@ def get_sigma_terms(ds, loc=None, rename=False):
             # Real name
             vname = _ds_search_ci_(ds, fvname)
             if vname is None:
-                raise XoaCFError("Formula array not found: "+fvname)
+                raise XoaSigmaError("Formula array not found: "+fvname)
 
             # xoa.cf name
             # TODO: handle mising cs and fallback with thetas and thetab
             if fname.lower() not in FORMULA_TERMS_TO_CF_NAMES:
-                raise XoaCFError("Unknown formula term name: "+fname)
+                raise XoaSigmaError("Unknown formula term name: "+fname)
             cf_name = FORMULA_TERMS_TO_CF_NAMES[fname.lower()]
             subterms[vname] = cf_name
 
@@ -581,7 +581,7 @@ def decode_cf_sigma(ds, rename=False, errors="raise"):
         all_terms = get_sigma_terms(ds, loc=None)
         if all_terms is None:
             return ds
-    except XoaCFError as e:
+    except XoaSigmaError as e:
         if errors == "raise":
             raise e
         if errors == "warn":
@@ -615,7 +615,7 @@ def decode_cf_sigma(ds, rename=False, errors="raise"):
         for da in ds.data_vars.values():
             if set(height.dims) <= set(da.dims):
                 if not transposed:
-                    height = xcoords.transpose_compat(height, da)
+                    height = xcoords.transpose(height, da, "compat")
                     transposed = True
                 ds[da.name] = da.assign_coords({height.name: height})
                 as_coord = True
