@@ -5,7 +5,8 @@ Coordinates and dimensions utilities
 
 import xarray as xr
 
-from .__init__ import XoaError
+from .__init__ import XoaError, xoa_warn
+from . import misc
 from . import cf
 
 
@@ -50,17 +51,34 @@ def get_coords(da, coord_names):
             for coord_name in coord_names]
 
 
-def transpose_compat(da, dims):
-    """Transpose an array with compatible dimensions
+class transpose_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
+    """Supported :func:`regrid1d` methods"""
+    #: Basic xarray transpose with :meth:`xarray.DataArray.transpose`
+    classic = 0
+    basic = 0
+    xarray = 0
+    #: Transpose skipping incompatible dimensions
+    compat = -1
+    #: Transpose adding missing dimensions with a size of 1
+    insert = 1
+    #: Transpose resizing to missing dimensions.
+    #: Note that dims must be an array or a dict of sizes
+    #: otherwize new dimensions will have a size of 1.
+    resize = 2
 
-    Incompatible dimensions are ignored
+
+def transpose(da, dims, mode='compat'):
+    """Transpose an array
 
     Parameters
     ----------
     da: xarray.DataArray
         Array to tranpose
-    dims: tuple(str), xarray.DataArray
+    dims: tuple(str), xarray.DataArray, dict
         Target dimensions or array with dimensions
+    mode: str, int
+        Transpose mode as one of the following:
+        {transpose_modes.rst_with_links}
 
     Return
     ------
@@ -74,16 +92,41 @@ def transpose_compat(da, dims):
         @suppress
         import xarray as xr, numpy as np
         @suppress
-        from xoa.coords import transpose_compat
+        from xoa.coords import transpose
         a = xr.DataArray(np.ones((2, 3, 4)), dims=('y', 'x', 't'))
         b = xr.DataArray(np.ones((10, 3, 2)), dims=('m', 'y', 'x'))
-        transpose_compat(a, ('y', 'x')).dims
-        transpose_compat(a, b.dims).dims
-        transpose_compat(a, b).dims  # same as with b.dims
+        # classic
+        transpose(a, (Ellipsis, 'y', 'x'), mode='classic')
+        # insert
+        transpose(a, ('m', 'y', 'x', 'z'), mod='insert')
+        transpose(a, b, mod='insert')
+        # resize
+        transpose(a, b, mod='resize')
+        transpose(a, b.sizes, mod='resize') # with dict
+        # compat mode
+        transpose(a, ('y', 'x'), 'compat').dims
+        transpose(a, b.dims, 'compat')).dims
+        transpose(a, b, 'compat')).dims  # same as with b.dims
     """
+    # Inits
     if hasattr(dims, 'dims'):
+        sizes = dims.sizes
         dims = dims.dims
+    elif isinstance(dims, dict):
+        sizes = dims
+        dims = list(dims.keys())
+    else:
+        sizes = None
+    mode = str(transpose_modes[mode])
+    kw = dict(transpose_coords=True)
+
+    # Classic
+    if mode == "classic":
+        return da.transpose(*dims, **kw)
+
+    # Get specs
     odims = ()
+    expand_dims = {}
     with_ell = False
     for dim in dims:
         if dim is Ellipsis:
@@ -91,10 +134,33 @@ def transpose_compat(da, dims):
             odims += dim,
         elif dim in da.dims:
             odims += dim,
+        elif mode == "insert":
+            expand_dims[dim] = 1
+            odims += dim,
+        elif mode == "resize":
+            if sizes is None or dim not in sizes:
+                xoa_warn(f"New dim '{dim}' in transposition is set to one"
+                         " since no size provided for this dim")
+                size = 1
+            else:
+                size = sizes[dim]
+            expand_dims[dim] = size
+            odims += dim,
+
+    # Expand
+    if expand_dims:
+        da = da.expand_dims(expand_dims)
+
+    # Input dimensions that were not specified in transposition
+    # are flushed to the left
     if not with_ell and set(odims) < set(da.dims):
         odims = (...,) + odims
-    kw = dict(transpose_coords=True)
+
+    # Transpose
     return da.transpose(*odims, **kw)
+
+
+transpose.__doc__ = transpose.__doc__.format(**locals())
 
 
 class DimFlusher1D(object):
@@ -171,7 +237,7 @@ class DimFlusher1D(object):
         # Store
         self._dim0, self._dim1 = dim0, dim1
         self._da_in = da_in
-        self.coord_out = transpose_compat(coord_out, (Ellipsis,) + dims01)
+        self.coord_out = transpose(coord_out, (Ellipsis,) + dims01, "compat")
         self.coord_out_name = self.coord_out.name or coord_in.name
         # self._odims0 = odims0
         # self._odims1 = odims1
@@ -192,7 +258,8 @@ class DimFlusher1D(object):
         # - input coordinate
         # if (set(coord_out.dims[:-1])set(da_in.coords[coord_in_name].dims[:-1])
         #         < set(coord_out.dims[:-1])):
-        if coord_out.ndim > 1 and set(coord_out.dims[:-1]) not in set(da_in.coords[coord_in_name].dims[:-1]):
+        if (coord_out.ndim > 1 and set(coord_out.dims[:-1]) not in
+                set(da_in.coords[coord_in_name].dims[:-1])):
 
         #set(coord_out.dims[:-1]) > set(da_in.coords[coord_in_name].dims[:-1]):
             if da_in.coords[coord_in_name].ndim == 1:
