@@ -108,9 +108,12 @@ def transpose(da, dims, mode='compat'):
         transpose(a, ('y', 'x'), mode='compat').dims
         transpose(a, b.dims, mode='compat').dims
         transpose(a, b, mode='compat').dims  # same as with b.dims
+
+    See also
+    --------
+    xarray.DataArray.transpose
     """
     # Inits
-    print(type(dims))
     if hasattr(dims, 'dims'):
         sizes = dims.sizes
         dims = dims.dims
