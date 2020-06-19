@@ -18,8 +18,8 @@ For those who know it, it is the successor of
 Documentation
 -------------
 
-The xoa documentation is currently hosted by github pages:
-https://vacumm.github.io/xoa
+The xoa documentation is currently hosted by readthedocs pages:
+https://xoa.readthedocs.io
 
 
 Sources and help

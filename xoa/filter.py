@@ -9,7 +9,7 @@ from .coords import transpose
 
 
 def generate_isotropic_kernel(shape, func, fill_value=0, npt=None):
-    """Generate an nD istropic kernel given a shape and a function
+    """Generate an nD istropic kernel given a shape and a window function
 
     Parameters
     ----------
@@ -88,11 +88,15 @@ def generate_kernel(kernel, data):
         Data array that the kernel must be compatible with
     kernel: xarray.DataArray, np.ndarray, int, list, dict
         Ready to use kernel or specs to generate it.
-        If an int, the kernel built with ones with a size
-        of `kernel` along all dimensions. If a tuple, the kernel is built
-        with ones and a shape equal to `kernel`. If a numpy array, it is used
-        as is. If a data array, it is transposed and/or expanded with
-        :func:`transpose_kernel`.
+
+        - If an int, the kernel built with ones with a size
+          of `kernel` along all dimensions.
+        - If a tuple, the kernel is built with ones and a shape
+          equal to `kernel`.
+        - If a numpy array, it is used as is.
+
+        The final data array is transposed and/or expanded with
+        :func:`xoa.coords.transpose` to fit into the input data array.
 
     Return
     ------
