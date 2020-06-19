@@ -8,8 +8,79 @@ from .__init__ import XoaError
 from .coords import transpose
 
 
+def generate_isotropic_kernel(shape, func, fill_value=0, npt=None):
+    """Generate an nD istropic kernel given a shape and a function
+
+    Parameters
+    ----------
+    func: str, callable
+        Function that take a size parameter as unique argument.
+        If a string, it is expected to be a numpy window function.
+    shape: int, tuple
+        Shape of the desired kernel
+    fill_value: float
+        Value to set when outside window bounds, near the corners
+    npt: int, None
+        Number of interpolation point to get the window value
+        at all positions. It is infered from shape if not given.
+
+    Return
+    ------
+    array_like(shape)
+        Output kernel
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import numpy as np, matplotlib.pyplot as plt
+        @suppress
+        from xoa.filter import generate_isotropic_kernel
+        kernel = generate_isotropic_kernel((150, 200), "bartlett", np.nan)
+        plt.axes(aspect=1);
+        plt.pcolormesh(kernel, cmap="cmo.solar");
+        @savefig api.filter.generate_isotropic_kernel.png
+        plt.colorbar();
+
+    See also
+    --------
+    numpy.bartlett
+    numpy.blackman
+    numpy.hamming
+    numpy.hanning
+    numpy.kaiser
+    numpy.interp
+
+    """
+    # Windox function
+    if isinstance(func, str):
+        func = getattr(np, func)
+
+    # Normalised indices
+    indices = np.indices(shape).astype('d')
+    for i, width in enumerate(shape):
+        indices[i] /= (width-1)
+        indices[i] -= 0.5
+
+    # Distance from bounds with 0.5 at center and < 0 outside bounds
+    x = 0.5 - np.sqrt((indices**2).sum(axis=0))
+
+    # Window values
+    if npt is None:
+        npt = 2*max(shape)
+    fp = func(npt)
+    xp = np.linspace(0, 1, npt)
+
+    # Interpolation
+    kernel = np.interp(x.ravel(), xp, fp).reshape(x.shape)
+    kernel[x < 0] = fill_value
+
+    return kernel
+
+
 def generate_kernel(kernel, data):
-    """Generate according to specs and compatible with a given data array
+    """Generate a kernel that is compatible with a given data array
 
     Parameters
     ----------
@@ -26,10 +97,11 @@ def generate_kernel(kernel, data):
     Return
     ------
     xarray.DataArray
-        Kernel array with suitable dimensions and
+        Kernel array with suitable dimensions and shape
 
-    Sea also
+    See also
     --------
+    generate_isotropic_kernel
     xoa.coords.transpose
     """
     # Constant kernel of the given size
@@ -83,8 +155,8 @@ def generate_kernel(kernel, data):
     return transpose(kernel, data, mode="insert").astype(data.dtype)
 
 
-def _convolve(data, kernel, normalize):
-    """Pure numpy convolution that take care of nans"""
+def _convolve_(data, kernel, normalize):
+    """Pure numpy convolution that takes care of nans"""
     import scipy.signal as ss
 
     # Kernel
@@ -150,17 +222,17 @@ def convolve(data, kernel, normalize=False):
         kernel = dict(x=[1, 2, 5, 2, 1], y=[1, 2, 1])
         datac = convolve(data, kernel, normalize=True)
         fig, (ax0, ax1) = plt.subplots(ncols=2, figsize=(7, 3))
-        kw = dict(vmin=data.vmin(), vmax=data.vmax())
-        data.plot(ax=ax0, title='Original', **kw)
+        kw = dict(vmin=data.min(), vmax=data.max())
+        data.plot.pcolormesh(ax=ax0, **kw);
         @savefig api.filter.convolve.png
-        datac.plot(ax=ax2, title='Original', **kw);
+        datac.plot.pcolormesh(ax=ax1, **kw);
 
     """
     # Adapt the kernel to the data
     kernel = generate_kernel(kernel, data)
 
     # Numpy convolution
-    datac = _convolve(data, kernel)
+    datac = _convolve_(data, kernel.data, normalize)
 
     # Format
     return xr.DataArray(datac, coords=data.coords, attrs=data.attrs)
