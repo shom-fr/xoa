@@ -53,7 +53,7 @@ def get_coords(da, coord_names):
 
 
 class transpose_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
-    """Supported :func:`regrid1d` methods"""
+    """Supported :func:`transpose` modes"""
     #: Basic xarray transpose with :meth:`xarray.DataArray.transpose`
     classic = 0
     basic = 0

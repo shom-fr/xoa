@@ -15,6 +15,7 @@ Python
     xoa.sigma
     xoa.grid
     xoa.regrid
+    xoa.filter
     xoa.cfgm
     xoa.cli
 
