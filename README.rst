@@ -3,11 +3,18 @@ xoa - xarray-based ocean analysis library
 
 
 .. image:: https://mybinder.org/badge_logo.svg
+    :alt: Run examples live on binder!
     :target: https://mybinder.org/v2/gh/VACUMM/xoa/master?filepath=doc%2Fexamples
 .. image:: https://travis-ci.org/VACUMM/xoa.svg?branch=master
+    :alt: Building and testing status
     :target: https://travis-ci.org/VACUMM/xoa
 .. image:: https://circleci.com/gh/VACUMM/xoa/tree/master.svg?style=shield
+    :alt: Documentation building on circleci
     :target: https://circleci.com/gh/VACUMM/xoa/tree/master
+.. image:: https://readthedocs.org/projects/docs/badge/?version=latest
+    :alt: Documentation Status
+    :target: https://docs.readthedocs.io/en/latest/?badge=latest
+
 
 xoa is intended to help reading and manipulating observed
 and simulated ocean data.
