@@ -77,14 +77,23 @@ DEFAULT_USER_CONFIG_FILE = os.path.join(
     appdirs.user_data_dir("xoa"), "xoa.cfg"
 )
 
-_REQUIREMENTS_FILE = os.path.join(
-    os.path.dirname(__file__), "..", "requirements.txt"
-)
-
 # Directory of sample files
 _SAMPLE_DIR = os.path.join(os.path.dirname(__file__), '_samples')
 
 _CACHE = {}
+
+_PACKAGE_VERSIONS = {
+    "python": ("platform", "python_version()"),
+    "appdirs": "__version__",
+    "cartopy": "__version__",
+    "configobj": "__version__",
+    "matplotlib": "__version__",
+    "numpy": "__version__",
+    "pandas": "__version__",
+    "scipy": "__version__",
+    "xarray": "__version__",
+    "xesmf": "__version__"
+    }
 
 
 class XoaError(Exception):
@@ -349,17 +358,17 @@ def show_versions():
         show_versions()
     """
     print("- xoa:", __version__)
-    for package in _parse_requirements_(_REQUIREMENTS_FILE):
-        try:
+    for package, getter in _PACKAGE_VERSIONS.items():
+        if isinstance(getter, str):
             pp = importlib.import_module(package)
-            if hasattr(pp, "__version__"):
-                version = pp.__version__
-            else:
-                version = "UNKNOWN"
-        except ImportError:
-            version = 'ERROR'
-        if hasattr(pp, "__version__"):
-            print(f"- {package}: {version}")
+        elif isinstance(getter, tuple):
+            pp = importlib.import_module(getter[0])
+            getter = getter[1]
+        if getter.endswith('()'):
+            version = getattr(pp, getter[:-2])()
+        else:
+            version = getattr(pp, getter)
+        print(f"- {package}: {version}")
 
 
 def show_paths():
