@@ -188,17 +188,25 @@ def test_cf_sglocator_merge_attr(value0, value1, loc, value):
 
 
 @pytest.mark.parametrize(
-    "isn, psn, osn, loc",
+    "isn, psn, osn, loc, replace",
     [
-     ("sst", None, "sst", None),
-     (None, "sst", "sst", None),
-     ("sst", "temp", "temp", None),
-     ("sst_at_t_location", "temp_at_u_location", "temp_at_u_location", None),
-     ("sst", "temp", "temp_at_u_location", "u"),
-     ("sst_at_t_location", "temp_at_x_location", "temp_at_u_location", "u"),
+      ("sst", None, "sst", None, False),
+      (None, "sst", "sst", None, False),
+      ("sst", "temp", "sst", None, False),
+      ("sst", "temp", "temp", None, True),
+      ("sst_at_t_location", "temp_at_u_location", "sst_at_t_location",
+       None, False),
+      ("sst_at_t_location", "temp_at_u_location", "temp_at_u_location",
+       None, True),
+      ("sst", "temp", "sst_at_u_location", "u", False),
+      ("sst", "temp", "temp_at_u_location", "u", True),
+      ("sst_at_t_location", "temp_at_x_location", "sst_at_u_location",
+       "u", False),
+      ("sst_at_t_location", "temp_at_x_location", "temp_at_u_location",
+       "u", True),
      ]
 )
-def test_cf_sglocator_patch_attrs(isn, psn, osn, loc):
+def test_cf_sglocator_patch_attrs(isn, psn, osn, loc, replace):
 
     iattrs = {"units": "m", "color": "blue"}
     patch = {"cmap": "viridis", "mylist": [1, 2], "units": "cm"}
@@ -207,9 +215,10 @@ def test_cf_sglocator_patch_attrs(isn, psn, osn, loc):
     if psn:
         patch["standard_name"] = psn
 
-    oattrs = cf.SGLocator().patch_attrs(iattrs, patch, loc=loc)
+    oattrs = cf.SGLocator().patch_attrs(
+        iattrs, patch, loc=loc, replace=replace)
 
-    assert oattrs["units"] == "cm"
+    assert oattrs["units"] == ("cm" if replace else "m")
     assert oattrs["color"] == "blue"
     assert oattrs["cmap"] == "viridis"
     assert oattrs["mylist"] == [1, 2]
@@ -218,22 +227,24 @@ def test_cf_sglocator_patch_attrs(isn, psn, osn, loc):
 
 
 @pytest.mark.parametrize(
-    "floc,fname,fattrs,out_name,out_standard_name",
+    "floc,fname,fattrs,out_name,out_standard_name,replace_attrs",
     [
-     ("p", None, None, "banana_p", "banana_at_p_location"),
-     (None, None, None, "banana_t", "banana"),
+     # ("p", None, None, "banana_p", "banana_at_p_location", False),
+     # (None, None, None, "banana_t", "banana", False),
      ("p", "sst", {"standard_name": "potatoe"},
-      "sst_p", "potatoe_at_p_location"),
+      "sst_p", "banana_at_p_location", False),
+     ("p", "sst", {"standard_name": "potatoe"},
+      "sst_p", "potatoe_at_p_location", True),
      ('x', "sst", {"standard_name": ["potatoe", "banana"]},
-      "sst_x", "banana_at_x_location"),
+      "sst_x", "banana_at_x_location", True),
      (None, "sst_q", {"standard_name": ["potatoe"]},
-      "sst_q", "potatoe"),
+      "sst_q", "potatoe", True),
      (None, "sst", {"standard_name": ["potatoe"]},
-      "sst_t", "potatoe")
+      "sst_t", "potatoe", True)
      ]
 )
 def test_cf_sglocator_format_dataarray(
-        floc, fname, fattrs, out_name, out_standard_name):
+        floc, fname, fattrs, out_name, out_standard_name, replace_attrs):
 
     lon = xr.DataArray(range(5), dims="lon")
     banana = xr.DataArray(
@@ -244,7 +255,7 @@ def test_cf_sglocator_format_dataarray(
         attrs={"standard_name": "banana", "taste": "good"},
     )
     banana_fmt = cf.SGLocator().format_dataarray(
-        banana, floc, name=fname, attrs=fattrs)
+        banana, floc, name=fname, attrs=fattrs, replace_attrs=replace_attrs)
     assert banana_fmt.name == out_name
     assert banana_fmt.standard_name == out_standard_name
     assert banana_fmt.taste == "good"
@@ -427,7 +438,7 @@ def test_cf_cfspecs_search_data_var(cf_name, in_name, in_attrs):
     [
         ("lon", None),
         ("xxx", {"standard_name": "longitude"}),
-        ("xxx", {"units": "degree_east"}),
+        ("xxx", {"units": "degrees_east"}),
     ],
 )
 def test_cf_cfspecs_format_coord(cf_name, in_name, in_attrs):
@@ -479,7 +490,8 @@ def test_cf_cfspecs_format_data_var_loc():
                         attrs={'standard_name': 'banana_at_x_location'})
     cfspecs = cf.get_cf_specs()
 
-    temp_fmt = cfspecs.format_data_var(temp, "temp", format_coords=False)
+    temp_fmt = cfspecs.format_data_var(
+        temp, "temp", format_coords=False, replace_attrs=True)
     assert temp_fmt.name == "temp_t"
     assert temp_fmt.standard_name == "sea_water_temperature_at_x_location"
 
@@ -495,17 +507,43 @@ def test_cf_cfspecs_format_data_var_unkown():
     assert da_fmt.name == "foo"
 
 
-def test_cf_cfspecs_coords_get_dim_type():
+def test_cf_cfspecs_coords_get_axis():
     cfspecs = cf.get_cf_specs().coords
 
     # from attrs
     depth = xr.DataArray([1], dims='aa', attrs={'axis': 'z'})
-    assert cfspecs.get_dim_type(depth) == 'z'
+    assert cfspecs.get_axis(depth) == 'Z'
 
     # from CF specs
     depth = xr.DataArray([1], dims='aa',
                          attrs={'standard_name': 'ocean_layer_depth'})
-    assert cfspecs.get_dim_type(depth) == 'z'
+    assert cfspecs.get_axis(depth) == 'Z'
+
+
+def test_cf_cfspecs_coords_get_dim_type():
+    cfspecs = cf.get_cf_specs().coords
+
+    # from name
+    assert cfspecs.get_dim_type('aa') is None
+    assert cfspecs.get_dim_type('xi') == "x"
+
+    # from a known coordinate
+    coord = xr.DataArray([1], dims='aa', attrs={'standard_name': 'longitude'})
+    da = xr.DataArray([1], dims='aa', coords={'aa': coord})
+    assert cfspecs.get_dim_type('aa', da=da) == "x"
+
+
+def test_cf_cfspecs_coords_get_dim_types():
+    cfspecs = cf.get_cf_specs().coords
+
+    aa = xr.DataArray([0, 1], dims="aa", attrs={"standard_name": "latitude"})
+    da = xr.DataArray(np.ones((2, 2, 2)), dims=('foo', 'aa', 'xi'),
+                      coords={'aa': aa})
+
+    assert cfspecs.get_dim_types(da) == (None, 'y', 'x')
+    assert cfspecs.get_dim_types(da, unknown='-') == ("-", 'y', 'x')
+    assert cfspecs.get_dim_types(da, asdict=True) == {
+        "foo": None, "aa": "y", "xi": "x"}
 
 
 def test_cf_cfspecs_coords_search_dim():
@@ -515,19 +553,20 @@ def test_cf_cfspecs_coords_search_dim():
     temp = xr.DataArray(np.arange(2*3).reshape(1, 2, 3),
                         dims=('aa', 'ny', 'x'))
     assert cfspecs.search_dim(temp, 'y') == 'ny'
-    assert cfspecs.search_dim(temp) is None
+    assert cfspecs.search_dim(temp) == (None, None)
 
     # from explicit axis attribute
     depth = xr.DataArray([1], dims='aa', attrs={'axis': 'z'})
     temp.coords['aa'] = depth
     assert cfspecs.search_dim(temp, 'z') == 'aa'
-    assert cfspecs.search_dim(temp) is None
+    assert cfspecs.search_dim(temp) == (None, None)
+    assert cfspecs.search_dim(depth) == ("aa", "z")
 
     # from known coordinate
     del temp.coords['aa'].attrs['axis']
     temp.coords['aa'].attrs['standard_name'] = 'ocean_layer_depth'
     assert cfspecs.search_dim(temp, 'z') == 'aa'
-    assert cfspecs.search_dim(temp) is None
+    assert cfspecs.search_dim(temp) == (None, None)
 
     # subcoords
     level = xr.DataArray(np.arange(2), dims='level')
@@ -540,6 +579,7 @@ def test_cf_cfspecs_coords_search_dim():
     depth.aa.attrs['axis'] = 'Z'
     assert cfspecs.search_dim(depth) == ('aa', 'z')
 
+    # not found but only 1d and no dim_type specified
     assert cfspecs.search_dim(xr.DataArray([5], dims='bb')) == ('bb', None)
 
 
@@ -576,6 +616,19 @@ def test_cf_cfspecs_coords_search_from_dim():
     # Nothing identifiable
     temp = xr.DataArray([3], dims='banana')
     assert cfspecs.search_from_dim(temp, "banana") is None
+
+
+def test_cf_cfspecs_coords_get_dims():
+    lat = xr.DataArray([4, 5], dims='yy', attrs={'units': 'degrees_north'})
+    depth = xr.DataArray([4, 5], dims='level', attrs={'axis': 'Z'})
+    da = xr.DataArray(np.ones((2, 2, 2, 2)), dims=('r', 'level', 'yy', 'xi'),
+                      coords={'level': depth, 'yy': lat})
+
+    cfspecs = cf.get_cf_specs().coords
+    dims = cfspecs.get_dims(da, 'xyzt', allow_positional=True)
+    assert dims == ('xi', 'yy', 'level', 'r')
+    dims = cfspecs.get_dims(da, 'f')
+    assert dims == (None,)
 
 
 def test_cf_dataarraycfaccessor():
