@@ -51,7 +51,7 @@ import pprint
 import appdirs
 
 from .__init__ import XoaError, xoa_warn, get_option
-from .misc import dict_merge, match_string
+from .misc import dict_merge, match_string, ERRORS, Choices
 
 _THISDIR = os.path.dirname(__file__)
 
@@ -80,6 +80,14 @@ _CF_DICT_MERGE_KWARGS = dict(
 )
 
 _CACHE = {}
+
+
+ATTRS_PATCH_MODE = Choices(
+    {'fill': 'do not erase existing attributes, just fill missing ones',
+     'replace': 'replace existing attributes'},
+    parameter="mode",
+    description="policy for patching existing attributes"
+    )
 
 
 class XoaCFError(XoaError):
@@ -439,7 +447,8 @@ class SGLocator(object):
                 loc = loc0
         return self.format_attr(attr, value1, loc, standardize=standardize)
 
-    def patch_attrs(self, attrs, patch, loc=None, standardize=True):
+    def patch_attrs(self, attrs, patch, loc=None, standardize=True,
+                    replace=False):
         """Patch a dict of attribute with another dict taking care of loc
 
         Parameters
@@ -454,6 +463,8 @@ class SGLocator(object):
             else, it is removed.
         standardize: bool
             If True, standardize ``root`` and ``loc`` values.
+        replace: bool
+            Replace existing attributes?
 
         Returns
         -------
@@ -470,9 +481,11 @@ class SGLocator(object):
             attrs.update(self.format_attrs(
                 attrs, loc, standardize=standardize))
 
-        # Loop on attributes
+        # Loop patching on attributes
         for attr, value in patch.items():
-            if value is None:
+
+            # Skip
+            if value is None or (attr in attrs and not replace):
                 continue
 
             # Attr with loc
@@ -503,7 +516,7 @@ class SGLocator(object):
 
     def format_dataarray(
         self, da, loc=None, standardize=True, name=None, attrs=None,
-        rename=True, copy=True
+        rename=True, copy=True, replace_attrs=False
     ):
         """Format name and attributes of copy of DataArray
 
@@ -524,7 +537,9 @@ class SGLocator(object):
             and if the dataarray has its attribute included in the list,
             it is left unchanged since it is considered compatible.
         rename:
-            Prevent renaming the array
+            Allow renaming the array if its name is already set
+        replace_attrs: bool
+            Replace existing attributes?
         copy: bool
             Make sure to work on a copy
 
@@ -542,14 +557,15 @@ class SGLocator(object):
 
         # Attributes
         if attrs:
-            da.attrs.update(self.patch_attrs(da.attrs, attrs, loc,
-                                             standardize=standardize))
+            da.attrs.update(self.patch_attrs(
+                da.attrs, attrs, loc, standardize=standardize,
+                replace=replace_attrs))
         else:
             da.attrs.update(self.format_attrs(
                 da.attrs, loc, standardize=standardize))
 
         # Name
-        if rename:
+        if rename or da.name is None:
             da.name = self.merge_attr("name", da.name, name, loc)
 
         return da
@@ -731,6 +747,21 @@ class CFSpecs(object):
             )
         )
 
+    @property
+    def dims(self):
+        """Dictionary of dims per dimension type within x, y, z, t and f"""
+        return self._dict['dims']
+
+    @property
+    def coords(self):
+        """Specifications for coords :class:`CFCoordSpecs`"""
+        return self._cfs['coords']
+
+    @property
+    def data_vars(self):
+        """Specification for data_vars :class:`CFVarSpecs`"""
+        return self._cfs['data_vars']
+
     # def __str__(self):
     #     return pformat(self._dict)
 
@@ -869,7 +900,8 @@ class CFSpecs(object):
         yield category, name, specs
 
     def format_coord(self, da, name=None, loc=None, copy=True,
-                     standardize=True, rename=True, rename_dim=True):
+                     standardize=True, rename=True, rename_dim=True,
+                     replace_attrs=False):
         """Format a coordinate array
 
         Parameters
@@ -888,6 +920,8 @@ class CFSpecs(object):
             For a 1D array, rename the dimension if it has the same name
             as the array.
             Note that it is set to False, if ``rename`` is False.
+        replace_attrs: bool
+            Replace existing attributes?
 
         Returns
         -------
@@ -902,13 +936,15 @@ class CFSpecs(object):
         """
         return self.coords.format_dataarray(
             da, name=name, loc=loc, copy=copy, standardize=standardize,
-            rename=rename, rename_dim=rename_dim)
+            rename=rename, rename_dim=rename_dim,
+            replace_attrs=replace_attrs)
 
     def format_data_var(
         self,
         da,
         name=None,
         rename=True,
+        replace_attrs=False,
         format_coords=True,
         coords=None,
         loc=None,
@@ -929,6 +965,8 @@ class CFSpecs(object):
         rename: bool
             Not only format attribute, but also rename arrays,
             thus making a copies.
+        replace_attrs: bool
+            Replace existing attributes?
         format_coords: bool
             Also format coords.
         coords: dict, None
@@ -959,7 +997,7 @@ class CFSpecs(object):
         # Data var
         new_name = self.data_vars.format_dataarray(
             da, name=name, loc=loc, standardize=standardize,
-            rename=False, copy=False
+            rename=False, copy=False, replace_attrs=replace_attrs
         )
         if rename and new_name:
             da.name = new_name
@@ -974,7 +1012,8 @@ class CFSpecs(object):
                     loc=loc,
                     standardize=standardize,
                     rename=False,
-                    copy=False
+                    copy=False,
+                    replace_attrs=replace_attrs
                 )
 
         # Final renaming
@@ -988,7 +1027,8 @@ class CFSpecs(object):
         return da
 
     def format_dataset(self, ds, loc=None, rename=True, standardize=True,
-                       format_coords=True, coords=None, copy=True):
+                       format_coords=True, coords=None, copy=True,
+                       replace_attrs=False):
         """Auto-format a whole xarray.Dataset"""
         # Copy
         if copy:
@@ -1001,7 +1041,7 @@ class CFSpecs(object):
         for name, da in list(ds.items()):
             new_name = self.format_data_var(
                 da, loc=loc, rename=False, standardize=True,
-                format_coords=False, copy=False)
+                format_coords=False, copy=False, replace_attrs=replace_attrs)
             if rename and new_name:
                 rename_args[da.name] = new_name
 
@@ -1010,7 +1050,7 @@ class CFSpecs(object):
             for cname, cda in list(ds.coords.items()):
                 new_name = self.format_coord(
                     cda, loc=loc, standardize=True, rename=False,
-                    rename_dim=False, copy=False)
+                    rename_dim=False, copy=False, replace_attrs=replace_attrs)
                 if rename:
                     rename_args[cda.name] = new_name
 
@@ -1026,20 +1066,36 @@ class CFSpecs(object):
 
         return ds
 
-    def auto_format(self, dsa, loc=None, standardize=True):
+    def auto_format(self, dsa, **kwargs):
         """Auto-format the xarray.Dataset or xarray.DataArray
 
         See also
         --------
         format_dataarray
         format_dataset
+        fill_attrs
         """
         if hasattr(dsa, "data_vars"):
-            return self.format_dataset(dsa, loc=loc, standardize=standardize,
-                                       format_coords=True)
-        return self.format_data_var(dsa, loc=loc, standardize=standardize)
+            return self.format_dataset(dsa, format_coords=True, **kwargs)
+        return self.format_data_var(dsa, **kwargs)
 
     __call__ = auto_format
+
+    def fill_attrs(self, dsa, **kwargs):
+        """Fill missing attributes of a xarray.Dataset or xarray.DataArray
+
+        .. note:: It does not rename anything
+
+        See also
+        --------
+        format_dataarray
+        format_dataset
+        auto_format
+        """
+        kwargs.update(rename=False, replace_attrs=False)
+        if hasattr(dsa, "data_vars"):
+            return self.format_dataset(dsa, format_coords=True, **kwargs)
+        return self.format_data_var(dsa, **kwargs)
 
     def match_coord(self, da, name=None, loc="any"):
         """Check if an array matches a given or any coord specs
@@ -1300,6 +1356,46 @@ class CFSpecs(object):
         """A shortcut to :meth:`search` with an explicit name"""
         return self.search(dsa, name)
 
+    @ERRORS.format_method_docstring
+    def get_dims(self, da, dim_types, allow_positional=False,
+                 positions='tzyx', errors="warn"):
+        """Get the data array dimensions names from their type
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Array to scan
+        dim_types: str, list
+            Letters among "x", "y", "z", "t" and "f".
+        allow_positional: bool
+            Fall back to positional dimension of types is unkown.
+        positions: str
+            Default position per type starting from the end.
+        {errors}
+
+        Return
+        ------
+        tuple
+            Tuple of dimension name or None when the dimension if not found
+
+        See also
+        --------
+        CFCoordSpecs.get_dims
+        """
+        return self.coords.get_dims(
+            da, dim_types, allow_positional=allow_positional,
+            positions=positions, errors=errors)
+
+    def get_axis(self, coord, lower=False):
+        return self.coords.get_axis(coord, lower=lower)
+
+    def get_dim_type(self, dim, da=None, lower=True):
+        return self.coords.get_dim_type(dim, da=da, lower=lower)
+
+    def get_dim_types(self, da, unknown=None, asdict=False):
+        return self.coords.get_dim_types(
+            da, unknown=unknown, asdict=asdict)
+
 
 class _CFCatSpecs_(object):
     """Base class for loading data_vars and coords CF specifications"""
@@ -1395,6 +1491,7 @@ class _CFCatSpecs_(object):
 
     @property
     def dims(self):
+        """Dims per dimension types"""
         return self.parent._dict['dims']
 
     def set_specs(self, item, **specs):
@@ -1614,7 +1711,8 @@ class _CFCatSpecs_(object):
         return attrs
 
     def format_dataarray(self, da, name=None, loc=None, rename=True,
-                         standardize=True, rename_dim=True, copy=True):
+                         standardize=True, rename_dim=True,
+                         replace_attrs=False, copy=True):
         """Format a DataArray's name and attributes
 
         Parameters
@@ -1627,12 +1725,16 @@ class _CFCatSpecs_(object):
             - None or "any": any
             - False or '"": no location
         rename: bool
-            Rename arrays
+            Rename arrays when their name is set?
+        replace_attrs: bool
+            Replace existing attributes?
         standardize: bool
         rename_dim: bool
             For a 1D array, rename the dimension if it has the same name
             as the array.
             Note that it is set to False, if ``rename`` is False.
+        copy: bool
+            Force a copy (not of the data) in any case?
 
         Returns
         -------
@@ -1667,7 +1769,8 @@ class _CFCatSpecs_(object):
             attrs=cf_attrs,
             standardize=standardize,
             rename=rename,
-            copy=False,
+            replace_attrs=replace_attrs,
+            copy=False
         )
 
         # Return renaming name not renaming
@@ -1693,7 +1796,7 @@ class CFCoordSpecs(_CFCatSpecs_):
 
     category = "coords"
 
-    def get_dim_type(self, coord, lower=True):
+    def get_axis(self, coord, lower=False):
         """Get the dimension type, either from axis attr or from match Cf coord
 
         .. note:: The ``axis`` is the uppercase version of the ``dim_type``
@@ -1708,6 +1811,10 @@ class CFCoordSpecs(_CFCatSpecs_):
         ------
         {"x", "y", "z", "t", "f"}, None
 
+        See also
+        --------
+        get_dim_type
+        get_dim_types
         """
         axis = None
         if "axis" in coord.attrs:
@@ -1721,6 +1828,94 @@ class CFCoordSpecs(_CFCatSpecs_):
                 return axis.lower()
             return axis.upper()
 
+    def get_dim_type(self, dim, da=None, lower=True):
+        """Get the type of a dimension
+
+        Two cases:
+        - This dimension is registered in CF dims.
+        - da has dim as dim and has an axis attribute inferred with
+           :meth:`get_axis`.
+        - da has a coord named dim with an axis attribute inferred with
+           :meth:`get_axis`.
+
+        Parameters
+        ----------
+        dim: str
+            Dimension name
+        da: xarray.DataArray
+            Data array that the dimension belongs to, to help inferring
+            the type
+        lower: bool
+            For lower case
+
+        Return
+        ------
+        str, None
+            Letter as one of x, y, z, t or f, if found, else None
+
+        See also
+        --------
+        get_axis
+        """
+        # Remove location
+        dim = self.sglocator.parse_attr('name', dim)[0]
+
+        # Loop on types
+        for dim_type, dims in self.dims.items():
+            if dim.lower() in dims:
+                return dim_type
+
+        # Check if a coordinate have the same name and an axis type
+        if da is not None:
+
+            # Check dim validity
+            if dim not in da.dims:
+                raise XoaCFError(f"dimension '{dim}' does not belong to da")
+
+            # Check da axis itself
+            axis = self.get_axis(da, lower=True)
+            if axis:
+                return axis
+
+            # Check axis from coords
+            for name, coord in da.coords.items():
+                if name == dim:
+                    return self.get_axis(coord, lower=True)
+
+    def get_dim_types(self, da, unknown=None, asdict=False):
+        """Get a tuple of the dimension types of an array
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Data array
+        unknown:
+            Value to assign when type is unkown
+        asdict: bool
+
+        Return
+        ------
+        tuple, dict
+            Tuple of dimension types and of length ``da.ndim``.
+            A dimension type is either a letter or the ``unkown`` value
+            when the inference of type has failed.
+            If ``asdict`` is True, a dict is returned instead,
+            ``(dim, dim_type)`` as key-value pairs.
+
+        See also
+        --------
+        get_dim_type
+        """
+        dim_types = {}
+        for dim in da.dims:
+            dim_type = self.get_dim_type(dim, da=da)
+            if dim_type is None:
+                dim_type = unknown
+            dim_types[dim] = dim_type
+        if asdict:
+            return dim_types
+        return tuple(dim_types.values())
+
     def search_dim(self, da, dim_type=None, loc="any"):
         """Search a dataarray for a dimension name according to its type
 
@@ -1731,9 +1926,9 @@ class CFCoordSpecs(_CFCatSpecs_):
         Parameters
         ----------
         da: xarray.DataArray
-            Data or coordinate array
+            Coordinate or data array
         dim_type: {"x", "y", "z", "t", "f"}, None
-            When
+            When set to None, it is inferred with :meth:`get_axis`
         loc: "any", letter
             Staggered grid location
 
@@ -1742,40 +1937,45 @@ class CFCoordSpecs(_CFCatSpecs_):
         str, (str, str)
             Dim name OR, (dim name, dim_type) if dim_type is None
         """
-        if dim_type is not None:
+        # Fixed dim type?
+        with_dim_type = dim_type is not None
+        if with_dim_type:
             dim_type = dim_type.lower()
         else:
-            da_axis = self.get_dim_type(da)
+            dim_type = self.get_axis(da, lower=True)
 
-        # From dimension names
+        # Loop on dims
         for dim in da.dims:
+
+            # Filter by loc
             pname, ploc = self.sglocator.parse_attr('name', dim)
             if loc != "any" and ploc and loc and loc != ploc:
                 continue
-            dim_types = (self.dims.keys()
-                         if not dim_type and not da_axis else
-                         [dim_type or da_axis])
-            for dt in dim_types:
-                if pname.lower() in self.dims[dt]:
-                    if dim_type is not None:
-                        return dim
-                    if da.ndim == 1 or da_axis:
-                        return dim, dt
 
-        # From coordinates
-        for coord in da.coords.values():
-            if coord.ndim == 1 and coord.name in da.dims:
-                co_axis = self.get_dim_type(coord)
-                if co_axis:
-                    if dim_type and co_axis == dim_type:
-                        return coord.name
-                    if dim_type is None and da_axis and (
-                            da_axis == co_axis):
-                        return coord.name, co_axis
+            # Type of the current dim
+            this_dim_type = self.get_dim_type(dim, da=da)
 
-        # Fallback
-        if dim_type is None and da.ndim == 1:
-            return da.dims[0], da_axis
+            # This must match dim_type
+            if with_dim_type:
+                if this_dim_type and this_dim_type == dim_type:
+                    return dim
+                continue
+
+            # Any dim_type but no ambiguity
+            if dim_type:
+
+                # Same as da
+                if this_dim_type and this_dim_type == dim_type:
+                    return dim, dim_type
+
+        # Not found but only 1d and no dim_type specified
+        if da.ndim == 1 and this_dim_type is None:
+            return dim, dim_type
+
+        # Failed
+        if with_dim_type:
+            return
+        return None, None
 
     def search_from_dim(self, da, dim):
         """Search a dataarray for a coordinate from a dimension name
@@ -1793,43 +1993,111 @@ class CFCoordSpecs(_CFCatSpecs_):
         ------
         xarray.DataArray, None
             An coordinate array or None
-        """
 
-        assert dim in da.dims, 'Invalid dimension'
-        dim_type = None
+        See also
+        --------
+        get_axis
+        get_dim_type
+        """
+        if dim not in da.dims:
+            raise XoaError(f"Invalid dimension: {dim}")
 
         # Coord as dim only
         if dim in da.coords:
 
             # Check if another coordinate has this dim
+            #  like depth that also have the level dim
             for coord in da.coords.values():
                 if coord.name != dim and dim in coord.dims:
                     break
             else:
                 return da.coords[dim]
 
-            # Get the dim_type if any
-            dim_type = self.get_dim_type(da.coords[dim])
-
         # Get dim_type from known dim name
-        if dim_type is None:
-            pname, ploc = self.sglocator.parse_attr('name', dim)
-            for dim_type, dim_names in self.dims.items():
-                if pname.lower() in dim_names:
-                    break
+        #  like dim is not explicit but the coordinate is known
+        dim_type = self.get_dim_type(dim, da=da, lower=True)
 
         # Nothing to do there
         if dim_type is None:
             return
 
         # Look for a coordinate with this dim_type
+        # starting from coordinates with a greater number of dimensions
+        #  like depth that have more dims than level
         for coord in sorted(da.coords.values(),
                             key=operator.attrgetter('ndim'),
                             reverse=True):
             if dim in coord.dims:
-                coord_dim_type = self.get_dim_type(coord)
+                coord_dim_type = self.get_axis(coord, lower=True)
                 if coord_dim_type and coord_dim_type == dim_type:
                     return coord
+
+    @ERRORS.format_method_docstring
+    def get_dims(self, da, dim_types, allow_positional=False,
+                 positions='tzyx', errors="warn"):
+        """Get the data array dimensions names from their type
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Array to scan
+        dim_types: list
+            Letters among "x", "y", "z", "t" and "f".
+        allow_positional: bool
+            Fall back to positional dimension of types is unkown.
+        positions: str
+            Default position per type starting from the end.
+        {errors}
+
+        Return
+        ------
+        tuple
+            Tuple of dimension names or None when the dimension is not found
+
+        See also
+        --------
+        search_dim
+        get_dim_type
+        """
+        # Check shape
+        errors = ERRORS[errors]
+        if len(dim_types) > da.ndim:
+            msg = (f"this data array has less dimensions ({da.ndim})"
+                   " than requested ({})".format(len(dim_types)))
+            if errors == "raise":
+                raise XoaError(msg)
+            if errors == "warn":
+                xoa_warn(msg)
+
+        # Loop on types
+        scanned = {}
+        for dim_type in dim_types:
+            scanned[dim_type] = self.search_dim(da, dim_type)
+
+        # Guess from position
+        if allow_positional:
+            not_found = [item[0] for item in scanned.items()
+                         if item[1] is None]
+            for i, dim_type in enumerate(positions[::-1]):
+                if dim_type in not_found:
+                    scanned[dim_type] = da.dims[-i-1]
+
+        # Final check
+        if errors != 'ignore':
+            for dim_type, dim in scanned.items():
+                if dim is None:
+                    msg = f"no dimension found of type '{dim_type}'"
+                    if errors == 'raise':
+                        raise XoaError(msg)
+                    xoa_warn(msg)
+
+        return tuple(scanned.values())
+
+
+for meth in ('get_axis', 'get_dim_type', 'get_dim_types',
+             'search_dim', 'get_dims'):
+    doc = getattr(CFCoordSpecs, meth).__doc__
+    getattr(CFSpecs, meth).__doc__ = doc
 
 
 def _get_cfgm_():
@@ -2077,6 +2345,11 @@ class _CFAccessor_(object):
 
     __call__ = auto_format
 
+    def fill_attrs(self, loc=None, standardize=True):
+        """Fill attributes with :meth:`CFSpecs.fill_attrs`"""
+        return self._cfspecs.fill_attrs(self._dsa, loc=loc,
+                                        standardize=standardize)
+
     @property
     def coords(self):
         """Sub-accessor for coords only"""
@@ -2128,6 +2401,10 @@ class _CoordAccessor_(_CFAccessor_):
     @property
     def tdim(self):
         return self.get_dim("t")
+
+    @property
+    def fdim(self):
+        return self.get_dim("f")
 
 
 class _DataVarAccessor__(_CFAccessor_):
