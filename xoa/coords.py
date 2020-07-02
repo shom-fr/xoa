@@ -52,7 +52,7 @@ def get_cf_coords(da, coord_names):
             for coord_name in coord_names]
 
 
-@misc.ERROR.format_function_docstring
+@misc.ERRORS.format_function_docstring
 def get_dims(da, dim_types, allow_positional=False, positions='tzyx',
              errors="warn"):
     """Get the data array dimensions names from their type

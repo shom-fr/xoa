@@ -257,6 +257,7 @@ class Choices(object):
             for choice, doc in self._docs.items():
                 rst += f"{pindent}- ``{choice}``: {doc}\n"
             rst += "\n"
+        return rst
 
     def format_function_docstring(self, func):
         func.__doc__ = func.__doc__.format(
