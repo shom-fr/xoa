@@ -44,3 +44,10 @@ def test_misc_is_iterable(obj, expected):
 )
 def test_misc_match_string(ss, checks, expected):
     assert misc.match_string(ss, checks) is expected
+
+
+def test_misc_choices():
+
+    choices = misc.Choices(['a', 'bb', 'c'])
+    assert choices['a'] == 'a'
+    assert choices['C'] == 'c'
