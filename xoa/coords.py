@@ -13,7 +13,7 @@ from . import cf
 
 def get_lon(da):
     """Get the longitude coordinate"""
-    return cf.get_cf_specs().search_coord(da, 'lon')
+    return cf.get_cf_specs().search(da, 'lon')
 
 
 def get_lat(da):
@@ -45,11 +45,42 @@ def get_vertical(da):
     return height
 
 
-def get_coords(da, coord_names):
+def get_cf_coords(da, coord_names):
     """Get several coordinates"""
     cfspecs = cf.get_cf_specs()
     return [cfspecs.search_coord(da, coord_name)
             for coord_name in coord_names]
+
+
+@misc.ERROR.format_function_docstring
+def get_dims(da, dim_types, allow_positional=False,
+             positions='tzyx', errors="warn")
+        """Get the data array dimensions names from their type
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Array to scan
+        dim_types: str, list
+            Letters among "x", "y", "z", "t" and "f".
+        allow_positional: bool
+            Fall back to positional dimension of types is unkown.
+        positions: str
+            Default position per type starting from the end.
+        {errors}
+
+        Return
+        ------
+        tuple
+            Tuple of dimension name or None when the dimension if not found
+
+        See also
+        --------
+        xoa.cf.CFSpecs.get_dims
+        """
+        return cf.get_cf_specs.get_dims(
+            da, dim_types, allow_positional=allow_positional,
+            positions=positions, errors=errors)
 
 
 class transpose_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
