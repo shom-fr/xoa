@@ -180,6 +180,103 @@ class IntEnumChoices(IntEnum):
         return self.name
 
 
+class Choices(object):
+    """Choice management for a function or method parameter
+
+    Parameters
+    ----------
+    choices: dict, list
+        Allowed choices. When a dict, values are considered as the
+        description of choices.
+    case_insensitive: bool
+        Wether the treatment of string type choice should be case
+        sensitive or not.
+    parameter: None, str
+        Parameter name, which defaults to the lower case class name
+    description: str
+        Short description of the parameter.
+    """
+
+    def __init__(self, choices, case_insensitive=True, parameter=None,
+                 description="Choices"):
+        self._ci = case_insensitive
+        self._docs = {}
+        if isinstance(choices, dict):
+            self._choices = []
+            for value, doc in choices.items():
+                value = self._reformat_value_(value)
+                self._docs[value] = doc
+                self._choices.append(value)
+        else:
+            self._choices = [self._reformat_value_(value) for value in choices]
+        self._parameter = (self.__class__.__name__.lower()
+                           if parameter is None else parameter)
+        self._description = description
+
+    @property
+    def choices(self):
+        return self._choices
+
+    def _reformat_value_(self, value):
+        if self._ci and isinstance(value, str):
+            return value.lower()
+        return value
+
+    def __getitem__(self, choice):
+        choice = self._reformat_value_(choice)
+        if choice not in self._choices:
+            desc = self._description if self._description else 'choice'
+            raise XoaError(f"Invalid {desc}: {choice}. Please choose one of:"
+                           " {self}")
+        return choice
+
+    def __str__(self):
+        return ", ".join(self._choices)
+
+    def to_docstring(self, indent=4):
+        """Convert to numpy-like docstring
+
+        Parameters
+        ----------
+        indent: str, int
+            Base indentation. Integers are multiplied by a space char.
+
+        Return
+        ------
+        str
+            Docstring of this parameter
+        """
+        indent = (" " * indent) if isinstance(indent, int) else indent
+        pindent = indent + 4 * " "
+        types = "{" + ", ".join([repr(c) for c in self.choices]) + "}"
+        rst = f"{indent}{self._parameter}: {types}\n"
+        if self._description:
+            rst += f"{pindent}{self._description}\n"
+        if self._docs:
+            rst += "\n"
+            for choice, doc in self._docs.items():
+                rst += f"{pindent}- ``{choice}``: {doc}\n"
+            rst += "\n"
+
+    def format_function_docstring(self, func):
+        func.__doc__ = func.__doc__.format(
+            **{self._parameter: self.to_docstring(4)})
+        return func
+
+    def format_method_docstring(self, func):
+        func.__doc__ = func.__doc__.format(
+            **{self._parameter: self.to_docstring(8)})
+        return func
+
+
+ERRORS = Choices({"ignore": "silently ignore",
+                  "warn": "emit a warning",
+                  "raise": "raise an exception"},
+                 parameter="errors",
+                 description="In case of errors"
+                 )
+
+
 def get_axis_slices(ndim, axis, **kwargs):
     """Get standard slices for an axis of a ndim array
 
