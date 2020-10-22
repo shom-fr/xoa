@@ -1373,8 +1373,18 @@ class CFSpecs(object):
             return found
 
     def get(self, dsa, name):
-        """A shortcut to :meth:`search` with an explicit name"""
-        return self.search(dsa, name)
+        """A shortcut to :meth:`search` with an explicit name
+
+        A single element is searched for.
+
+        Look into all :attr:`categories` and raise and error
+        if nothing is found.
+        """
+        da = self.search(dsa, name, errors="ignore", single=True)
+        if da is None:
+            raise XoaCFError("Search failed for the following cf name: "
+                             + name)
+        return da
 
     @ERRORS.format_method_docstring
     def get_dims(self, da, dim_types, allow_positional=False,
@@ -2362,7 +2372,7 @@ def get_cf_specs(name=None, category=None, cache="rw"):
 
     # Clean cache
     if cache == "clean":
-        clean_cf_cache()
+        reset_cache()
 
     cf_source = _CACHE["specs"]
 
