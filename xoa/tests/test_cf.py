@@ -485,6 +485,14 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
     assert temp.lon.standard_name == "longitude"
 
 
+def test_cf_cfspecs_format_data_var_specialize():
+
+    da = xr.DataArray(1, name="salinity")
+    da = cf.get_cf_specs().format_data_var(da, specialize=True)
+    assert da.name == "psal"
+    assert da.standard_name == "sea_water_salinity"
+
+
 def test_cf_cfspecs_format_data_var_loc():
     temp = xr.DataArray(0, name='xtemp_t',
                         attrs={'standard_name': 'banana_at_x_location'})

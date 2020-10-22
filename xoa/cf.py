@@ -518,7 +518,7 @@ class SGLocator(object):
         self, da, loc=None, standardize=True, name=None, attrs=None,
         rename=True, copy=True, replace_attrs=False
     ):
-        """Format name and attributes of copy of DataArray
+        """Format name and attributes of a copy of DataArray
 
         Parameters
         ----------
@@ -901,7 +901,7 @@ class CFSpecs(object):
 
     def format_coord(self, da, name=None, loc=None, copy=True,
                      standardize=True, rename=True, rename_dim=True,
-                     replace_attrs=False):
+                     specialize=False, attrs=True, replace_attrs=False):
         """Format a coordinate array
 
         Parameters
@@ -915,11 +915,19 @@ class CFSpecs(object):
             - False or '"": no location
         rename: bool
             Rename arrays
+        specialize: bool
+            Does not use the CF name for renaming, but the second name
+            as list in specs, which is generally a specialized one,
+            like a name adopted by specific dataset.
         standardize: bool
         rename_dim: bool
             For a 1D array, rename the dimension if it has the same name
             as the array.
             Note that it is set to False, if ``rename`` is False.
+        attrs: bool, dict
+            If False, does not change attributes at all.
+            If True, use Cf attributes.
+            If a dict, use this dict.
         replace_attrs: bool
             Replace existing attributes?
 
@@ -937,13 +945,16 @@ class CFSpecs(object):
         return self.coords.format_dataarray(
             da, name=name, loc=loc, copy=copy, standardize=standardize,
             rename=rename, rename_dim=rename_dim,
-            replace_attrs=replace_attrs)
+            replace_attrs=replace_attrs, attrs=attrs,
+            specialize=specialize)
 
     def format_data_var(
         self,
         da,
         name=None,
         rename=True,
+        specialize=False,
+        attrs=True,
         replace_attrs=False,
         format_coords=True,
         coords=None,
@@ -965,6 +976,14 @@ class CFSpecs(object):
         rename: bool
             Not only format attribute, but also rename arrays,
             thus making a copies.
+        specialize: bool
+            Does not use the CF name for renaming, but the second name
+            as list in specs, which is generally a specialized one,
+            like a name adopted by specific dataset.
+        attrs: bool, dict
+            If False, does not change attributes at all.
+            If True, use Cf attributes.
+            If a dict, use this dict.
         replace_attrs: bool
             Replace existing attributes?
         format_coords: bool
@@ -997,7 +1016,8 @@ class CFSpecs(object):
         # Data var
         new_name = self.data_vars.format_dataarray(
             da, name=name, loc=loc, standardize=standardize,
-            rename=False, copy=False, replace_attrs=replace_attrs
+            rename=False, copy=False, replace_attrs=replace_attrs,
+            attrs=attrs, specialize=specialize
         )
         if rename and new_name:
             da.name = new_name
@@ -1711,7 +1731,8 @@ class _CFCatSpecs_(object):
         return attrs
 
     def format_dataarray(self, da, name=None, loc=None, rename=True,
-                         standardize=True, rename_dim=True,
+                         attrs=True, standardize=True,
+                         specialize=False, rename_dim=True,
                          replace_attrs=False, copy=True):
         """Format a DataArray's name and attributes
 
@@ -1726,9 +1747,17 @@ class _CFCatSpecs_(object):
             - False or '"": no location
         rename: bool
             Rename arrays when their name is set?
+        attrs: bool, dict
+            If False, does not change attributes at all.
+            If True, use Cf attributes.
+            If a dict, use this dict.
         replace_attrs: bool
             Replace existing attributes?
         standardize: bool
+        specialized: bool
+            Does not use the CF name for renaming, but the second name
+            as list in specs, which is generally a specialized one,
+            like a name adopted by specific dataset.
         rename_dim: bool
             For a 1D array, rename the dimension if it has the same name
             as the array.
@@ -1749,7 +1778,7 @@ class _CFCatSpecs_(object):
         if copy:
             da = da.copy()
 
-        # Get name
+        # Get names
         if name is None:
             name = self.match(da, loc="any")
         if name is None:
@@ -1757,16 +1786,26 @@ class _CFCatSpecs_(object):
                 return
             return da.copy() if copy else None
         assert name in self.names
+        cf_name = new_name = name
+        old_name = da.name
+        if specialize:
+            specs = self.get_specs(cf_name)
+            new_name = specs["name"][:2][-1]
+            print('hereeee', new_name)
+
+        # Attributes
+        if attrs is True:
+            attrs = self.get_attrs(
+                name, loc=None, standardize=False, multi=True)
+        elif not attrs:
+            attrs = {}
 
         # Format array
-        old_name = da.name
-        cf_attrs = self.get_attrs(
-            name, loc=None, standardize=False, multi=True)
         new_da = self.sglocator.format_dataarray(
             da,
             loc=loc,
-            name=name,
-            attrs=cf_attrs,
+            name=new_name,
+            attrs=attrs,
             standardize=standardize,
             rename=rename,
             replace_attrs=replace_attrs,
@@ -1775,7 +1814,7 @@ class _CFCatSpecs_(object):
 
         # Return renaming name not renaming
         if not rename:
-            return self.sglocator.merge_attr("name", da.name, name, loc)
+            return self.sglocator.merge_attr("name", da.name, new_name, loc)
 
         # Rename dim if axis coordinate
         rename_dim = rename and rename_dim
@@ -1783,6 +1822,44 @@ class _CFCatSpecs_(object):
                 old_name == da.dims[0]):
             new_da = new_da.rename({old_name: new_da.name})
         return new_da
+
+    def rename_dataarray(self, da, name=None, specialize=False, loc=None,
+                         standardize=True, rename_dim=True,
+                         copy=True):
+        """Rename a DataArray
+
+        It is a specialized call to :meth:`format_dataarray` where
+        attributes are left unchanged.
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+        name: str, None
+            A CF name. If not provided, it guessed with :meth:`match`.
+        specialize: bool
+            Does not use the CF name for renaming, but the second name
+            as list in specs, which is generally a specialized one,
+            like a name adopted by specific dataset.
+        loc: str, {"any", None}, {"", False}
+            - str: one of these locations
+            - None or "any": any
+            - False or '"": no location
+        standardize: bool
+        rename_dim: bool
+            For a 1D array, rename the dimension if it has the same name
+            as the array.
+            Note that it is set to False, if ``rename`` is False.
+        copy: bool
+            Force a copy (not of the data) in any case?
+
+
+        See also
+        --------
+        format_dataarray
+        """
+        return self.format_dataarray(
+            da, name=name, specialize=specialize, loc=loc, attrs=False,
+            standardize=standardize, rename_dim=rename_dim, copy=copy)
 
 
 class CFVarSpecs(_CFCatSpecs_):
