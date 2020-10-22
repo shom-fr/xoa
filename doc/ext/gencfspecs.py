@@ -3,8 +3,6 @@
 import os
 import logging
 
-import sphinx.util
-
 import xoa.cf
 
 
@@ -12,7 +10,8 @@ skip_keys = ["inherit", "processed"]
 
 cat_titles = {
     "data_vars": "Data variables (:attr:`~xoa.cf.CFSpecs.data_vars`)",
-    "coords": "Coordinates (:attr:`~xoa.cf.CFSpecs.coords`)"
+    "coords": "Coordinates (:attr:`~xoa.cf.CFSpecs.coords`)",
+    "dims": "Dimensions (:attr:`~xoa.cf.CFSpecs.dims`)"
     }
 
 roles = {
@@ -34,9 +33,6 @@ def genrst(app):
     rst_tables = {}
     rst_toctrees = {}
     for cfcat in ["data_vars", "coords"]:
-
-        rst_tables[cfcat] = ".. list-table::\n\n"
-        rst_toctrees[cfcat] = ".. toctree::\n    :hidden:\n\n"
 
         logging.info(f"Generating rst files for xoa.cf {cfcat}specs")
         for cfname in cfspecs[cfcat]:
@@ -71,6 +67,12 @@ def genrst(app):
             # Append to toctree
             rst_toctrees[cfcat] += f"    gencfspecs/{cfcat}/{cfname}\n"
 
+    rst_tables["dims"] = ".. list-table::\n\n"
+    for dim_type, dims in cfspecs["dims"].items():
+        rst_tables["dims"] += f"    * - :cfdim:`{dim_type}`\n"
+        rst_tables["dims"] += "      - {}\n".format(
+            ", ".join([f"``{dim}``" for dim in dims]))
+
     with open(os.path.join(gendir, "index.txt"), "w") as f:
 
         for cfcat in rst_tables.keys():
@@ -78,7 +80,8 @@ def genrst(app):
             title = cat_titles[cfcat]
             title = title + "\n" + len(title)*"^"
             f.write(f".. _appendix.cf.{cfcat}:\n\n" + title + "\n\n")
-            f.write(rst_toctrees[cfcat]+"\n")
+            if cfcat in rst_toctrees:
+                f.write(rst_toctrees[cfcat]+"\n")
             f.write(rst_tables[cfcat]+"\n\n")
 
 
@@ -86,14 +89,18 @@ def setup(app):
 
     app.add_object_type(
         'cfdatavar', 'cfdatavar',
-        objname='xoacf CFSpecs.data_vars item',
-        indextemplate='pair: %s; xoacf CFSpecs.data_vars item')
+        objname='xoa.cf CFSpecs.data_vars item',
+        indextemplate='pair: %s; xoa.cf CFSpecs.data_vars item')
 
     app.add_object_type(
         'cfcoord', 'cfcoord',
-        objname='xoacf CFSpecs.coords item',
-        indextemplate='pair: %s; xoacf CFSpecs.coords item')
+        objname='xoa.cf CFSpecs.coords item',
+        indextemplate='pair: %s; xoa.cf CFSpecs.coords item')
 
+    app.add_object_type(
+        'cfdim', 'cfdim',
+        objname='xoa.cf CFSpecs.coords.dims item',
+        indextemplate='pair: %s; xoa.cf CFSpecs.coords.dims item')
 
     app.connect('builder-inited', genrst)
 
