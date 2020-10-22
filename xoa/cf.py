@@ -2193,13 +2193,27 @@ class set_cf_specs(object):
             _CACHE["specs"] = self.old_specs
 
 
-def clean_cf_cache():
-    """Remove the cf specs cache file"""
-    if os.path.exists(USER_CF_CACHE_FILE):
+def reset_cache(disk=True, memory=False):
+    """Reset the on disk and/or in memory cf specs cache
+
+    Parameters
+    ----------
+    disk: bool
+        Remove the cf specs cahce file (:data:`USER_CF_CACHE_FILE`)
+    memory: bool
+        Remove the in-memory cache.
+
+        .. warning:: This may lead to unpredicted behaviors.
+
+    """
+    if disk and os.path.exists(USER_CF_CACHE_FILE):
         os.remove(USER_CF_CACHE_FILE)
 
+    if memory:
+        _CACHE.clear()
 
-def show_cf_cache():
+
+def show_cache():
     """Show the cf specs cache file"""
     print(USER_CF_CACHE_FILE)
 
