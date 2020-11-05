@@ -44,6 +44,7 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     both = 2
     all = 2
 
+
 def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
              conserv=False, extrap=0):
     """Regrid along a single dimension
