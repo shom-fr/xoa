@@ -918,7 +918,7 @@ class CFSpecs(object):
         specialize: bool
             Does not use the CF name for renaming, but the second name
             as list in specs, which is generally a specialized one,
-            like a name adopted by specific dataset.
+            like a name adopted by specialized dataset.
         standardize: bool
         rename_dim: bool
             For a 1D array, rename the dimension if it has the same name
@@ -979,7 +979,7 @@ class CFSpecs(object):
         specialize: bool
             Does not use the CF name for renaming, but the second name
             as list in specs, which is generally a specialized one,
-            like a name adopted by specific dataset.
+            like a name adopted by specialized dataset.
         attrs: bool, dict
             If False, does not change attributes at all.
             If True, use Cf attributes.
@@ -1499,7 +1499,7 @@ class _CFCatSpecs_(object):
         return self._dict.keys()
 
     def get_specs(self, name, errors="warn"):
-        """Get the specs of acf item
+        """Get the specs of a cf item
 
         Parameters
         ----------
@@ -1740,6 +1740,32 @@ class _CFCatSpecs_(object):
 
         return attrs
 
+    def get_name(self, name, specialize=False, loc=None):
+        """Get the name of the matching CF specs
+
+        Parameters
+        ----------
+        name: str, xarray.DataArray
+            Either a cf name or a data array
+        specialize: bool
+            Does not use the CF name for renaming, but the second name
+            as list in specs, which is generally a specialized one,
+            like a name adopted by specialized dataset.
+        loc: str, None
+            Format it at this location
+
+        Return
+        ------
+        None or str
+        """
+        if not isinstance(name, str):
+            name = self.match(name)
+        if name is None:
+            return
+        names = self[name]["name"][:2]
+        name = names[-1 if specialize else 0]
+        return self.sglocator.format_attr("name", name, loc=loc)
+
     def format_dataarray(self, da, name=None, loc=None, rename=True,
                          attrs=True, standardize=True,
                          specialize=False, rename_dim=True,
@@ -1767,7 +1793,7 @@ class _CFCatSpecs_(object):
         specialized: bool
             Does not use the CF name for renaming, but the second name
             as list in specs, which is generally a specialized one,
-            like a name adopted by specific dataset.
+            like a name adopted by specialized dataset.
         rename_dim: bool
             For a 1D array, rename the dimension if it has the same name
             as the array.
@@ -1849,7 +1875,7 @@ class _CFCatSpecs_(object):
         specialize: bool
             Does not use the CF name for renaming, but the second name
             as list in specs, which is generally a specialized one,
-            like a name adopted by specific dataset.
+            like a name adopted by specialized dataset.
         loc: str, {"any", None}, {"", False}
             - str: one of these locations
             - None or "any": any
