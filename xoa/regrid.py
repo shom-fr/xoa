@@ -43,6 +43,7 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     #: Both below and above
     both = 2
     all = 2
+    yes = 2
 
 
 def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
