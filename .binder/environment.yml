@@ -7,8 +7,8 @@ dependencies:
   #- cartopy
   - cmocean
   - configobj
-  - libgfortran
   - matplotlib-base
+  - numba
   - pip
   - python>=3
   #- scipy

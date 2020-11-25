@@ -8,12 +8,11 @@ dependencies:
   - appdirs
   - cartopy
   - cmocean
-  - fortran-compiler
   - ipython
   - ipykernel
   - jupyter_client
-  - libgfortran
   - matplotlib-base
+  - numba
   - pip
   - python>=3
   - xarray

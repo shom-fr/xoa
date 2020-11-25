@@ -2,6 +2,7 @@ appdirs
 cartopy
 configobj
 matplotlib-base
+numba
 pandas
 python>=3
 scipy

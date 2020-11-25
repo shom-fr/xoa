@@ -8,9 +8,7 @@ Naming convention tools for reading and formatting variables
 See the :ref:`usages.cf` section.
 
 """
-# Copyright or © or Copr. Shom/Ifremer/Actimar
-#
-# stephane.raynaud@shom.fr, charria@ifremer.fr, wilkins@actimar.fr
+# Copyright or © or Copr. Shom, 2020
 #
 # This software is a computer program whose purpose is to [describe
 # functionalities and technical features of your software].

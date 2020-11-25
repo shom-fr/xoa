@@ -8,8 +8,8 @@ dependencies:
   - appdirs
   #- cartopy
   - configobj
-  - libgfortran
   - matplotlib-base
+  - numba
   - python>=3
   #- scipy
   - xarray

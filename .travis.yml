@@ -19,7 +19,7 @@ before_install:
   appdirs configobj
 install:
 - source activate test-environment
-- python setup.py build_ext --inplace
+- pip install -e .
 - export PYTHONPATH=$PWD:$PYTHONPATH
 script: pytest
 notifications:

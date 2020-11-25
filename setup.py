@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Copyright or © or Copr. Shom/Ifremer/Actimar
-#
-# stephane.raynaud@shom.fr, charria@ifremer.fr, wilkins@actimar.fr
+# Copyright or © or Copr. Shom, 2020
 #
 # This software is a computer program whose purpose is to [describe
 # functionalities and technical features of your software].
@@ -105,35 +103,20 @@ def configuration():
     config.add_data_dir('xoa/_samples')
     config.add_data_files("xoa/cf.ini", "xoa/cf.cfg")
 
-    # Add extensions
-    os.environ['LDFLAGS'] = "-shared"
-    config.add_extension("xoa._interp", ["src/interp.f90"])
-
     # Env vars
     if "READTHEDOCS" in os.environ:
         for name, suffix in[
-                ("FC", "gfortran"),
-                ("F90", "gfortran"),
-                ("F77", "gfortran"),
                 ("AR", "ar"),
                 ("GCC", "gcc"),
                 ("LD", "ld")]:
             os.environ[name] = os.path.join(
                 sys.prefix, "bin", "x86_64-conda_cos6-linux-gnu-"+suffix)
         libdir = os.path.join(sys.prefix, "lib")
-        os.environ["LDFLAGS"] = (
-            "-Wl,-O2 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro "
-            "-Wl,-z,now -Wl,--disable-new-dtags -Wl,--gc-sections "
-            f"-Wl,-rpath,{libdir} -Wl,-rpath-link,{libdir} -L{libdir}")
 
     return config
 
 
 def main():
-
-    # Setup config file
-    if not os.path.exists("setup.cfg"):
-        shutil.copy("setup.cfg.default", "setup.cfg")
 
     # Lauch setup
     setup(configuration=configuration, **specs)

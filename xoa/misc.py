@@ -3,9 +3,7 @@
 """
 Miscellaneaous low level utilities
 """
-# Copyright or © or Copr. Shom/Ifremer/Actimar
-#
-# stephane.raynaud@shom.fr, charria@ifremer.fr, wilkins@actimar.fr
+# Copyright or © or Copr. Shom, 2020
 #
 # This software is a computer program whose purpose is to [describe
 # functionalities and technical features of your software].
@@ -35,6 +33,7 @@ Miscellaneaous low level utilities
 #
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
+
 
 import types
 from enum import IntEnum, EnumMeta
