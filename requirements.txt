@@ -3,6 +3,7 @@ cartopy
 configobj
 matplotlib-base
 numba
+numpy
 pandas
 python>=3
 scipy
