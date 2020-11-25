@@ -6,6 +6,7 @@ import math
 import numpy as np
 import numba
 
+
 # %% 1D routines
 
 @numba.njit(parallel=True, fastmath=True)
@@ -14,7 +15,7 @@ def interp1d(vari, yi, yo, method="linear", extrap="no", bias=0., tension=0.):
 
     Parameters
     ----------
-    vari: array_like(nx, nb, nyi)
+    vari: array_like(nb, nx, nyi)
     yi: array_like(nx, nyi)
     yo: array_like(nx, nyo)
     method: {"nearest", "linear", "cubic", "hermit"}
@@ -31,16 +32,16 @@ def interp1d(vari, yi, yo, method="linear", extrap="no", bias=0., tension=0.):
     """
     # Shapes
     if vari.ndim == 2:
-        vari = vari.reshape(vari.shape[0], 1, vari.shape[1])
-    nx, nb, nyi = vari.shape
+        vari = vari.reshape(1, vari.shape[0], vari.shape[1])
+    nb, nx, nyi = vari.shape
     yi = np.atleast_2d(yi)
     yo = np.atleast_2d(yo)
     nyo = yo.shape[1]
 
     # Init output
-    varo = np.full((nx, nb, nyo), np.nan, dtype=vari.dtype)
+    varo = np.full((nb, nx, nyo), np.nan, dtype=vari.dtype)
 
-    # Loop on varying dimension
+    # Loop on the varying dimension
     for ix in numba.prange(nx):
 
         # Index along x for coordinate arrays
@@ -180,7 +181,6 @@ def extrap1d(vari, varo, extrap):
 
 # %% 2D routines
 
-#@numba.njit(fastmath=True)
 @numba.vectorize
 def haversine(lon0, lat0, lon1, lat1):
     """Haversine distance between two points on a unit sphere
@@ -350,8 +350,8 @@ def curvgrid2relpt(xxi, yyi, xo, yo):
 
             # Get relative position
             a, b = curvcell2relpt(
-                xxi(j, i), xxi(j+1, i), xxi(j+1, i+1), xxi(j, i+1),
-                yyi(j, i), yyi(j+1, i), yyi(j+1, i+1), yyi(j, i+1),
+                xxi[j, i], xxi[j+1, i], xxi[j+1, i+1], xxi[j, i+1],
+                yyi[j, i], yyi[j+1, i], yyi[j+1, i+1], yyi[j, i+1],
                 xo, yo)
 
             # Store absolute indices
@@ -362,3 +362,224 @@ def curvgrid2relpt(xxi, yyi, xo, yo):
                 return p, q
 
     return p, q
+
+
+def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
+    """Linear interpolation of gridded data to random positions
+
+    Parameters
+    ----------
+    xxi: array_like(nyi, nxi)
+        Input grid longitudes in degrees, with `nyi==1` for 1D coordinates.
+    yyi: array_like(nyi, nxi)
+        Input grid latitudes in degrees, with `nxi==1` for 1D coordinates.
+    zzi: array_like(nexz, nti, nzi, nyi, nxi)
+        Input grid depths, positive up. Non effective dimensions
+        must be set to 1. `nexz` may be equal or a multiple of `nex`.
+    ti:  array_like(nti)
+        Input times
+    vi: array_like(nex, nti, nzi, nyi, nxi)
+        Input values.
+    xo: array_like(no)
+        Points longitude
+    yo: array_like(no)
+        Points latitude
+    zo: array_like(no)
+        Points depth, positive up.
+    to: array_like(no)
+        Points time.
+
+    Return
+    ------
+    array_like(nex, no)
+        Points value.
+    """
+
+    # Dimensions
+    nyix, nxi = xxi.shape
+    nyi, nxiy = yyi.shape
+    nexz, ntiz, nzi, nyiz, nxiz = zzi.shape
+    nex, nti, nzi, nyi, nxi = vi.shape
+    no = xo.shape[0]
+
+    # Initalisations
+    vo = np.full((nex, no), np.nan, dtype=vi.dtype)
+    bmask = np.isnan(vi)
+    ximin = vi.min()
+    ximax = xxi.max()
+    yimin = yyi.min()
+    yimax = yyi.max()
+    zimin = zzi.min()
+    zimax = zzi.max()
+    timin = ti.min()
+    timax = ti.max()
+    curved = nyix != 1
+
+    # Verifications
+    assert not curved or (nxi == nxiy and nyi == nyix), (
+        "linear4dto1: Invalid curved dimensions")
+    assert nxiz == 1 or nxiz == nxi, "linear4dto1: Invalid nxiz dimension"
+    assert nyiz == 1 or nyiz == nyi, "linear4dto1: Invalid nyiz dimension"
+    assert ntiz == 1 or ntiz == nti, "linear4dto1: Invalid ntiz dimension"
+
+    # Loop on ouput points
+    for io in numba.prange(no):
+        if ((nxi == 1 or (xo[io] >= ximin and xo[io] <= ximax)) and
+                (nyi == 1 or (yo[io] >= yimin and yo[io] <= yimax)) and
+                (nzi == 1 or (zo[io] >= zimin and zo[io] <= zimax)) and
+                (nti == 1 or (to[io] >= timin and to[io] <= timax))):
+            continue
+
+        # Weights
+        if curved:
+
+            p, q = curvgrid2relpt(xxi, yyi, xo[io], yo[io])
+            if p < 1 or p > nxi or q < 1 or q > nyi:
+                continue  # outside the grid
+            i = int(p)
+            j = int(q)
+            a = p - i
+            b = q - j
+            npi = 2
+            npj = 2
+
+        else:
+            # - X
+            if nxi == 1:
+                i = 0
+                a = 0.
+                npi = 1
+            elif xxi[0, nxi-1] == xo[io]:
+                i = nxi - 1
+                npi = 0
+                a = 0.
+            else:
+                # i = minloc(xxi[1, :], dim=1, mask=xxi(1,:)>xo[io])-1
+                i = np.searchsorted(xxi[0, :], xo[io], "right") - 1
+                npi = 2
+                a = xo[io] - xxi[0, i]
+                if abs(a) > 180.:
+                    a -= 180.  # FIXME: linear4dto1dxx: abs(a)>180.
+                a = a / (xxi[0, i+1] - xxi[0, i])
+
+            # - Y
+            if nyi == 1:
+                j = 0
+                b = 0.
+                npj = 1
+            elif yyi[nyi-1, 0] == yo[io]:
+                j = nyi - 1
+                b = 0.
+                npj = 1
+            else:
+                # j = minloc(yyi[:,1], dim=1, mask=yyi[:,1]>yo[io]) - 1
+                j = np.searchsorted(yyi[:, 0], yo[io], "right") - 1
+                b = (yo[io]-yyi[j, 0]) / (yyi[j+1, 0]-yyi[j, 0])
+                npj = 2
+
+        # - T
+        if nti == 1:
+            l = 0
+            d = 0.
+            npl = 1
+        elif ti[nti-1] == to[io]:
+            l = nti - 1
+            d = 0.
+            npl = 1
+        else:
+            l = np.searchsorted(ti, to[io], "right") - 1
+            # l = minloc(ti, dim=1, mask=ti>to[io])-1
+            if ti[l+1] == ti[l]:
+                d = 0.
+                npl = 1
+            else:
+                d = (to[io]-ti[l]) / (ti[l+1]-ti[l])
+                npl = 2
+
+        # - Z
+        if nzi == 1:
+            k = 0
+            c = 0.
+            npk = 1
+        else:
+
+            # Local zi
+
+            if nxiz == 1:
+                npiz = 1
+                az = 0
+                iz = 0
+            else:
+                npiz = npi
+                az = a
+                iz = i
+
+            if nyiz == 1:
+                npjz = 1
+                bz = 0
+                jz = 0
+            else:
+                npjz = npj
+                bz = b
+                jz = j
+
+            if ntiz == 1:
+                nplz = 1
+                dz = 0
+                lz = 0
+            else:
+                nplz = npl
+                dz = d
+                lz = l
+
+            zi = 0.
+            for ie in range(nex):
+                for ll in range(0, nplz):
+                    for kk in range(nzi):
+                        for jj in range(0, npjz):
+                            for ii in range(0, npiz):
+                                zi = (zi + zzi[ie, lz+ll, kk, jz+jj, iz+ii] *
+                                      ((1-az) * (1-ii) + az * ii) *
+                                      ((1-bz) * (1-jj) + bz * jj) *
+                                      ((1-dz) * (1-ll) + dz * ll))
+
+            # Normal stuff (c(nexz),zi[nexz,nzi),k(nexz)
+            for ie in range(nex):  # extra dim
+                if zi[ie, nzi-1] == zo[io]:
+                    k[ie] = nzi - 1
+                    c[ie] = 0.
+                    npk[ie] = 1
+                else:
+                    k[ie] = np.searchsorted(zi[ie], zo[io], "right") - 1
+                    if zi[ie, k[ie]+1] == zi[ie, k[ie]]:
+                        c[ie] = 0.
+                        npk[ie] = 1
+                    else:
+                        c[ie] = ((zo[io]-zi[ie, k[ie]]) /
+                                 (zi[ie, k[ie]+1] - zi[ie, k[ie]]))
+                        npk[ie] = 2
+
+        # Interpolate
+        for ieb in range(0, nex//nexz):
+
+            ie0 = (ieb-1)*nexz - 1
+
+            for iez in range(nexz):
+                if not bmask[ie0:ie0+iez, l:l+npl,
+                             k[iez+1]:k[iez+1]+npk[iez+1],
+                             j:j+npj,
+                             i:i+npi].any():
+                    vo[ie0+iez, io] = 0.
+                    for ll in range(npl):
+                        for kk in range(npk[iez+1]):
+                            for jj in range(npj):
+                                for ii in range(npi):
+                                    vo[ie0+iez, io] = (
+                                        vo[ie0+iez, io] +
+                                        vi[ie0+iez,
+                                           l+ll, k[iez]+kk, j+jj, i+ii] *
+                                        ((1-a) * (1-ii) + a * ii) *
+                                        ((1-b) * (1-jj) + b * jj) *
+                                        ((1-c[iez]) *
+                                         (1-kk) + c[iez] * kk) *
+                                        ((1-d) * (1-ll) + d * ll))
