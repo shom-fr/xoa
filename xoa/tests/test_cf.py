@@ -280,8 +280,8 @@ def test_cf_get_cfg_specs(cache):
 
 def test_cf_get_cfg_specs_var():
     specs = cf.get_cf_specs("temp", "data_vars")
-    assert specs["name"][0] == "temp"
-    assert specs["standard_name"][0] == "sea_water_temperature"
+    assert specs["name"][0] == "temperature"
+    assert specs["attrs"]["standard_name"][0] == "sea_water_temperature"
     assert specs["cmap"] == "cmo.thermal"
     new_specs = cf.get_cf_specs("temp")
     assert new_specs is specs
@@ -289,13 +289,13 @@ def test_cf_get_cfg_specs_var():
 
 def test_cf_get_cfg_specs_var_inherit():
     specs = cf.get_cf_specs("sst", "data_vars")
-    assert specs["standard_name"][0] == "sea_surface_temperature"
-    assert specs["units"][0] == "degrees_celsius"
+    assert specs["attrs"]["standard_name"][0] == "sea_surface_temperature"
+    assert specs["attrs"]["units"][0] == "degrees_celsius"
 
 
 def test_cf_get_cfg_specs_coord():
     specs = cf.get_cf_specs("lon", "coords")
-    assert specs["name"][0] == "lon"
+    assert specs["name"][0] == "longitude"
     assert "longitude" in specs["name"]
     new_specs = cf.get_cf_specs("lon")
     assert new_specs is specs
@@ -303,8 +303,8 @@ def test_cf_get_cfg_specs_coord():
 
 def test_cf_get_cfg_specs_coord_inherit():
     specs = cf.get_cf_specs("depth", "coords")
-    assert specs["name"][0] == "depth"
-    assert specs["long_name"][0] == "Depth"
+    assert specs["name"][0] == "dep"
+    assert specs["attrs"]["long_name"][0] == "Depth"
 
 
 @pytest.mark.parametrize(
@@ -353,6 +353,26 @@ def test_cf_set_cf_specs_context():
         assert cfspecs is cfspecs1
         assert cf.get_cf_specs() is cfspecs1
     assert cf.get_cf_specs() is cfspecs0
+
+
+@pytest.mark.parametrize(
+    "specialize,expected",
+    [
+         (False, "temp"),
+         (True, "temperature")
+     ]
+)
+def test_cf_cfspecs_get_name(specialize, expected):
+    cfspecs = cf.get_cf_specs()
+    assert (cfspecs.data_vars.get_name("temp", specialize=specialize)
+            == expected)
+
+
+def test_cf_cfspecs_get_attrs():
+    cfspecs = cf.get_cf_specs()
+    attrs = cfspecs.data_vars.get_attrs("temp", other="ok")
+    assert attrs["long_name"] == "Temperature"
+    assert attrs["other"] == "ok"
 
 
 @pytest.mark.parametrize("cf_name", [None, "lon"])
@@ -635,7 +655,7 @@ def test_cf_cfspecs_coords_get_dims():
     cfspecs = cf.get_cf_specs().coords
     dims = cfspecs.get_dims(da, 'xyzt', allow_positional=True)
     assert dims == ('xi', 'yy', 'level', 'r')
-    dims = cfspecs.get_dims(da, 'f')
+    dims = cfspecs.get_dims(da, 'f', errors="ignore")
     assert dims == (None,)
 
 

@@ -75,6 +75,7 @@ _CF_DICT_MERGE_KWARGS = dict(
     skipempty=False,
     overwriteempty=True,
     mergetuples=True,
+    unique=True
 )
 
 _CACHE = {}
@@ -793,10 +794,11 @@ class CFSpecs(object):
             self._dict[category].update(items[category])
 
         # Updates valid dimensions
-        for coord_specs in self._dict['coords'].values():
+        for name, coord_specs in self._dict['coords'].items():
             if coord_specs['axis']:
                 axis = coord_specs['axis'].lower()
-                self._dict['dims'][axis].extend(coord_specs['name'])
+                names = [name] + coord_specs['name']
+                self._dict['dims'][axis].extend(names)
 
     def _process_entry_(self, category, name):
         """Process an entry
@@ -805,7 +807,6 @@ class CFSpecs(object):
         - Check geo coords
         - Check inheritance
         - Makes sure that coords specs have no 'coords' key
-        - Makes sure that specs key is the first entry of 'names'
         - Add standard_name to list of names
         - Check duplications to other locations ('toto' -> 'toto_u')
 
@@ -832,13 +833,13 @@ class CFSpecs(object):
         specs = entries[name]
 
         # Long name from name or standard_name
-        if not specs["long_name"]:
-            if specs["standard_name"]:
-                long_name = specs["standard_name"][0]
+        if not specs["attrs"]["long_name"]:
+            if specs["attrs"]["standard_name"]:
+                long_name = specs["attrs"]["standard_name"][0]
             else:
                 long_name = name.title()
             long_name = long_name.replace("_", " ").capitalize()
-            specs["long_name"].append(long_name)
+            specs["attrs"]["long_name"].append(long_name)
 
         # Inherits from other specs (merge specs with dict_merge)
         if "inherit" in specs and specs["inherit"]:
@@ -865,17 +866,20 @@ class CFSpecs(object):
                 **_CF_DICT_MERGE_KWARGS,
             )
 
-            # Check compatibility of keys
-            for key in list(specs.keys()):
-                if key not in self._cfgspecs[category]["__many__"]:
-                    del specs[key]
+            # Check compatibility of keys when not from same category
+            if category != from_cat:
+                for key in list(specs.keys()):
+                    if (key not in self._cfgspecs[category]["__many__"] and
+                            key in self._cfgspecs[from_cat]["__many__"]):
+                        del specs[key]
 
-            specs["inherit"] = None  # switch off inheritance now
+            # Switch off inheritance now
+            specs["inherit"] = None
 
-        # Names
-        if name in specs["name"]:
-            specs["name"].remove(name)
-        specs["name"].insert(0, name)
+        # # Names
+        # if name in specs["name"]:
+        #     specs["name"].remove(name)
+        # specs["name"].insert(0, name)
 
         # Select
         if specs.get("select", None):
@@ -885,11 +889,11 @@ class CFSpecs(object):
                 except Exception:
                     pass
 
-        # Standard_names in names
-        if specs["standard_name"]:
-            for standard_name in specs["standard_name"]:
-                if standard_name not in specs["name"]:
-                    specs["name"].append(standard_name)
+        # # Standard_names in names
+        # if specs["standard_name"]:
+        #     for standard_name in specs["standard_name"]:
+        #         if standard_name not in specs["name"]:
+        #             specs["name"].append(standard_name)
 
         # if name=="depth":
         #     print('>>>>',category, specs['name'])
@@ -914,8 +918,8 @@ class CFSpecs(object):
         rename: bool
             Rename arrays
         specialize: bool
-            Does not use the CF name for renaming, but the second name
-            as list in specs, which is generally a specialized one,
+            Does not use the CF name for renaming, but the first name
+            as listed in specs, which is generally a specialized one,
             like a name adopted by specialized dataset.
         standardize: bool
         rename_dim: bool
@@ -975,8 +979,8 @@ class CFSpecs(object):
             Not only format attribute, but also rename arrays,
             thus making a copies.
         specialize: bool
-            Does not use the CF name for renaming, but the second name
-            as list in specs, which is generally a specialized one,
+            Does not use the CF name for renaming, but the first name
+            as listed in specs, which is generally a specialized one,
             like a name adopted by specialized dataset.
         attrs: bool, dict
             If False, does not change attributes at all.
@@ -1544,8 +1548,12 @@ class _CFCatSpecs_(object):
                 "axis",
                 "units",
             ):
-                if attr in specs and specs[attr] and attr[0] == sm:
-                    match_specs[attr] = specs[attr]
+                if attr[0] != sm:
+                    continue
+                if attr == "name" and "name" in specs:
+                    match_specs["name"] = [name] + specs["name"]
+                elif "attrs" in specs and attr in specs["attrs"]:
+                    match_specs[attr] = specs["attrs"][attr]
         return match_specs
 
     def match(self, da, name=None, loc="any"):
@@ -1555,7 +1563,7 @@ class _CFCatSpecs_(object):
         ----------
         da: xarray.DataArray
         name: str, dict, None
-            Cf name.
+            CF name.
             If None, all names are used.
             If a dict, name is interpreted as an explicit set of
             specifications.
@@ -1698,28 +1706,29 @@ class _CFCatSpecs_(object):
         """
 
         # Get specs
-        specs = self.get_specs(name, errors=errors) or {}
+        specs = self.get_specs(name, errors=errors)
+        if not specs:
+            return {}
 
         # Which attributes
-        attrs = {}
         if exclude is None:
             exclude = []
         elif isinstance(exclude, str):
             exclude = [exclude]
-        exclude.extend(self.attrs_exclude)
+        # exclude.extend(self.attrs_exclude)
         exclude.extend(extra.keys())
         exclude = set(exclude)
-        keys = set(self.attrs_first)
-        set(specs.keys())
+        keys = set(specs["attrs"].keys())
         keys -= exclude
         if select:
             keys = keys.intersection(select)
 
         # Loop
-        for key in keys:
+        attrs = {}
+        for key in specs["attrs"].keys():
 
             # No lists or tuples
-            value = specs[key]
+            value = specs["attrs"][key]
             if isinstance(value, list):
                 if len(value) == 0:
                     continue
@@ -1746,8 +1755,8 @@ class _CFCatSpecs_(object):
         name: str, xarray.DataArray
             Either a cf name or a data array
         specialize: bool
-            Does not use the CF name for renaming, but the second name
-            as list in specs, which is generally a specialized one,
+            Does not use the CF name for renaming, but the first name
+            as listed in specs, which is generally a specialized one,
             like a name adopted by specialized dataset.
         loc: str, None
             Format it at this location
@@ -1760,8 +1769,8 @@ class _CFCatSpecs_(object):
             name = self.match(name)
         if name is None:
             return
-        names = self[name]["name"][:2]
-        name = names[-1 if specialize else 0]
+        if specialize and self[name]["name"]:
+            name = self[name]["name"][0]
         return self.sglocator.format_attr("name", name, loc=loc)
 
     def format_dataarray(self, da, name=None, loc=None, rename=True,
@@ -1788,9 +1797,9 @@ class _CFCatSpecs_(object):
         replace_attrs: bool
             Replace existing attributes?
         standardize: bool
-        specialized: bool
-            Does not use the CF name for renaming, but the second name
-            as list in specs, which is generally a specialized one,
+        specialize: bool
+            Does not use the CF name for renaming, but the first name
+            as listed in specs, which is generally a specialized one,
             like a name adopted by specialized dataset.
         rename_dim: bool
             For a 1D array, rename the dimension if it has the same name
@@ -1820,17 +1829,14 @@ class _CFCatSpecs_(object):
                 return
             return da.copy() if copy else None
         assert name in self.names
-        cf_name = new_name = name
         old_name = da.name
-        if specialize:
-            specs = self.get_specs(cf_name)
-            new_name = specs["name"][:2][-1]
-            print('hereeee', new_name)
+        cf_name = name
+        new_name = self.get_name(name, specialize=specialize)
 
         # Attributes
         if attrs is True:
             attrs = self.get_attrs(
-                name, loc=None, standardize=False, multi=True)
+                cf_name, loc=None, standardize=False, multi=True)
         elif not attrs:
             attrs = {}
 
@@ -1848,7 +1854,7 @@ class _CFCatSpecs_(object):
 
         # Return renaming name not renaming
         if not rename:
-            return self.sglocator.merge_attr("name", da.name, new_name, loc)
+            return self.sglocator.merge_attr("name", old_name, new_name, loc)
 
         # Rename dim if axis coordinate
         rename_dim = rename and rename_dim
@@ -1871,8 +1877,8 @@ class _CFCatSpecs_(object):
         name: str, None
             A CF name. If not provided, it guessed with :meth:`match`.
         specialize: bool
-            Does not use the CF name for renaming, but the second name
-            as list in specs, which is generally a specialized one,
+            Does not use the CF name for renaming, but the first name
+            as listed in specs, which is generally a specialized one,
             like a name adopted by specialized dataset.
         loc: str, {"any", None}, {"", False}
             - str: one of these locations
@@ -1933,7 +1939,7 @@ class CFCoordSpecs(_CFCatSpecs_):
         else:
             cfname = self.match(coord)
             if cfname:
-                axis = self[cfname]["axis"]
+                axis = self[cfname]["attrs"]["axis"]
         if axis is not None:
             if lower:
                 return axis.lower()
