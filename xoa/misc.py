@@ -492,7 +492,9 @@ def dict_filter(
     return kwout
 
 
-def dict_merge(*dd, **kwargs):
+def dict_merge(*dd, mergesubdicts=True, mergelists=False, mergetuples=False,
+               uniquify=False, skipnones=True, overwriteempty=False, cls=None,
+               **kwargs):
     """Merge dictionaries
 
     First dictionaries have priority over next
@@ -504,18 +506,17 @@ def dict_merge(*dd, **kwargs):
         Those who are not dictionaries are skipped.
     mergesubdicts: optional
         Also merge dictionary items
-        (like in a tree) [default: True].
+        (like in a tree).
     mergetuples: optional
-        Also merge tuple items [default: False].
+        Also merge tuple items.
     mergelists: optional
-        Also merge list items [default: False].
-    unique: optional
-        Uniquify lists and tuples [default: True].
+        Also merge list items.
+    uniquify: optional
+        Uniquify lists and tuples.
     skipnones: optional
-        Skip Nones [default: True].
-    skipempty: optional
-        Skip everything is not converted to False
-        using bool [default: False].
+        Skip Nones.
+    overwriteempty: optional
+        Overwrite value that does are not True when converted to bool.
     cls: optional
         Class to use. Default to the first class found in arguments
         that is not a :class:`dict`, else defaults to :class:`dict`.
@@ -532,13 +533,6 @@ def dict_merge(*dd, **kwargs):
 
     """
     # Options
-    mergesubdicts = kwargs.get("mergesubdicts", True)
-    mergelists = kwargs.get("mergelists", False)
-    mergetuples = kwargs.get("mergetuples", False)
-    unique = kwargs.get("unique", True)
-    skipnones = kwargs.get("skipnones", True)
-    overwriteempty = kwargs.get("overwriteempty", False)
-    cls = kwargs.get("cls")
     dd = [_f for _f in dd if _f]
 
     # Get the class
@@ -561,6 +555,14 @@ def dict_merge(*dd, **kwargs):
         outd = Section(d.parent, d.depth, d.main, name=d.name)
     else:
         outd = cls()
+    kwargs.update(
+        mergesubdicts=mergesubdicts,
+        mergelists=mergelists,
+        mergetuples=mergetuples,
+        uniquify=uniquify,
+        skipnones=skipnones,
+        overwriteempty=overwriteempty,
+        cls=cls)
 
     # Loop
     for d in dd:
@@ -588,8 +590,8 @@ def dict_merge(*dd, **kwargs):
                 and isinstance(val, list)
             ):
                 outd[key] += val
-                if unique:
-                    outd[key] = list(set((outd[key])))
+                if uniquify:
+                    outd[key] = gunique(list(outd[key]))
             # Merge tuples
             elif (
                 mergetuples
@@ -597,8 +599,8 @@ def dict_merge(*dd, **kwargs):
                 and isinstance(val, tuple)
             ):
                 outd[key] += val
-                if unique:
-                    outd[key] = tuple(set(outd[key]))
+                if uniquify:
+                    outd[key] = tuple(gunique(outd[key]))
 
     # Comments for ConfigObj instances
     if cls is ConfigObj:
@@ -697,6 +699,32 @@ def match_attrs(obj, checks, ignorecase=True, transform=None):
         ):
             return True
     return False
+
+
+def gunique(seq):
+    """Create a generator that yields unique item whlist presrving the order
+
+    Parameters
+    ----------
+    seq: sequence
+
+    Yields
+    ------
+    item
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        from xoa.misc import uniquify
+        print(list([1, 6, 1, 8]))
+    """
+    seen = set()
+    seen_add = seen.add
+    for x in seq:
+        if not (x in seen or seen_add(x)):
+            yield x
 
 
 class ArgList(object):

@@ -51,3 +51,41 @@ def test_misc_choices():
     choices = misc.Choices(['a', 'bb', 'c'])
     assert choices['a'] == 'a'
     assert choices['C'] == 'c'
+
+
+def test_misc_dict_merge():
+    dict0 = {'inherit': 'ptemp', 'name': ['temperature'], 'domain': 'generic',
+             'cmap': None, 'squeeze': None, 'search_order': 'sn',
+             'attrs': {'standard_name': ['sea_water_temperature'],
+                       'long_name': ['Temperature'],
+                       'units': []},
+             'select': {}, "mytup": ('aa',)}
+    dict1 = {'cmap': 'cmo.thermal', 'name': [], 'domain': 'generic',
+             'inherit': None, 'squeeze': None, 'search_order': 'sn',
+             'attrs': {'standard_name': ['sea_water_potential_temperature'],
+                       'long_name': ['Potential temperature'],
+                       'units': ['degrees_celsius']},
+             'select': {}, 'processed': True, "mytup": ('bb',)}
+
+    expected = {'inherit': 'ptemp', 'name': ['temperature'],
+                'domain': 'generic', 'cmap': 'cmo.thermal',
+                'squeeze': None, 'search_order': 'sn',
+                'attrs': {'standard_name': ['sea_water_temperature',
+                                            'sea_water_potential_temperature'
+                                            ],
+                          'long_name': ['Temperature',
+                                        'Potential temperature'
+                                        ],
+                          'units': ['degrees_celsius']},
+                'select': {}, 'mytup': ('aa', 'bb'), 'processed': True}
+
+    dict01 = misc.dict_merge(
+        dict0, dict1,
+        mergesubdicts=True,
+        mergelists=True,
+        mergetuples=True,
+        skipnones=False,
+        overwriteempty=True,
+        uniquify=False)
+
+    assert dict01 == expected
