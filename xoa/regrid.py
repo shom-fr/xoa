@@ -38,7 +38,7 @@ from .__init__ import XoaError
 from . import misc
 from . import coords
 from . import grid
-from . import _interp
+from . import interp
 
 
 class XoaRegridError(XoaError):
@@ -50,7 +50,8 @@ class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     #: Linear iterpolation (default)
     linear = 1
     interp = 1  # compat
-    # nearest = 0
+    #: Nearest iterpolation
+    nearest = 0
     #: Cubic iterpolation
     cubic = 2
     #: Hermitian iterpolation
@@ -142,7 +143,7 @@ def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
         func_kwargs.update(yi=yi, yo=yo, method=method)
     # if method != regrid1d_methods.cellerr:
     #     func_kwargs["extrap"] = extrap
-    func = getattr(_interp, func_name)
+    func = getattr(interp, func_name)
 
     # Regrid
     varo = func(**func_kwargs)
