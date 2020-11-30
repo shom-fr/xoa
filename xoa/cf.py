@@ -727,9 +727,11 @@ class CFSpecs(object):
         return self._cfgspecs
 
     def __getitem__(self, section):
-        assert section in self._dict
         if section in self.categories:
             return self._cfs[section]
+        for cat in self.categories:
+            if section in self._cfs[cat]:
+                return self._cfs[cat][section]
         return self._dict[section]
 
     def __contains__(self, category):
@@ -1374,19 +1376,17 @@ class CFSpecs(object):
         if not single:
             return found
 
-    def get(self, dsa, name):
+    def get(self, dsa, name, get="obj"):
         """A shortcut to :meth:`search` with an explicit name
 
-        A single element is searched for.
-
-        Look into all :attr:`categories` and raise and error
-        if nothing is found.
+        A single element is searched for into all :attr:`categories`
+        and errors are ignored.
         """
-        da = self.search(dsa, name, errors="ignore", single=True)
-        if da is None:
-            raise XoaCFError("Search failed for the following cf name: "
-                             + name)
-        return da
+        return self.search(dsa, name, errors="ignore", single=True, get=get)
+        # if da is None:
+        #     raise XoaCFError("Search failed for the following cf name: "
+        #                      + name)
+        # return da
 
     @ERRORS.format_method_docstring
     def get_dims(self, da, dim_types, allow_positional=False,
@@ -1606,6 +1606,7 @@ class _CFCatSpecs_(object):
                         return True if name else name_
         return False if name else None
 
+    @ERRORS.format_method_docstring
     def search(self, dsa, name=None, loc="any", get="obj", single=True,
                errors="raise"):
         """Search for a data_var or coord that maches given or any specs
@@ -1615,17 +1616,17 @@ class _CFCatSpecs_(object):
         dsa: DataArray or Dataset
         name: str, dict
             A CF name. If not provided, all CF names are scaned.
-        loc: str, {"any", None}, {"", False}
+        loc: str, {{"any", None}}, {{"", False}}
             - str: one of these locations
             - None or "any": any
             - False or '"": no location
-        get: {"obj", "name"}
+        get: {{"obj", "name"}}
             When found, get the object found or its name.
         single: bool
             If True, return the first item found or None.
             If False, return a possible empty list of found items.
             A warning is emitted when set to True and multiple item are found.
-        errors: {"raise", "ignore"}
+        {errors}
 
         Returns
         -------
@@ -1670,8 +1671,11 @@ class _CFCatSpecs_(object):
         # Return
         if not single:
             return found
-        if len(found) > 1:
-            xoa_warn("Multiple items found while you requested a single one")
+        if errors != "ignore" and len(found) > 1:
+            msg = "Multiple items found while you requested a single one"
+            if errors == "raise":
+                raise XoaCFError(msg)
+            xoa_warn(msg)
         if found:
             return found[0]
 
@@ -1679,6 +1683,7 @@ class _CFCatSpecs_(object):
         """Call to :meth:`search` with an explicit name and ignoring errors"""
         return self.search(dsa, name, errors="ignore")
 
+    @ERRORS.format_method_docstring
     def get_attrs(
         self, name, select=None, exclude=None, errors="warn", loc=None,
         multi=False, standardize=True, **extra
@@ -1697,6 +1702,7 @@ class _CFCatSpecs_(object):
         multi: bool
             Get standard_name and long_name attribute as a list of possible
             values
+        {errors}
         **extra
           Extra params as included as extra attributes
 
@@ -2422,166 +2428,3 @@ def get_cf_specs(name=None, category=None, cache="rw"):
     for ss in toscan:
         if name in ss:
             return ss[name]
-
-
-# def get_cf_coord_specs(name=None):
-#     """Shortcut to ``get_cf_specs(name=name, category='coords')``"""
-#     return get_cf_specs(name=name, category="coords")
-
-
-# def get_cf_var_specs(name=None):
-#     """Shortcut to ``get_cf_specs(name=name, category='data_vars')``"""
-#     return get_cf_specs(name=name, category="data_vars")
-
-
-class _CFAccessor_(object):
-    _search_category = None
-
-    def __init__(self, dsa):
-        self._cfspecs = get_cf_specs()
-        self._dsa = dsa
-        self._coords = None
-        self._data_vars = None
-        self._cache = {}
-
-    def set_cf_specs(self, cfspecs):
-        """Set the :class:`CFSpecs` using by this accessor"""
-        assert isinstance(cfspecs, CFSpecs)
-        self._cfspecs = cfspecs
-
-    def get(self, name, loc="any", single=True):
-        """Search for a CF item with :meth:`CFSpecs.search`"""
-        kwargs = dict(name=name, loc=loc, get="obj", single=single,
-                      errors="ignore")
-        if self._search_category is None:
-            return self._cfspecs.search(self._dsa, **kwargs)
-        return self._cfspecs[self._search_category].search(self._dsa, **kwargs)
-
-    def get_coord(self, name, loc="any", single=True):
-        """Search for a CF coord with :meth:`CFCoordSpecs.search`"""
-        return self._cfspecs.coords.search(
-            self._dsa, name=name, loc=loc, get="obj", single=single,
-            errors="ignore")
-
-    def __getattr__(self, name):
-        return self.get(name)
-
-    def __getitem__(self, name):
-        return self.get(name)
-
-    def auto_format(self, loc=None, standardize=True):
-        """Auto-format attributes with :meth:`CFSpecs.auto_format`"""
-        return self._cfspecs.auto_format(self._dsa, loc=loc,
-                                         standardize=standardize)
-
-    __call__ = auto_format
-
-    def fill_attrs(self, loc=None, standardize=True):
-        """Fill attributes with :meth:`CFSpecs.fill_attrs`"""
-        return self._cfspecs.fill_attrs(self._dsa, loc=loc,
-                                        standardize=standardize)
-
-    @property
-    def coords(self):
-        """Sub-accessor for coords only"""
-        if self._coords is None:
-            self._coords = _CoordAccessor_(self._dsa)
-            self._coords.set_cf_specs(self._cfspecs)
-        return self._coords
-
-    @property
-    def data_vars(self):
-        """Sub-accessor for data_vars only"""
-        if self._data_vars is None:
-            self._data_vars = _DataVarAccessor__(self._dsa)
-            self._data_vars.set_cf_specs(self._cfspecs)
-        return self._data_vars
-
-
-class _CoordAccessor_(_CFAccessor_):
-    _search_category = 'coords'
-
-    @property
-    def dim(self):
-        try:
-            return self._cfspecs.coords.search_dim(self._dsa)[0]
-        except XoaError:
-            return
-
-    def get_dim(self, dim_type):
-        dim_type = dim_type.lower()
-        if not hasattr(self, '_dims'):
-            self._dims = {}
-            if dim_type not in self._dims:
-                self._dims[dim_type] = self._cfspecs.coords.search_dim(
-                    self._dsa, dim_type)
-        return self._dims[dim_type]
-
-    @property
-    def xdim(self):
-        return self.get_dim("x")
-
-    @property
-    def ydim(self):
-        return self.get_dim("y")
-
-    @property
-    def zdim(self):
-        return self.get_dim("z")
-
-    @property
-    def tdim(self):
-        return self.get_dim("t")
-
-    @property
-    def fdim(self):
-        return self.get_dim("f")
-
-
-class _DataVarAccessor__(_CFAccessor_):
-    _search_category = "data_vars"
-
-
-class DatasetCFAccessor(_CFAccessor_):
-    pass
-
-
-class DataArrayCFAccessor(_CoordAccessor_):
-
-    @property
-    def name(self):
-        if 'name' not in self._cache:
-            category, name = self._cfspecs.match(self._dsa)
-            self._cache["category"] = category
-            self._cache["name"] = name
-        return self._cache["name"]
-
-    @property
-    def attrs(self):
-        if "attrs" not in self._cache:
-            if self.name:
-                cf_attrs = self._cfspecs[self._cache["category"]].get_attrs(
-                    self._cache["name"], multi=True)
-                self._cache["attrs"] = self._cfspecs.sglocator.patch_attrs(
-                    self._dsa.attrs, cf_attrs)
-            else:
-                self._cache["attrs"] = {}
-        return self._cache["attrs"]
-
-    def __getattr__(self, attr):
-        if self.name and self.attrs and attr in self.attrs:
-            return self._cache["attrs"][attr]
-        return _CoordAccessor_.__getattr__(self, attr)
-
-
-def register_cf_accessors(name='cf'):
-    """Register xarray accessors"""
-    # cfspecs = cfspecs or get_cf_specs()
-    # name = cfspecs['accessors']['name']
-    import xarray as xr
-    with warnings.catch_warnings():
-        warnings.simplefilter(
-            "ignore",
-            xr.core.extensions.AccessorRegistrationWarning)
-        xr.register_dataarray_accessor(name)(DataArrayCFAccessor)
-        xr.register_dataset_accessor(name)(DatasetCFAccessor)

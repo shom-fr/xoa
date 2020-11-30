@@ -51,9 +51,9 @@ __project__ = "xoa"
 __version__ = "0.1.0"
 __release__ = "0"
 __date__ = "2020-02-04"
-__author__ = "Shom/Ifremer/Actimar"
-__email__ = "stephane.raynaud@shom.fr, charria@ifremer.fr, wilkins@actimar.fr"
-__copyright__ = "Copyright (c) 2020 Shom/Ifremer/Actimar"
+__author__ = "Shom"
+__email__ = "stephane.raynaud@shom.fr"
+__copyright__ = "Copyright (c) 2020 Shom"
 __description__ = __doc__
 
 _RE_OPTION_MATCH = re.compile(r"^(\w+)\W(\w+)$").match
@@ -437,7 +437,7 @@ def get_data_sample(filename=None):
 
         @suppress
         from xoa import get_data_sample
-        get_data_sample("croco.south-africa.nc")
+        get_data_sample("croco.south-africa.surf.nc")
         get_data_sample()
 
     See also
@@ -509,11 +509,13 @@ def show_data_samples():
     print(' '.join(get_data_sample()))
 
 
-def register_accessors(cf=True, sigma=True):
+def register_accessors(xoa=True, cf=False, sigma=False):
     """Register xarray accessors
 
     Parameters
     ----------
+    xoa: bool, str
+        Register the main accessors
     cf: bool, str
         Register the :mod:`xoa.cf` accessors
     sigma: bool, str
@@ -521,14 +523,17 @@ def register_accessors(cf=True, sigma=True):
 
     See also
     --------
-    xoa.cf.register_cf_accessors
-    xoa.sigma.register_sigma_accessor
+    xoa.accessors
     """
+    if xoa:
+        from .accessors import register_xoa_accessors
+        kw = {"name": cf} if isinstance(cf, str) else {}
+        register_xoa_accessors(**kw)
     if cf:
-        from .cf import register_cf_accessors
+        from .accessors import register_cf_accessors
         kw = {"name": cf} if isinstance(cf, str) else {}
         register_cf_accessors(**kw)
     if sigma:
-        from .sigma import register_sigma_accessor
+        from .accessors import register_sigma_accessor
         kw = {"name": sigma} if isinstance(sigma, str) else {}
         register_sigma_accessor()
