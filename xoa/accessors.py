@@ -69,10 +69,10 @@ class _CFAccessor_(object):
             errors="ignore")
 
     def __getattr__(self, name):
-        return self.get(name, errors="raise")
+        return self.get(name, errors="warn")
 
     def __getitem__(self, name):
-        return self.get(name, errors="raise")
+        return self.get(name, errors="warn")
 
     def auto_format(self, loc=None, standardize=True):
         """Auto-format attributes with :meth:`CFSpecs.auto_format`"""

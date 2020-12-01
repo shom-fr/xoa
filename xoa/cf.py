@@ -797,8 +797,8 @@ class CFSpecs(object):
 
         # Updates valid dimensions
         for name, coord_specs in self._dict['coords'].items():
-            if coord_specs['axis']:
-                axis = coord_specs['axis'].lower()
+            if coord_specs["attrs"]["axis"]:
+                axis = coord_specs["attrs"]['axis'].lower()
                 names = [name] + coord_specs['name']
                 self._dict['dims'][axis].extend(names)
 
@@ -1954,12 +1954,12 @@ class CFCoordSpecs(_CFCatSpecs_):
     def get_dim_type(self, dim, da=None, lower=True):
         """Get the type of a dimension
 
-        Two cases:
+        Three cases:
         - This dimension is registered in CF dims.
         - da has dim as dim and has an axis attribute inferred with
-           :meth:`get_axis`.
+          :meth:`get_axis`.
         - da has a coord named dim with an axis attribute inferred with
-           :meth:`get_axis`.
+          :meth:`get_axis`.
 
         Parameters
         ----------
@@ -1995,15 +1995,15 @@ class CFCoordSpecs(_CFCatSpecs_):
             if dim not in da.dims:
                 raise XoaCFError(f"dimension '{dim}' does not belong to da")
 
-            # Check da axis itself
-            axis = self.get_axis(da, lower=True)
-            if axis:
-                return axis
-
             # Check axis from coords
             for name, coord in da.coords.items():
                 if name == dim:
                     return self.get_axis(coord, lower=True)
+
+            # Check da axis itself
+            axis = self.get_axis(da, lower=True)
+            if axis:
+                return axis
 
     def get_dim_types(self, da, unknown=None, asdict=False):
         """Get a tuple of the dimension types of an array
@@ -2084,16 +2084,13 @@ class CFCoordSpecs(_CFCatSpecs_):
                     return dim
                 continue
 
-            # Any dim_type but no ambiguity
-            if dim_type:
-
-                # Same as da
-                if this_dim_type and this_dim_type == dim_type:
-                    return dim, dim_type
+            # Any dim_type but no ambiguity because same as da
+            elif dim_type and this_dim_type and this_dim_type == dim_type:
+                return dim, dim_type
 
         # Not found but only 1d and no dim_type specified
-        if da.ndim == 1 and this_dim_type is None:
-            return dim, dim_type
+        if da.ndim == 1 and not with_dim_type:
+            return dim, this_dim_type
 
         # Failed
         if with_dim_type:
