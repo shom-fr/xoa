@@ -78,7 +78,7 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
 
 
 def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
-             conserv=False, extrap=0):
+             conserv=False, extrap=0, bias=0., tension=0.):
     """Regrid along a single dimension
 
     The input and output coordinates may vary along other dimensions,
@@ -124,29 +124,26 @@ def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
     yi = dfl.coord_in_data
     yo = dfl.coord_out_data
     func_kwargs = {"vari": dfl.da_in_data}
-    if dfl.coord_in_data.shape[0] == dfl.coord_out_data.shape[0] == 1:  # 1d
-        yi = yi.reshape(-1)
-        yo = yo.reshape(-1)
-    else:
+    # if not (dfl.coord_in_data.shape[0] == dfl.coord_out_data.shape[0] == 1):  # 1d
         # if method == regrid1d_methods.cellerr:
         #     raise XoaRegridError("cellerr regrid method is works only "
         #                          "with 1D input and output cordinates")
-        if dfl.coord_out_data.shape[0] > 1:  # nd -> nd
-            func_name += 'xx'
-        else:  # nd -> 1d
-            func_name += 'x'
-            yo = yo.reshape(-1)
-    if method < 0:
+    if int(method) < 0:
         func_kwargs.update(yib=grid.get_edges_1d(yi, axis=-1),
                            yob=grid.get_edges_1d(yo, axis=-1))
     else:
-        func_kwargs.update(yi=yi, yo=yo, method=method)
-    # if method != regrid1d_methods.cellerr:
-    #     func_kwargs["extrap"] = extrap
+        func_kwargs.update(yi=yi, yo=yo)
     func = getattr(interp, func_name)
+    if method == "hermit":
+        func_kwargs.update(bias=bias, tension=tension)
 
     # Regrid
     varo = func(**func_kwargs)
+
+    # Extrap
+    extrap = extrap_modes[extrap]
+    if extrap != "no":
+        varo = interp.extrap1d(varo, extrap)
 
     # Reform back
     return dfl.get_back(varo)
