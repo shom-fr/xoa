@@ -36,3 +36,42 @@ def test_filter_generate_kernel(kernel, data, oshape, odims, osum):
     assert okernel.shape == oshape
     assert okernel.dims == odims
     np.testing.assert_allclose(okernel.data.sum(), osum)
+
+
+def test_convolve():
+
+    da = xr.DataArray(np.ones((5, 5)), dims=('ny', 'nx'))
+    da[2, 2] = np.nan
+
+    dac = xfilter.convolve(da, 3, normalize=True)
+    np.testing.assert_allclose(dac.data, np.ones(da.shape))
+
+    dac = xfilter.convolve(da, 3, normalize=False)
+    assert dac.sum() == 100
+
+
+def test_erode_mask():
+
+    da_in = da3d.copy()
+    nt, ny, nx = da_in.shape
+    da_in[:, int(ny/3):int(2*ny/3), int(nx/3):int(2*nx/3)] = np.nan
+
+    # iteration
+    da_out = xfilter.erode_mask(da_in, 2)
+    assert int(da_out.sum()) == -25
+    assert int(da_out.count()) == 69930
+
+    # check average
+    da_out = xfilter.erode_mask(da_in*0+1, 2)
+    assert da_out.mean() == 1
+
+    # until mask
+    mask = np.zeros((ny, nx), dtype='?')
+    ny2 = int(ny/2)
+    nx2 = int(nx/2)
+    xpad = int(nx/10)
+    ypad = int(ny/10)
+    mask[ny2-ypad:ny2+ypad+1, nx2-xpad:nx2+xpad+1] = True
+    da_out = xfilter.erode_mask(da_in, mask)
+    assert int(da_out.sum()) == -21
+    assert int(da_out.count()) == 72570

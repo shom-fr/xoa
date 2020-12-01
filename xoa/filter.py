@@ -459,10 +459,10 @@ def shapiro_kernel(dims):
     .. ipython:: python
 
         @suppress
-        from xoa.filter import shapiro
-        shapiro('nx')
-        shapiro(('ny', 'nx'))
-        shapiro(('nt', 'ny', 'nx'))
+        from xoa.filter import shapiro_kernel
+        shapiro_kernel('nx')
+        shapiro_kernel(('ny', 'nx'))
+        shapiro_kernel(('nt', 'ny', 'nx'))
 
     """
     if isinstance(dims, str):
@@ -491,18 +491,19 @@ def _convolve_(data, kernel, normalize):
 
     # Convolutions
     cdata = ss.convolve(data, kernel, mode='same')
-    if normalize:
+    if normalize or with_mask:
         weights = ss.convolve((~bad).astype('i'), kernel, mode='same')
         weights = np.clip(weights, 0, kernel.sum())
 
     # Weigthing and masking
+    if with_mask:
+        bad = np.isclose(weights, 0)
     if normalize:
         if with_mask:
-            bad = np.isclose(weights, 0)
             weights[bad] = 1
         cdata /= weights
     if with_mask:
-        cdata[bad] = np.nan
+        cdata[bad.data] = np.nan
     return cdata
 
 
@@ -559,15 +560,43 @@ def convolve(data, kernel, normalize=False):
     return xr.DataArray(datac, coords=data.coords, attrs=data.attrs)
 
 
+def _get_xydims_(data, xdim, ydim):
+    if xdim is None:
+        xdim = get_dims(
+            data, 'x', allow_positional=True, errors="raise")[0]
+    if ydim is None:
+        ydim = get_dims(
+            data, 'y', allow_positional=True, errors="raise")[0]
+    return xdim, ydim
+
+
+def _reduce_mask_(data, excluded_dims):
+    rmask = data.isnull()
+    for dim in set(data.dims) - set(excluded_dims):
+        rmask = rmask.any(dim=dim)
+    return rmask
+
+
+def _convolve_and_fill_(data, kernel):
+    return data.fillna(convolve(data, kernel, normalize=True))
+
+
 def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
     """Erode the horizontal mask using smoothing
+
+    Missing values are filled with the smoothed field in a iterative way.
+    Two cases:
+
+        - Erode a fixed number of times.
+        - Erode the data mask until there is no missing value where
+          a given horirizontal mask is False.
 
     Parameter
     ---------
     data: xarray.DataArray
         Array of at least 2 dimensions, that are supposed to be horizontal.
     until: array_like, int
-        Either a 2D minimal mask, or a max number of iteration.
+        Either a minimal mask, or a max number of iteration.
     kernel:
         Defaults to a :func:`shapiro <shapiro_kernel>` kernel.
         In this case, ``xdim`` and ``ydim`` can be set to the
@@ -581,7 +610,7 @@ def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
         along x and y dimensions.
     """
 
-    if data.dim < 2:
+    if data.ndim < 2:
         raise XoaError("input array must have at least 2 dimensions")
 
     # Iteration or mask
@@ -591,39 +620,35 @@ def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
     else:
         mask = until
         if isinstance(mask, np.ndarray):
+            xdim, ydim = _get_xydims_(data, xdim, ydim)
             if mask.ndim > 2:
                 raise XoaError("mask must be two-dimensional")
-            if xdim is None:
-                xdim = get_dims(
-                    data, 'x', allow_positional=True, errors="raise")
-            if ydim is None:
-                ydim = get_dims(
-                    data, 'y', allow_positional=True, errors="raise")
-            mask = xr.DatArray(mask, dims=(ydim, xdim))
+            mask = xr.DataArray(mask, dims=(ydim, xdim))
         if not set(mask.dims).issubset(data.dims):
             raise XoaError('mask dims must be a subset of data dims')
-        mask = transpose(kernel, data, mode="compat")
+        print('maskdddddddfd', mask.dtype)
+        mask = transpose(mask, data, mode="compat")
 
     # Kernel
     if kernel is None:
-        if xdim is None:
-            xdim = get_dims(data, 'x', allow_positional=True, errors="raise")
-        if ydim is None:
-            ydim = get_dims(data, 'y', allow_positional=True, errors="raise")
-        kernel = shapiro((ydim, xdim))
+        xdim, ydim = _get_xydims_(data, xdim, ydim)
+        kernel = shapiro_kernel((ydim, xdim))
     kernel = generate_kernel(kernel, data)
-    if mask.ndim > 2:
-        raise XoaError("kernel must be two-dimensional")
+    kdims = kernel.squeeze().dims
+    if len(kdims) > 2:
+        raise XoaError("Kernel must be two-dimensional")
 
     # Filter
-    if mask is None:
-        def to2dmask(data):
-            mask2d = np.isnan(data.values).
-            for dim in
-        while
+    if mask is not None:
+        nmask_min = int(mask.sum())
+        nmask = np.inf
+        while nmask > nmask_min:
+            data = _convolve_and_fill_(data, kernel)
+            rmask = _reduce_mask_(data, kdims)
+            nmask = (mask | rmask).sum()
+    else:
+        for i in range(niter):
+            data = _convolve_and_fill_(data, kernel)
 
-    for i in range(niter):
-        datac = convolve(data, kernel)
-        data = xr.where(np.isnan(data), datac, data)
     return data
 
