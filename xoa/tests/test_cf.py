@@ -599,8 +599,9 @@ def test_cf_cfspecs_coords_search_dim():
     # subcoords
     level = xr.DataArray(np.arange(2), dims='level')
     depth = xr.DataArray(np.arange(2*3).reshape(2, 3),
-                         dims=('level', 'x'), name='depth',
-                         coords={'level': level})
+                         dims=('level', 'lon'), name='depth',
+                         coords={'level': level,
+                                 'lon': [3, 4, 5]})
     assert cfspecs.search_dim(depth) == ('level', 'z')
     assert cfspecs.search_dim(depth.level) == ('level', 'z')
     depth = depth.rename(level='aa')
@@ -660,28 +661,30 @@ def test_cf_cfspecs_coords_get_dims():
 
 
 def test_cf_dataarraycfaccessor():
+    from xoa.accessors import CFDataArrayAccessor
     with warnings.catch_warnings():
         warnings.simplefilter(
             "ignore",
             xr.core.extensions.AccessorRegistrationWarning)
-        xr.register_dataarray_accessor('cf')(cf.DataArrayCFAccessor)
+        xr.register_dataarray_accessor('cfd')(CFDataArrayAccessor)
 
     lon = xr.DataArray(range(5), dims='xxx', name='xxx',
                        attrs={'standard_name': 'longitude'})
     temp = xr.DataArray(range(20, 25), dims='xxx',
                         coords={'xxx': lon}, name='temp')
 
-    assert temp.cf.lon.name == 'xxx'
-    assert temp.cf.lat is None
-    assert temp.cf.lon.cf.name == "lon"
+    assert temp.cfd.lon.name == 'xxx'
+    assert temp.cfd.lat is None
+    assert temp.cfd.lon.cfd.name == "lon"
 
 
 def test_cf_datasetcfaccessor():
+    from xoa.accessors import CFDatasetAccessor
     with warnings.catch_warnings():
         warnings.simplefilter(
             "ignore",
             xr.core.extensions.AccessorRegistrationWarning)
-        xr.register_dataset_accessor('cf')(cf.DatasetCFAccessor)
+        xr.register_dataset_accessor('cfd')(CFDatasetAccessor)
 
     lon = xr.DataArray(range(5), dims='xxx', name='xxx',
                        attrs={'standard_name': 'longitude'})
@@ -690,5 +693,5 @@ def test_cf_datasetcfaccessor():
                         attrs={'standard_name': 'sea_water_temperature'})
 
     ds = temp.to_dataset()
-    assert ds.cf.temp.name == 'yoyo'
-    assert ds.cf.sal is None
+    assert ds.cfd.temp.name == 'yoyo'
+    assert ds.cfd.sal is None
