@@ -7,34 +7,34 @@ import numpy as np
 
 from xoa import interp
 
-from time import time
-import matplotlib.pyplot as plt
-
 CACHE = {}
 
 
 def vfunc(t=0, z=0, y=0, x=0):
     return 1.13*x + 2.35*y + 3.24*z - 0.65*t
 
-def getinterp1d_data():
+
+def get_interp1d_data(yimin=-1000., yimax=0., yomin=-1200., yomax=100.,
+                      irregular=True):
 
     if "interp1d" not in CACHE:
 
         np.random.seed(0)
 
         # coords
-        nx = 2
-        nyi = 10
-        nyo = 30
-        yi = np.linspace(-1000., 0., nyi)
-        yo = np.linspace(-1200, 100, nyo)
+        nx = 17
+        nyi = 15
+        nyo = 25
+        yi = np.linspace(yimin, yimax, nyi)
+        yo = np.linspace(yomin, yomax, nyo)
         x = np.linspace(0, 700, nx)
-        dyi = (yi[1]-yi[0])*0.49
         yyi = np.resize(yi, (nx, nyi))
-        yyi += np.random.uniform(-dyi, dyi, (nx, nyi))
-        dyo = (yo[1]-yo[0])*0.49
         yyo = np.resize(yo, (nx, nyo))
-        yyo += +np.random.uniform(-dyo, dyo, (nx, nyo))
+        if irregular:
+            dyi = (yi[1]-yi[0])*0.49
+            yyi += np.random.uniform(-dyi, dyi, (nx, nyi))
+            dyo = (yo[1]-yo[0])*0.49
+            yyo += +np.random.uniform(-dyo, dyo, (nx, nyo))
         xxi = np.resize(x, (nyi, nx)).T
         xxo = np.resize(x, (nyo, nx)).T
 
@@ -48,7 +48,7 @@ def getinterp1d_data():
     return CACHE["interp1d"]
 
 
-def testinterp_linear4dto1dxx():
+def _test_interp_linear4dto1dxx():
     nex = 4
     nexz = 2
     nxi = 7
@@ -194,11 +194,10 @@ def testinterp_linear4dto1dxx():
     np.testing.assert_almost_equal(vointerp[0], vo_truth)
 
 
-
-def testinterp_nearest1d():
+def test_interp_nearest1d():
 
     # Get data
-    xxi, yyi, vari, xxo, yyo = getinterp1d_data()
+    xxi, yyi, vari, xxo, yyo = get_interp1d_data()
 
     # Interpolation
     varon = interp.nearest1d(vari, yyi, yyo)
@@ -209,10 +208,10 @@ def testinterp_nearest1d():
     np.testing.assert_allclose(varon_true, varon)
 
 
-def testinterp_linear1d():
+def test_interp_linear1d():
 
     # Get data
-    xxi, yyi, vari, xxo, yyo = getinterp1d_data()
+    xxi, yyi, vari, xxo, yyo = get_interp1d_data()
 
     # Interpolation
     varol = interp.linear1d(vari, yyi, yyo)
@@ -222,10 +221,10 @@ def testinterp_linear1d():
     np.testing.assert_allclose(varol_true, varol)
 
 
-def testinterp_cubic1d():
+def test_interp_cubic1d():
 
     # Get data
-    xxi, yyi, vari, xxo, yyo = getinterp1d_data()
+    xxi, yyi, vari, xxo, yyo = get_interp1d_data()
 
     # Interpolation
     varoh = interp.cubic1d(vari, yyi, yyo)
@@ -234,10 +233,10 @@ def testinterp_cubic1d():
     assert np.nanmin(varoh) >= np.nanmin(vari)
 
 
-def testinterp_cubic1d():
+def test_interp_hermit1d():
 
     # Get data
-    xxi, yyi, vari, xxo, yyo = getinterp1d_data()
+    xxi, yyi, vari, xxo, yyo = get_interp1d_data()
 
     # Interpolation
     varoh = interp.hermit1d(vari, yyi, yyo)
@@ -246,74 +245,74 @@ def testinterp_cubic1d():
     assert np.nanmin(varoh) >= np.nanmin(vari)
 
 
-def testinterp_cellave1d():
+# def test_interp_cellave1d():
 
-    # coords
-    nx = 17
-    nyi = 20
-    nyo = 12
-    yib = np.linspace(-1000., 0., nyi+1)
-    yob = np.linspace(-1200, 200, nyo+1)
-    xb = np.arange(nx+1)
-    xxib, yyib = np.meshgrid(xb, yib)
-    xxob, yyob = np.meshgrid(xb, yob)
+#     # coords
+#     nx = 17
+#     nyi = 20
+#     nyo = 12
+#     yib = np.linspace(-1000., 0., nyi+1)
+#     yob = np.linspace(-1200, 200, nyo+1)
+#     xb = np.arange(nx+1)
+#     xxib, yyib = np.meshgrid(xb, yib)
+#     xxob, yyob = np.meshgrid(xb, yob)
 
-    # input
-    u, v = np.mgrid[-3:3:nx*1j, -3:3:nyi*1j]-2
-    vari = np.asarray(u**2+v**2)
-    vari[int(nx/3):int(2*nx/3), int(nyi/3):int(2*nyi/3)] = np.nan
+#     # input
+#     u, v = np.mgrid[-3:3:nx*1j, -3:3:nyi*1j]-2
+#     vari = np.asarray(u**2+v**2)
+#     vari[int(nx/3):int(2*nx/3), int(nyi/3):int(2*nyi/3)] = np.nan
 
-    # conserv, no extrap
-    varoc = interp.cellave1d(vari, yib, yob, conserv=1, extrap=0)
-    sumi = np.nansum(vari*np.resize(np.diff(yib), vari.shape), axis=1)
-    sumo = np.nansum(varoc*np.resize(np.diff(yob), varoc.shape), axis=1)
-    np.testing.assert_allclose(sumi, sumo)
+#     # conserv, no extrap
+#     varoc = interp.cellave1d(vari, yib, yob, conserv=1, extrap=0)
+#     sumi = np.nansum(vari*np.resize(np.diff(yib), vari.shape), axis=1)
+#     sumo = np.nansum(varoc*np.resize(np.diff(yob), varoc.shape), axis=1)
+#     np.testing.assert_allclose(sumi, sumo)
 
-    # average, no extrap
-    varoa = interp.cellave1d(vari, yib, yob, conserv=0, extrap=0)
-    np.testing.assert_allclose([np.nanmin(vari), np.nanmax(vari)],
-                               [np.nanmin(vari), np.nanmax(vari)])
+#     # average, no extrap
+#     varoa = interp.cellave1d(vari, yib, yob, conserv=0, extrap=0)
+#     np.testing.assert_allclose([np.nanmin(vari), np.nanmax(vari)],
+#                                [np.nanmin(vari), np.nanmax(vari)])
 
-    # average, extrap
-    varoe = interp.cellave1d(vari, yib, yob, conserv=0, extrap=2)
-    assert not np.isnan(varoe[0]).any()
-    vv = varoa[0, ~np.isnan(varoa[0])]
-    np.testing.assert_allclose(vv[[0, -1]], varoe[0, [0, -1]])
-
-
-def testinterp_cellave1dx():
-
-    # coords
-    nx = 17
-    nyi = 20
-    nyo = 12
-    yib = np.linspace(-1000., 0., nyi+1)
-    yob = np.linspace(-1200, 200, nyo+1)
-    yyib = np.resize(yib, (nx, nyi+1))
-    dyi = (yib[1]-yib[0])*0.49
-    np.random.seed(0)
-    yyib += np.random.uniform(-dyi, dyi, yyib.shape)
-
-    # input
-    u, v = np.mgrid[-3:3:nx*1j, -3:3:nyi*1j]-2
-    vari = np.asarray(u**2+v**2)
-    vari[int(nx/3):int(2*nx/3), int(nyi/3):int(2*nyi/3)] = np.nan
-
-    # conserv, no extrap
-    varoc = interp.cellave1dx(vari, yyib, yob, conserv=1, extrap=0)
-    sumi = np.nansum(vari*np.diff(yyib, axis=1), axis=1)
-    sumo = np.nansum(varoc*np.resize(np.diff(yob), varoc.shape), axis=1)
-    np.testing.assert_allclose(sumi, sumo)
-
-    # average, no extrap
-    interp.cellave1dx(vari, yyib, yob, conserv=0, extrap=0)
-
-    # average, extrap
-    varoe = interp.cellave1dx(vari, yyib, yob, conserv=0, extrap=2)
-    assert not np.isnan(varoe[0]).any()
+#     # average, extrap
+#     varoe = interp.cellave1d(vari, yib, yob, conserv=0, extrap=2)
+#     assert not np.isnan(varoe[0]).any()
+#     vv = varoa[0, ~np.isnan(varoa[0])]
+#     np.testing.assert_allclose(vv[[0, -1]], varoe[0, [0, -1]])
 
 
-def testinterp_cellave1dxx():
+# def test_interp_cellave1dx():
+
+#     # coords
+#     nx = 17
+#     nyi = 20
+#     nyo = 12
+#     yib = np.linspace(-1000., 0., nyi+1)
+#     yob = np.linspace(-1200, 200, nyo+1)
+#     yyib = np.resize(yib, (nx, nyi+1))
+#     dyi = (yib[1]-yib[0])*0.49
+#     np.random.seed(0)
+#     yyib += np.random.uniform(-dyi, dyi, yyib.shape)
+
+#     # input
+#     u, v = np.mgrid[-3:3:nx*1j, -3:3:nyi*1j]-2
+#     vari = np.asarray(u**2+v**2)
+#     vari[int(nx/3):int(2*nx/3), int(nyi/3):int(2*nyi/3)] = np.nan
+
+#     # conserv, no extrap
+#     varoc = interp.cellave1dx(vari, yyib, yob, conserv=1, extrap=0)
+#     sumi = np.nansum(vari*np.diff(yyib, axis=1), axis=1)
+#     sumo = np.nansum(varoc*np.resize(np.diff(yob), varoc.shape), axis=1)
+#     np.testing.assert_allclose(sumi, sumo)
+
+#     # average, no extrap
+#     interp.cellave1dx(vari, yyib, yob, conserv=0, extrap=0)
+
+#     # average, extrap
+#     varoe = interp.cellave1dx(vari, yyib, yob, conserv=0, extrap=2)
+#     assert not np.isnan(varoe[0]).any()
+
+
+def test_interp_cellave1d():
 
     np.random.seed(0)
 

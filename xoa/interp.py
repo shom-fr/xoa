@@ -377,13 +377,14 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
 
 
 @numba.njit(parallel=True, fastmath=True)
-def extrap1d(vari, varo, extrap):
+def extrap1d(vari, extrap):
     """Extrapolate valid data to the top and/or bottom
 
     Parameters
     ----------
     vari: array_like(nx, ny)
     extrap: {"top", "bottom", "both", "no"}
+        Extrapolation mode
 
     Return
     ------
