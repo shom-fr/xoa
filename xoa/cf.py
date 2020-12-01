@@ -2161,7 +2161,7 @@ class CFCoordSpecs(_CFCatSpecs_):
         ----------
         da: xarray.DataArray
             Array to scan
-        dim_types: list
+        dim_types: str, list
             Letters among "x", "y", "z", "t" and "f".
         allow_positional: bool
             Fall back to positional dimension of types is unkown.

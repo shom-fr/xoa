@@ -95,7 +95,7 @@ def get_dims(da, dim_types, allow_positional=False, positions='tzyx',
     dim_types: str, list
         Letters among "x", "y", "z", "t" and "f".
     allow_positional: bool
-        Fall back to positional dimension of types is unkown.
+        Fall back to positional dimension of types if unkown.
     positions: str
         Default position per type starting from the end.
     {errors}
@@ -109,7 +109,7 @@ def get_dims(da, dim_types, allow_positional=False, positions='tzyx',
     --------
     xoa.cf.CFSpecs.get_dims
     """
-    return cf.get_cf_specs.get_dims(
+    return cf.get_cf_specs().get_dims(
         da, dim_types, allow_positional=allow_positional,
         positions=positions, errors=errors)
 
