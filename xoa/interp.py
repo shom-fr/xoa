@@ -82,7 +82,7 @@ def nearest1d(vari, yi, yo):
         for iyi in range(0, nyi-1):
 
             # Out of bounds
-            if yi[ixiy, iyi] < yo[ixoy, 0]:
+            if yi[ixiy, iyi+1] < yo[ixoy, 0]:
                 continue
             if yi[ixiy, iyi] > yo[ixoy, -1]:
                 break
@@ -153,7 +153,7 @@ def linear1d(vari, yi, yo, bias=0., tension=0.):
         for iyi in range(0, nyi-1):
 
             # Out of bounds
-            if yi[ixiy, iyi] < yo[ixoy, 0]:
+            if yi[ixiy, iyi+1] < yo[ixoy, 0]:
                 continue
             if yi[ixiy, iyi] > yo[ixoy, -1]:
                 break
@@ -235,7 +235,7 @@ def cubic1d(vari, yi, yo):
         for iyi in range(0, nyi-1):
 
             # Out of bounds
-            if yi[ixiy, iyi] < yo[ixoy, 0]:
+            if yi[ixiy, iyi+1] < yo[ixoy, 0]:
                 continue
             if yi[ixiy, iyi] > yo[ixoy, -1]:
                 break
@@ -323,7 +323,7 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
         for iyi in range(0, nyi-1):
 
             # Out of bounds
-            if yi[ixiy, iyi] < yo[ixoy, 0]:
+            if yi[ixiy, iyi+1] < yo[ixoy, 0]:
                 continue
             if yi[ixiy, iyi] > yo[ixoy, -1]:
                 break
