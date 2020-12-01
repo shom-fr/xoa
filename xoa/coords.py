@@ -206,7 +206,6 @@ def transpose(da, dims, mode='compat'):
             odims += dim,
         elif mode == "resize":
             if sizes is None or dim not in sizes:
-                print(sizes is None, dim not in sizes)
                 xoa_warn(f"new dim '{dim}' in transposition is set to one"
                          " since no size is provided to it")
                 size = 1
@@ -253,21 +252,30 @@ class DimFlusher1D(object):
         dim0, dim1 = dim
         if None in dim or coord_in_name is None:
             cfspecs = cf.get_cf_specs()
-        if dim1 is None:
+        # - dim1 (out)
+        if dim1 is None:  # get dim1 from coord_out
             dim1 = cfspecs.search_dim(coord_out)
             if dim1 is None:
                 raise cf.XoaCFError("No CF dimension found for output coord. "
                                     "Please specifiy the working dimension.")
             dim1, dim_type = dim1
+        else:  # dim1 is provided
+            dim_type = cfspecs.coords.get_dim_type(dim1, coord_out)
+        # - dim0 (in)
         if dim0 is None:
-            for c0 in da_in.coords.values():
-                dim0 = cfspecs.coords.search_dim(c0, dim_type)
-                if dim0:
-                    break
+            if dim_type:
+                for c0 in da_in.coords.values():
+                    dim0 = cfspecs.coords.search_dim(c0, dim_type)
+                    if dim0:
+                        if dim_type is None:
+                            dim0 = dim0[0]
+                        break
+                else:
+                    raise cf.XoaCFError(
+                        "No CF {dim_type }dimension found for datarray. "
+                        "Please specifiy the working dimension.")
             else:
-                raise cf.XoaCFError(
-                    "No CF {dim_type }dimension found for datarray. "
-                    "Please specifiy the working dimension.")
+                dim0 = dim1  # be cafeful, dim1 must be in input!
         assert dim0 in da_in.dims
         assert dim1 in coord_out.dims
 
