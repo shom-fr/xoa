@@ -19,6 +19,7 @@ It has two intents:
 
 Accessing the current specifications
 ====================================
+
 Scanning and formatting actions are based on specifications,
 and this module natively includes a
 :ref:`default configuration <appendix.cf.default>`
@@ -89,6 +90,17 @@ Description of specification keys:
       - list(str)
       - List of dimensions that must be squeezed out
 
+.. note:: The `standard_name`, `long_name` and `units` attributes are
+    internally stored in as a dict in the `attrs` key.
+
+Get name and attributes only:
+
+.. ipython:: python
+
+    print(cfspecs.get_name("sst"))
+    print(cfspecs.get_attrs("sst"))
+
+
 Coordinates
 -----------
 
@@ -125,6 +137,16 @@ Description of specification keys:
     * - ``inherit``
       - str
       - Inherit specification from another data variable
+
+.. note:: The `standard_name`, `long_name`, `units` and `axis` attributes are
+    internally stored in as a dict in the `attrs` key.
+
+Get name and attributes only:
+
+.. ipython:: python
+
+    print(cfspecs.get_name("lon"))
+    print(cfspecs.get_attrs("lon"))
 
 Searching within a :class:`~xarray.Dataset` or  :class:`~xarray.DataArray`
 ==========================================================================
@@ -181,6 +203,7 @@ You can also search for coordinates in datasets, for instance like this:
       :meth:`xoa.cf.CFVarSpecs.match` :meth:`xoa.cf.CFSpecs.search`
       :meth:`xoa.cf.CFCoordSpecs.search` :meth:`xoa.cf.CFVarSpecs.search`
 
+
 Formatting
 ==========
 
@@ -210,6 +233,7 @@ as soon as the ``format_coords`` keyword is ``True``.
     :meth:`xoa.cf.CFSpecs.format_coord`
     :meth:`xoa.cf.CFSpecs.format_data_var`
     :meth:`xoa.cf.CFSpecs.auto_format`
+    :meth:`xoa.cf.CFSpecs.auto_format`
 
 Using the accessors
 ===================
@@ -219,7 +243,17 @@ can be registered with the :func:`xoa.cf.register_cf_accessors`:
 
 .. ipython:: python
 
-    cf.register_cf_accessors()
+    cf.register_cf_accessors("cfd")
+
+The accessor is named here `cfd` to no conflict with the
+`cf` accessor of
+`cf-xarray <https://cf-xarray.readthedocs.io/en/latest/>`_.
+
+
+.. note:: All xoa accessors can be be registered with
+    :func:`xoa.egister_accessors`. Note also that all functionalities
+    of the `cf` accessor are also available with the more global
+    `xoa` accessor.
 
 These accessors make it easy to use some of the :class:`xoa.cf.CFSpecs`
 capabilities.
@@ -228,20 +262,20 @@ Here are examples of use:
 .. ipython:: python
 
     temp
-    temp.cf.get("lon") # access by .get
-    ds.cf.get("temp") # access by .get
-    ds.cf.lon # access by attribute
-    ds.cf.coords.lon  # specific search = ds.cf.coords.get("lon")
-    ds.cf.temp # access by attribute
-    ds.cf["temp"].name # access by item
-    ds.cf.data_vars.temp.name  # specific search = ds.cf.coords.get("temp")
-    ds.cf.data_vars.bathy is None # returns None when not found
-    ds.cf.temp.cf.lon.name  # chaining
-    ds.cf.temp.cf.name # CF name, not real name
-    ds.cf.temp.cf.attrs # attributes, merged with CF attrs
-    ds.cf.temp.cf.standard_name # single attribute
-    ds.mytemp.cf.auto_format() # or ds.temp.cf()
-    ds.cf.auto_format() # or ds.cf()
+    temp.cfd.get("lon") # access by .get
+    ds.cfd.get("temp") # access by .get
+    ds.cfd.lon # access by attribute
+    ds.cfd.coords.lon  # specific search = ds.cf.coords.get("lon")
+    ds.cfd.temp # access by attribute
+    ds.cfd["temp"].name # access by item
+    ds.cfd.data_vars.temp.name  # specific search = ds.cf.coords.get("temp")
+    ds.cfd.data_vars.bathy is None # returns None when not found
+    ds.cfd.temp.cfd.lon.name  # chaining
+    ds.cf.temp.cfd.name # CF name, not real name
+    ds.cfd.temp.cfd.attrs # attributes, merged with CF attrs
+    ds.cfd.temp.cf.standard_name # single attribute
+    ds.mytemp.cfd.auto_format() # or ds.temp.cfd()
+    ds.cfd.auto_format() # or ds.cfd()
 
 As you can see, accessing an accessor attribute or item make an
 implicit call to :class:`~xoa.cf.DataArrayCFAccessor.get`.

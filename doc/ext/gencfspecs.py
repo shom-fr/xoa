@@ -20,6 +20,22 @@ roles = {
     }
 
 
+def add_items(rst, data):
+    for key, value in data.items():
+        if key in skip_keys:
+            continue
+        if isinstance(value, dict):
+            rst = add_items(rst, value)
+        else:
+            if isinstance(value, list):
+                value = " ".join(f"``{v!r}``" for v in value)
+            else:
+                value = f"``{value!r}``"
+            rst += f"\t    * - **{key}**\n"
+            rst += f"\t      - {value}\n"
+        return rst
+
+
 def genrst(app):
 
     srcdir = app.env.srcdir
@@ -49,14 +65,7 @@ def genrst(app):
                 rst = title + "\n\n"
                 rst += f".. {role}:: {cfname}\n\n"
                 rst += "\t.. list-table::\n\n"
-                for key, value in cfspecs[cfcat][cfname].items():
-                    if isinstance(value, list):
-                        value = " ".join(f"``{v!r}``" for v in value)
-                    else:
-                        value = f"``{value!r}``"
-                    if key not in skip_keys:
-                        rst += f"\t    * - **{key}**\n"
-                        rst += f"\t      - {value}\n"
+                rst = add_items(rst, cfspecs[cfcat][cfname])
                 f.write(rst)
 
             # Append to table
