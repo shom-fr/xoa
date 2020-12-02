@@ -536,4 +536,4 @@ def register_accessors(xoa=True, cf=False, sigma=False):
     if sigma:
         from .accessors import register_sigma_accessor
         kw = {"name": sigma} if isinstance(sigma, str) else {}
-        register_sigma_accessor()
+        register_sigma_accessor(**kw)

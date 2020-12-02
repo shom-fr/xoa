@@ -243,13 +243,15 @@ def _register_xarray_accessors_(dataarrays=None, datasets=None):
         warnings.simplefilter(
             "ignore",
             xr.core.extensions.AccessorRegistrationWarning)
-        for name, cls in dataarrays.items():
-            xr.register_dataset_accessor(name)(cls)
-        for name, cls in datasets.items():
-            xr.register_dataarray_accessor(name)(cls)
+        if dataarrays:
+            for name, cls in dataarrays.items():
+                xr.register_dataarray_accessor(name)(cls)
+        if datasets:
+            for name, cls in datasets.items():
+                xr.register_dataset_accessor(name)(cls)
 
 
-def register_cf_accessors(name='cf'):
+def register_cf_accessors(name='cfd'):
     """Register the cf accessors"""
     _register_xarray_accessors_(
         dataarrays={name: CFDataArrayAccessor},
