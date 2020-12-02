@@ -142,7 +142,7 @@ def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
 
     # Extrap
     extrap = extrap_modes[extrap]
-    if extrap != "no":
+    if extrap != extrap_modes.no:
         varo = interp.extrap1d(varo, extrap)
 
     # Reform back
