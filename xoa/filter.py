@@ -292,7 +292,7 @@ def generate_orthogonal_kernel(kernels, window_func="ones", fill_value=0.):
                 size = int(k1d)
                 if size != k1d:
                     size += 2
-                k1d = np.full(k1d, fill_value)
+                k1d = np.full(size, fill_value)
                 k1d[1:-1] = window_func(size-2)
         else:
             k1d = np.asarray(k1d)
@@ -313,7 +313,7 @@ def generate_kernel(
 
     Parameters
     ----------
-    kernel: xarray.DataArray, np.ndarray, int, list, dict
+    kernel: xarray.DataArray, np.ndarray, int, list, dictorthokernels
         Ready to use kernel or specs to generate it.
 
         - If an int, the kernel built with ones with a size
@@ -326,6 +326,8 @@ def generate_kernel(
         :func:`xoa.coords.transpose` to fit into the input data array.
     data: xarray.DataArray
         Data array that the kernel must be compatible with
+    isotropic: bool, tuple
+        Tuple of the dimensions over which must be computed isotropically.
 
     Return
     ------
@@ -346,7 +348,7 @@ def generate_kernel(
     if isinstance(kernel, int):
         kernel = (kernel,)*data.ndim
 
-    # Convert to dict
+    # Convert tuple to dict with dims
     if isinstance(kernel, tuple):
         if len(kernel) > data.ndim:
             raise XoaError("Too many dimensions for your kernel: {} > {}"
@@ -354,8 +356,8 @@ def generate_kernel(
         kernel = dict(item for item in
                       zip(data.dims[-len(kernel):], kernel))
 
-    # Convert to dict
-    if isinstance(kernel, list):
+    # Convert list to dict with dims
+    elif isinstance(kernel, list):
         kernel = dict((dim, kernel) for dim in data.dims)
 
     # From an size or 1d kernel for given dimensions
@@ -373,7 +375,7 @@ def generate_kernel(
         isokernel = None
         orthokernels = {}
         for dim, kn in kernel.items():
-            if isotropic and dim not in isotropic:
+            if not isotropic or dim not in isotropic:
                 orthokernels[dim] = kn
             else:
                 if isokernel:
@@ -400,8 +402,9 @@ def generate_kernel(
             window_kwargs = {} if window_kwargs is None else window_kwargs
             window_func = get_window_func(
                 window_func, *window_args, **window_kwargs)
+            sizes = tuple(orthokernels.values())
             kernel = generate_orthogonal_kernel(
-                orthokernels, window_func=window_func, fill_value=fill_value)
+                sizes, window_func=window_func, fill_value=fill_value)
 
         # Build isotropic kernel
         if isokernel:
@@ -626,7 +629,6 @@ def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
             mask = xr.DataArray(mask, dims=(ydim, xdim))
         if not set(mask.dims).issubset(data.dims):
             raise XoaError('mask dims must be a subset of data dims')
-        print('maskdddddddfd', mask.dtype)
         mask = transpose(mask, data, mode="compat")
 
     # Kernel
