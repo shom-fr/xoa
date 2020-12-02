@@ -78,10 +78,10 @@ class XEnumMeta(EnumMeta):
     """
     default = None
 
-    def __call__(cls, value=None, *args, **kwargs):
-        if value is None:
-            return next(iter(cls))
-        return super().__call__(value, *args, **kwargs)
+    # def __call__(cls, value=None, *args, **kwargs):
+    #     if value is None:
+    #         return next(iter(cls))
+    #     return super().__call__(value, *args, **kwargs)
 
     def __contains__(cls, value):
         if isinstance(value, str):
@@ -170,6 +170,8 @@ class DefaultEnumMeta(XEnumMeta):
     def __getitem__(cls, name):
         if name is None:
             return next(iter(cls))
+        if not isinstance(name, str):
+            return cls(name)
         return cls._member_map_[name]
 
 
