@@ -400,6 +400,7 @@ to be used as a fonction.
     cf.set_cf_specs(cfspecs_old)
     cf.get_cf_specs() is cfspecs_old
 
+
 In case of a temporary change, you can used :class:`~xoa.cf.set_cf_specs`
 in a context statement:
 
@@ -409,6 +410,14 @@ in a context statement:
         print('inside', cf.get_cf_specs() is cfspecs_banana)
         print('inside', myspecs is cf.get_cf_specs())
     print('outside', cf.get_cf_specs() is cfspecs_old)
+
+For convience, you can set specs directly with a dictionary:
+
+ .. ipython:: python
+
+    with cf.set_cf_specs({"data_vars": {"apple": {}}}) as myspecs:
+        print("apple" in cf.get_cf_specs())
+    print("apple" in cf.get_cf_specs())
 
 Application with an accessor usage:
 
