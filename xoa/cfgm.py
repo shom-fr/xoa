@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """Configuration management utilities based on :mod:`configobj`"""
-# Copyright or © or Copr. Shom/Ifremer/Actimar
-#
-# stephane.raynaud@shom.fr, charria@ifremer.fr, wilkins@actimar.fr
+# Copyright or © or Copr. Shom/Actimar, 2020
 #
 # This software is a computer program whose purpose is to [describe
 # functionalities and technical features of your software].
@@ -32,7 +30,6 @@
 #
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
-
 
 import inspect
 import os

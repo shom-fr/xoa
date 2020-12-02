@@ -50,6 +50,9 @@ def genrst(app):
     rst_toctrees = {}
     for cfcat in ["data_vars", "coords"]:
 
+        rst_tables[cfcat] = ".. list-table::\n\n"
+        rst_toctrees[cfcat] = ".. toctree::\n    :hidden:\n\n"
+
         logging.info(f"Generating rst files for xoa.cf {cfcat}specs")
         for cfname in cfspecs[cfcat]:
 
@@ -71,7 +74,7 @@ def genrst(app):
             # Append to table
             rst_tables[cfcat] += f"    * - :{role}:`{cfname}`\n"
             rst_tables[cfcat] += "      - {}\n".format(
-                cfspecs[cfcat][cfname]["long_name"][0])
+                cfspecs[cfcat][cfname]["attrs"]["long_name"][0])
 
             # Append to toctree
             rst_toctrees[cfcat] += f"    gencfspecs/{cfcat}/{cfname}\n"

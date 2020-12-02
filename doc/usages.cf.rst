@@ -97,8 +97,8 @@ Get name and attributes only:
 
 .. ipython:: python
 
-    print(cfspecs.get_name("sst"))
-    print(cfspecs.get_attrs("sst"))
+    print(cfspecs.data_vars.get_name("sst"))
+    print(cfspecs.data_vars.get_attrs("sst"))
 
 
 Coordinates
@@ -145,8 +145,8 @@ Get name and attributes only:
 
 .. ipython:: python
 
-    print(cfspecs.get_name("lon"))
-    print(cfspecs.get_attrs("lon"))
+    print(cfspecs.coords.get_name("lon"))
+    print(cfspecs.coords.get_attrs("lon"))
 
 Searching within a :class:`~xarray.Dataset` or  :class:`~xarray.DataArray`
 ==========================================================================
@@ -243,7 +243,8 @@ can be registered with the :func:`xoa.cf.register_cf_accessors`:
 
 .. ipython:: python
 
-    cf.register_cf_accessors("cfd")
+    import xoa
+    xoa.register_accessors(cf="cfd")
 
 The accessor is named here `cfd` to no conflict with the
 `cf` accessor of
@@ -271,9 +272,9 @@ Here are examples of use:
     ds.cfd.data_vars.temp.name  # specific search = ds.cf.coords.get("temp")
     ds.cfd.data_vars.bathy is None # returns None when not found
     ds.cfd.temp.cfd.lon.name  # chaining
-    ds.cf.temp.cfd.name # CF name, not real name
+    ds.cfd.temp.cfd.name # CF name, not real name
     ds.cfd.temp.cfd.attrs # attributes, merged with CF attrs
-    ds.cfd.temp.cf.standard_name # single attribute
+    ds.cfd.temp.cfd.standard_name # single attribute
     ds.mytemp.cfd.auto_format() # or ds.temp.cfd()
     ds.cfd.auto_format() # or ds.cfd()
 
@@ -360,10 +361,10 @@ An config created **from default and user configs**:
 
 .. ipython:: python
 
-    banana_specs = {"data_vars": {"banana": {"standard_name": "banana"}}}
+    banana_specs = {"data_vars": {"banana": {"attrs": {"standard_name": "banana"}}}}
     mycfspecs = cf.CFSpecs(banana_specs)
-    mycfspecs["data_vars"]["sst"]["standard_name"]
-    mycfspecs["data_vars"]["banana"]["standard_name"]
+    mycfspecs["data_vars"]["sst"]["attrs"]["standard_name"]
+    mycfspecs["data_vars"]["banana"]["attrs"]["standard_name"]
 
 An config created **from scratch**:
 
@@ -377,7 +378,7 @@ An config created **from two other configs**:
 .. ipython:: python
 
     cfspecs_banana = cf.CFSpecs(banana_specs, default=False, user=False)
-    apple_specs = {"data_vars": {"apple": {"long_name": "Big apple"}}}
+    apple_specs = {"data_vars": {"apple": {"attrs": {"long_name": "Big apple"}}}}
     cfspecs_apple = cf.CFSpecs(apple_specs, default=False, user=False)
     cfspecs_fruits = cf.CFSpecs([cfspecs_apple, cfspecs_banana],
         default=False, user=False)
@@ -419,4 +420,6 @@ Application with an accessor usage:
     mycfspecs = cf.CFSpecs({"data_vars": {"ssb":
         {"standard_name": "sea_surface_banana"}}})
     with cf.set_cf_specs(mycfspecs):
-        print(ds.cf.get("ssb"))
+        print(ds.cfd.get("ssb"))
+
+

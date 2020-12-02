@@ -66,7 +66,7 @@ def get_window_func(window, *args, **kwargs):
     .. ipython:: python
 
         @suppress
-        matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt
         @suppress
         from xoa.filter import get_window_func
         func0 = get_window_func("gaussian", 22, sym=True)
@@ -165,6 +165,7 @@ def generate_isotropic_kernel(shape, window_func, fill_value=0, npt=None):
 
     Example
     -------
+
     .. ipython:: python
 
         @suppress
@@ -248,24 +249,24 @@ def generate_orthogonal_kernel(kernels, window_func="ones", fill_value=0.):
         ny, nx = (21, 31)
         kernel = generate_orthogonal_kernel((ny, nx), "bartlett")
         j, i = 5, 20
+        plt.plot([3, 4])
         fig = plt.figure(constrained_layout=True)
         gs = GridSpec(3, 3, figure=fig)
         ax0 = fig.add_subplot(gs[1:, :2])
         ax0.matshow(kernel)
         ax0.axhline(j, color='tab:red')
-        ax0.axvline(i, color='tab:orange')
         ax1 = fig.add_subplot(gs[0, :2], sharex=ax0)
         ax1.plot(np.arange(nx), kernel[j], color='tab:red')
         ax2 = fig.add_subplot(gs[1:, -1], sharey=ax0)
-        ax2.plot(kernel[:, i], np.arange(ny), color='tab:orange')
+        ax2.plot(kernel[:, i], np.arange(ny), color='tab:orange');
         @savefig api.filter.generate_orthogonal_kernel_0.png
-        plt.colorbar();
+        ax0.axvline(i, color='tab:orange')
         # From 1d kernels
-        kernel = xfilter.generate_orthogonal_kernel(
-            ([1, 1, 1], [1, 2, 3, 2, 1]))
-        plt.figure();
-        plt.matshow(kernel);
+        kernel = generate_orthogonal_kernel(([1, 1, 1], [1, 2, 3, 2, 1]))
+        plt.figure()
         @savefig api.filter.generate_orthogonal_kernel_1.png
+        plt.matshow(kernel);
+
 
 
     See also
@@ -538,6 +539,7 @@ def convolve(data, kernel, normalize=False):
     -------
     .. ipython:: python
 
+        @savefig api.filter.convolve.png
         @suppress
         import xarray as xr, numpy as np, matplotlib.pyplot as plt
         @suppress
@@ -548,9 +550,8 @@ def convolve(data, kernel, normalize=False):
         datac = convolve(data, kernel, normalize=True)
         fig, (ax0, ax1) = plt.subplots(ncols=2, figsize=(7, 3))
         kw = dict(vmin=data.min(), vmax=data.max())
-        data.plot.pcolormesh(ax=ax0, **kw);
-        @savefig api.filter.convolve.png
-        datac.plot.pcolormesh(ax=ax1, **kw);
+        data.plot.pcolormesh(ax=ax0, **kw)
+        datac.plot.pcolormesh(ax=ax1, **kw)
 
     """
     # Adapt the kernel to the data
@@ -594,8 +595,8 @@ def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
         - Erode the data mask until there is no missing value where
           a given horirizontal mask is False.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     data: xarray.DataArray
         Array of at least 2 dimensions, that are supposed to be horizontal.
     until: array_like, int

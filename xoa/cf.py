@@ -2299,6 +2299,8 @@ class set_cf_specs(object):
     """Set the current CF specs"""
 
     def __init__(self, cf_source):
+        if isinstance(cf_source, dict):
+            cf_source = CFSpecs(cf_source)
         assert isinstance(cf_source, CFSpecs)
         self.old_specs = _CACHE.get("specs", None)
         _CACHE["specs"] = self.specs = cf_source

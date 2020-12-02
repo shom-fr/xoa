@@ -25,7 +25,7 @@ For those who know it, it is the successor of
 Documentation
 -------------
 
-The xoa documentation is currently hosted by readthedocs pages:
+The xoa documentation is currently hosted on readthedocs:
 https://xoa.readthedocs.io
 
 
@@ -40,7 +40,7 @@ Here you can also post tickets for requests and issues.
 License
 -------
 
-xoa is a property of Shom, Ifremer and Actimar,
+xoa is a property of Shom
 and is published under the CeCiLL license,
 which is compatible with well known GPL license.
 

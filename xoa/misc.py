@@ -719,8 +719,8 @@ def gunique(seq):
     .. ipython:: python
 
         @suppress
-        from xoa.misc import uniquify
-        print(list([1, 6, 1, 8]))
+        from xoa.misc import gunique
+        print(list(gunique([1, 6, 1, 8])))
     """
     seen = set()
     seen_add = seen.add
