@@ -1,13 +1,12 @@
 API Reference
 =============
 
-Python
-------
 
 .. autosummary::
     :toctree: api
 
     xoa
+    xoa.accessors
     xoa.misc
     xoa.color
     xoa.cf
@@ -16,13 +15,6 @@ Python
     xoa.grid
     xoa.regrid
     xoa.filter
+    xoa.interp
     xoa.cfgm
     xoa.cli
-
-Fortran wrappers
-----------------
-
-.. genfortran::
-
-    xoa._interp Interpolation routines
-

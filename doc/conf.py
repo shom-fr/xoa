@@ -46,7 +46,7 @@ extensions = [
     'nbsphinx',
     'genoptions',
     'gencfspecs',
-    'genfortran',
+    # 'genfortran',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput'
 ]
@@ -86,7 +86,7 @@ intersphinx_mapping = {
     'proplot': ('https://proplot.readthedocs.io/en/latest/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
     'xarray': ('http://xarray.pydata.org/en/stable/', None),
-    'xesmf': ("https://xesmf.readthedocs.io/en/latest/", None)
+    # 'xesmf': ("https://xesmf.readthedocs.io/en/latest/", None)
     }
 
 # %% Napoleon
@@ -100,7 +100,7 @@ genoptions_table = 'genoptions/table.txt'
 genoptions_declarations = 'genoptions/declarations.txt'
 
 # %% genfortran
-genfortran_src_files = ["api.rst"]
+#genfortran_src_files = ["api.rst"]
 
 # %% User directives
 
