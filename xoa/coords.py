@@ -64,7 +64,7 @@ def get_altitude(da):
 
 def get_level(da):
     """Get the level coordinate"""
-    return cf.get_cf_specs().search(da, 'level')
+    return cf.get_cf_specs().coords.search(da, 'level')
 
 
 def get_vertical(da):
@@ -74,6 +74,11 @@ def get_vertical(da):
     if height is None:
         height = cfspecs.search(da, 'altitude')
     return height
+
+
+def get_time(da):
+    """Get the time coordinate"""
+    return cf.get_cf_specs().coords.search(da, 'time')
 
 
 def get_cf_coords(da, coord_names):
