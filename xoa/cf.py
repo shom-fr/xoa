@@ -1355,19 +1355,40 @@ class CFSpecs(object):
         return self.data_vars.search(dsa, name=name, loc=loc, get=get,
                                      single=single)
 
+    @ERRORS.format_method_docstring
     def search(self, dsa, name=None, loc="any", get="obj",
-               single=True, categories=None, errors="raise"):
-        """Search for a dataarray with data_vars and/or coords"""
+               single=True, categories=None, errors="warn"):
+        """Search for a dataarray with data_vars and/or coords
+
+
+        Parameters
+        ----------
+        dsa: xarray.DataArray, xarray.Dataset
+            Array or dataset to scan
+        name: str
+            Name to search for.
+        categories: str, list, None
+            Explicty categories with "coords" and "data_vars".
+        {errors}
+
+        Return
+        ------
+        None, xarray.DataArray, list
+
+        """
         if not categories:
             categories = (self.categories if hasattr(dsa, "data_vars")
-                          else ["coords"])
+                          else ["coords", "data_vars"])
+        elif isinstance(categories, str):
+            categories = [categories]
         else:
             categories = self.categories
+        errors = ERRORS[errors]
         if not single:
             found = []
         for category in categories:
             res = self[category].search(dsa, name=name, loc=loc, get=get,
-                                        single=single, errors=errors)
+                                        single=single, errors="ignore")
             if not single:
                 res = [r for r in res if r not in found]
                 found.extend(res)
@@ -1375,6 +1396,11 @@ class CFSpecs(object):
                 return res
         if not single:
             return found
+        msg = "Search failed"
+        if errors == "warn":
+            xoa_warn(msg)
+        else:
+            raise XoaCFError(msg)
 
     def get(self, dsa, name, get="obj"):
         """A shortcut to :meth:`search` with an explicit name
@@ -1512,7 +1538,7 @@ class _CFCatSpecs_(object):
         ------
         dict or None
         """
-        assert errors in ("ignore", "warn", "raise")
+        errors = ERRORS[errors]
         if name not in self._dict:
             if errors == "raise":
                 raise XoaCFError("Can't get cf specs from: " + name)
