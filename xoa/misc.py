@@ -227,8 +227,8 @@ class Choices(object):
         choice = self._reformat_value_(choice)
         if choice not in self._choices:
             desc = self._description if self._description else 'choice'
-            raise XoaError(f"Invalid {desc}: {choice}. Please choose one of:"
-                           " {self}")
+            raise XoaError(f"Invalid choice for \"{desc}\": {choice}. "
+                           f"Please choose one of: {self}")
         return choice
 
     def __str__(self):
