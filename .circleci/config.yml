@@ -48,7 +48,6 @@ cp-run: &cp-install
   name: Install xoa
   command: |
     source activate test-environment
-    echo $FC
     pip install -ve .
 
 doc-run: &doc-build
