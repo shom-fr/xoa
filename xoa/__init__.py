@@ -40,6 +40,8 @@ import importlib
 import os
 import re
 import warnings
+import pkg_resources
+import platform
 
 import appdirs
 import configobj
@@ -80,18 +82,18 @@ _SAMPLE_DIR = os.path.join(os.path.dirname(__file__), '_samples')
 
 _CACHE = {}
 
-_PACKAGE_VERSIONS = {
-    "python": ("platform", "python_version()"),
-    "appdirs": "__version__",
-    "cartopy": "__version__",
-    "configobj": "__version__",
-    "matplotlib": "__version__",
-    "numpy": "__version__",
-    "pandas": "__version__",
-    "scipy": "__version__",
-    "xarray": "__version__",
-    "xesmf": "__version__"
-    }
+_PACKAGES = [
+    "appdirs",
+    "cartopy",
+    "cmocean",
+    "configobj",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "scipy",
+    "xarray",
+    "xesmf"
+    ]
 
 
 class XoaError(Exception):
@@ -355,17 +357,13 @@ def show_versions():
         from xoa import show_versions
         show_versions()
     """
+    print("- python:", platform.python_version())
     print("- xoa:", __version__)
-    for package, getter in _PACKAGE_VERSIONS.items():
-        if isinstance(getter, str):
-            pp = importlib.import_module(package)
-        elif isinstance(getter, tuple):
-            pp = importlib.import_module(getter[0])
-            getter = getter[1]
-        if getter.endswith('()'):
-            version = getattr(pp, getter[:-2])()
-        else:
-            version = getattr(pp, getter)
+    for package in _PACKAGES:
+        try:
+            version = pkg_resources.get_distribution(package).version
+        except pkg_resources.DistributionNotFound:
+            version = "NOT INSTALLED or UKNOWN"
         print(f"- {package}: {version}")
 
 

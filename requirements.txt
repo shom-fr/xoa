@@ -1,11 +1,13 @@
 appdirs
 cartopy
+cmocean
 configobj
 matplotlib-base
 numba
 numpy
 pandas
 python>=3
+setuptools
 scipy
 xarray
 xesmf
