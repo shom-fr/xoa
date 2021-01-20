@@ -113,6 +113,7 @@ class XEnumMeta(EnumMeta):
             prefix = ((link_module+".") if link_module else "")
             prefix += cls.__name__ + "."
             for number, names in cls._get_groups_().items():
+                number = int(number)
                 attr = names[0]
                 choice = "|".join([f"{number:d}"] +
                                   [f'"{name}"' for name in names])
