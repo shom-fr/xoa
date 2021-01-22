@@ -41,8 +41,7 @@ License
 -------
 
 xoa is a property of Shom
-and is published under the CeCiLL license,
-which is compatible with well known GPL license.
+and is published under the Apache 2.0 license.
 
 
 Contacts
