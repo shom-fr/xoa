@@ -31,96 +31,13 @@
 # The fact that you are presently reading this means that you have had
 # knowledge of the CeCILL license and that you accept its terms.
 
-# Imports
-import os
-import sys
-import re
-import shutil
-from glob import glob
-
-# Setup
-from numpy.distutils.core import setup
-from numpy.distutils.misc_util import Configuration
-
-# Get some specs from __init__.py
-re_var_match = re.compile(r"^(__(\w+)__) = .+").match
-specs = {}
-valid_keys = ["version", "author", "email", "description"]
-with open(os.path.join(os.path.dirname(__file__), "xoa/__init__.py")) as f:
-    for line in f:
-        line = line[:-1].strip()
-        m = re_var_match(line)
-        if m and m.group(2) in valid_keys:
-            exec(line)
-            specs[m.group(2)] = locals()[m.group(1)]
-specs["author_email"] = specs.pop("email")
-specs["long_description"] = specs.pop("description")
-
-# Infos
-specs.update(
-    name="xoa",
-    description="Xarray-based Ocean Analysis library",
-    license="CeCiLL",
-    url="https://github.com/VACUMM/xoa",
-    classifiers=[
-        "Intended Audience :: Science/Research",
-        "License :: CeCiLL",
-        "Programming Language :: Python :: 2",
-        "Topic :: Scientific/Engineering :: GIS",
-        "Topic :: Scientific/Engineering :: Physics",
-        "Topic :: Scientific/Engineering :: Mathematics",
-        "Topic :: Scientific/Engineering :: Atmospheric Science",
-        "Topic :: Software Development :: Libraries :: Python Modules",
-        "Operating System :: POSIX",
-        "Operating System :: UNIX",
-        "Operating System :: MacOS :: MacOS X",
-    ],
-    packages=['xoa']
-)
+from setuptools import setup
 
 
-def configuration():
+with open('README.rst') as f:
+    long_description = f.read()
 
-    # Initialize
-    config = Configuration()
-
-    # Set options
-    config.set_options(
-        ignore_setup_xxx_py=True,
-        assume_default_configuration=True,
-        quiet=True,
-        delegate_options_to_subpackages=True,
-    )
-
-    # Add bin scripts
-    scripts = []
-    for pat in ["xoa", "*.py"]:
-        pat = os.path.join(os.path.dirname(__file__), "bin", pat)
-        scripts.extend(glob(pat))
-    config.add_scripts(*scripts)
-
-    # Add data samples
-    config.add_data_dir('xoa/_samples')
-    config.add_data_files("xoa/cf.ini", "xoa/cf.cfg")
-
-    # Env vars
-    if "READTHEDOCS" in os.environ:
-        for name, suffix in[
-                ("AR", "ar"),
-                ("GCC", "gcc"),
-                ("LD", "ld")]:
-            os.environ[name] = os.path.join(
-                sys.prefix, "bin", "x86_64-conda_cos6-linux-gnu-"+suffix)
-        libdir = os.path.join(sys.prefix, "lib")
-
-    return config
-
-
-def main():
-
-    # Lauch setup
-    setup(configuration=configuration, **specs)
-
-if __name__ == "__main__":
-
-    main()
+setup(
+      long_description=long_description,
+      use_scm_version={"fallback_version": "999"}
+      )
