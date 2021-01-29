@@ -4,6 +4,7 @@ Test the :mod:`xoa.interp` module
 """
 
 import numpy as np
+import pytest
 
 from xoa import interp
 
@@ -243,6 +244,28 @@ def test_interp_hermit1d():
     assert not np.isnan(varoh).all()
     assert np.nanmax(varoh) <= np.nanmax(vari)
     assert np.nanmin(varoh) >= np.nanmin(vari)
+
+
+@pytest.mark.parametrize("method", ["nearest", "linear", "cubic", "hermit"])
+def test_interp1d_nans_in_coords(method):
+
+    # Get data
+    xxi, yyi, vari, xxo, yyo = get_interp1d_data()
+
+    # Add nans to coords
+    yyin = yyi.copy()
+    yyin[:, :3] = np.nan
+    yyin[:, -3:] = np.nan
+    yyon = yyo.copy()
+    yyon[:, :3] = np.nan
+    yyon[:, -3:] = np.nan
+
+    # Interpolations
+    func = getattr(interp, method+"1d")
+    varol = func(vari[:, 3:-3], yyi[:, 3:-3], yyo[:, 3:-3])
+    varoln = func(vari, yyin, yyon)
+    np.testing.assert_allclose(varol, varoln[:, 3:-3])
+
 
 
 # def test_interp_cellave1d():

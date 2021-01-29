@@ -1,36 +1,19 @@
 """
 Low level interpolation routines accelerated with numba
 """
-# Copyright or © or Copr. Shom, 2020
+# Copyright 2020-2021 Shom
 #
-# This software is a computer program whose purpose is to [describe
-# functionalities and technical features of your software].
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# This software is governed by the CeCILL license under French law and
-# abiding by the rules of distribution of free software.  You can  use,
-# modify and/ or redistribute the software under the terms of the CeCILL
-# license as circulated by CEA, CNRS and INRIA at the following URL
-# "http://www.cecill.info".
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# As a counterpart to the access to the source code and  rights to copy,
-# modify and redistribute granted by the license, users are provided only
-# with a limited warranty  and the software's author,  the holder of the
-# economic rights,  and the successive licensors  have only  limited
-# liability.
-#
-# In this respect, the user's attention is drawn to the risks associated
-# with loading,  using,  modifying and/or developing or reproducing the
-# software by the user in light of its specific status of free software,
-# that may mean  that it is complicated to manipulate,  and  that  also
-# therefore means  that it is reserved for developers  and  experienced
-# professionals having in-depth computer knowledge. Users are therefore
-# encouraged to load and test the software's suitability as regards their
-# requirements in conditions enabling the security of their systems and/or
-# data to be ensured and,  more generally, to use and operate it in the
-# same conditions as regards security.
-#
-# The fact that you are presently reading this means that you have had
-# knowledge of the CeCILL license and that you accept its terms.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import math
 import numpy as np
@@ -38,6 +21,34 @@ import numba
 
 
 # %% 1D routines
+
+@numba.njit(cache=True)
+def get_iminmax(data1d):
+    """The first and last non nan values for a 1d array
+
+    Parameters
+    ----------
+    data1d: array_like(n)
+
+    Return
+    ------
+    int
+        Index of the first valid value
+    int
+        Index of the last valid value
+    """
+    imin = -1
+    imax = -1
+    n = len(data1d)
+    for i in range(n):
+        if imin < 0 and not np.isnan(data1d[i]):
+            imin = i
+        if imax < 0 and not np.isnan(data1d[n-1-i]):
+            imax = n-1-i
+        if imax > 0 and imin > 0:
+            break
+    return imin, imax
+
 
 @numba.njit(parallel=True, cache=True)
 def nearest1d(vari, yi, yo):
@@ -78,17 +89,18 @@ def nearest1d(vari, yi, yo):
         ixoy = min(nxo-1, ix % nxo)
 
         # Loop on input grid
-        iyo0 = 0
-        for iyi in range(0, nyi-1):
+        iyimin, iyimax = get_iminmax(yi[ixiy])
+        iyomin, iyomax = get_iminmax(yo[ixoy])
+        for iyi in range(iyimin, iyimax):
 
             # Out of bounds
-            if yi[ixiy, iyi+1] < yo[ixoy, 0]:
+            if yi[ixiy, iyi+1] < yo[ixoy, iyomin]:
                 continue
-            if yi[ixiy, iyi] > yo[ixoy, -1]:
+            if yi[ixiy, iyi] > yo[ixoy, iyomax]:
                 break
 
             # Loop on output grid
-            for iyo in range(iyo0, nyo):
+            for iyo in range(iyomin, iyomax+1):
 
                 dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
                 dy1 = yi[ixiy, iyi+1] - yo[ixoy, iyo]
@@ -99,7 +111,7 @@ def nearest1d(vari, yi, yo):
 
                 # Below
                 if dy0 < 0:
-                    iyo0 = iyo + 1
+                    iyomin = iyo + 1
 
                 # Interpolations
                 elif dy0 <= dy1:
@@ -149,17 +161,18 @@ def linear1d(vari, yi, yo, bias=0., tension=0.):
         ixoy = min(nxo-1, ix % nxo)
 
         # Loop on input grid
-        iyo0 = 0
-        for iyi in range(0, nyi-1):
+        iyimin, iyimax = get_iminmax(yi[ixiy])
+        iyomin, iyomax = get_iminmax(yo[ixoy])
+        for iyi in range(iyimin, iyimax):
 
             # Out of bounds
-            if yi[ixiy, iyi+1] < yo[ixoy, 0]:
+            if yi[ixiy, iyi+1] < yo[ixoy, iyomin]:
                 continue
-            if yi[ixiy, iyi] > yo[ixoy, -1]:
+            if yi[ixiy, iyi] > yo[ixoy, iyomax]:
                 break
 
             # Loop on output grid
-            for iyo in range(iyo0, nyo):
+            for iyo in range(iyomin, iyomax+1):
 
                 dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
                 dy1 = yi[ixiy, iyi+1] - yo[ixoy, iyo]
@@ -170,7 +183,7 @@ def linear1d(vari, yi, yo, bias=0., tension=0.):
 
                 # Below
                 if dy0 < 0:
-                    iyo0 = iyo + 1
+                    iyomin = iyo + 1
 
                 # Interpolation
                 elif dy0 >= 0 and dy1 >= 0:
@@ -231,17 +244,18 @@ def cubic1d(vari, yi, yo):
         ixoy = min(nxo-1, ix % nxo)
 
         # Loop on input grid
-        iyo0 = 0
-        for iyi in range(0, nyi-1):
+        iyimin, iyimax = get_iminmax(yi[ixiy])
+        iyomin, iyomax = get_iminmax(yo[ixoy])
+        for iyi in range(iyimin, iyimax):
 
             # Out of bounds
-            if yi[ixiy, iyi+1] < yo[ixoy, 0]:
+            if yi[ixiy, iyi+1] < yo[ixoy, iyomin]:
                 continue
-            if yi[ixiy, iyi] > yo[ixoy, -1]:
+            if yi[ixiy, iyi] > yo[ixoy, iyomax]:
                 break
 
             # Loop on output grid
-            for iyo in range(iyo0, nyo):
+            for iyo in range(iyomin, nyo):
 
                 dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
                 dy1 = yi[ixiy, iyi+1] - yo[ixoy, iyo]
@@ -253,15 +267,15 @@ def cubic1d(vari, yi, yo):
                 # Inside
                 if dy0 >= 0 and dy1 >= 0:
 
-                    iyo0 = iyo
+                    iyomin = iyo
                     mu = dy0 / (dy0+dy1)
 
                     # Extrapolations
-                    if iyi == 0:  # y0
+                    if iyi == iyimin:  # y0
                         vc0 = 2*vari[ix, iyi] - vari[ix, iyi+1]
                     else:
                         vc0 = vari[ixi, iyi-1]
-                    if iyi == nyi-2:  # y3
+                    if iyi == iyimax-1:  # y3
                         vc1 = 2*vari[ixi, iyi+1] - vari[ixi, iyi]
                     else:
                         vc1 = vari[ixi, iyi+2]
@@ -319,17 +333,18 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
         ixoy = min(nxo-1, ix % nxo)
 
         # Loop on input grid
-        iyo0 = 0
-        for iyi in range(0, nyi-1):
+        iyimin, iyimax = get_iminmax(yi[ixiy])
+        iyomin, iyomax = get_iminmax(yo[ixoy])
+        for iyi in range(iyimin, iyimax):
 
             # Out of bounds
-            if yi[ixiy, iyi+1] < yo[ixoy, 0]:
+            if yi[ixiy, iyi+1] < yo[ixoy, iyomin]:
                 continue
-            if yi[ixiy, iyi] > yo[ixoy, -1]:
+            if yi[ixiy, iyi] > yo[ixoy, iyomax]:
                 break
 
             # Loop on output grid
-            for iyo in range(iyo0, nyo):
+            for iyo in range(iyomin, nyo):
 
                 dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
                 dy1 = yi[ixiy, iyi+1] - yo[ixoy, iyo]
@@ -341,15 +356,15 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
                 # Inside
                 if dy0 >= 0 and dy1 >= 0:
 
-                    iyo0 = iyo
+                    iyomin = iyo
                     mu = dy0 / (dy0+dy1)
 
                     # Extrapolations
-                    if iyi == 0:  # y0
+                    if iyi == iyimin:  # y0
                         vc0 = 2*vari[ix, iyi] - vari[ix, iyi+1]
                     else:
                         vc0 = vari[ixi, iyi-1]
-                    if iyi == nyi-2:  # y3
+                    if iyi == iyimax-1:  # y3
                         vc1 = 2*vari[ixi, iyi+1] - vari[ixi, iyi]
                     else:
                         vc1 = vari[ixi, iyi+2]
@@ -398,13 +413,7 @@ def extrap1d(vari, extrap):
     # Loop on varying dim
     for ix in numba.prange(0, nx):
 
-        iybot = -1
-        iytop = -1
-        for iy in range(ny):
-            if not np.isnan(vari[ix, iy]):
-                if iybot == -1:
-                    iybot = iy
-                iytop = iy
+        iybot, iytop = get_iminmax(vari[ix])
         if iybot == -1:
             continue
 
@@ -572,7 +581,7 @@ def closest2d(xxi, yyi, xo, yo):
 
 
 @numba.njit(fastmath=True)
-def curvcell2relpt(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
+def cell2relloc(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
     """Compute coordinates of point relative to a curvilinear cell
 
     Cell shape::
@@ -583,7 +592,7 @@ def curvcell2relpt(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
 
     Example
     -------
-    >>> curv2rect(0., -2., 0., 2., 0., 1., 1., 0., 0., 0.5)
+    >>> cell2relloc(0., -2., 0., 2., 0., 1., 1., 0., 0., 0.5)
     (0.5, 0.5)
 
 
@@ -638,7 +647,7 @@ def curvcell2relpt(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
 
 
 @numba.njit(fastmath=True)
-def curvgrid2relpt(xxi, yyi, xo, yo):
+def grid2relloc(xxi, yyi, xo, yo):
     """Compute coordinates of point relative to a curvilinear grid
 
     Parameters
@@ -647,9 +656,9 @@ def curvgrid2relpt(xxi, yyi, xo, yo):
         Grid longitudes in degrees
     yyi: array_like(nyi, nxi)
         Grid latitudes in degrees
-    xo:
+    xo: float
         Point longitude
-    yo:
+    yo: float
         Point latitude
 
     Return
@@ -677,7 +686,7 @@ def curvgrid2relpt(xxi, yyi, xo, yo):
         for j in range(max(jc-1, 0), min(jc, nyi-2)):
 
             # Get relative position
-            a, b = curvcell2relpt(
+            a, b = cell2relloc(
                 xxi[j, i], xxi[j+1, i], xxi[j+1, i+1], xxi[j, i+1],
                 yyi[j, i], yyi[j+1, i], yyi[j+1, i+1], yyi[j, i+1],
                 xo, yo)
@@ -690,6 +699,40 @@ def curvgrid2relpt(xxi, yyi, xo, yo):
                 return p, q
 
     return p, q
+
+
+@numba.njit(fastmath=True)
+def grid2rellocs(xxi, yyi, xo, yo):
+    """Compute coordinates of points relative to a curvilinear grid
+
+    Parameters
+    ----------
+    xxi: array_like(nyi, nxi)
+        Grid longitudes in degrees
+    yyi: array_like(nyi, nxi)
+        Grid latitudes in degrees
+    xo: array_like(no)
+        Point longitude
+    yo: array_like(no)
+        Point latitude
+
+    Return
+    ------
+    array_like(no):
+        The integer part gives the grid cell index along the second dim,
+        and the fractional part gives the coordinate relative this cell.
+        A value of -1 means outside the grid.
+    array_like(no):
+        The integer part gives the grid cell index along the first dim,
+        and the fractional part gives the coordinate relative this cell.
+        A value of -1 means outside the grid.
+    """
+    no = xo.size
+    pp = np.zeros(no, 'd')
+    qq = np.zeros(no, 'd')
+    for i in range(xo.size):
+        pp[i], qq[i] = grid2relloc(xxi, yyi, xo[i], yo[i])
+    return pp, qq
 
 
 def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
@@ -761,7 +804,7 @@ def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
         # Weights
         if curved:
 
-            p, q = curvgrid2relpt(xxi, yyi, xo[io], yo[io])
+            p, q = grid2relloc(xxi, yyi, xo[io], yo[io])
             if p < 1 or p > nxi or q < 1 or q > nyi:
                 continue  # outside the grid
             i = int(p)
