@@ -1660,7 +1660,7 @@ class _CFCatSpecs_(object):
         """
 
         # Get target objects
-        if self.category:
+        if self.category and hasattr(dsa, self.category):
             objs = getattr(dsa, self.category)
         else:
             objs = dsa.keys() if hasattr(dsa, "keys") else dsa.coords
@@ -1697,6 +1697,7 @@ class _CFCatSpecs_(object):
         # Return
         if not single:
             return found
+        errors = ERRORS[errors]
         if errors != "ignore" and len(found) > 1:
             msg = "Multiple items found while you requested a single one"
             if errors == "raise":
@@ -1704,6 +1705,11 @@ class _CFCatSpecs_(object):
             xoa_warn(msg)
         if found:
             return found[0]
+        if errors != "ignore":
+            msg = "No match item found"
+            if errors == "raise":
+                raise XoaCFError(msg)
+            xoa_warn(msg)
 
     def get(self, dsa, name):
         """Call to :meth:`search` with an explicit name and ignoring errors"""
@@ -2039,7 +2045,7 @@ class CFCoordSpecs(_CFCatSpecs_):
         da: xarray.DataArray
             Data array
         unknown:
-            Value to assign when type is unkown
+            Value to assign when type is unknown
         asdict: bool
 
         Return
@@ -2192,7 +2198,8 @@ class CFCoordSpecs(_CFCatSpecs_):
         allow_positional: bool
             Fall back to positional dimension of types is unkown.
         positions: str
-            Default position per type starting from the end.
+            Default expected position of dim per type in da
+            starting from the end.
         {errors}
 
         Return
