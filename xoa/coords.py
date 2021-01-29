@@ -42,47 +42,134 @@ from . import misc
 from . import cf
 
 
-def get_lon(da):
-    """Get the longitude coordinate"""
+@misc.ERRORS.format_method_docstring
+def get_lon(da, errors="raise"):
+    """Get the longitude coordinate
+
+    Paramaters
+    ----------
+    {errors}
+
+    Return
+    ------
+    xarray.DataArray or None
+    """
     return cf.get_cf_specs().search(da, 'lon')
 
 
-def get_lat(da):
-    """Get the latitude coordinate"""
+@misc.ERRORS.format_method_docstring
+def get_lat(da, errors="raise"):
+    """Get the latitude coordinate
+
+    Paramaters
+    ----------
+    {errors}
+
+    Return
+    ------
+    xarray.DataArray or None
+    """
     return cf.get_cf_specs().search(da, 'lat')
 
 
-def get_depth(da):
-    """Get the depth coordinate"""
+@misc.ERRORS.format_method_docstring
+def get_depth(da, errors="raise"):
+    """Get the depth coordinate
+
+    Paramaters
+    ----------
+    {errors}
+
+    Return
+    ------
+    xarray.DataArray or None
+    """
     return cf.get_cf_specs().search(da, 'depth')
 
 
-def get_altitude(da):
-    """Get the altitude coordinate"""
+@misc.ERRORS.format_method_docstring
+def get_altitude(da, errors="raise"):
+    """Get the altitude coordinate
+
+    Paramaters
+    ----------
+    {errors}
+
+    Return
+    ------
+    xarray.DataArray or None
+    """
     return cf.get_cf_specs().search(da, 'altitude')
 
 
-def get_level(da):
-    """Get the level coordinate"""
+@misc.ERRORS.format_method_docstring
+def get_level(da, errors="raise"):
+    """Get the level coordinate
+
+    Paramaters
+    ----------
+    {errors}
+
+    Return
+    ------
+    xarray.DataArray or None
+    """
     return cf.get_cf_specs().coords.search(da, 'level')
 
 
-def get_vertical(da):
-    """Get either depth or altitude"""
+@misc.ERRORS.format_method_docstring
+def get_vertical(da, errors="raise"):
+    """Get either depth or altitude
+
+    Paramaters
+    ----------
+    {errors}
+
+    Return
+    ------
+    xarray.DataArray or None
+    """
     cfspecs = cf.get_cf_specs()
-    height = cfspecs.search(da, 'depth')
+    height = cfspecs.search(da, 'depth', errors="ignore")
     if height is None:
-        height = cfspecs.search(da, 'altitude')
-    return height
+        height = cfspecs.search(da, 'altitude', errors="ignore")
+    if height is None:
+        errors = misc.ERRORS["errors"]
+        msg = "No vertical coordinate found"
+        if errors == "raise":
+            raise cf.XoaCFError(msg)
+        xoa_warn(msg)
+    else:
+        return height
 
 
+@misc.ERRORS.format_method_docstring
 def get_time(da):
-    """Get the time coordinate"""
+    """Get the time coordinate
+
+    Paramaters
+    ----------
+    {errors}
+
+    Return
+    ------
+    xarray.DataArray or None
+    """
     return cf.get_cf_specs().coords.search(da, 'time')
 
 
-def get_cf_coords(da, coord_names):
-    """Get several coordinates"""
+@misc.ERRORS.format_method_docstring
+def get_cf_coords(da, coord_names, errors="raise"):
+    """Get several coordinates
+
+    Paramaters
+    ----------
+    {errors}
+
+    Return
+    ------
+    list(xarray.DataArray)
+    """
     cfspecs = cf.get_cf_specs()
     return [cfspecs.search_coord(da, coord_name)
             for coord_name in coord_names]
@@ -131,7 +218,7 @@ class transpose_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     insert = 1
     #: Transpose resizing to missing dimensions.
     #: Note that dims must be an array or a dict of sizes
-    #: otherwize new dimensions will have a size of 1.
+    #: otherwise new dimensions will have a size of 1.
     resize = 2
 
 
@@ -389,3 +476,72 @@ class DimFlusher1D(object):
         da_out.name = self.da_in.name
 
         return da_out
+
+
+def get_dim_types(dims, unknown=None, asdict=False):
+    """Get dimension types
+
+    Parameters
+    ----------
+    dims: tuple(str) or xarray.DataArray
+        Dimensions or data array
+    unknown:
+        Vaue to assign to unknown types
+    asdict: bool
+        Get the result as dictionary
+
+    Return
+    ------
+    tuple
+    """
+    if isinstance(dims, xr.DataArray):
+        da = dims
+        dims = da.dims
+    else:
+        da = None
+    cfspecs = cf.get_cf_specs()
+    return cfspecs.coords.get_dim_types(
+        dims, da=da, unknown=unknown, asdict=asdict)
+
+
+def reorder(da, order):
+    """Transpose an array to match a given order
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Data array to transpose
+    order: str
+        A combination of x, y, z, t, f and - symbols and
+        their upper case value.
+        Letters refer to the dimension type.
+        When the value is -, it may match any dimension type.
+
+    Return
+    ------
+    xarray.DataArray
+    """
+    # Convert from dim_types
+    if isinstance(order, dict):
+        order = tuple(order.values())
+    if isinstance(order, tuple):
+        order = ''.join([
+            ('-' if o not in "ftzyx" else o) for o in order])
+
+    # From order to dims
+    to_dims = ()
+    dim_types = get_dim_types(da, asdict=True)
+    ndim = len(dim_types)
+    for i, o in enumerate(order[::-1]):
+        if i+1 == ndim:
+            break
+        for dim in da.dims:
+            if o == dim_types[dim]:
+                to_dims = (dim, ) + to_dims
+                break
+        else:
+            raise XoaError(
+                f"Coordinate type not found: {o}. Dims are: {da.dims}")
+
+    # Final transpose
+    return transpose(da, to_dims)
