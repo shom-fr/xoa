@@ -422,7 +422,7 @@ def generate_kernel(
     elif not set(kernel.dims).issubset(set(data.dims)):
         raise XoaError(f"kernel dimensions {kernel.dims} "
                        f"are not a subset of {data.dims}")
-
+      
     # Finalize
     return transpose(kernel, data, mode="insert").astype(data.dtype)
 
@@ -469,6 +469,11 @@ def _convolve_(data, kernel, normalize):
 
     # Kernel
     assert data.ndim == kernel.ndim
+    if kernel.dtype is not data.dtype:
+        xoa_warn(
+            "The dtype of your kernel is not the same as that of your data. "
+            "Converting it...")
+        kernel = kernel.astype(data.dtype)
 
     # Guess mask
     bad = np.isnan(data)
@@ -484,7 +489,7 @@ def _convolve_(data, kernel, normalize):
 
     # Weigthing and masking
     if with_mask:
-        bad = np.isclose(weights, 0)
+        bad = np.isclose(weights, 0, atol=float(1e-6*kernel.sum()))
     if normalize:
         if with_mask:
             weights[bad] = 1
@@ -541,7 +546,7 @@ def convolve(data, kernel, normalize=False):
     kernel = generate_kernel(kernel, data)
 
     # Numpy convolution
-    datac = _convolve_(data, kernel.data, normalize)
+    datac = _convolve_(data.data, kernel.data, normalize)
 
     # Format
     return xr.DataArray(datac, coords=data.coords, attrs=data.attrs)
