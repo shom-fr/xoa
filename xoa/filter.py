@@ -18,7 +18,7 @@ Filtering utilities
 import numpy as np
 import xarray as xr
 
-from .__init__ import XoaError
+from .__init__ import XoaError, xoa_warn
 from .coords import transpose, get_dims
 
 
@@ -422,7 +422,7 @@ def generate_kernel(
     elif not set(kernel.dims).issubset(set(data.dims)):
         raise XoaError(f"kernel dimensions {kernel.dims} "
                        f"are not a subset of {data.dims}")
-      
+
     # Finalize
     return transpose(kernel, data, mode="insert").astype(data.dtype)
 
