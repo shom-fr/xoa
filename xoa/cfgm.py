@@ -71,7 +71,7 @@ def _valwrap_(validator):
         # Remove extraneous arguments the validator can't handle
         argspec = inspect.getfullargspec(validator)
         kwargs = kwargs.copy()
-        for k in kwargs.keys():
+        for k in list(kwargs.keys()):
             if k not in argspec.args:
                 kwargs.pop(k)
         return validator(value, *args, **kwargs)
@@ -179,7 +179,8 @@ def _valwraplist_(validator):
         istuple = isinstance(value, tuple)
 
         # Validate each values
-        value = [validator(v, *args[1:], **kwargs) for v in value]
+        # FIXME: why *args[1:] as previously instead of *args?
+        value = [validator(v, *args, **kwargs) for v in value]
         return tuple(value) if istuple else value
 
     list_validator_wrapper.__name__ += "-" + validator.__name__
@@ -552,6 +553,7 @@ VALIDATOR_SPECS = {
     "float": validate.is_float,
     "boolean": validate.is_boolean,
     "string": validate.is_string,
+    "option": validate.is_option,
     # single value
     "date": validator_cdtime,
     "cdtime": validator_cdtime,
