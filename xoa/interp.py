@@ -1,5 +1,8 @@
 """
 Low level interpolation routines accelerated with numba
+
+The numerical inputs and outputs of all these routines are of scalar
+or numpy.ndarray type.
 """
 # Copyright 2020-2021 Shom
 #
@@ -643,6 +646,10 @@ def cell2relloc(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
         p = p1
         q = q1
 
+    if p < -small or q < -small:
+        p = -1.
+        q = -1.
+
     return p, q
 
 
@@ -735,7 +742,7 @@ def grid2rellocs(xxi, yyi, xo, yo):
     return pp, qq
 
 
-def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
+def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     """Linear interpolation of gridded data to random positions
 
     Parameters
@@ -776,7 +783,7 @@ def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
     # Initalisations
     vo = np.full((nex, no), np.nan, dtype=vi.dtype)
     bmask = np.isnan(vi)
-    ximin = vi.min()
+    ximin = xxi.min()
     ximax = xxi.max()
     yimin = yyi.min()
     yimax = yyi.max()
@@ -785,20 +792,25 @@ def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
     timin = ti.min()
     timax = ti.max()
     curved = nyix != 1
+    zi = np.zeros((nexz, nzi))
+    c = np.zeros(nexz)
+    k = np.zeros(nexz, 'l')
+    npk = np.zeros(nexz, 'l')
 
     # Verifications
     assert not curved or (nxi == nxiy and nyi == nyix), (
         "linear4dto1: Invalid curved dimensions")
-    assert nxiz == 1 or nxiz == nxi, "linear4dto1: Invalid nxiz dimension"
-    assert nyiz == 1 or nyiz == nyi, "linear4dto1: Invalid nyiz dimension"
-    assert ntiz == 1 or ntiz == nti, "linear4dto1: Invalid ntiz dimension"
+    assert nxiz == 1 or nxiz == nxi, "grid2locs: Invalid nxiz dimension"
+    assert nyiz == 1 or nyiz == nyi, "grid2locs: Invalid nyiz dimension"
+    assert ntiz == 1 or ntiz == nti, "grid2locs: Invalid ntiz dimension"
 
     # Loop on ouput points
-    for io in numba.prange(no):
-        if ((nxi == 1 or (xo[io] >= ximin and xo[io] <= ximax)) and
-                (nyi == 1 or (yo[io] >= yimin and yo[io] <= yimax)) and
-                (nzi == 1 or (zo[io] >= zimin and zo[io] <= zimax)) and
-                (nti == 1 or (to[io] >= timin and to[io] <= timax))):
+    # for io in numba.prange(no):
+    for io in range(no):
+        if ((nxi != 1 and (xo[io] < ximin or xo[io] > ximax)) or
+                (nyi != 1 and (yo[io] < yimin or yo[io] > yimax)) or
+                (nzi != 1 and (zo[io] < zimin or zo[io] > zimax)) or
+                (nti != 1 and (to[io] < timin or to[io] > timax))):
             continue
 
         # Weights
@@ -830,7 +842,7 @@ def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
                 npi = 2
                 a = xo[io] - xxi[0, i]
                 if abs(a) > 180.:
-                    a -= 180.  # FIXME: linear4dto1dxx: abs(a)>180.
+                    a -= 180.  # FIXME: grid2locs: abs(a)>180.
                 a = a / (xxi[0, i+1] - xxi[0, i])
 
             # - Y
@@ -869,16 +881,16 @@ def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
 
         # - Z
         if nzi == 1:
-            k = 0
-            c = 0.
-            npk = 1
+            k[:] = 0
+            c[:] = 0.
+            npk[:] = 1
         else:
 
             # Local zi
 
             if nxiz == 1:
                 npiz = 1
-                az = 0
+                az = 0.
                 iz = 0
             else:
                 npiz = npi
@@ -887,7 +899,7 @@ def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
 
             if nyiz == 1:
                 npjz = 1
-                bz = 0
+                bz = 0.
                 jz = 0
             else:
                 npjz = npj
@@ -896,26 +908,27 @@ def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
 
             if ntiz == 1:
                 nplz = 1
-                dz = 0
+                dz = 0.
                 lz = 0
             else:
                 nplz = npl
                 dz = d
                 lz = l
 
-            zi = 0.
-            for ie in range(nex):
-                for ll in range(0, nplz):
+            zi[:] = 0.
+            for ie in range(nexz):
+                for ll in range(nplz):
                     for kk in range(nzi):
                         for jj in range(0, npjz):
                             for ii in range(0, npiz):
-                                zi = (zi + zzi[ie, lz+ll, kk, jz+jj, iz+ii] *
-                                      ((1-az) * (1-ii) + az * ii) *
-                                      ((1-bz) * (1-jj) + bz * jj) *
-                                      ((1-dz) * (1-ll) + dz * ll))
+                                zi[ie, kk] += (
+                                    zzi[ie, lz+ll, kk, jz+jj, iz+ii] *
+                                    ((1-az) * (1-ii) + az * ii) *
+                                    ((1-bz) * (1-jj) + bz * jj) *
+                                    ((1-dz) * (1-ll) + dz * ll))
 
             # Normal stuff (c(nexz),zi[nexz,nzi),k(nexz)
-            for ie in range(nex):  # extra dim
+            for ie in range(nexz):  # extra dim
                 if zi[ie, nzi-1] == zo[io]:
                     k[ie] = nzi - 1
                     c[ie] = 0.
@@ -937,12 +950,12 @@ def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
 
             for iez in range(nexz):
                 if not bmask[ie0:ie0+iez, l:l+npl,
-                             k[iez+1]:k[iez+1]+npk[iez+1],
+                             k[iez]:k[iez]+npk[iez],
                              j:j+npj,
                              i:i+npi].any():
                     vo[ie0+iez, io] = 0.
                     for ll in range(npl):
-                        for kk in range(npk[iez+1]):
+                        for kk in range(npk[iez]):
                             for jj in range(npj):
                                 for ii in range(npi):
                                     vo[ie0+iez, io] = (
@@ -954,3 +967,5 @@ def linear4dto1dxx(xxi, yyi, zzi, ti, vi, xo, yo, zo, to, vo):
                                         ((1-c[iez]) *
                                          (1-kk) + c[iez] * kk) *
                                         ((1-d) * (1-ll) + d * ll))
+
+    return vo
