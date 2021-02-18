@@ -3,36 +3,20 @@
 """
 Regridding utilities
 """
-# Copyright or © or Copr. Shom, 2020
+# Copyright 2020-2021 Shom
 #
-# This software is a computer program whose purpose is to [describe
-# functionalities and technical features of your software].
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# This software is governed by the CeCILL license under French law and
-# abiding by the rules of distribution of free software.  You can  use,
-# modify and/ or redistribute the software under the terms of the CeCILL
-# license as circulated by CEA, CNRS and INRIA at the following URL
-# "http://www.cecill.info".
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
-# As a counterpart to the access to the source code and  rights to copy,
-# modify and redistribute granted by the license, users are provided only
-# with a limited warranty  and the software's author,  the holder of the
-# economic rights,  and the successive licensors  have only  limited
-# liability.
-#
-# In this respect, the user's attention is drawn to the risks associated
-# with loading,  using,  modifying and/or developing or reproducing the
-# software by the user in light of its specific status of free software,
-# that may mean  that it is complicated to manipulate,  and  that  also
-# therefore means  that it is reserved for developers  and  experienced
-# professionals having in-depth computer knowledge. Users are therefore
-# encouraged to load and test the software's suitability as regards their
-# requirements in conditions enabling the security of their systems and/or
-# data to be ensured and,  more generally, to use and operate it in the
-# same conditions as regards security.
-#
-# The fact that you are presently reading this means that you have had
-# knowledge of the CeCILL license and that you accept its terms.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 
 from .__init__ import XoaError
 from . import misc
@@ -150,3 +134,92 @@ def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
 
 
 regrid1d.__doc__ = regrid1d.__doc__.format(**locals())
+
+
+def grid2loc(da, loc, compat="warn"):
+    """Interpolate a gridded data array to random locations
+    
+    ``da`` and ``loc`` must comply with CF conventions.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        A data array with at least an horizontal grid.
+    loc: xarray.Dataset, xarray.DataArray
+        A dataset or data array with coordinates as 1d arrays
+        that share the same dimension.
+        For example, such dataset may be initialized as follows::
+
+            loc = xr.Dataset(coords={
+                'lon': ('npts', [5, 6]),
+                'lat': ('npts', [4, 5]),
+                'depth': ('npts',  [-10, -20])
+                })
+
+    compat: {"ignore", "warn"}
+        In case a requested coordinate is not found in the input dataset.
+
+    Return
+    ------
+    xarray.dataArray
+        The interpolated data array.
+    """
+
+    # Get coordinates
+    # - horizontal
+    # if set(glon.dims).isdisjoint(glat.dims):
+    #     gdims = glat.dims + glon.dims
+    # else:
+    #     gdims = glon.dims
+    order = "yx"
+    lons = coords.get_lon(loc)
+    lats = coords.get_lat(loc)
+    # - vertical
+    deps = coords.get_vertical(loc, errors="ignore")
+    if deps is not None:
+        gdep = coords.get_vertical(da, errors=compat)
+        if gdep is not None:
+            order = "z" + order
+    # - temporal
+    times = coords.get_time(loc, errors="ignore")
+    if times is not None:
+        gtime = coords.get_time(da, errors=compat)
+        if gtime is not None:
+            order = "t" + order
+
+    # Transpose following the tzyx order
+    da_tmp = coords.reorder(da, order)
+    # TODO: reshape with singleton insertions, also for cordinates
+    
+    # To numpy with singletons
+    # - data
+    da_num = da.values
+    for axis_type, axis in (("z", -3), ("t", -4)):
+        if axis_type not in order:
+            da_num = np.expand_dims(axis_type, axis)
+    # - xy
+    glon_num = coords.get_lon(da_tmp).values
+    glat_num = coords.get_lat(da_tmp).values
+    # - z
+    if "z" in order:
+        gdep_order = coords.get_order(da_tmp[gdep.name])
+        gdep_num = da_tmp[gdep.name].values
+        for axis_type, axis in (("x", -1), ("y", -2), ("t", -4)):
+            if axis_type not in gdep_order:
+                da_num = np.expand_dims(axis_type, axis)
+    else:
+        gdep_num = np.zeros((1, 1, 1, 1))
+    if gdep_num.ndim == 4:
+        gdep_num = gdep_num.reshape((1,)+gdep_num.shape))
+    # - t
+    if "t" in order:
+        # numeric times
+        gtime_num = (
+            (gtime.values - np.datetime64("1950-01-01")) /
+            np.timedelta64(1, "D"))
+        times_num = (
+            (times.values - np.datetime64("1950-01-01")) /
+            np.timedelta64(1, "D"))
+    else:
+        gtime_num = np.zeros(1)
+    
