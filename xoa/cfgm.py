@@ -205,7 +205,7 @@ def validator_bbox(value, default=None):
 def validator_numerics(
     value, default=None, min=None, max=None, type="float", n=None
 ):
-    """Validator of a tuple of numeric values"""
+    """Validator function of a tuple of numeric values"""
     if isinstance(value, str):
         value = value.strip("()[] ")
     if str(value) == "None":
@@ -250,7 +250,7 @@ def validator_numerics(
 def validator_minmax(
     value, min=None, max=None, default=(0, 100), type="float"
 ):
-    """Validator of a min,max pair"""
+    """Validator function of a min,max pair"""
     value = validator_numerics(
         value, min=min, max=max, default=default, type=type, n=2
     )
@@ -262,14 +262,14 @@ def validator_minmax(
 
 
 def validator_figsize(value, default=(6, 6), min=0, max=20):
-    """Validator of a figure size (xsize,ysize)"""
+    """Validator function of a figure size (xsize,ysize)"""
     return validator_numerics(
         value, default=default, min=min, max=max, type="float", n=2
     )
 
 
 def validator_interval(value, default=None):
-    """Validator of an interval of coordinates (min, max [,bounds])"""
+    """Validator function of an interval of coordinates (min, max [,bounds])"""
     if isinstance(value, str):
         value = value.strip("()[] ")
     if str(value) == "None":
@@ -301,7 +301,7 @@ def validator_interval(value, default=None):
 
 
 def validator_cmap(value, default=None):
-    """Validator that return a :`xoa.color.CmapAdapter`"""
+    """Validator function that return a :`xoa.color.CmapAdapter`"""
     if str(value) == "None":
         return None
     from .color import CmapAdapter
@@ -354,7 +354,7 @@ def validator_pydatetime(value, default=None, fmt="%Y-%m-%dT%H:%M:%S"):
 
 
 # def validator_timeunits(value, default="days since 1950-01-01"):
-#     """Validator of standard time units"""
+#     """Validator function of standard time units"""
 #     from .atime import are_valid_units
 #     value = str(value)
 #     if value == "None" or not value:
@@ -365,7 +365,7 @@ def validator_pydatetime(value, default=None, fmt="%Y-%m-%dT%H:%M:%S"):
 
 
 def validator_cdtime(value, min=None, max=None, default=None):
-    """Validator of a date (compatible with :func:`cdtime.s2c`)"""
+    """Validator function of a date (compatible with :func:`cdtime.s2c`)"""
     import cdtime
 
     value = str(value).strip()
@@ -383,7 +383,7 @@ def validator_cdtime(value, min=None, max=None, default=None):
 
 
 def validator_timestamp(value, default=None):
-    """Validator of date as parsable by :func:`pandas.Timestamp`"""
+    """Validator function of date as parsable by :func:`pandas.Timestamp`"""
     if str(value) == "None":
         return
     import pandas as pd
@@ -392,7 +392,7 @@ def validator_timestamp(value, default=None):
 
 
 def validator_timedelta(value, default=None):
-    """Validator of date as parsable by :func:`pandas.Timedelta`"""
+    """Validator function of date as parsable by :func:`pandas.Timedelta`"""
     if str(value) == "None":
         return
     if not isinstance(value, list) or len(value) != 2:
@@ -403,7 +403,7 @@ def validator_timedelta(value, default=None):
 
 
 def validator_timedelta64(value, default=None):
-    """Validator of date as parsable by :func:`numpy.timedelta64`"""
+    """Validator function of date as parsable by :func:`numpy.timedelta64`"""
     if str(value) == "None":
         return
     if not isinstance(value, list) or len(value) != 2:
@@ -414,7 +414,7 @@ def validator_timedelta64(value, default=None):
 
 
 def validator_datetime(value, default=None):
-    """Validator to magically create a :class:`datetime.datetime`"""
+    """Validator function to magically create a :class:`datetime.datetime`"""
     value = validator_timestamp(value, default=default)
     if str(value) == "None":
         return
@@ -422,14 +422,14 @@ def validator_datetime(value, default=None):
 
 
 def validator_datetime64(value, default=None):
-    """Validator to create a :class:`numpy.datetime64`"""
+    """Validator function to create a :class:`numpy.datetime64`"""
     if str(value) == "None":
         return
     return validator_timestamp(value, default=default).to_datetime64()
 
 
 def validator_daterange(value, default=None):
-    """Validator of a date range created with :func:`pandas.date_range`"""
+    """Validator function of a date range created with :func:`pandas.date_range`"""
     if str(value) == "None":
         return
     if not isinstance(value, list) or len(value) not in [3, 4]:
@@ -441,7 +441,7 @@ def validator_daterange(value, default=None):
 
 
 def validator_daterange64(value, default=None):
-    """Validator of a date range created with :func:`numpy.arange`"""
+    """Validator function of a date range created with :func:`numpy.arange`"""
     if str(value) == "None":
         return
     if not isinstance(value, list) or len(value) != 3:
@@ -501,7 +501,7 @@ _re_set = re.compile(r"^\s*(\w+)\s*=\s*(.+)\s*$").match  # a=b
 
 
 def validator_dict(value, default={}, vtype=None):
-    """validator for dictionaries
+    """Validator function for dictionaries
 
     Examples
     --------
@@ -647,15 +647,15 @@ for key in VALIDATOR_TYPES:
 __doc__ = __doc__.format(" ".join(_for_doc))
 
 
-def register_config_validator(**kwargs):
-    """Add a new configobj validator function
+def register_validator_functions(**kwargs):
+    """Add a new configobj validator functions
 
     Example
     -------
     .. ipython:: python
 
         @suppress
-        from xoa.cfgm import register_config_validator
+        from xoa.cfgm import register_validator_functions
 
         def upper_string(mystr, default=""):
             mystr = str(mystr)
@@ -663,11 +663,35 @@ def register_config_validator(**kwargs):
                 mystr = ""
             return str(mystr).upper()
 
-        register_config_validator(upper_string=upper_string)
+        register_validator_functions(upper_string=upper_string)
 
     """
     VALIDATOR_SPECS.update(**kwargs)
     _update_registry_()
+
+
+def print_validator_functions(pattern="*"):
+    """Print available xoa validator functions
+    
+    Parameters
+    ----------
+    pattern: str
+        Only print function that matches this string
+    """
+    from fnmatch import fnmatch
+    import inspect
+    for name in VALIDATOR_TYPES:
+        specs = VALIDATOR_SPECS[name]
+        func = specs["base_func"]
+        if fnmatch(name, pattern):
+            sig = str(inspect.signature(func))
+            doc = inspect.getdoc(func)
+            if doc:
+                doc = doc.split("\n")[0]
+                doc = f"\n    {doc}"
+            else:
+                doc = ""
+            print(f"{name}{sig}{doc}")
 
 
 class ConfigManager(object):
