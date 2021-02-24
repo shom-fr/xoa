@@ -63,14 +63,14 @@ Get the default values:
 
     pprint(CFGM.defaults.dict())
 
-Extend the validation capabilities
-==================================
+Extending the validation capabilities
+=====================================
 
 One can add user validation fonctions to the default ones.
 
 Use the :func:`~xoa.cfgm.print_validation_fonctions` function to print
 the list of validation functions.
-In the following example, only those matching ``*time*`` are printed:
+In the following example, only those matching ``*datetime*`` are printed:
 
 .. ipython:: python
 
@@ -107,8 +107,8 @@ an entry to an angle in degrees within [0, 360):
     print(validator.check("angle(radians=True)", 180+360))
 
 
-Use the :mod:`argparse` capabilities
-====================================
+Using the :mod:`argparse` capabilities
+======================================
 
 The :class:`~xoa.cfgm.ConfigManager` has the capability to generate
 commandline options from the configuration specifications thanks to
@@ -170,13 +170,13 @@ the ``--short-help`` and ``--long--help`` in addition to the
 ``--help`` option.
 
 .. note:: The previous example can be compacted using the
-    :func:`~xoa.cfgm.argparse` function::
+    :func:`~xoa.cfgm.cfgargparse` function::
 
         cfg, args = cfgargparse(cfgspecsfile, parser=parser, getargs=True)
 
 
-Convert to ``.rst`` format
-==========================
+Converting to ``.rst`` format
+==============================
 
 The config manager instance is exportable to `rst` declaration
 for documentation purpose.
@@ -185,5 +185,28 @@ for documentation purpose.
 
     print(CFGM.get_rst())
 
-Combined with a little home made sphinx extension, one can easily
-document a configuration.
+The result is the following.
+
+.. include:: uses.cfgm.cfg2rst.rst
+
+These above sphinx declarations need two objet types to be declared, either
+in the :file:`conf.py` file of the documentation or
+in an home-made extension::
+
+    def setup(app):
+
+        app.add_css_file('custom.css')
+
+        app.add_object_type('confopt', 'confopt',
+                            objname='configuration option',
+                            indextemplate='pair: %s; configuration option')
+        app.add_object_type('confsec', 'confsec',
+                            objname='configuration section',
+                            indextemplate='pair: %s; configuration section')
+
+The name of these types are parameters of the
+:func:`~xoa.cfgm.cfg2rst` function
+(and :func:`~xoa.cfgm.CofigManager.get_rst` method).
+
+Combined with a little sphinx extension, one can easily
+document a python package configuration system.
