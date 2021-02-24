@@ -61,26 +61,18 @@ def test_convolve():
 
 def test_erode_mask():
 
-    da_in = da3d.copy()
+    da_in = xr.DataArray(
+        np.random.normal(size=(2, 9, 11)), dims=('nt', 'ny', 'nx'))
     nt, ny, nx = da_in.shape
-    da_in[:, int(ny/3):int(2*ny/3), int(nx/3):int(2*nx/3)] = np.nan
+    i0, n = 2, 5
+    da_in[:, i0:i0+n, i0:i0+n] = np.nan
 
     # iteration
-    da_out = xfilter.erode_mask(da_in, 2)
-    assert int(da_out.sum()) == -25
-    assert int(da_out.count()) == 69930
-
-    # check average
-    da_out = xfilter.erode_mask(da_in*0+1, 2)
-    assert da_out.mean() == 1
+    da_out_iter = xfilter.erode_mask(da_in, 2)
+    assert int(da_out_iter[1].count()) == (
+        da_in[1].size - (n-4)**2)
 
     # until mask
-    mask = np.zeros((ny, nx), dtype='?')
-    ny2 = int(ny/2)
-    nx2 = int(nx/2)
-    xpad = int(nx/10)
-    ypad = int(ny/10)
-    mask[ny2-ypad:ny2+ypad+1, nx2-xpad:nx2+xpad+1] = True
-    da_out = xfilter.erode_mask(da_in, mask)
-    assert int(da_out.sum()) == -21
-    assert int(da_out.count()) == 72570
+    mask = np.isnan(da_out_iter)
+    da_out_until = xfilter.erode_mask(da_in, mask)
+    np.testing.assert_allclose(da_out_iter, da_out_until)
