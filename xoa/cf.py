@@ -1206,7 +1206,10 @@ class CFSpecs(object):
                 return category, name
         return None, None
 
-    def search_coord(self, dsa, name=None, loc="any", get="obj", single=True):
+    @ERRORS.format_method_docstring
+    def search_coord(
+            self, dsa, name=None, loc="any", get="obj", single=True,
+            errors="warn"):
         """Search for a coord that maches given or any specs
 
         Parameters
@@ -1214,16 +1217,17 @@ class CFSpecs(object):
         dsa: DataArray or Dataset
         name: str, dict
             A CF name. If not provided, all CF names are scaned.
-        loc: str, {"any", None}, {"", False}
+        loc: str, {{"any", None}}, {{"", False}}
             - str: one of these locations
             - None or "any": any
             - False or '"": no location
-        get: {"obj", "name"}
+        get: {{"obj", "name"}}
             When found, get the object found or its name.
         single: bool
             If True, return the first item found or None.
             If False, return a possible empty list of found items.
             A warning is emitted when set to True and multiple item are found.
+        {errors}
 
         Returns
         -------
@@ -1238,20 +1242,20 @@ class CFSpecs(object):
             @suppress
             import xarray as xr, numpy as np
             lon = xr.DataArray([2, 3], dims='foo',
-                               attrs={'standard_name': 'longitude'})
+                               attrs={{'standard_name': 'longitude'}})
             data = xr.DataArray([0, 1], dims=('foo'), coords=[lon])
             cfspecs = get_cf_specs()
             cfspecs.search_coord(data, "lon")
             cfspecs.search_coord(data, "lon", get="name")
-            cfspecs.search_coord(data, "lat")
+            cfspecs.search_coord(data, "lat", errors="ignore")
 
         See also
         --------
         search_data_var
         CFCoordSpecs.search
         """
-        return self.coords.search(dsa, name=name, loc=loc, get=get,
-                                  single=single)
+        return self.coords.search(
+            dsa, name=name, loc=loc, get=get, single=single, errors=errors)
 
     def search_dim(self, da, dim_type=None, loc="any"):
         """Search for a dimension from its type
@@ -1289,8 +1293,10 @@ class CFSpecs(object):
         """
         return self.coords.search_from_dim(da, dim)
 
-    def search_data_var(self, dsa, name=None, loc="any", get="obj",
-                        single=True):
+    @ERRORS.format_method_docstring
+    def search_data_var(
+            self, dsa, name=None, loc="any", get="obj", single=True,
+            errors="warn"):
         """Search for a data_var that maches given or any specs
 
         Parameters
@@ -1298,16 +1304,17 @@ class CFSpecs(object):
         dsa: DataArray or Dataset
         name: str, dict
             A CF name. If not provided, all CF names are scaned.
-        loc: str, {"any", None}, {"", False}
+        loc: str, {{"any", None}}, {{"", False}}
             - str: one of these locations
             - None or "any": any
             - False or '"": no location
-        get: {"obj", "name"}
+        get: {{"obj", "name"}}
             When found, get the object found or its name.
         single: bool
             If True, return the first item found or None.
             If False, return a possible empty list of found items.
             A warning is emitted when set to True and multiple item are found.
+        {errors}
 
         Returns
         -------
@@ -1316,6 +1323,7 @@ class CFSpecs(object):
         Example
         -------
         .. ipython:: python
+            :okwarning:
 
             @suppress
             from xoa.cf import get_cf_specs
@@ -1323,8 +1331,8 @@ class CFSpecs(object):
             import xarray as xr, numpy as np
             data = xr.DataArray(
                 [0, 1], dims=('x'),
-                attrs={'standard_name': 'sea_water_temperature'})
-            ds = xr.Dataset({'foo': data})
+                attrs={{'standard_name': 'sea_water_temperature'}})
+            ds = xr.Dataset({{'foo': data}})
             cfspecs = get_cf_specs()
             cfspecs.search_data_var(ds, "temp")
             cfspecs.search_data_var(ds, "temp", get="name")
@@ -1335,8 +1343,8 @@ class CFSpecs(object):
         search_coord
         CFVarSpecs.search
         """
-        return self.data_vars.search(dsa, name=name, loc=loc, get=get,
-                                     single=single)
+        return self.data_vars.search(
+            dsa, name=name, loc=loc, get=get, single=single, errors=errors)
 
     @ERRORS.format_method_docstring
     def search(self, dsa, name=None, loc="any", get="obj",
@@ -1382,7 +1390,7 @@ class CFSpecs(object):
         msg = "Search failed"
         if errors == "warn":
             xoa_warn(msg)
-        else:
+        elif errors == "raise":
             raise XoaCFError(msg)
 
     def get(self, dsa, name, get="obj"):
@@ -1713,13 +1721,13 @@ class _CFCatSpecs_(object):
             Include only these attributes
         exclude: str, list
             Exclude these attributes
-        mode: "silent", "warning" or "error".
         multi: bool
             Get standard_name and long_name attribute as a list of possible
             values
         {errors}
+
         **extra
-          Extra params as included as extra attributes
+          Extra params are included as extra attributes
 
         Return
         ------

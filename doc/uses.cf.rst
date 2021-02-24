@@ -1,7 +1,7 @@
 .. _usages.cf:
 
-Using the :mod:`xoa.cf` module
-##############################
+CF compliant data with :mod:`xoa.cf`
+####################################
 
 Introduction
 ============
@@ -16,6 +16,17 @@ It has two intents:
 * Formatting :class:`xarray.DataArray` variables or coordinates with
   unique ``name``, and ``standard_name``, ``long_name`` and ``units``
   attributes, with support of staggered grid location syntax.
+
+.. note:: This module shares common feature with the excellent and long
+    awaited `xf_xarray <https://cf-xarray.readthedocs.io/en/latest/>`_
+    package, but started a long time before with the Vacumm package.
+    Among the main differences are :
+
+    - The current module is also designed for data variables, not only
+      coordinates.
+    - It is not only available as accessors, but also as independant
+      objects that can be configured for each type of dataset or in
+      contexts.
 
 Accessing the current specifications
 ====================================
@@ -261,6 +272,7 @@ capabilities.
 Here are examples of use:
 
 .. ipython:: python
+    :okwarning:
 
     temp
     temp.cfd.get("lon") # access by .get

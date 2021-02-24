@@ -23,7 +23,7 @@ To this end, the library relies on the following libraries, among others:
     All plots are made with them, with an extra layer that
     prevents the user from making certain choices or
     explicitly providing certain parameters.
-`xesmf <https://xesmf.readthedocs.io/en/latest/>`_ and `scipy.interpolate <https://docs.scipy.org/doc/scipy/reference/interpolate.html>`_
+`xesmf <https://xesmf.readthedocs.io/en/latest/>`_ and `scipy.interpolate <https://docs.scipy.org/doc/scipy/reference/interpolate.html>`_ and `numba <https://numba.pydata.org/>`_
     :mod:`xesmf` is used to perform efficient and valid regridding between
     structured grids.
     :mod:`scipy.interpolate` helps performing interpolations
@@ -32,6 +32,7 @@ To this end, the library relies on the following libraries, among others:
     xoa adds missing capabilities such as the ability to make 1D interpolations
     with coordinates that varies along other dimensions, which is often
     the case for the vertical coordinate of ocean models.
+    The interpolation routines are accelerated with :mod:`numba`.
 
 For those who know `vacumm <https://github.com/VACUMM/vacumm>`_,
 xoa a light weight, faster and more flexible version,
@@ -62,13 +63,13 @@ with the :mod:`xoa.sigma` module.
 Interpolations
 --------------
 
-The :mod:`fortran interpolation routines <xoa._interp>` are implemented.
-Calling python routines such as :func:`xoa.regrid.regrid1d` still have to be
-implemented.
-The interpolation engine must always be these xoa fortran routines by default
-because they fulfill all basic requirements.
-One can however imagine the possibility of using scipy's
-abilities when it is appropriate to do so.
+The :mod:`low level interpolation routines <xoa.interp>` are
+accelarated with numba.
+They are designed to provide efficient and pure numeric routines
+to perform interpolations that are not provided by other packages
+because of the complex ocean coordinates.
+The :func:`xoa.regrid` module is intended to provide routines that help
+calling the low level routines with xarray data and coordinates.
 
 Graphics
 --------

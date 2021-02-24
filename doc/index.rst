@@ -14,7 +14,7 @@
    :maxdepth: 1
    :hidden:
 
-   usages.cf
+   uses
    cli
    examples
 

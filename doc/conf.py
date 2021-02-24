@@ -82,7 +82,8 @@ autosummary_generate = True
 intersphinx_mapping = {
     'cmocean': ('https://matplotlib.org/cmocean/', None),
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None),
-    'numpy': ("https://docs.scipy.org/doc/numpy/", None),
+    'numba:': ('https://numba.readthedocs.io/en/stable/', None),
+    'numpy': ("https://numpy.org/doc/stable/", None),
     'proplot': ('https://proplot.readthedocs.io/en/latest/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
     'xarray': ('http://xarray.pydata.org/en/stable/', None),

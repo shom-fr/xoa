@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Configuration management utilities based on :mod:`configobj`"""
+"""Configuration management utilities based on :mod:`configobj`
+
+.. rubric:: Usage
+
+See the :ref:`usages.cfgm` section.
+
+"""
 # Copyright 2020-2021 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,8 +35,9 @@ from warnings import warn
 
 import validate
 from configobj import ConfigObj, flatten_errors
-from validate import (ValidateError, Validator, VdtMissingValue, VdtTypeError,
-                      VdtValueTooBigError, VdtValueTooSmallError)
+from validate import (
+    ValidateError, Validator, VdtTypeError,
+    VdtValueTooBigError, VdtValueTooSmallError)
 
 from .__init__ import XoaError, XoaWarning, xoa_warn
 
@@ -187,7 +194,7 @@ def _valwraplist_(validator):
     return list_validator_wrapper
 
 
-def validator_bbox(value, default=None):
+def is_bbox(value, default=None):
     """Parse bbox coordinates with value format: x1,y1,x2,y2"""
     if str(value) == "None":
         return None
@@ -202,10 +209,10 @@ def validator_bbox(value, default=None):
     return list(map(float, c))
 
 
-def validator_numerics(
+def is_numerics(
     value, default=None, min=None, max=None, type="float", n=None
 ):
-    """Validator function of a tuple of numeric values"""
+    """Validation function of a tuple of numeric values"""
     if isinstance(value, str):
         value = value.strip("()[] ")
     if str(value) == "None":
@@ -247,11 +254,11 @@ def validator_numerics(
     return out
 
 
-def validator_minmax(
+def is_minmax(
     value, min=None, max=None, default=(0, 100), type="float"
 ):
-    """Validator function of a min,max pair"""
-    value = validator_numerics(
+    """Validation function of a min,max pair"""
+    value = is_numerics(
         value, min=min, max=max, default=default, type=type, n=2
     )
     if value is not None:
@@ -261,15 +268,15 @@ def validator_minmax(
     return value
 
 
-def validator_figsize(value, default=(6, 6), min=0, max=20):
-    """Validator function of a figure size (xsize,ysize)"""
-    return validator_numerics(
+def is_figsize(value, default=(6, 6), min=0, max=20):
+    """Validation function of a figure size (xsize,ysize)"""
+    return is_numerics(
         value, default=default, min=min, max=max, type="float", n=2
     )
 
 
-def validator_interval(value, default=None):
-    """Validator function of an interval of coordinates (min, max [,bounds])"""
+def is_interval(value, default=None):
+    """Validation function of an interval of coordinates (min,max[,bounds])"""
     if isinstance(value, str):
         value = value.strip("()[] ")
     if str(value) == "None":
@@ -300,8 +307,8 @@ def validator_interval(value, default=None):
     return out
 
 
-def validator_cmap(value, default=None):
-    """Validator function that return a :`xoa.color.CmapAdapter`"""
+def is_cmap(value, default=None):
+    """Validation function that return a :`xoa.color.CmapAdapter`"""
     if str(value) == "None":
         return None
     from .color import CmapAdapter
@@ -319,7 +326,7 @@ class VdtDateTimeError(ValidateError):
     pass
 
 
-def validator_path(value, default="", expand=None):
+def is_path(value, default="", expand=None):
     """Parse a value as a path
 
     Parameters
@@ -339,7 +346,7 @@ def validator_path(value, default="", expand=None):
     return value
 
 
-def validator_pydatetime(value, default=None, fmt="%Y-%m-%dT%H:%M:%S"):
+def is_pydatetime(value, default=None, fmt="%Y-%m-%dT%H:%M:%S"):
     """Parse value as a :class:`datetime.datetime` object"""
     import datetime
 
@@ -353,8 +360,8 @@ def validator_pydatetime(value, default=None, fmt="%Y-%m-%dT%H:%M:%S"):
         raise VdtDateTimeError(e)
 
 
-# def validator_timeunits(value, default="days since 1950-01-01"):
-#     """Validator function of standard time units"""
+# def is_timeunits(value, default="days since 1950-01-01"):
+#     """Validation function of standard time units"""
 #     from .atime import are_valid_units
 #     value = str(value)
 #     if value == "None" or not value:
@@ -364,8 +371,8 @@ def validator_pydatetime(value, default=None, fmt="%Y-%m-%dT%H:%M:%S"):
 #     return value
 
 
-def validator_cdtime(value, min=None, max=None, default=None):
-    """Validator function of a date (compatible with :func:`cdtime.s2c`)"""
+def is_cdtime(value, min=None, max=None, default=None):
+    """Validation function of a date (compatible with :func:`cdtime.s2c`)"""
     import cdtime
 
     value = str(value).strip()
@@ -382,8 +389,8 @@ def validator_cdtime(value, min=None, max=None, default=None):
     return value
 
 
-def validator_timestamp(value, default=None):
-    """Validator function of date as parsable by :func:`pandas.Timestamp`"""
+def is_timestamp(value, default=None):
+    """Validation function of date as parsable by :func:`pandas.Timestamp`"""
     if str(value) == "None":
         return
     import pandas as pd
@@ -391,8 +398,8 @@ def validator_timestamp(value, default=None):
     return pd.Timestamp(value)
 
 
-def validator_timedelta(value, default=None):
-    """Validator function of date as parsable by :func:`pandas.Timedelta`"""
+def is_timedelta(value, default=None):
+    """Validation function of date as parsable by :func:`pandas.Timedelta`"""
     if str(value) == "None":
         return
     if not isinstance(value, list) or len(value) != 2:
@@ -402,8 +409,8 @@ def validator_timedelta(value, default=None):
     return pd.Timedelta(float(value[0]), value[1])
 
 
-def validator_timedelta64(value, default=None):
-    """Validator function of date as parsable by :func:`numpy.timedelta64`"""
+def is_timedelta64(value, default=None):
+    """Validation function of date as parsable by :func:`numpy.timedelta64`"""
     if str(value) == "None":
         return
     if not isinstance(value, list) or len(value) != 2:
@@ -413,23 +420,23 @@ def validator_timedelta64(value, default=None):
     return np.timedelta64(float(value[0]), value[1])
 
 
-def validator_datetime(value, default=None):
-    """Validator function to magically create a :class:`datetime.datetime`"""
-    value = validator_timestamp(value, default=default)
+def is_datetime(value, default=None):
+    """Validation function to magically create a :class:`datetime.datetime`"""
+    value = is_timestamp(value, default=default)
     if str(value) == "None":
         return
     return value.to_pydatetime()
 
 
-def validator_datetime64(value, default=None):
-    """Validator function to create a :class:`numpy.datetime64`"""
+def is_datetime64(value, default=None):
+    """Validation function to create a :class:`numpy.datetime64`"""
     if str(value) == "None":
         return
-    return validator_timestamp(value, default=default).to_datetime64()
+    return is_timestamp(value, default=default).to_datetime64()
 
 
-def validator_daterange(value, default=None):
-    """Validator function of a date range created with :func:`pandas.date_range`"""
+def is_daterange(value, default=None):
+    """Validation function of a :func:`pandas.date_range`"""
     if str(value) == "None":
         return
     if not isinstance(value, list) or len(value) not in [3, 4]:
@@ -440,8 +447,8 @@ def validator_daterange(value, default=None):
     return pd.time_range(value[0], value[1], value[2], closed)
 
 
-def validator_daterange64(value, default=None):
-    """Validator function of a date range created with :func:`numpy.arange`"""
+def is_daterange64(value, default=None):
+    """Validation function of a date range created with :func:`numpy.arange`"""
     if str(value) == "None":
         return
     if not isinstance(value, list) or len(value) != 3:
@@ -451,7 +458,7 @@ def validator_daterange64(value, default=None):
     return np.arange(value[0], value[1], dtype="M8[{}]".format(value[2]))
 
 
-def validator_eval(value, default=None, unchanged_if_failed=True):
+def is_eval(value, default=None, unchanged_if_failed=True):
     """Validate a string that can be evaluated"""
     try:
         value = eval(str(value))
@@ -463,7 +470,8 @@ def validator_eval(value, default=None, unchanged_if_failed=True):
     return value
 
 
-def validator_color(value, default="k", alpha=False, as256=None):
+def is_color(value, default="k", alpha=False, as256=None):
+    """Validate a matplotlib compatible color"""
     if str(value) == "None":
         return None
     from matplotlib.colors import ColorConverter
@@ -500,8 +508,8 @@ _re_acc = re.compile(r"^\s*(\{.*\})\s*$").match  # {...}
 _re_set = re.compile(r"^\s*(\w+)\s*=\s*(.+)\s*$").match  # a=b
 
 
-def validator_dict(value, default={}, vtype=None):
-    """Validator function for dictionaries
+def is_dict(value, default={}, vtype=None):
+    """Validation function for dictionaries
 
     Examples
     --------
@@ -555,27 +563,27 @@ VALIDATOR_SPECS = {
     "string": validate.is_string,
     "option": validate.is_option,
     # single value
-    "date": validator_cdtime,
-    "cdtime": validator_cdtime,
-    "pydatetime": validator_pydatetime,
-    "datetime": validator_datetime,
-    "datetime64": validator_datetime64,
-    "timestamp": validator_timestamp,
-    "daterange": validator_daterange,
-    # "timeunits": validator_timeunits,
-    "minmax": validator_minmax,
-    "numerics": validator_numerics,
-    "figsize": validator_figsize,
-    "bbox": validator_bbox,
-    "datetime": validator_datetime,
-    "file": validator_path,
-    "path": validator_path,
-    "directory": validator_path,
-    "interval": validator_interval,
-    "eval": validator_eval,
-    "cmap": validator_cmap,
-    "color": validator_color,
-    "dict": validator_dict,
+    "date": is_cdtime,
+    "cdtime": is_cdtime,
+    "pydatetime": is_pydatetime,
+    "datetime": is_datetime,
+    "datetime64": is_datetime64,
+    "timestamp": is_timestamp,
+    "daterange": is_daterange,
+    # "timeunits": is_timeunits,
+    "minmax": is_minmax,
+    "numerics": is_numerics,
+    "figsize": is_figsize,
+    "bbox": is_bbox,
+    "datetime": is_datetime,
+    "file": is_path,
+    "path": is_path,
+    "directory": is_path,
+    "interval": is_interval,
+    "eval": is_eval,
+    "cmap": is_cmap,
+    "color": is_color,
+    "dict": is_dict,
     # lists validators for these scalars will be automatically generated
 }
 
@@ -647,7 +655,7 @@ for key in VALIDATOR_TYPES:
 __doc__ = __doc__.format(" ".join(_for_doc))
 
 
-def register_validator_functions(**kwargs):
+def register_validation_functions(**kwargs):
     """Add a new configobj validator functions
 
     Example
@@ -655,31 +663,41 @@ def register_validator_functions(**kwargs):
     .. ipython:: python
 
         @suppress
-        from xoa.cfgm import register_validator_functions
+        from xoa.cfgm import register_validation_functions
 
-        def upper_string(mystr, default=""):
+        def is_upper_string(mystr, default=""):
             mystr = str(mystr)
             if mystr == "None":
                 mystr = ""
             return str(mystr).upper()
 
-        register_validator_functions(upper_string=upper_string)
+        register_validation_functions(is_upper_string=is_upper_string)
 
     """
     VALIDATOR_SPECS.update(**kwargs)
     _update_registry_()
 
 
-def print_validator_functions(pattern="*"):
+def print_validation_functions(pattern="*"):
     """Print available xoa validator functions
-    
+
     Parameters
     ----------
     pattern: str
         Only print function that matches this string
+
+    Example
+    -------
+
+    .. ipython:: python
+
+        @suppress
+        from xoa.cfgm import print_validation_functions
+
+        print_validation_functions("*time*")
+
     """
     from fnmatch import fnmatch
-    import inspect
     for name in VALIDATOR_TYPES:
         specs = VALIDATOR_SPECS[name]
         func = specs["base_func"]
@@ -842,6 +860,8 @@ class ConfigManager(object):
             cfg.inline_comments = self._configspec.inline_comments
         return cfg
 
+    defaults = property(fget=get_defaults, doc="Default config")
+
     def reset(
         self, cfgfile="config.cfg", backup=True, nocomments=True, verbose=True
     ):
@@ -867,7 +887,7 @@ class ConfigManager(object):
         """
 
         # Load defaults
-        cfg = self.defaults(nocomments=nocomments, interpolation=False)
+        cfg = self.get_defaults(nocomments=nocomments, interpolation=False)
 
         # Remove old file
         if os.path.exists(cfgfile):
@@ -1043,7 +1063,7 @@ class ConfigManager(object):
         nested=None,
         extraopts=None,
     ):
-        """Options (:mod:`argparse`) and config mixer.
+        """Commandline options (:mod:`argparse`) and config mixer.
 
             1. Creates command-line options from config defaults
             2. Parse command-line argument and create a configuration patch
@@ -1185,7 +1205,7 @@ class ConfigManager(object):
             )
 
         # Default config
-        defaults = self.defaults()
+        defaults = self.defaults
 
         # Create global group of options from defaults
         # - inits
@@ -1241,6 +1261,7 @@ class ConfigManager(object):
                 exc=exc,
                 nested=nested,
                 boolean_false=self._boolean_false,
+                validator=self.validator
             )
 
         # Now create a configuration instance from passed options
@@ -1295,7 +1316,7 @@ class ConfigManager(object):
             if getparser:
                 out += (parser,)
             if getargs:
-                options.vacumm_cfg = cfg
+                # options.xoa_cfg = cfg
                 out += (options,)
             return out
 
@@ -1761,6 +1782,7 @@ def _walker_argcfg_setarg_(
     nested=None,
     encoding=None,
     boolean_false=True,
+    validator=None
 ):
     """Walker to set options"""
     # Find option key and output var name
@@ -1768,6 +1790,8 @@ def _walker_argcfg_setarg_(
     pp = _parent_list_(sec)
     varname = "_".join(pp + [key])
     optkey = _cfg2optname_(varname, nested)
+    if validator is None:
+        validator = get_validator()
 
     # Check exceptions
     if key in exc:
@@ -1792,16 +1816,17 @@ def _walker_argcfg_setarg_(
         return wrapper_argparse_type
 
     # Add argument to group
-    type = wrap_argparse_type(
-        spec.get("func", lambda s: s), spec.get("iterable", None)
-    )
+    def func(value):
+        return validator.check(sec.configspec[key], value)
+    # func = spec.get("func", lambda s: s)
+    argtype = wrap_argparse_type(func, spec.get("iterable", None))
     kw = {}
     if boolean_false and spec.get("opttype", "") == "boolean":
         default = sec[key]
         action = "store_true" if default is False else "store_false"
     else:
         action = "store"
-        kw["type"] = type
+        kw["type"] = argtype
     group.add_argument(
         "--" + optkey, action=action, help=_shelp_(sec, key), **kw
     )
@@ -1810,7 +1835,7 @@ def _walker_argcfg_setarg_(
 def _shelp_(
     sec,
     key,
-    format="{shelp} [default: {default)r]",
+    format="{shelp} [default: {default}]",
     mode="auto",
     undoc="Undocumented",
     adddot=True,
@@ -1858,7 +1883,7 @@ def _shelp_(
     if not shelp:
         shelp = undoc
     default = _sdefault_(sec, key)
-    return format.format(locals())
+    return format.format(**locals())
 
 
 def _sdefault_(sec, key):
@@ -2013,7 +2038,7 @@ def cfg2rst(cfg, mode="basic", optrole="confopt", secrole="confsec", **kwargs):
     ----------
     cfg: :class:`ConfigObj`, :class:`ConfigManager`
         In the case of a :class:`ConfigManager`,
-        the :meth:`~ConfigManager.defaults`
+        the :meth:`~ConfigManager.get_defaults`
         are used.
 
     Return
@@ -2024,7 +2049,7 @@ def cfg2rst(cfg, mode="basic", optrole="confopt", secrole="confsec", **kwargs):
         if mode == "specs":
             cfg = cfg.specs
         else:
-            cfg = cfg.defaults()
+            cfg = cfg.defaults
     lines = []
     cfg.walk(
         _walker_cfg2rst_,

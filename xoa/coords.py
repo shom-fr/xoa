@@ -25,11 +25,11 @@ from . import misc
 from . import cf
 
 
-@misc.ERRORS.format_method_docstring
+@misc.ERRORS.format_function_docstring
 def get_lon(da, errors="raise"):
     """Get the longitude coordinate
 
-    Paramaters
+    Parameters
     ----------
     {errors}
 
@@ -40,11 +40,11 @@ def get_lon(da, errors="raise"):
     return cf.get_cf_specs().search(da, 'lon')
 
 
-@misc.ERRORS.format_method_docstring
+@misc.ERRORS.format_function_docstring
 def get_lat(da, errors="raise"):
     """Get the latitude coordinate
 
-    Paramaters
+    Parameters
     ----------
     {errors}
 
@@ -55,11 +55,11 @@ def get_lat(da, errors="raise"):
     return cf.get_cf_specs().search(da, 'lat')
 
 
-@misc.ERRORS.format_method_docstring
+@misc.ERRORS.format_function_docstring
 def get_depth(da, errors="raise"):
     """Get the depth coordinate
 
-    Paramaters
+    Parameters
     ----------
     {errors}
 
@@ -70,11 +70,11 @@ def get_depth(da, errors="raise"):
     return cf.get_cf_specs().search(da, 'depth')
 
 
-@misc.ERRORS.format_method_docstring
+@misc.ERRORS.format_function_docstring
 def get_altitude(da, errors="raise"):
     """Get the altitude coordinate
 
-    Paramaters
+    Parameters
     ----------
     {errors}
 
@@ -85,11 +85,11 @@ def get_altitude(da, errors="raise"):
     return cf.get_cf_specs().search(da, 'altitude')
 
 
-@misc.ERRORS.format_method_docstring
+@misc.ERRORS.format_function_docstring
 def get_level(da, errors="raise"):
     """Get the level coordinate
 
-    Paramaters
+    Parameters
     ----------
     {errors}
 
@@ -100,11 +100,11 @@ def get_level(da, errors="raise"):
     return cf.get_cf_specs().coords.search(da, 'level')
 
 
-@misc.ERRORS.format_method_docstring
+@misc.ERRORS.format_function_docstring
 def get_vertical(da, errors="raise"):
     """Get either depth or altitude
 
-    Paramaters
+    Parameters
     ----------
     {errors}
 
@@ -126,11 +126,11 @@ def get_vertical(da, errors="raise"):
         return height
 
 
-@misc.ERRORS.format_method_docstring
+@misc.ERRORS.format_function_docstring
 def get_time(da):
     """Get the time coordinate
 
-    Paramaters
+    Parameters
     ----------
     {errors}
 
@@ -141,11 +141,11 @@ def get_time(da):
     return cf.get_cf_specs().coords.search(da, 'time')
 
 
-@misc.ERRORS.format_method_docstring
+@misc.ERRORS.format_function_docstring
 def get_cf_coords(da, coord_names, errors="raise"):
     """Get several coordinates
 
-    Paramaters
+    Parameters
     ----------
     {errors}
 
