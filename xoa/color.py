@@ -17,7 +17,6 @@ Colors and colormaps utilities
 # limitations under the License.
 
 
-
 import warnings
 
 import cmocean
