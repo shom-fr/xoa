@@ -187,7 +187,7 @@ for documentation purpose.
 
 The result is the following.
 
-.. include:: uses.cfgm.cfg2rst.rst
+.. include:: uses.cfgm.cfg2rst.txt
 
 These above sphinx declarations need two objet types to be declared, either
 in the :file:`conf.py` file of the documentation or

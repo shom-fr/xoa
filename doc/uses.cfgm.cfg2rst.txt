@@ -1,0 +1,37 @@
+.. confsec:: [logger]
+
+    Logging system
+
+    .. confopt:: [logger] level
+
+        | default: ``info``
+        | type: ``option``
+        | args: ``debug, info, error``
+
+        Logging level
+
+    .. confopt:: [logger] name
+
+        | default: ``root``
+        | type: ``string``
+
+        Logger name
+
+.. confsec:: [domain]
+
+
+
+    .. confopt:: [domain] xlim
+
+        | default: ``-20, 0``
+        | type: ``floats``
+        | n: ``2``
+
+        Min and max longitudes
+
+    .. confopt:: [domain] ylim
+
+        | default: ``40, 50``
+        | type: ``floats``
+        | n: ``2``
+
