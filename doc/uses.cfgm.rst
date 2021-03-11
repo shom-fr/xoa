@@ -11,7 +11,7 @@ The :mod:`xoa.cfgm` module facilitates and extends the functionality
 offered by the excellent
 `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_
 configuration file reading and validation package.
-It makes the global usage slightly easier and hads support for
+It makes the global usage slightly easier and adds support for
 plurals forms and for exporting the specifications
 to a commandline options and rst declarations.
 

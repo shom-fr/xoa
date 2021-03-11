@@ -71,6 +71,13 @@ def nearest1d(vari, yi, yo):
         With `nx=max(nxi, nxo)`
     """
     # Shapes
+    if vari.ndim > yo.ndim:
+        eshapes = vari.shape[:-1]
+    else:
+        eshapes = yo.shape[:-1]
+    vari = vari.reshape(-1, vari.shape[-1])
+    yi = yi.reshape(-1, yi.shape[-1])
+    yo = yo.reshape(-1, yo.shape[-1])
     nxi, nyi = vari.shape
     nxiy = yi.shape[0]
     nxi, nyi = vari.shape
@@ -119,6 +126,8 @@ def nearest1d(vari, yi, yo):
                 else:
                     varo[ix, iyo] = vari[ixi, iyi+1]
 
+    varo = varo.reshape(eshapes+varo.shape[-1:])
+
     return varo
 
 
@@ -143,6 +152,13 @@ def linear1d(vari, yi, yo, bias=0., tension=0.):
         With `nx=max(nxi, nxo)`
     """
     # Shapes
+    if vari.ndim > yo.ndim:
+        eshapes = vari.shape[:-1]
+    else:
+        eshapes = yo.shape[:-1]
+    vari = vari.reshape(-1, vari.shape[-1])
+    yi = yi.reshape(-1, yi.shape[-1])
+    yo = yo.reshape(-1, yo.shape[-1])
     nxi, nyi = vari.shape
     nxiy = yi.shape[0]
     nxi, nyi = vari.shape
@@ -202,6 +218,8 @@ def linear1d(vari, yi, yo, bias=0., tension=0.):
         #             if yo[ixoy, iyo] > yi[ixiy, -1]:
         #                 varo[ix, iyo] = vari[ixi, -1]
 
+    varo = varo.reshape(eshapes+varo.shape[-1:])
+
     return varo
 
 
@@ -226,6 +244,13 @@ def cubic1d(vari, yi, yo):
         With `nx=max(nxi, nxo)`
     """
     # Shapes
+    if vari.ndim > yo.ndim:
+        eshapes = vari.shape[:-1]
+    else:
+        eshapes = yo.shape[:-1]
+    vari = vari.reshape(-1, vari.shape[-1])
+    yi = yi.reshape(-1, yi.shape[-1])
+    yo = yo.reshape(-1, yo.shape[-1])
     nxi, nyi = vari.shape
     nxiy = yi.shape[0]
     nxi, nyi = vari.shape
@@ -289,6 +314,8 @@ def cubic1d(vari, yi, yo):
                     varo[ix, iyo] += mu*(vari[ix, iyi+1] - vc0)
                     varo[ix, iyo] += vari[ix, iyi]
 
+    varo = varo.reshape(eshapes+varo.shape[-1:])
+
     return varo
 
 
@@ -315,6 +342,13 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
         With `nx=max(nxi, nxo)`
     """
     # Shapes
+    if vari.ndim > yo.ndim:
+        eshapes = vari.shape[:-1]
+    else:
+        eshapes = yo.shape[:-1]
+    vari = vari.reshape(-1, vari.shape[-1])
+    yi = yi.reshape(-1, yi.shape[-1])
+    yo = yo.reshape(-1, yo.shape[-1])
     nxi, nyi = vari.shape
     nxiy = yi.shape[0]
     nxi, nyi = vari.shape
@@ -388,6 +422,8 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
                         (1-bias)*(1-tension)/2)
                     varo[ix, iyo] += a3*vari[ix, iyi+1]
 
+    varo = varo.reshape(eshapes+varo.shape[-1:])
+
     return varo
 
 
@@ -446,6 +482,13 @@ def cellave1d(vari, yib, yob, conserv=False, extrap="no"):
         With `nx=max(nxi, nxo)`
     """
     # Shapes
+    if vari.ndim > yob.ndim:
+        eshapes = vari.shape[:-1]
+    else:
+        eshapes = yob.shape[:-1]
+    vari = vari.reshape(-1, vari.shape[-1])
+    yib = yib.reshape(-1, yib.shape[-1])
+    yob = yob.reshape(-1, yob.shape[-1])
     nxi, nyib = vari.shape
     nxiy, nyi = yib.shape
     nxi, nyi = vari.shape
@@ -512,6 +555,8 @@ def cellave1d(vari, yib, yob, conserv=False, extrap="no"):
                     varo[ix, iyo] /= wo
                 else:
                     varo[ix, iyo] = np.nan
+
+    varo = varo.reshape(eshapes+varo.shape[-1:])
 
     return varo
 
