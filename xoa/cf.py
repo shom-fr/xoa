@@ -1257,24 +1257,28 @@ class CFSpecs(object):
         return self.coords.search(
             dsa, name=name, loc=loc, get=get, single=single, errors=errors)
 
-    def search_dim(self, da, dim_type=None, loc="any"):
+    @ERRORS.format_method_docstring
+    def search_dim(self, da, dim_type=None, loc="any", errors="ignore"):
         """Search for a dimension from its type
 
         Parameters
         ----------
         da: xarray.DataArray
-        dim_type: None, {"x", "y", "z", "t", "f"}
+        dim_type: None, {{"x", "y", "z", "t", "f"}}
             Dimension type
         loc:
             Location
+        {errors}
 
         See also
         --------
         CFCoordSpecs.search_dim
         """
-        return self.coords.search_dim(da, dim_type=dim_type, loc=loc)
+        return self.coords.search_dim(
+            da, dim_type=dim_type, loc=loc, errors=errors)
 
-    def search_coord_from_dim(self, da, dim):
+    @ERRORS.format_method_docstring
+    def search_coord_from_dim(self, da, dim, errors="ignore"):
         """Search a dataarray for a coordinate from a dimension name
 
         It first searches for a coordinate with the same name and that is
@@ -1285,13 +1289,14 @@ class CFSpecs(object):
         ----------
         da: xarray.DataArray
         dim: str
+        {errors}
 
         Return
         ------
         xarray.DataArray, None
             An coordinate array or None
         """
-        return self.coords.search_from_dim(da, dim)
+        return self.coords.search_from_dim(da, dim, errors=errors)
 
     @ERRORS.format_method_docstring
     def search_data_var(
@@ -2062,7 +2067,8 @@ class CFCoordSpecs(_CFCatSpecs_):
             return dim_types
         return tuple(dim_types.values())
 
-    def search_dim(self, da, dim_type=None, loc="any"):
+    @ERRORS.format_method_docstring
+    def search_dim(self, da, dim_type=None, loc="any", errors="ignore"):
         """Search a dataarray for a dimension name according to its type
 
         First, scan the dimension names.
@@ -2073,10 +2079,11 @@ class CFCoordSpecs(_CFCatSpecs_):
         ----------
         da: xarray.DataArray
             Coordinate or data array
-        dim_type: {"x", "y", "z", "t", "f"}, None
+        dim_type: {{"x", "y", "z", "t", "f"}}, None
             When set to None, it is inferred with :meth:`get_axis`
         loc: "any", letter
             Staggered grid location
+        {errors}
 
         Return
         ------
@@ -2113,14 +2120,21 @@ class CFCoordSpecs(_CFCatSpecs_):
 
         # Not found but only 1d and no dim_type specified
         if da.ndim == 1 and not with_dim_type:
+            #FIXME: loop on coordinates?
             return dim, this_dim_type
 
         # Failed
+        errors = ERRORS[errors]
+        if errors == "raise":
+            #TODO: warn here
+            raise XoaCFError(
+                f"No dimension found in dataarray matching type: {dim_type}")
         if with_dim_type:
             return
         return None, None
 
-    def search_from_dim(self, da, dim):
+    @ERRORS.format_method_docstring
+    def search_from_dim(self, da, dim, errors="ignore"):
         """Search a dataarray for a coordinate from a dimension name
 
         It first searches for a coordinate with the same name and that is
@@ -2131,6 +2145,7 @@ class CFCoordSpecs(_CFCatSpecs_):
         ----------
         da: xarray.DataArray
         dim: str
+        {errors}
 
         Return
         ------
@@ -2160,20 +2175,25 @@ class CFCoordSpecs(_CFCatSpecs_):
         #  like dim is not explicit but the coordinate is known
         dim_type = self.get_dim_type(dim, da=da, lower=True)
 
-        # Nothing to do there
-        if dim_type is None:
-            return
+        # So we can do something
+        if dim_type is not None:
 
-        # Look for a coordinate with this dim_type
-        # starting from coordinates with a greater number of dimensions
-        #  like depth that have more dims than level
-        for coord in sorted(da.coords.values(),
-                            key=operator.attrgetter('ndim'),
-                            reverse=True):
-            if dim in coord.dims:
-                coord_dim_type = self.get_axis(coord, lower=True)
-                if coord_dim_type and coord_dim_type == dim_type:
-                    return coord
+            # Look for a coordinate with this dim_type
+            # starting from coordinates with a greater number of dimensions
+            #  like depth that have more dims than level
+            for coord in sorted(da.coords.values(),
+                                key=operator.attrgetter('ndim'),
+                                reverse=True):
+                if dim in coord.dims:
+                    coord_dim_type = self.get_axis(coord, lower=True)
+                    if coord_dim_type and coord_dim_type == dim_type:
+                        return coord
+
+        # Nothing found
+        if ERRORS[errors] == "raise":
+            raise XoaCFError(
+                f"No dataarray coord found from dim: {dim}")
+
 
     @ERRORS.format_method_docstring
     def get_dims(self, da, dim_types, allow_positional=False,
