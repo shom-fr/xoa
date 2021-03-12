@@ -17,9 +17,11 @@ Regridding utilities
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import xarray as xr
 
 from .__init__ import XoaError
 from . import misc
+from . import cf
 from . import coords
 from . import grid
 from . import interp
@@ -43,7 +45,7 @@ class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     hermitian = 3
     #: Cell-averaging or conservative regridding
     cellave = -1
-    # cellerr = -2
+    cellerr = -2
 
 
 class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
@@ -61,13 +63,17 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     yes = 2
 
 
-def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
-             conserv=False, extrap=0, bias=0., tension=0.):
+def regrid1d(
+        da, coord, method=None, dim=None, coord_in_name=None,
+        conserv=False, extrap=0, bias=0., tension=0.):
     """Regrid along a single dimension
 
     The input and output coordinates may vary along other dimensions,
     which useful for instance for vertical interpolation in coastal
     ocean models.
+    Since it uses func:`xarray.apply_ufunc`, it support dask features.
+    The core computation is performed by the numba-accelerated routines
+    of :mod:`xoa.interp`.
 
     Parameters
     ----------
@@ -81,9 +87,12 @@ def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
     dim:  str, tuple(str), None
         Dimension on which to operate. If a string, it is expected to
         be the same dimension for both input and output coordinates.
-        Else, provide a two-element tuple: ``(dim_coord_in, dim_coord_out)``.
+        Else, provide a two-element tuple: ``(dim_in, dim_out)``.
+        It is inferred by default from output coordinate et input data array.
     coord_in_name: str, None
-        Name of the input coordinate array, which must be known of ``da``
+        Name of the input coordinate array, which must be known of ``da``.
+        It is inferred from the input dara array and dimension name
+        by default.
     conserv: bool
         Use conservative regridding when using ``cellave`` method.
     extrap: str, int
@@ -95,45 +104,85 @@ def regrid1d(da, coord, method=None, dim=None, coord_in_name=None,
     xarray.DataArray
         Regridded array with ``coord`` as new coordinate array.
     """
+    # Get the working dimensions
+    if not isinstance(dim, (tuple, list)):
+        dim = (dim, dim)
+    dim_in, dim_out = dim
+    if None in dim or coord_in_name is None:
+        cfspecs = cf.get_cf_specs()
+    # - dim out
+    if dim_out is None:  # get dim_out from coord_out
+        dim_out, dim_type = cfspecs.search_dim(coord, errors="raise")
+    else:  # dim_out is provided
+        dim_type = cfspecs.coords.get_dim_type(dim_out, coord)
+    # - dim in
+    if dim_in is None:
+        if dim_type:
+            dim_in = cfspecs.coords.search_dim(da, dim_type, errors="raise")
+        else:
+            dim_in = dim_out  # be cafeful, dim1 must be in input!
+    assert dim_in in da.dims
+    assert dim_out in coord.dims
 
-    # Array manager
-    dfl = coords.DimFlusher1D(da, coord, dim=dim,
-                              coord_in_name=coord_in_name)
+    # Input coordinate
+    if coord_in_name:
+        assert coord_in_name in da.coords, 'Invalid coordinate'
+        coord_in = da.coords['coord_in_name']
+    else:
+        coord_in = cfspecs.search_coord_from_dim(da, dim_in, errors="raise")
+        coord_in_name = coord_in.name
 
-    # Method
+    # Coordinate arguments
+    output_sizes = {dim_out: coord.sizes[dim_out]}
+    input_core_dims = [[dim_in]]
     method = regrid1d_methods[method]
+    if int(method) < 0:
+        coord_in = grid.get_edges_1d(coord_in, axis=dim_in)
+        coord = grid.get_edges_1d(coord, axis=dim_out)
+        input_core_dims.extend([[dim_in+"_edges"], [dim_out+"_edges"]])
+    else:
+        input_core_dims.extend([[dim_in], [dim_out]])
+    output_core_dims = [[dim_out]]
 
     # Fortran function name and arguments
     func_name = str(method) + "1d"
-    yi = dfl.coord_in_data
-    yo = dfl.coord_out_data
-    func_kwargs = {"vari": dfl.da_in_data}
-    # if not (dfl.coord_in_data.shape[0] == dfl.coord_out_data.shape[0] == 1):  # 1d
-        # if method == regrid1d_methods.cellerr:
-        #     raise XoaRegridError("cellerr regrid method is works only "
-        #                          "with 1D input and output cordinates")
-    if int(method) < 0:
-        func_kwargs.update(yib=grid.get_edges_1d(yi, axis=-1),
-                           yob=grid.get_edges_1d(yo, axis=-1))
-    else:
-        func_kwargs.update(yi=yi, yo=yo)
+    if (not (coord_in.sizes[dim_in] == coord.sizes[dim_out] == 1) and
+            method == regrid1d_methods.cellerr):
+        raise XoaRegridError("cellerr regrid method is works only "
+                             "with 1D input and output cordinates")
     func = getattr(interp, func_name)
+    func_kwargs = {}
     if method == "hermit":
         func_kwargs.update(bias=bias, tension=tension)
 
-    # Regrid
-    varo = func(**func_kwargs)
+    # Apply
+    da_out = xr.apply_ufunc(
+        func,
+        da,
+        coord_in,
+        coord,
+        join="override",
+        kwargs=func_kwargs,
+        input_core_dims=input_core_dims,
+        output_core_dims=output_core_dims,
+        exclude_dims={dim_in, dim_out},
+        dask_gufunc_kwargs={"output_sizes": output_sizes}
+        )
 
-    # Extrap
-    extrap = extrap_modes[extrap]
-    if extrap != extrap_modes.no:
-        varo = interp.extrap1d(varo, extrap)
+    # Transpose
+    dims = list(da.dims)
+    dims[dims.index(dim_in)] = dim_out
+    da_out = da_out.transpose(..., *dims, missing_dims="ignore")
 
-    # Reform back
-    return dfl.get_back(varo)
+    # Add output coordinates
+    coord_out_name = coord.name if coord.name else coord_in.name
+    da_out = da_out.assign_coords({coord_out_name: coord})
+
+    return da_out
 
 
 regrid1d.__doc__ = regrid1d.__doc__.format(**locals())
+
 
 
 def grid2loc(da, loc, compat="warn"):
