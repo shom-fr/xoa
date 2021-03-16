@@ -21,11 +21,10 @@ This follows the CF conventions for
 # limitations under the License.
 
 import re
-import warnings
 
 import numpy as np
 
-from .__init__ import XoaError, xoa_warn
+from .__init__ import xoa_warn
 from . import cf
 from . import coords as xcoords
 
