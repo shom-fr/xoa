@@ -78,9 +78,12 @@ def nearest1d(vari, yi, yo):
         eshapes = vari.shape[:-1]
     else:
         eshapes = yo.shape[:-1]
-    vari = vari.reshape(-1, vari.shape[-1])
-    yi = yi.reshape(-1, yi.shape[-1])
-    yo = yo.reshape(-1, yo.shape[-1])
+    if vari.ndim > 2:
+        vari = np.ascontiguousarray(vari).reshape(-1, vari.shape[-1])
+    if yi.ndim > 2:
+        yi = np.ascontiguousarray(yi).reshape(-1, yi.shape[-1])
+    if yo.ndim > 2:
+        yo = np.ascontiguousarray(yo).reshape(-1, yo.shape[-1])
     nxi, nyi = vari.shape
     nxiy = yi.shape[0]
     nxi, nyi = vari.shape
@@ -159,9 +162,12 @@ def linear1d(vari, yi, yo, bias=0., tension=0.):
         eshapes = vari.shape[:-1]
     else:
         eshapes = yo.shape[:-1]
-    vari = vari.reshape(-1, vari.shape[-1])
-    yi = yi.reshape(-1, yi.shape[-1])
-    yo = yo.reshape(-1, yo.shape[-1])
+    if vari.ndim > 2:
+        vari = np.ascontiguousarray(vari).reshape(-1, vari.shape[-1])
+    if yi.ndim > 2:
+        yi = np.ascontiguousarray(yi).reshape(-1, yi.shape[-1])
+    if yo.ndim > 2:
+        yo = np.ascontiguousarray(yo).reshape(-1, yo.shape[-1])
     nxi, nyi = vari.shape
     nxiy = yi.shape[0]
     nxi, nyi = vari.shape
@@ -251,9 +257,12 @@ def cubic1d(vari, yi, yo):
         eshapes = vari.shape[:-1]
     else:
         eshapes = yo.shape[:-1]
-    vari = vari.reshape(-1, vari.shape[-1])
-    yi = yi.reshape(-1, yi.shape[-1])
-    yo = yo.reshape(-1, yo.shape[-1])
+    if vari.ndim > 2:
+        vari = np.ascontiguousarray(vari).reshape(-1, vari.shape[-1])
+    if yi.ndim > 2:
+        yi = np.ascontiguousarray(yi).reshape(-1, yi.shape[-1])
+    if yo.ndim > 2:
+        yo = np.ascontiguousarray(yo).reshape(-1, yo.shape[-1])
     nxi, nyi = vari.shape
     nxiy = yi.shape[0]
     nxi, nyi = vari.shape
@@ -349,9 +358,12 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
         eshapes = vari.shape[:-1]
     else:
         eshapes = yo.shape[:-1]
-    vari = vari.reshape(-1, vari.shape[-1])
-    yi = yi.reshape(-1, yi.shape[-1])
-    yo = yo.reshape(-1, yo.shape[-1])
+    if vari.ndim > 2:
+        vari = np.ascontiguousarray(vari).reshape(-1, vari.shape[-1])
+    if yi.ndim > 2:
+        yi = np.ascontiguousarray(yi).reshape(-1, yi.shape[-1])
+    if yo.ndim > 2:
+        yo = np.ascontiguousarray(yo).reshape(-1, yo.shape[-1])
     nxi, nyi = vari.shape
     nxiy = yi.shape[0]
     nxi, nyi = vari.shape
@@ -447,6 +459,9 @@ def extrap1d(vari, extrap):
     varo = vari.copy()
     if extrap == "no":
         return varo
+    ishape = vari.shape
+    if vari.ndim > 2:
+        vari = np.ascontiguousarray(vari).reshape(-1, vari.shape[-1])
     nx, ny = vari.shape
 
     # Loop on varying dim
@@ -461,7 +476,7 @@ def extrap1d(vari, extrap):
         if extrap == "both" or extrap == "top":
             varo[ix, iytop+1:] = varo[ix, iytop]
 
-    return varo
+    return varo.reshape(ishape)
 
 
 @numba.njit(parallel=True, cache=True)
@@ -489,9 +504,12 @@ def cellave1d(vari, yib, yob, conserv=False, extrap="no"):
         eshapes = vari.shape[:-1]
     else:
         eshapes = yob.shape[:-1]
-    vari = vari.reshape(-1, vari.shape[-1])
-    yib = yib.reshape(-1, yib.shape[-1])
-    yob = yob.reshape(-1, yob.shape[-1])
+    if vari.ndim > 2:
+        vari = np.ascontiguousarray(vari).reshape(-1, vari.shape[-1])
+    if yib.ndim > 2:
+        yib = np.ascontiguousarray(yib).reshape(-1, yib.shape[-1])
+    if yob.ndim > 2:
+        yob = np.ascontiguousarray(yob).reshape(-1, yob.shape[-1])
     nxi, nyib = vari.shape
     nxiy, nyi = yib.shape
     nxi, nyi = vari.shape
