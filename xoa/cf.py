@@ -2042,8 +2042,8 @@ class CFCoordSpecs(_CFCatSpecs_):
 
         Parameters
         ----------
-        da: xarray.DataArray
-            Data array
+        da: xarray.DataArray or tuple(str)
+            Data array or tuple of dimensions
         unknown:
             Value to assign when type is unknown
         asdict: bool
@@ -2062,7 +2062,12 @@ class CFCoordSpecs(_CFCatSpecs_):
         get_dim_type
         """
         dim_types = {}
-        for dim in da.dims:
+        if isinstance(da, tuple):
+            dims = da
+            da = None
+        else:
+            dims = da.dims
+        for dim in dims:
             dim_type = self.get_dim_type(dim, da=da)
             if dim_type is None:
                 dim_type = unknown
