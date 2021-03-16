@@ -37,7 +37,7 @@ def get_lon(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().search(da, 'lon')
+    return cf.get_cf_specs().search(da, 'lon', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -52,7 +52,7 @@ def get_lat(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().search(da, 'lat')
+    return cf.get_cf_specs().search(da, 'lat', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -67,7 +67,7 @@ def get_depth(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().search(da, 'depth')
+    return cf.get_cf_specs().search(da, 'depth', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -82,7 +82,7 @@ def get_altitude(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().search(da, 'altitude')
+    return cf.get_cf_specs().search(da, 'altitude', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -97,7 +97,7 @@ def get_level(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().coords.search(da, 'level')
+    return cf.get_cf_specs().coords.search(da, 'level', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -127,7 +127,7 @@ def get_vertical(da, errors="raise"):
 
 
 @misc.ERRORS.format_function_docstring
-def get_time(da):
+def get_time(da, errors="raise"):
     """Get the time coordinate
 
     Parameters
@@ -138,7 +138,7 @@ def get_time(da):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().coords.search(da, 'time')
+    return cf.get_cf_specs().coords.search(da, 'time', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -154,7 +154,7 @@ def get_cf_coords(da, coord_names, errors="raise"):
     list(xarray.DataArray)
     """
     cfspecs = cf.get_cf_specs()
-    return [cfspecs.search_coord(da, coord_name)
+    return [cfspecs.search_coord(da, coord_name, errors=errors)
             for coord_name in coord_names]
 
 
@@ -461,15 +461,15 @@ class DimFlusher1D(object):
         return da_out
 
 
-def get_dim_types(dims, unknown=None, asdict=False):
+def get_dim_types(da, unknown=None, asdict=False):
     """Get dimension types
 
     Parameters
     ----------
-    dims: tuple(str) or xarray.DataArray
-        Dimensions or data array
+    da: xarray.DataArray or tuple(str)
+        Data array or tuple of dimensions
     unknown:
-        Vaue to assign to unknown types
+        Value to assign to unknown types
     asdict: bool
         Get the result as dictionary
 
@@ -477,14 +477,13 @@ def get_dim_types(dims, unknown=None, asdict=False):
     ------
     tuple
     """
-    if isinstance(dims, xr.DataArray):
-        da = dims
-        dims = da.dims
-    else:
-        da = None
-    cfspecs = cf.get_cf_specs()
-    return cfspecs.coords.get_dim_types(
-        dims, da=da, unknown=unknown, asdict=asdict)
+    return cf.get_cf_specs().coords.get_dim_types(
+        da, unknown=unknown, asdict=asdict)
+
+
+def get_order(da):
+    """Like :func:`get_dim_types` but returning a string"""
+    return "".join(get_dim_types(da, unknown="-", asdict=False))
 
 
 def reorder(da, order):
@@ -528,3 +527,36 @@ def reorder(da, order):
 
     # Final transpose
     return transpose(da, to_dims)
+
+
+def get_coords_compat_with_dims(da, include_dims=None, exclude_dims=None):
+    """Return the coordinates that are compatible with dims
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Data array
+    include_dims: set(str)
+        If provided, the coordinates must have at least one of these
+        dimensions
+    exclude_dims: set(str)
+        If provided, the coordinates must not have one of these dimnesions
+
+    Return
+    ------
+    list(str)
+        List of coordinates
+    """
+    if isinstance(include_dims, str):
+        include_dims = {include_dims}
+    if isinstance(exclude_dims, str):
+        exclude_dims = {exclude_dims}
+    coords = []
+    for coord in da.coords.values():
+        dims = set(coord.dims)
+        if include_dims and not include_dims.intersection(dims):
+            continue
+        if exclude_dims and exclude_dims.intersection(dims):
+            continue
+        coords.append(coord)
+    return coords

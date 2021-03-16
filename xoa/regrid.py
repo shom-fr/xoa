@@ -17,6 +17,7 @@ Regridding utilities
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import xarray as xr
 
 from .__init__ import XoaError
@@ -103,6 +104,14 @@ def regrid1d(
     -------
     xarray.DataArray
         Regridded array with ``coord`` as new coordinate array.
+
+    See also
+    --------
+    xoa.interp.nearest1d
+    xoa.interp.linear2d
+    xoa.interp.cubic2d
+    xoa.interp.hermit1d
+    xoa.interp.cellave1d
     """
     # Get the working dimensions
     if not isinstance(dim, (tuple, list)):
@@ -184,15 +193,17 @@ def regrid1d(
 regrid1d.__doc__ = regrid1d.__doc__.format(**locals())
 
 
-
 def grid2loc(da, loc, compat="warn"):
     """Interpolate a gridded data array to random locations
+
+    ``da`` and ``loc`` must comply with CF conventions.
 
     Parameters
     ----------
     da: xarray.DataArray
-        A data array with at least an horizontal grid.
-    loc: xarray.Dataset, xarray.DataArray
+        A data array with at least an horizontal rectilinear or
+        a curvilinear grid.
+    loc: xarray.Dataset, xarray.DataArray, pandas.DataFrame
         A dataset or data array with coordinates as 1d arrays
         that share the same dimension.
         For example, such dataset may be initialized as follows::
@@ -210,25 +221,31 @@ def grid2loc(da, loc, compat="warn"):
     ------
     xarray.dataArray
         The interpolated data array.
+
+    See also
+    --------
+    xoa.interp.grid2locs
+    xoa.interp.grid2relloc
+    xoa.interp.grid2rellocs
+    xoa.interp.cell2relloc
     """
 
     # Get coordinates
+    if hasattr(loc, "to_xarray"):
+        loc = loc.to_xarray()
     # - horizontal
-    glon = coords.get_lon(da)
-    glat = coords.get_lat(da)
-    # if set(glon.dims).isdisjoint(glat.dims):
-    #     gdims = glat.dims + glon.dims
-    # else:
-    #     gdims = glon.dims
     order = "yx"
     lons = coords.get_lon(loc)
     lats = coords.get_lat(loc)
+    xo = lons.values
+    yo = lats.values
     # - vertical
     deps = coords.get_vertical(loc, errors="ignore")
     if deps is not None:
         gdep = coords.get_vertical(da, errors=compat)
         if gdep is not None:
             order = "z" + order
+    # - temporal
     times = coords.get_time(loc, errors="ignore")
     if times is not None:
         gtime = coords.get_time(da, errors=compat)
@@ -237,4 +254,73 @@ def grid2loc(da, loc, compat="warn"):
 
     # Transpose following the tzyx order
     da_tmp = coords.reorder(da, order)
-    # TODO: reshape with singleton insertions, also for cordinates
+
+    # To numpy with singletons
+    # - data
+    vi = da_tmp.values
+    for axis_type, axis in (("z", -3), ("t", -4)):
+        if axis_type not in order:
+            vi = np.expand_dims(axis_type, axis)
+    vi = vi.reshape((-1,)+vi.shape[-4:])
+    # - xy
+    glon = coords.get_lon(da_tmp)
+    glat = coords.get_lat(da_tmp)
+    xi = glon.values
+    yi = glat.values
+    dims_in = set(glon.dims).union(glat.dims)
+    coords_out = [lons, lats]
+    if xi.ndim == 1:
+        xi = xi.reshape(1, - 1)
+    if yi.ndim == 1:
+        yi = yi.reshape(-1, 1)
+    # - z
+    if "z" in order:
+        gdep_order = coords.get_order(da_tmp[gdep.name])
+        dims_in.update(gdep.dims)
+        zi = da_tmp[gdep.name].values
+        for axis_type, axis in (("x", -1), ("y", -2), ("t", -4)):
+            if axis_type not in gdep_order:
+                zi = np.expand_dims(zi, axis)
+        zo = deps.values
+        coords_out.append(deps)
+    else:
+        zi = np.zeros((1, 1, 1, 1))
+        zo = np.zeros_like(lons.values)
+    zi = zi.reshape((-1,)+zi.shape[-4:])
+    # - t
+    if "t" in order:
+        # numeric times
+        ti = (
+            (gtime.values - np.datetime64("1950-01-01", "us")) /
+            np.timedelta64(1, "us"))
+        to = (
+            (times.values - np.datetime64("1950-01-01", "us")) /
+            np.timedelta64(1, "us"))
+        dims_in.update(gtime.dims)
+        coords_out.append(times)
+    else:
+        ti = np.zeros(1)
+        to = np.zeros(lons.values)
+
+    # Interpolate
+    vo = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
+
+    # As data array
+    dims_out = [dim for dim in da.dims if dim not in dims_in]
+    sizes_out = [size for dim, size in da.sizes.items() if dim in dims_out]
+    dims_out.extend(loc.dims)
+    sizes_out.append(lons.shape[-1])
+    coords_out = coords_out + coords.get_coords_compat_with_dims(
+        da, exclude_dims=dims_in)
+    da_out = xr.DataArray(
+        vo.reshape(sizes_out),
+        dims=dims_out,
+        coords=dict((coord.name, coord) for coord in coords_out),
+        attrs=da.attrs,
+        name=da.name
+    )
+
+    # Transpose
+    da_out = coords.transpose(da_out, da.dims, mode="compat")
+
+    return da_out
