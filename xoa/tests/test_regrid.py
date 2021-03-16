@@ -7,6 +7,7 @@ import numpy as np
 import xarray as xr
 
 from xoa import regrid
+from test_interp import get_grid2locs_coords, vfunc
 
 
 def test_regrid_regrid1d():
@@ -57,3 +58,52 @@ def test_regrid_regrid1d():
     da_out = regrid.regrid1d(da_in, depth_out, method="linear")
     assert da_out.dims == ('time', "nk", "lon")
     assert not np.isnan(da_out).all()
+
+
+def test_regrid_grid2loc():
+
+    np.random.seed(0)
+
+    # Multi-dimensional generic coordinates
+    nex = 4
+    nexz = 2
+    nxi = 7
+    nyi = 6
+    nzi = 5
+    nti = 4
+    no = 10
+    xxi, yyi, zzi, tti, xo, yo, to, zo = get_grid2locs_coords(
+        nex=nex, nexz=nexz, nxi=nxi, nyi=nyi, nzi=nzi, nti=nti, no=no)
+    ttidt = tti.astype("m8[us]") + np.datetime64("1950-01-01")
+    todt = to.astype("m8[us]") + np.datetime64("1950-01-01")
+    todt = xr.DataArray(todt, dims='time')
+    xo = xr.DataArray(xo, dims="time")
+    yo = xr.DataArray(yo, dims="time")
+    zo = xr.DataArray(zo, dims="time")
+    loc = xr.Dataset(
+        coords={"time": todt, "depth": zo, "lat": yo, "lon": xo})
+
+    # Pure 1D axes
+    xi = xr.DataArray(xxi[0, 0, 0, :], dims='lon')
+    yi = xr.DataArray(yyi[0, 0, :, 0], dims='lat')
+    zi = xr.DataArray(zzi[0, 0, :, 0, 0], dims='depth')
+    ti = xr.DataArray(ttidt[:, 0, 0, 0], dims='time')
+    mi = xr.DataArray(np.arange(nex), dims='member')
+    vi = vfunc(tti, zzi, yyi, xxi)
+    vi = xr.DataArray(
+        np.resize(vi, (nex, )+vi.shape[1:]),
+        dims=('member', 'time', 'depth', 'lat', 'lon'),
+        coords={"member": mi, "time": ti, "depth": zi, "lat": yi, "lon": xi},
+        attrs={'long_name': "Long name"})
+    vo_truth = np.array(vfunc(to, zo.values, yo.values, xo.values))
+    vo_interp = regrid.grid2loc(vi, loc)
+    assert vo_interp.shape == (nex, no)
+    assert vo_interp.dims == ("member", "time")
+    assert "time" in vo_interp.coords
+    assert "lon" in vo_interp.coords
+    assert "member" in vo_interp.coords
+    vo_truth[np.isnan(vo_interp[0].values)] = np.nan
+    np.testing.assert_almost_equal(vo_interp[0], vo_truth)
+    assert "long_name" in vo_interp.attrs
+
+test_regrid_grid2loc()

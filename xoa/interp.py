@@ -428,7 +428,7 @@ def extrap1d(vari, extrap):
     return varo
 
 
-@numba.njit(parallel=False, cache=True)
+@numba.njit(parallel=True, cache=True)
 def cellave1d(vari, yib, yob, conserv=False, extrap="no"):
     """Cell average regrid. of nD data along an axis with varying coordinates
 
@@ -735,13 +735,14 @@ def grid2rellocs(xxi, yyi, xo, yo):
         A value of -1 means outside the grid.
     """
     no = xo.size
-    pp = np.zeros(no, 'd')
-    qq = np.zeros(no, 'd')
+    pp = np.zeros(no)
+    qq = np.zeros(no)
     for i in range(xo.size):
         pp[i], qq[i] = grid2relloc(xxi, yyi, xo[i], yo[i])
     return pp, qq
 
 
+@numba.njit(parallel=True, cache=True)
 def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     """Linear interpolation of gridded data to random positions
 
@@ -772,7 +773,6 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     array_like(nex, no)
         Points value.
     """
-
     # Dimensions
     nyix, nxi = xxi.shape
     nyi, nxiy = yyi.shape
@@ -805,8 +805,8 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     assert ntiz == 1 or ntiz == nti, "grid2locs: Invalid ntiz dimension"
 
     # Loop on ouput points
-    # for io in numba.prange(no):
-    for io in range(no):
+    for io in numba.prange(no):
+    # for io in range(no):
         if ((nxi != 1 and (xo[io] < ximin or xo[io] > ximax)) or
                 (nyi != 1 and (yo[io] < yimin or yo[io] > yimax)) or
                 (nzi != 1 and (zo[io] < zimin or zo[io] > zimax)) or
@@ -834,16 +834,16 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
                 npi = 1
             elif xxi[0, nxi-1] == xo[io]:
                 i = nxi - 1
-                npi = 0
                 a = 0.
+                npi = 1
             else:
                 # i = minloc(xxi[1, :], dim=1, mask=xxi(1,:)>xo[io])-1
                 i = np.searchsorted(xxi[0, :], xo[io], "right") - 1
-                npi = 2
                 a = xo[io] - xxi[0, i]
                 if abs(a) > 180.:
                     a -= 180.  # FIXME: grid2locs: abs(a)>180.
                 a = a / (xxi[0, i+1] - xxi[0, i])
+                npi = 2
 
             # - Y
             if nyi == 1:
