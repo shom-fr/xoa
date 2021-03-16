@@ -137,7 +137,6 @@ doc/genfortran/
 my/
 
 # misc
-setup.cfg
 # conda smithy ci-skeleton start
 *.pyc
 
