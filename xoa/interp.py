@@ -745,7 +745,7 @@ def grid2rellocs(xxi, yyi, xo, yo):
     return pp, qq
 
 
-@numba.njit(parallel=True)#, cache=True)
+@numba.njit#(parallel=True)#, cache=True)
 def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     """Linear interpolation of gridded data to random positions
 
