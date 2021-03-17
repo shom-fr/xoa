@@ -20,7 +20,7 @@ install:
 - source activate test-environment
 - pip install -e .
 - export PYTHONPATH=$PWD:$PYTHONPATH
-script: pytest
+script: pytest -s
 notifications:
   slack:
     secure: IPwB/IqojYFa2DKwlMNt3QAR4abnHhO6HKq6PEcxTGqcTxdmNhIbREtOcUMekBGCDzHjFdnh4a9KLWrumh73N2V676S2n9Yplvy8cyiqESX+h1P+4D45GvL2MbdHkdHGM6m7a5Umicr0gwDiKAUmw+3NLwkMDbz0mZwzo7w2JfiNlze2ZSNJkpo5Mr9WXpV3uAspekX/Mr8kjCTK/5Az+gLfJDI8jAx9zu8Yynqy/Orr9guqi2wyCb7CIczmQWme9raWArdTzkCgdPlkazE+t7QlAOy9BrR+KOoP9/lpbRhGcjCEb+ucTsPsHSASVtFxU2SN1Aai6RD/PWH8OiKPLCxCjsK7PQ/oVvIE5xkR/5dey7s9gv4aNWdmuFKBq+ItK7j62keLMaCZJrMx8oxK7kPP+Eav3xR+S9cTo4rt1qIlGd/e2b9t/VB3wcgCVLtMjr2q3OKe/BbevcC4ZjW/tI7HrN26hHXTLj3KtMAY17LC2OXi3mQDhs1Y7CFiAKaAhixeIJpN6I77g0/KgI0ShYdUseyROmh7rLp5xTJw/+0YUs7S3fec01D0t78CR5BVtKD4Jadot2hhvWCDmaStDI1Lll39g5es5tLEJ4cfVBfwpRiycRfir9BjD68cjJ0JKO8F48LkJE4x6V9ksrk7vdnKYYbDxmkuvn+dU0mjZZ4=

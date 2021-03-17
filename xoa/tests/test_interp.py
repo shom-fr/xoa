@@ -307,8 +307,12 @@ def test_interp_grid2locs():
     vi = vfunc(tti, zzi, yyi, xxi)[:, :, :, :1, :1]
     vi = np.resize(vi, (nex, )+vi.shape[1:])  # (nex,nti,nzi,1,1)
     vo_truth = np.array(vfunc(to, zo, yi[0], xi[0]))
+    print(xi.mean(), yi.mean(), zi.mean(), ti.mean(), vi.mean(),
+          xo.mean(), yo.mean(), zo.mean(), to.mean())
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
+    print(vo_truth)
+    print(vo_interp[0])
     np.testing.assert_allclose(vo_interp[0], vo_truth)
 
     # Constant time
