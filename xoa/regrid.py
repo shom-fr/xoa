@@ -64,6 +64,32 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     yes = 2
 
 
+def _wrapper_interp1d_(vari, yi, yo, func_name, **kwargs):
+    """To make sure vari, yi and yo are 2D when passed to interp routines
+
+    Output arrays are reshaped back accordindly
+    """
+    # To 2D
+    if vari.ndim > yo.ndim:
+        eshape = vari.shape[:-1]
+    else:
+        eshape = yo.shape[:-1]
+    vari = np.reshape(vari, (-1, vari.shape[-1]))
+    yi = np.reshape(yi, (-1, yi.shape[-1]))
+    yo = np.reshape(yo, (-1, yo.shape[-1]))
+
+    # Call
+    func = getattr(interp, func_name)
+    varo = func(vari, yi, yo,**kwargs)
+
+    # From 2D
+    return varo.reshape(eshape+varo.shape[-1:])
+
+
+
+
+
+
 def regrid1d(
         da, coord, method=None, dim=None, coord_in_name=None,
         conserv=False, extrap=0, bias=0., tension=0.):
@@ -159,14 +185,14 @@ def regrid1d(
             method == regrid1d_methods.cellerr):
         raise XoaRegridError("cellerr regrid method is works only "
                              "with 1D input and output cordinates")
-    func = getattr(interp, func_name)
-    func_kwargs = {}
+    # func = getattr(interp, func_name)
+    func_kwargs = {"func_name": func_name}
     if method == "hermit":
         func_kwargs.update(bias=bias, tension=tension)
 
     # Apply
     da_out = xr.apply_ufunc(
-        func,
+        _wrapper_interp1d_,
         da,
         coord_in,
         coord,

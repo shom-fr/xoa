@@ -7,15 +7,13 @@ import numpy as np
 import xarray as xr
 
 from xoa import regrid
-from test_interp import get_grid2locs_coords, vfunc
+from test_interp import get_grid2locs_coords, vfunc, get_interp1d_data
 
 
 def test_regrid_regrid1d():
 
     # Get some data
-    from test_interp import get_interp1d_data
-    xxi, yyi, vari, xxo, yyo = get_interp1d_data(
-        yimin=-100., yimax=0., yomin=-90., yomax=10.)
+    xxi, yyi, vari, xxo, yyo = get_interp1d_data()
 
     # Some inits
     nz1 = xxo.shape[1]
@@ -105,5 +103,3 @@ def test_regrid_grid2loc():
     vo_truth[np.isnan(vo_interp[0].values)] = np.nan
     np.testing.assert_almost_equal(vo_interp[0], vo_truth)
     assert "long_name" in vo_interp.attrs
-
-test_regrid_grid2loc()

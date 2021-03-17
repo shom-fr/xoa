@@ -24,8 +24,8 @@ def round_as_time(arr, units="us", origin="1950-01-01"):
 
 
 @functools.lru_cache()
-def get_interp1d_data(yimin=-1000., yimax=0., yomin=-1200., yomax=100.,
-                      irregular=True):
+def get_interp1d_data(
+        yimin=-100., yimax=0., yomin=-90., yomax=10., irregular=True):
 
     np.random.seed(0)
 
@@ -297,7 +297,7 @@ def test_interp_grid2locs():
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     assert vo_interp[0].shape == vo_truth.shape
     vo_truth[np.isnan(vo_interp[0])] = np.nan
-    np.testing.assert_almost_equal(vo_interp[0], vo_truth)
+    np.testing.assert_allclose(vo_interp[0], vo_truth)
 
     # Single point in space
     xi = xxi[0, 0, 0:1, :1]  # (nyix=1,nxi)
@@ -309,7 +309,7 @@ def test_interp_grid2locs():
     vo_truth = np.array(vfunc(to, zo, yi[0], xi[0]))
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
-    np.testing.assert_almost_equal(vo_interp[0], vo_truth)
+    np.testing.assert_allclose(vo_interp[0], vo_truth)
 
     # Constant time
     xi = xxi[0, 0, 0:1, :]  # (nyix=1,nxi)
@@ -321,7 +321,7 @@ def test_interp_grid2locs():
     vo_truth = vfunc(ti, zo, yo, xo)
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
-    np.testing.assert_almost_equal(vo_interp[0], vo_truth)
+    np.testing.assert_allclose(vo_interp[0], vo_truth)
 
     # Variable depth with 1D X/Y + T
     xi = xxi[0, 0, 0:1, :]  # (nyix=1,nxi)
@@ -333,7 +333,7 @@ def test_interp_grid2locs():
     vo_truth = vfunc(to, zo, yo, xo)
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
-    np.testing.assert_almost_equal(vo_interp[0], vo_truth)
+    np.testing.assert_allclose(vo_interp[0], vo_truth)
 
     # 2D X/Y with no other axes (pure curvilinear)
     xi = xxi[0, 0]  # (nyix=nyi,nxi)
@@ -347,10 +347,10 @@ def test_interp_grid2locs():
         xi[:1], yi[:, :1], zi, ti, vi, xo, yo, zo, to)
     vo_truth = vfunc(ti, zi.ravel()[0], yo, xo)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
-    np.testing.assert_almost_equal(vo_interp[0], vo_truth)
+    np.testing.assert_allclose(vo_interp[0], vo_truth)
     vo_truth = vfunc(ti, zi.ravel()[0], yo, xo)
     vo_truth[np.isnan(vo_interp_rect[0])] = np.nan
-    np.testing.assert_almost_equal(vo_interp_rect[0], vo_truth)
+    np.testing.assert_allclose(vo_interp_rect[0], vo_truth)
 
     # Same coordinates
     xi = xxi[0, 0, 0:1, :]  # (nyix=1,nxi)
@@ -367,7 +367,4 @@ def test_interp_grid2locs():
     vo_truth = vfunc(to, zo, yo, xo)
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
-    np.testing.assert_almost_equal(vo_interp[0], vo_truth)
-
-
-test_interp_grid2locs()
+    np.testing.assert_allclose(vo_interp[0], vo_truth)
