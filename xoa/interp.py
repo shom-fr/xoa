@@ -17,15 +17,19 @@ or numpy.ndarray type.
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import os
 import math
+
 import numpy as np
 import numba
 
 
+NOT_CI = os.environ.get("CI", "false") == "false"
+
+
 # %% 1D routines
 
-@numba.njit(cache=True)
+@numba.njit(cache=NOT_CI)
 def get_iminmax(data1d):
     """The first and last non nan values for a 1d array
 
@@ -53,7 +57,7 @@ def get_iminmax(data1d):
     return imin, imax
 
 
-@numba.njit(parallel=True, cache=True)
+@numba.njit(parallel=NOT_CI, cache=NOT_CI)
 def nearest1d(vari, yi, yo):
     """Nearest interpolation of nD data along an axis with varying coordinates
 
@@ -125,7 +129,7 @@ def nearest1d(vari, yi, yo):
     return varo
 
 
-@numba.njit(parallel=True, cache=True)
+@numba.njit(parallel=NOT_CI, cache=NOT_CI)
 def linear1d(vari, yi, yo):
     """Linear interpolation of nD data along an axis with varying coordinates
 
@@ -208,7 +212,7 @@ def linear1d(vari, yi, yo):
     return varo
 
 
-@numba.njit(parallel=True, cache=True)
+@numba.njit(parallel=NOT_CI, cache=NOT_CI)
 def cubic1d(vari, yi, yo):
     """Cubic interpolation of nD data along an axis with varying coordinates
 
@@ -295,7 +299,7 @@ def cubic1d(vari, yi, yo):
     return varo
 
 
-@numba.njit(parallel=True, cache=True)
+@numba.njit(parallel=NOT_CI, cache=NOT_CI)
 def hermit1d(vari, yi, yo, bias=0., tension=0.):
     """Hermitian interp. of nD data along an axis with varying coordinates
 
@@ -394,7 +398,7 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
     return varo
 
 
-@numba.njit(parallel=True, fastmath=True)
+@numba.njit(parallel=NOT_CI, fastmath=True)
 def extrap1d(vari, extrap):
     """Extrapolate valid data to the top and/or bottom
 
@@ -431,7 +435,7 @@ def extrap1d(vari, extrap):
     return varo.reshape(ishape)
 
 
-@numba.njit(parallel=True, cache=True)
+@numba.njit(parallel=NOT_CI, cache=NOT_CI)
 def cellave1d(vari, yib, yob, conserv=False, extrap="no"):
     """Cell average regrid. of nD data along an axis with varying coordinates
 
@@ -745,7 +749,7 @@ def grid2rellocs(xxi, yyi, xo, yo):
     return pp, qq
 
 
-@numba.njit#(parallel=True)#, cache=True)
+@numba.njit(parallel=NOT_CI, cache=NOT_CI)
 def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     """Linear interpolation of gridded data to random positions
 
