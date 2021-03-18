@@ -800,9 +800,6 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     timax = ti.max()
     curved = nyix != 1
     zi = np.zeros((nexz, nzi))
-    c = np.zeros(nexz)
-    k = np.zeros(nexz, 'l')
-    npk = np.zeros(nexz, 'l')
 
     # Verifications
     assert not curved or (nxi == nxiy and nyi == nyix), (
@@ -887,6 +884,9 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
                 npl = 2
 
         # - Z
+        c = np.zeros(nexz)
+        k = np.zeros(nexz, 'l')
+        npk = np.zeros(nexz, 'l')
         if nzi == 1:
             k[:] = 0
             c[:] = 0.
