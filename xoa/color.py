@@ -16,10 +16,10 @@ Colors and colormaps utilities
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import warnings
-
 import cmocean
 import matplotlib.pyplot as plt
+
+from .__init__ import xoa_warn
 
 
 def crop_cmap(cmapin, vmin, vmax, pivot=0):
@@ -105,7 +105,7 @@ class CmapAdapter(object):
         """Get the adapted colormap"""
         if self.specs[0] == "pivot":
             if self.vmin is None or self.vmax is None:
-                warnings.warn(
+                xoa_warn(
                     "cmap not adapted since vmin and vmin are not set"
                 )
                 return self.cmap
