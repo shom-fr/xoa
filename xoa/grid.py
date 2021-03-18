@@ -134,13 +134,15 @@ def get_edges_2d(da, name_suffix='_edges'):
 
 class positive_attr(misc.IntEnumChoices):
     """Allowed value for the positive attribute"""
+    #: Guessed from the axis coordinate
+    guess = 0
     #: Coordinates are increasing up
     up = 1
     #: Coordinates are increasing down
     down = -1
 
 
-def dz2depth(dz, positive, zdim=None, cfname="depth"):
+def dz2depth(dz, positive="guessed", zdim=None, cfname="depth"):
     """Integrate layer thicknesses to compute depths
 
     The output depths are the depths at the bottom of the layers and the top
@@ -151,14 +153,16 @@ def dz2depth(dz, positive, zdim=None, cfname="depth"):
     ----------
     dz: xarray.DataArray
         Layer thinknesses
-    positive: str, int
-    extrap: str, int
+    positive: str, int, None
         Direction over wich coordinates are increasing:
         {positive_attr.rst_with_links}
         When "up", the first level is supposed to be the bottom
         and the output coordinates are negative.
         When "down", first level is supposed to be the top
         and the output coordinates are positive.
+        When "guess", the dz array must have an axis coordinate
+        of the same name as the z dimension, and this coordinate must have
+        a valid positive attribute.
     zdim: str
         Name of the vertical dimension.
         If note set, it is infered with :func:`~xoa.coords.get_dims`.
@@ -186,12 +190,25 @@ def dz2depth(dz, positive, zdim=None, cfname="depth"):
         # Positive up
         print(dz2depth(dz, "up"))
     """
+    # Vertical dimension
     zdim = coords.get_dims(dz, "z", errors="raise")[0]
-    depth = dz.cumsum(dim=zdim)
-    positive = positive_attr[positive].name
-    if positive == "up":
-        depth[:] -= depth.isel({zdim: -1})
-        depth[:] -= dz.isel({zdim: 0})
-    depth.attrs["positive"] = positive
 
+    # Positive attribute
+    positive = positive_attr[positive].name
+    if positive == "guess":
+        if zdim not in dz.coords and "positive" not in dz.coords["zdim"].attrs:
+            raise XoaError("Can't guess positive attribute from data array")
+        positive = positive_attr[dz.coords["zdim"].attrs["positive"]].name
+
+    # Positive down as cumsum
+    depth = dz.cumsum(dim=zdim)
+
+    # Positive up: integrate from the ground
+    if positive == "up":
+        depth = depth.roll({zdim: 1}, roll_coords=False)
+        depth[{zdim: 0}] *= -1
+        depth[{zdim: slice(1, None)}] += depth.isel({zdim: 0}).values
+
+    # Finalize
+    depth.attrs["positive"] = positive
     return cf.get_cf_specs().format_coord(depth, cfname)
