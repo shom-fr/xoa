@@ -61,7 +61,7 @@ _CF_DICT_MERGE_KWARGS = dict(
     unique=True
 )
 
-_CACHE = {}
+_CACHE = {"bank": []}
 
 
 ATTRS_PATCH_MODE = Choices(
@@ -567,10 +567,13 @@ class CFSpecs(object):
         Load also the default internal specs
     user: bool
         Load also the user specs stored in :data:`USER_CF_FILE`
+    name: str, None
+        Assign a shortcut name. It defaults the the `[register] name`
+        option of the specs.
 
     """
 
-    def __init__(self, cfg=None, default=True, user=True):
+    def __init__(self, cfg=None, default=True, user=True, name=None):
 
         # Initialiase categories
         self._cfs = {}
@@ -585,6 +588,9 @@ class CFSpecs(object):
         self._load_default = default
         self._load_user = user
         self.load_cfg(cfg)
+
+        # Force the name
+        self._name = name
 
     def _load_cfg_as_dict_(self, cfg, cache=None):
         """Load a single cfg, validate it and return it as a dict
@@ -691,6 +697,14 @@ class CFSpecs(object):
         """Dictionary copy of the specs"""
         return self._dict.copy()
 
+    def get_name(self):
+        return self._dict["register"]["name"]
+
+    def set_name(self, name):
+        self._dict["register"]["name"] = self._name = name
+
+    name = property(fset=set_name, fget=get_name, doc="Name")
+
     def pprint(self, **kwargs):
         """Pretty print the specs as dict using :func:`pprint.pprint`"""
         pprint.pprint(self.dict, **kwargs)
@@ -784,6 +798,10 @@ class CFSpecs(object):
                 axis = coord_specs["attrs"]['axis'].lower()
                 names = [name] + coord_specs['name']
                 self._dict['dims'][axis].extend(names)
+
+        # Shortcut name
+        if self._name:
+            self._dict["register"]["name"] = self._name
 
     def _process_entry_(self, category, name):
         """Process an entry
@@ -2476,3 +2494,70 @@ def get_cf_specs(name=None, category=None, cache="rw"):
     for ss in toscan:
         if name in ss:
             return ss[name]
+
+
+def register_cf_specs(*args, **kwargs):
+    """Register :class:`CFSpecs` in a bank optionally with a name"""
+    args = list(args)
+    for name, cfspecs in kwargs.items():
+        if not isinstance(cfspecs, CFSpecs):
+            cfspecs = CFSpecs(cfspecs)
+        cfspecs.name = name
+        args.append(cfspecs)
+    for cfspecs in args:
+        if cfspecs not in _CACHE["bank"]:
+            _CACHE["bank"].append(cfspecs)
+
+
+def get_best_cf_specs(ds):
+    """Get the registered CFSpecs that are best matching this dataset
+
+    First, the "cfspecs" global attribute of the dataset is compared
+    with the name of all registered datasets.
+    Second, a score based on the number of data_vars and coord names
+    that are both in the cfspecs and the dataset is computed for the
+    registered cfspecs.
+    Finally, if no matching dataset is found, the current one is returned.
+
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+
+    Return
+    ------
+    CFSpecs
+        The matching cf specs or the current ones
+
+    See also
+    --------
+    register_cf_specs
+    get_cf_specs
+    """
+    # By name first
+    if "cfspecs" in ds.attrs:
+        for cfspecs in _CACHE["bank"]:
+            if cfspecs["name"] and cfspecs["name"] == ds.attrs["cfspecs"]:
+                return cfspecs
+
+    # By matching score
+    best_score = -1
+    for cfspecs in _CACHE["bank"]:
+        hit = 0
+        total = 0
+        for cat in "data_vars", "coords":
+            cfnames = [cfspecs[cat].get_name(name, specialize=True)
+                       for name in cfspecs[cat].names]
+            dsnames = [cfspecs.sglocator.parse_attr("name", dsname)[0]
+                       for dsname in getattr(ds, cat).keys()]
+            total += len(dsnames)
+            hit += len(set(dsnames).intersection(cfnames))
+        if hit != 0:
+            score = hit/total
+            if score > best_score:
+                best_cfspecs = cfspecs
+    if best_score != -1:
+        return best_cfspecs
+
+    # Fallback to current specs
+    return get_cf_specs()
