@@ -28,6 +28,7 @@ import re
 import operator
 import warnings
 import pprint
+import fnmatch
 
 import appdirs
 
@@ -61,7 +62,11 @@ _CF_DICT_MERGE_KWARGS = dict(
     unique=True
 )
 
-_CACHE = {"bank": []}
+_CACHE = {
+    "current": None,     # current active specs
+    "loaded_dicts": {},  # for pure caching of dicts by key
+    "registered": []     # for registration and matching purpose
+}
 
 
 ATTRS_PATCH_MODE = Choices(
@@ -583,14 +588,12 @@ class CFSpecs(object):
 
         # Load config
         self._dict = None
+        self._name = name
         self._cfgspecs = _get_cfgm_().specs.dict()
         self._cfgs = []
         self._load_default = default
         self._load_user = user
         self.load_cfg(cfg)
-
-        # Force the name
-        self._name = name
 
     def _load_cfg_as_dict_(self, cfg, cache=None):
         """Load a single cfg, validate it and return it as a dict
@@ -601,7 +604,7 @@ class CFSpecs(object):
 
         Parameters
         ----------
-        cf: str, tuple, dict, CFSpecs
+        cf: str, dict, CFSpecs
             Config source
         cache: bool
             Use in-memory cache system?
@@ -610,22 +613,22 @@ class CFSpecs(object):
         # Config manager to get defaults and validation
         cfgm = _get_cfgm_()
 
-        # Get it from cache
+        # Get it from cache if from str or CFSpecs with registration name
         if cache is None:
             cache = get_option("cf.cache")
         cache = cache and ((isinstance(cfg, str) and '\n' not in cfg) or
-                           isinstance(cfg, tuple))
+                           (isinstance(cfg, dict) and "register" in cfg and
+                            cfg["register"]["name"]))
         if cache:
             # Init cache
-            if "cfgs" not in _CACHE:
-                _CACHE["cfgs"] = {}
             if isinstance(cfg, str):
                 cache_key = cfg
-            else:
-                cache_key, cfg = cfg
-            if cache_key in _CACHE["cfgs"]:
+            elif (isinstance(cfg, dict) and "register" in cfg and
+                  cfg["register"]["name"]):
+                cache_key = cfg["register"]["name"]
+            if cache_key in _CACHE["loaded_dicts"]:
                 # print("CFG FROM CACHE: " + cfg)
-                return _CACHE["cfgs"][cfg]
+                return _CACHE["loaded_dicts"][cfg]
 
         # Check input type
         if isinstance(cfg, str) and '\n' in cfg:
@@ -638,7 +641,7 @@ class CFSpecs(object):
 
         # Cache it
         if cache:
-            _CACHE["cfgs"][cache_key] = cfg_dict
+            _CACHE["loaded_dicts"][cache_key] = cfg_dict
 
         return cfg_dict
 
@@ -651,10 +654,9 @@ class CFSpecs(object):
             Single or a list of either:
 
             - config file name,
-            - multiline config string,
+            - multiline config string or a list of lines,
             - config dict,
-            - two-element tuple with the first item of one of the above types,
-              and second item as a cache key for faster reloading.
+            - tuple of the previous.
         cache: bool, None
             In in-memory cache system?
             Defaults to option boolean :xoaoption:`cf.cache`.
@@ -663,8 +665,8 @@ class CFSpecs(object):
         # Get the list of validated configurations
         to_load = []
         if cfg:
-            if not isinstance(cfg, list):
-                cfg = [cfg]
+            if not isinstance(cfg, tuple):
+                cfg = (cfg,)
             to_load.extend([c for c in cfg if c])
         if self._load_user and os.path.exists(USER_CF_FILE):
             to_load.append(USER_CF_FILE)
@@ -676,8 +678,9 @@ class CFSpecs(object):
         # Load them
         dicts = [self._load_cfg_as_dict_(cfg, cache) for cfg in to_load]
 
-        # Merge them
+        # Merge them, except "register"
         self._dict = dict_merge(*dicts, **_CF_DICT_MERGE_KWARGS)
+        self._dict["register"] = dicts[0]["register"]
 
         # SG locator
         self._sgl_settings = self._dict["sglocator"]
@@ -820,29 +823,18 @@ class CFSpecs(object):
         # Dict of entries for this category
         entries = self._dict[category]
 
-        # # Wrong entry!
-        # if name not in entries:
-        #     print('bad name', name)
-        #     yield
+        # Wrong entry!
+        if name not in entries:
+            yield
 
-        # # Already processed
-        # if "processed" in entries[name] and name=='temp':
-        #     print('already processed', name)
-        #     yield
+        # Already processed
+        if "processed" in entries[name]:
+            yield
 
         # Get the specs as pure dict
         if hasattr(entries[name], "dict"):
             entries[name] = entries[name].dict()
         specs = entries[name]
-
-        # Long name from name or standard_name
-        if not specs["attrs"]["long_name"]:
-            if specs["attrs"]["standard_name"]:
-                long_name = specs["attrs"]["standard_name"][0]
-            else:
-                long_name = name.title()
-            long_name = long_name.replace("_", " ").capitalize()
-            specs["attrs"]["long_name"].append(long_name)
 
         # Inherits from other specs (merge specs with dict_merge)
         if "inherit" in specs and specs["inherit"]:
@@ -872,6 +864,8 @@ class CFSpecs(object):
             # Check compatibility of keys when not from same category
             if category != from_cat:
                 for key in list(specs.keys()):
+                    # print(self._cfgspecs[category])
+                    # print(self._cfgspecs[from_cat])
                     if (key not in self._cfgspecs[category]["__many__"] and
                             key in self._cfgspecs[from_cat]["__many__"]):
                         del specs[key]
@@ -879,10 +873,14 @@ class CFSpecs(object):
             # Switch off inheritance now
             specs["inherit"] = None
 
-        # # Names
-        # if name in specs["name"]:
-        #     specs["name"].remove(name)
-        # specs["name"].insert(0, name)
+        # Long name from name or standard_name
+        if not specs["attrs"]["long_name"]:
+            if specs["attrs"]["standard_name"]:
+                long_name = specs["attrs"]["standard_name"][0]
+            else:
+                long_name = name.title()
+            long_name = long_name.replace("_", " ").capitalize()
+            specs["attrs"]["long_name"].append(long_name)
 
         # Select
         if specs.get("select", None):
@@ -897,9 +895,6 @@ class CFSpecs(object):
         #     for standard_name in specs["standard_name"]:
         #         if standard_name not in specs["name"]:
         #             specs["name"].append(standard_name)
-
-        # if name=="depth":
-        #     print('>>>>',category, specs['name'])
 
         specs['processed'] = True
         yield category, name, specs
@@ -1532,7 +1527,7 @@ class _CFCatSpecs_(object):
 
     @property
     def names(self):
-        return list(self._dict.keys())
+        return [key for key in self._dict.keys() if not key.startswith("_")]
 
     def items(self):
         return self._dict.items()
@@ -1807,7 +1802,7 @@ class _CFCatSpecs_(object):
         name: str, xarray.DataArray
             Either a cf name or a data array
         specialize: bool
-            Does not use the CF name for renaming, but the first name
+            Get the first name
             as listed in specs, which is generally a specialized one,
             like a name adopted by specialized dataset.
         loc: str, None
@@ -2369,17 +2364,17 @@ class set_cf_specs(object):
         if isinstance(cf_source, dict):
             cf_source = CFSpecs(cf_source)
         assert isinstance(cf_source, CFSpecs)
-        self.old_specs = _CACHE.get("specs", None)
-        _CACHE["specs"] = self.specs = cf_source
+        self.old_specs = _CACHE["current"]
+        _CACHE["current"] = self.specs = cf_source
 
     def __enter__(self):
         return self.specs
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.old_specs is None:
-            del _CACHE["specs"]
+            del _CACHE["current"]
         else:
-            _CACHE["specs"] = self.old_specs
+            _CACHE["current"] = self.old_specs
 
 
 def reset_cache(disk=True, memory=False):
@@ -2399,7 +2394,9 @@ def reset_cache(disk=True, memory=False):
         os.remove(USER_CF_CACHE_FILE)
 
     if memory:
-        _CACHE.clear()
+        _CACHE["loaded_dicts"].clear()
+        _CACHE["current"] = None
+        _CACHE["registered"].clear()
 
 
 def show_cache():
@@ -2407,18 +2404,17 @@ def show_cache():
     print(USER_CF_CACHE_FILE)
 
 
-def get_cf_specs(name=None, category=None, cache="rw"):
+def get_cf_specs(name=None, cache="rw"):
     """Get the CF specifications for a target in a category
 
     Parameters
     ----------
     name: str or None
-        A target name like "sst". If not provided, return all specs.
-    category: str or None
-        Select a category with "coords" or "data_vars".
-        If not provided, search first in "data_vars", then "coords".
+        A registration name for these specs.
+        When set, ``cache`` is ignored.
+        Raises a :class:`XoaCFError` is case of invalid name.
     cache: str, bool, None
-        Cache specs on disk with pickling for fast loading.
+        Cache default specs on disk with pickling for fast loading.
         If ``None``, it defaults to boolean option :xoaoption:`cf.cache`.
         Possible string values: ``"ignore"``, ``"rw"``, ``"read"``,
         ``"write"``, ``"clean"``.
@@ -2429,7 +2425,20 @@ def get_cf_specs(name=None, category=None, cache="rw"):
     ------
     dict or None
         None is return if no specs are found
+
+    Raise
+    -----
+    XoaCFError
+        When ``name`` is provided and invalid.
     """
+    # Explicit name => not the default
+    if name and _CACHE["registered"]:
+        for cfspecs in _CACHE["registered"]:
+            if cfspecs["register"]["name"] == name:
+                return cfspecs
+        raise XoaCFError("Invalid CF specs registration name: "+name)
+
+    # Not named => default specs
     if cache is None:
         cache = get_option('cf.cache')
     if cache is True:
@@ -2437,12 +2446,10 @@ def get_cf_specs(name=None, category=None, cache="rw"):
     elif cache is False:
         cache = "ignore"
     assert cache in ("ignore", "rw", "read", "write", "clean")
-
-    # Get the source of specs
-    if "specs" not in _CACHE:
+    if _CACHE["current"] is None:
 
         # Try from disk cache
-        if cache in ("read", "w"):
+        if cache in ("read", "rw"):
             if os.path.exists(USER_CF_CACHE_FILE) and (
                 os.stat(_CFGFILE).st_mtime <
                 os.stat(USER_CF_CACHE_FILE).st_mtime
@@ -2456,7 +2463,7 @@ def get_cf_specs(name=None, category=None, cache="rw"):
                     )
 
         # Compute it from scratch
-        if "specs" not in _CACHE:
+        if _CACHE["current"] is None:
 
             # Setup
             set_cf_specs(CFSpecs())
@@ -2468,7 +2475,7 @@ def get_cf_specs(name=None, category=None, cache="rw"):
                     if not os.path.exists(cachedir):
                         os.makedirs(cachedir)
                     with open(USER_CF_CACHE_FILE, "wb") as f:
-                        pickle.dump(_CACHE["specs"], f)
+                        pickle.dump(_CACHE["current"], f)
                 except Exception as e:
                     xoa_warn("Error while caching cf specs: " + str(e.args))
 
@@ -2476,24 +2483,7 @@ def get_cf_specs(name=None, category=None, cache="rw"):
     if cache == "clean":
         reset_cache()
 
-    cf_source = _CACHE["specs"]
-
-    # Select categories
-    if category is not None:
-        if isinstance(cf_source, CFSpecs):
-            cf_source = cf_source[category]
-        if name is None:
-            return cf_source
-        toscan = [cf_source]
-    else:
-        if name is None:
-            return cf_source
-        toscan = [cf_source["data_vars"], cf_source["coords"]]
-
-    # Search
-    for ss in toscan:
-        if name in ss:
-            return ss[name]
+    return _CACHE["current"]
 
 
 def register_cf_specs(*args, **kwargs):
@@ -2505,14 +2495,44 @@ def register_cf_specs(*args, **kwargs):
         cfspecs.name = name
         args.append(cfspecs)
     for cfspecs in args:
-        if cfspecs not in _CACHE["bank"]:
-            _CACHE["bank"].append(cfspecs)
+        if cfspecs not in _CACHE["registered"]:
+            _CACHE["registered"].append(cfspecs)
+
+
+def get_cf_specs_matching_score(ds, cfspecs):
+    """Get the matching score between ds data_vars and coord names and a CFSpecs instance names
+
+    Parameters
+    ----------
+    ds: xarray.Dataset, xarray.DataArray
+    cf_specs: CFSpecs
+
+    Return
+    ------
+    float
+        A percentage
+    """
+    hit = 0
+    total = 0
+    for cat in "data_vars", "coords":
+        cfnames = [cfspecs[cat].get_name(name, specialize=True)
+                   for name in cfspecs[cat].names]
+        if not hasattr(ds, "data_vars"):  # DataArray
+            dsnames = [ds.name] if ds.name else []
+        else:
+            dsnames = list(getattr(ds, cat).keys())
+        dsnames = [cfspecs.sglocator.parse_attr("name", dsname)[0] for dsname in dsnames]
+        total += len(dsnames)
+        hit += len(set(dsnames).intersection(cfnames))
+    if total == 0:
+        return 0
+    return 100 * hit / total
 
 
 def get_best_cf_specs(ds):
     """Get the registered CFSpecs that are best matching this dataset
 
-    First, the "cfspecs" global attribute of the dataset is compared
+    First, the "cfspecs" global attribute or encoding of the dataset is compared
     with the name of all registered datasets.
     Second, a score based on the number of data_vars and coord names
     that are both in the cfspecs and the dataset is computed for the
@@ -2522,7 +2542,7 @@ def get_best_cf_specs(ds):
 
     Parameters
     ----------
-    ds: xarray.Dataset
+    ds: xarray.Dataset, xarray.DataArray
 
     Return
     ------
@@ -2534,30 +2554,35 @@ def get_best_cf_specs(ds):
     register_cf_specs
     get_cf_specs
     """
-    # By name first
-    if "cfspecs" in ds.attrs:
-        for cfspecs in _CACHE["bank"]:
-            if cfspecs["name"] and cfspecs["name"] == ds.attrs["cfspecs"]:
+    # Candidates
+    candidates = _CACHE["registered"][::-1]
+    if _CACHE["current"]:
+        candidates.append(_CACHE["current"])
+
+    # By registration name first
+    attrs = dict(ds.attrs)
+    attrs.update(ds.encoding)
+    if "cfspecs" in attrs:
+        for cfspecs in candidates:
+            if cfspecs["register"]["name"] and cfspecs["register"]["name"] == attrs["cfspecs"]:
                 return cfspecs
+
+    # By attributes
+    if attrs:
+        for cfspecs in candidates:
+            for attr, pattern in cfspecs["register"]["attrs"].items():
+                if attr in attrs and fnmatch.fnmatch(attrs[attr].lower(), pattern.lower()):
+                    return cfspecs
 
     # By matching score
     best_score = -1
-    for cfspecs in _CACHE["bank"]:
-        hit = 0
-        total = 0
-        for cat in "data_vars", "coords":
-            cfnames = [cfspecs[cat].get_name(name, specialize=True)
-                       for name in cfspecs[cat].names]
-            dsnames = [cfspecs.sglocator.parse_attr("name", dsname)[0]
-                       for dsname in getattr(ds, cat).keys()]
-            total += len(dsnames)
-            hit += len(set(dsnames).intersection(cfnames))
-        if hit != 0:
-            score = hit/total
-            if score > best_score:
-                best_cfspecs = cfspecs
+    for cfspecs in candidates:
+        score = get_cf_specs_matching_score(ds, cfspecs)
+        if score != 0 and score > best_score:
+            best_cfspecs = cfspecs
+            best_score = score
     if best_score != -1:
         return best_cfspecs
 
-    # Fallback to current specs
+    # Fallback to default specs
     return get_cf_specs()

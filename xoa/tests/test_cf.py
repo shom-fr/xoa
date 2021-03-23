@@ -279,30 +279,30 @@ def test_cf_get_cfg_specs(cache):
 
 
 def test_cf_get_cfg_specs_var():
-    specs = cf.get_cf_specs("temp", "data_vars")
+    specs = cf.get_cf_specs().data_vars["temp"]
     assert specs["name"][0] == "temperature"
     assert specs["attrs"]["standard_name"][0] == "sea_water_temperature"
     assert specs["cmap"] == "cmo.thermal"
-    new_specs = cf.get_cf_specs("temp")
+    new_specs = cf.get_cf_specs()["temp"]
     assert new_specs is specs
 
 
 def test_cf_get_cfg_specs_var_inherit():
-    specs = cf.get_cf_specs("sst", "data_vars")
+    specs = cf.get_cf_specs().data_vars["sst"]
     assert specs["attrs"]["standard_name"][0] == "sea_surface_temperature"
     assert specs["attrs"]["units"][0] == "degrees_celsius"
 
 
 def test_cf_get_cfg_specs_coord():
-    specs = cf.get_cf_specs("lon", "coords")
+    specs = cf.get_cf_specs().coords["lon"]
     assert specs["name"][0] == "longitude"
     assert "longitude" in specs["name"]
-    new_specs = cf.get_cf_specs("lon")
+    new_specs = cf.get_cf_specs()["lon"]
     assert new_specs is specs
 
 
 def test_cf_get_cfg_specs_coord_inherit():
-    specs = cf.get_cf_specs("depth", "coords")
+    specs = cf.get_cf_specs().coords["depth"]
     assert specs["name"][0] == "dep"
     assert specs["attrs"]["long_name"][0] == "Depth"
 
@@ -337,11 +337,10 @@ def test_cf_cfspecs_copy():
 
 
 def test_cf_set_cf_specs():
-    cf._CACHE.clear()
+    cf.reset_cache(disk=False)
     cfspecs = cf.get_cf_specs()
     cf.set_cf_specs(cfspecs)
-    assert "specs" in cf._CACHE
-    assert cf._CACHE["specs"] is cfspecs
+    assert cf._CACHE["current"] is cfspecs
     assert cf.get_cf_specs() is cfspecs
 
 
@@ -508,8 +507,9 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
 def test_cf_cfspecs_format_data_var_specialize():
 
     da = xr.DataArray(1, name="salinity")
-    da = cf.get_cf_specs().format_data_var(da, specialize=True)
-    assert da.name == "psal"
+    cfspecs = cf.CFSpecs({'data_vars': {'sal': {'name': 'supersal'}}})
+    da = cfspecs.format_data_var(da, specialize=True)
+    assert da.name == "supersal"
     assert da.standard_name == "sea_water_salinity"
 
 
@@ -695,3 +695,139 @@ def test_cf_datasetcfaccessor():
     ds = temp.to_dataset()
     assert ds.cfd.temp.name == 'yoyo'
     assert ds.cfd.sal is None
+
+
+def test_cf_register_cf_specs():
+
+    cf._CACHE["registered"].clear()
+
+    content = """
+        [register]
+        name=myname
+
+        [data_vars]
+            [[temp]]
+            name=mytemp
+        """
+
+    cf_specs = cf.CFSpecs(content)
+    assert cf_specs.name == "myname"
+
+    cf.register_cf_specs(cf_specs)
+    assert cf_specs in cf._CACHE["registered"]
+    assert cf_specs.name == "myname"
+
+    cf.register_cf_specs(myothername=cf_specs)
+    assert cf_specs in cf._CACHE["registered"]
+    assert cf_specs.name == "myothername"
+
+
+def test_cf_get_cf_specs_registered():
+
+    cf._CACHE["registered"].clear()
+    content = """
+        [register]
+        name=myname
+
+        [data_vars]
+            [[temp]]
+            name=mytemp
+        """
+    cf_specs_in = cf.CFSpecs(content)
+    cf.register_cf_specs(cf_specs_in)
+
+    cf_specs_out = cf.get_cf_specs(name='myname')
+    assert cf_specs_out is cf_specs_in
+
+
+def test_cf_get_cf_specs_matching_score():
+
+    cf_content0 = """
+        [data_vars]
+            [[temp]]
+            name=mytemp
+        """
+    cf_specs0 = cf.CFSpecs(cf_content0)
+    cf_content1 = """
+        [data_vars]
+            [[temp]]
+            name=mytemp
+            [[sal]]
+            name=mysal
+        [coords]
+            [[lon]]
+            name=mylon
+        """
+    cf_specs1 = cf.CFSpecs(cf_content1)
+    cf_content2 = """
+        [data_vars]
+            [[temp]]
+            name=mytemp
+            [[sal]]
+            name=mysal
+        """
+    cf_specs2 = cf.CFSpecs(cf_content2)
+
+    ds = xr.Dataset(
+         {"mytemp": (["mylat", "mylon"], np.ones((2, 2))),
+          "mysal": (["mylat", "mylon"], np.ones((2, 2)))},
+         coords={"mylon": np.arange(2),
+                 "mylat": np.arange(2)}
+         )
+
+    for cf_specs, score in [(cf_specs0, 25), (cf_specs1, 75), (cf_specs2, 50)]:
+        assert cf.get_cf_specs_matching_score(ds, cf_specs) == score
+
+
+def test_cf_get_best_cf_specs():
+
+    cf_content0 = """
+        [register]
+            [[attrs]]
+            source="*hycom3d*"
+
+        [data_vars]
+            [[temp]]
+            name=mytemp
+        """
+    cf_specs0 = cf.CFSpecs(cf_content0)
+    cf_content1 = """
+        [data_vars]
+            [[temp]]
+            name=mytemp
+            [[sal]]
+            name=mysal
+        [coords]
+            [[lon]]
+            name=mylon
+        """
+    cf_specs1 = cf.CFSpecs(cf_content1)
+    cf_content2 = """
+        [register]
+        name=hycom3d
+
+        [data_vars]
+            [[temp]]
+            name=mytemp
+            [[sal]]
+            name=mysal
+        """
+    cf_specs2 = cf.CFSpecs(cf_content2)
+
+    cf._CACHE["registered"].clear()
+    cf.register_cf_specs(cf_specs0, cf_specs1, cf_specs2)
+
+    temp = xr.DataArray([1], dims="mylon")
+    sal = xr.DataArray([1], dims="mylon")
+    lon = xr.DataArray([1], dims="mylon")
+
+    ds = xr.Dataset({"mytemp": temp, "mysal": sal}, coords={"mylon": lon})
+    assert cf.get_best_cf_specs(ds) is cf_specs1
+
+    ds.attrs.update(source="my hycom3d!")
+    assert cf.get_best_cf_specs(ds) is cf_specs0
+
+    ds.attrs.update(cfspecs="hycom3d")
+    assert cf.get_best_cf_specs(ds) is cf_specs2
+
+test_cf_get_best_cf_specs()
