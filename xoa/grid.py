@@ -142,7 +142,7 @@ class positive_attr(misc.IntEnumChoices):
     down = -1
 
 
-def dz2depth(dz, positive="guessed", zdim=None, cfname="depth"):
+def dz2depth(dz, positive="guessed", zdim=None, base=None, cfname="depth"):
     """Integrate layer thicknesses to compute depths
 
     The output depths are the depths at the bottom of the layers and the top
@@ -166,6 +166,13 @@ def dz2depth(dz, positive="guessed", zdim=None, cfname="depth"):
     zdim: str
         Name of the vertical dimension.
         If note set, it is infered with :func:`~xoa.coords.get_dims`.
+    base: xarray.DataArray
+        Base array from which to integrate:
+
+        - If **positive up", it is expected to be the **SSH** (sea surface heigth)
+        - If **positive down", it is expected to be the depth of ground,
+          also known as **bathymetry**, which should be positive.
+
     cfname: str
         CF name used to format the output depth variable.
 
@@ -191,7 +198,8 @@ def dz2depth(dz, positive="guessed", zdim=None, cfname="depth"):
         print(dz2depth(dz, "up"))
     """
     # Vertical dimension
-    zdim = coords.get_dims(dz, "z", errors="raise")[0]
+    if zdim is None:
+        zdim = coords.get_dims(dz, "z", errors="raise")[0]
 
     # Positive attribute
     positive = positive_attr[positive].name
@@ -205,9 +213,16 @@ def dz2depth(dz, positive="guessed", zdim=None, cfname="depth"):
 
     # Positive up: integrate from the ground
     if positive == "up":
+
         depth = depth.roll({zdim: 1}, roll_coords=False)
-        depth[{zdim: 0}] *= -1
+        if base is None:
+            depth[{zdim: 0}] *= -1
+        else:
+            depth[{zdim: 0}] = -base  # bath is bottom depth
         depth[{zdim: slice(1, None)}] += depth.isel({zdim: 0}).values
+
+    elif base is not None:  # base is ssh
+        depth[:] -= base
 
     # Finalize
     depth.attrs["positive"] = positive
