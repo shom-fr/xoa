@@ -31,7 +31,7 @@ deps-run: &deps-install
         ipython \
         ipykernel \
         jupyter_client \
-        matplotlib \
+        matplotlib-base \
         numba \
         nbsphinx \
         pandas \
