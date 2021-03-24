@@ -1463,6 +1463,23 @@ class CFSpecs(object):
         return self.coords.get_dim_types(
             da, unknown=unknown, asdict=asdict)
 
+    def assign_coords(self, ds):
+        """Search for known coords and make sur they are set as cords
+
+        Parameters
+        ----------
+        ds: xarray.Dataset
+
+        Return
+        ------
+        xarray.Dataset
+            New dataset with potentially updated coordinates
+        """
+        for da in ds.data_vars.values():
+            if self.coords.match(da):
+                ds = ds.set_coords(da.name)
+        return ds.copy()
+
 
 class _CFCatSpecs_(object):
     """Base class for loading data_vars and coords CF specifications"""
@@ -2292,6 +2309,27 @@ def _get_cfgm_():
     return _CACHE["cfgm"]
 
 
+def get_matching_item_specs(da, loc="any"):
+    """Get the item CF specs that match this data array
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+
+    Return
+    ------
+    dict or None
+
+    See also
+    --------
+    CFSpecs.match
+    """
+    cfspecs = get_cf_specs(da)
+    cat, name =  cfspecs.match(da, loc=loc)
+    if cat:
+        return cfspecs[cat][name]
+
+
 def _same_attr_(da0, da1, attr):
     return (attr in da0.attrs and attr in da1.attrs and
             da0.attrs[attr].lower() == da1.attrs[attr].lower())
@@ -2303,7 +2341,7 @@ def are_similar(da0, da1):
     Verifications are performed in the following order:
 
     - ``standard_name`` attribute,
-    - ``cf_name`` as the results of ``da.cf.name``.
+    - Matching CFSpecs item name.
     - ``name`` attribute.
     - ``long_name`` attribute.
 
@@ -2321,7 +2359,9 @@ def are_similar(da0, da1):
         return True
 
     # Cf name
-    if (da0.cf.name and da1.cf.name and da0.cf.name == da1.cf.name):
+    cf0 = get_matching_item_specs(da0)
+    cf1 = get_matching_item_specs(da1)
+    if (cf0 and cf1 and cf0.name == cf1.name):
         return True
 
     # Name
@@ -2347,10 +2387,14 @@ def search_similar(dsa, da):
     Return
     ------
     xarray.DataArray or None
+
+    See also
+    --------
+    is_similar
+    get_matching_item_specs
     """
-    import xarray as xr
     targets = list(da.coords.values())
-    if isinstance(dsa, xr.Dataset):
+    if hasattr(dsa, "data_vars"):
         targets = list(da.data_vars.values()) + targets
     for ds_da in targets:
         if are_similar(ds_da, da):
@@ -2404,15 +2448,61 @@ def show_cache():
     print(USER_CF_CACHE_FILE)
 
 
-def get_cf_specs(name=None, cache="rw"):
-    """Get the CF specifications for a target in a category
+@ERRORS.format_function_docstring
+def get_cf_specs_from_name(name, errors="warn"):
+    """Get a registered CF specs instance from its name
+
+    Parameter
+    ---------
+    name: str
+    {errors}
+
+    Return
+    ------
+    CFSpecs or None
+        Issue a warning if not found
+    """
+    for cfspecs in _CACHE["registered"][::-1]:
+        if cfspecs["register"]["name"] and cfspecs["register"]["name"] == name.lower():
+            return cfspecs
+    errors = ERRORS[errors]
+    msg = f"Invalid registration name for CF specs: {name}"
+    if errors == "raise":
+        raise XoaCFError(msg)
+    elif errors == "warn":
+        xoa_warn(msg)
+
+
+def get_cf_specs_from_encoding(ds):
+    """Get a registered CF specs instance from the ``cfspecs`` encoding value
 
     Parameters
     ----------
-    name: str or None
+    ds: xarray.DataArray, xarray.Dataset
+
+    Return
+    ------
+    CFSpecs or None
+    """
+    if ds is not None and not isinstance(ds, str):
+        for source in ds.encoding, ds.attrs:
+            for attr, value in source.items():
+                if attr.lower() == "cfspecs":
+                    return get_cf_specs_from_name(value.lower(), errors="warn")
+
+
+def get_cf_specs(name=None, cache="rw"):
+    """Get the current or a registered CF specifications instance
+
+    Parameters
+    ----------
+    name: str, None, xarray.Dataset, xarray.DataArray
         A registration name for these specs.
         When set, ``cache`` is ignored.
         Raises a :class:`XoaCFError` is case of invalid name.
+        In case of a dataset or data array, the :attr:`cfspecs` attribute
+        or encoding is searched for and its value is used as a
+        registration name.
     cache: str, bool, None
         Cache default specs on disk with pickling for fast loading.
         If ``None``, it defaults to boolean option :xoaoption:`cf.cache`.
@@ -2423,20 +2513,22 @@ def get_cf_specs(name=None, cache="rw"):
 
     Return
     ------
-    dict or None
+    CFSpecs
         None is return if no specs are found
 
     Raise
     -----
     XoaCFError
-        When ``name`` is provided and invalid.
+        When ``name`` is provided as a string and is invalid.
     """
-    # Explicit name => not the default
-    if name and _CACHE["registered"]:
-        for cfspecs in _CACHE["registered"]:
-            if cfspecs["register"]["name"] == name:
+    # Look into the registration base
+    if name is not None:
+        if isinstance(name, str):  # Explicit name
+            return get_cf_specs_from_name(name, errors="raise")
+        else:  # Name as dataset or data array so we guess the name
+            cfspecs = get_cf_specs_from_encoding(name)
+            if cfspecs:
                 return cfspecs
-        raise XoaCFError("Invalid CF specs registration name: "+name)
 
     # Not named => default specs
     if cache is None:
@@ -2499,6 +2591,36 @@ def register_cf_specs(*args, **kwargs):
             _CACHE["registered"].append(cfspecs)
 
 
+def get_registered_cf_specs(current=True, reverse=True, named=False):
+    """Get the list of registered CFSpecs
+
+    Parameters
+    ----------
+    current: bool
+        Also include the current specs if any, always at the last position
+    reverse: bool
+        Reverse the list
+    named: bool
+        Make sure the returned CFSpecs have a valid registration name
+
+    Return
+    ------
+    list
+
+    See also
+    --------
+    register_cf_specs
+    """
+    cfl = _CACHE["registered"]
+    if reverse:
+        cfl = cfl[::-1]
+    if current and _CACHE["current"] is not None:
+        cfl.append(_CACHE["current"])
+    if named:
+        cfl = [c for c in cfl if c.name]
+    return cfl
+
+
 def get_cf_specs_matching_score(ds, cfspecs):
     """Get the matching score between ds data_vars and coord names and a CFSpecs instance names
 
@@ -2529,9 +2651,10 @@ def get_cf_specs_matching_score(ds, cfspecs):
     return 100 * hit / total
 
 
-def get_best_cf_specs(ds):
+def get_best_cf_specs(ds, named=False):
     """Get the registered CFSpecs that are best matching this dataset
 
+    This accomplished with some heurestics.
     First, the "cfspecs" global attribute or encoding of the dataset is compared
     with the name of all registered datasets.
     Second, a score based on the number of data_vars and coord names
@@ -2543,6 +2666,8 @@ def get_best_cf_specs(ds):
     Parameters
     ----------
     ds: xarray.Dataset, xarray.DataArray
+    named: bool
+        Make sure the candidate CFSpecs have a name
 
     Return
     ------
@@ -2552,22 +2677,23 @@ def get_best_cf_specs(ds):
     See also
     --------
     register_cf_specs
+    get_registered_cf_specs
     get_cf_specs
+    get_cf_specs
+    get_cf_specs_from_name
+    get_cf_specs_from_encoding
     """
-    # Candidates
-    candidates = _CACHE["registered"][::-1]
-    if _CACHE["current"]:
-        candidates.append(_CACHE["current"])
-
     # By registration name first
-    attrs = dict(ds.attrs)
-    attrs.update(ds.encoding)
-    if "cfspecs" in attrs:
-        for cfspecs in candidates:
-            if cfspecs["register"]["name"] and cfspecs["register"]["name"] == attrs["cfspecs"]:
-                return cfspecs
+    cfspecs = get_cf_specs_from_encoding(ds)
+    if cfspecs:
+        return cfspecs
+
+    # Candidates
+    candidates = get_registered_cf_specs(named=named)
 
     # By attributes
+    attrs = dict(ds.attrs)
+    attrs.update(ds.encoding)
     if attrs:
         for cfspecs in candidates:
             for attr, pattern in cfspecs["register"]["attrs"].items():
@@ -2585,4 +2711,47 @@ def get_best_cf_specs(ds):
         return best_cfspecs
 
     # Fallback to default specs
-    return get_cf_specs()
+    cfspecs = get_cf_specs()
+    if named and not cfspecs.name:
+        return
+    return cfspecs
+
+
+def assign_cf_specs(ds, name=None):
+    """Set the ``cfspecs`` encoding ot ``name`` in all data vars and coords
+
+    Paremeters
+    ----------
+    ds: xarray.DataArray, xarray.Dataset
+    name: None, str, CFSpecs
+        If a :class:`CFSpecs`, it must have a registration name :
+
+        .. code-block:: ini
+
+            [register]
+            name=registration_name
+
+        If not provided, :func:`get_best_cf_specs` is called to guess
+        the best named registered specs.
+    """
+    # Name as a CFSpecs instance
+    if name is None:
+        cfspecs = get_best_cf_specs(ds, named=True)
+        if cfspecs.name:
+            name = cfspecs.name
+        else:
+            return ds
+    if not isinstance(name, str):
+        if not name.name:
+            xoa_warn("CFSpecs instance has no registration name")
+            return ds
+        name = name.name
+
+    # Assign attrs and encoding
+    targets = list(ds.coords.values())
+    if hasattr(ds, "data_vars"):
+        targets.extend(list(ds.data_vars.values()))
+        # ds.attrs.update(cfspecs=name)
+    for target in targets:
+        target.encoding.update(cfspecs=name)
+    return ds

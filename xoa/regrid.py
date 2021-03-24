@@ -143,17 +143,17 @@ def regrid1d(
     if not isinstance(dim, (tuple, list)):
         dim = (dim, dim)
     dim_in, dim_out = dim
-    if None in dim or coord_in_name is None:
-        cfspecs = cf.get_cf_specs()
+    cfspecs_in = cf.get_cf_specs(da)
+    cfspecs_out = cf.get_cf_specs(coord)
     # - dim out
     if dim_out is None:  # get dim_out from coord_out
-        dim_out, dim_type = cfspecs.search_dim(coord, errors="raise")
+        dim_out, dim_type = cfspecs_out.search_dim(coord, errors="raise")
     else:  # dim_out is provided
-        dim_type = cfspecs.coords.get_dim_type(dim_out, coord)
+        dim_type = cfspecs_out.coords.get_dim_type(dim_out, coord)
     # - dim in
     if dim_in is None:
         if dim_type:
-            dim_in = cfspecs.coords.search_dim(da, dim_type, errors="raise")
+            dim_in = cfspecs_in.coords.search_dim(da, dim_type, errors="raise")
         else:
             dim_in = dim_out  # be cafeful, dim1 must be in input!
     assert dim_in in da.dims
@@ -164,7 +164,7 @@ def regrid1d(
         assert coord_in_name in da.coords, 'Invalid coordinate'
         coord_in = da.coords['coord_in_name']
     else:
-        coord_in = cfspecs.search_coord_from_dim(da, dim_in, errors="raise")
+        coord_in = cfspecs_in.search_coord_from_dim(da, dim_in, errors="raise")
         coord_in_name = coord_in.name
 
     # Coordinate arguments

@@ -37,7 +37,7 @@ def get_lon(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().search(da, 'lon', errors=errors)
+    return cf.get_cf_specs(da).search(da, 'lon', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -52,7 +52,7 @@ def get_lat(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().search(da, 'lat', errors=errors)
+    return cf.get_cf_specs(da).search(da, 'lat', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -67,7 +67,7 @@ def get_depth(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().search(da, 'depth', errors=errors)
+    return cf.get_cf_specs(da).search(da, 'depth', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -82,7 +82,7 @@ def get_altitude(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().search(da, 'altitude', errors=errors)
+    return cf.get_cf_specs(da).search(da, 'altitude', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -97,7 +97,7 @@ def get_level(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().coords.search(da, 'level', errors=errors)
+    return cf.get_cf_specs(da).coords.search(da, 'level', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -138,7 +138,7 @@ def get_time(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs().coords.search(da, 'time', errors=errors)
+    return cf.get_cf_specs(da).coords.search(da, 'time', errors=errors)
 
 
 @misc.ERRORS.format_function_docstring
@@ -153,7 +153,7 @@ def get_cf_coords(da, coord_names, errors="raise"):
     ------
     list(xarray.DataArray)
     """
-    cfspecs = cf.get_cf_specs()
+    cfspecs = cf.get_cf_specs(da)
     return [cfspecs.search_coord(da, coord_name, errors=errors)
             for coord_name in coord_names]
 
@@ -184,7 +184,7 @@ def get_dims(da, dim_types, allow_positional=False, positions='tzyx',
     --------
     xoa.cf.CFSpecs.get_dims
     """
-    return cf.get_cf_specs().get_dims(
+    return cf.get_cf_specs(da).get_dims(
         da, dim_types, allow_positional=allow_positional,
         positions=positions, errors=errors)
 
@@ -326,7 +326,7 @@ class DimFlusher1D(object):
             dim = (dim, dim)
         dim0, dim1 = dim
         if None in dim or coord_in_name is None:
-            cfspecs = cf.get_cf_specs()
+            cfspecs = cf.get_cf_specs(da_in)
         # - dim1 (out)
         if dim1 is None:  # get dim1 from coord_out
             dim1 = cfspecs.search_dim(coord_out)
@@ -477,7 +477,7 @@ def get_dim_types(da, unknown=None, asdict=False):
     ------
     tuple
     """
-    return cf.get_cf_specs().coords.get_dim_types(
+    return cf.get_cf_specs(da).coords.get_dim_types(
         da, unknown=unknown, asdict=asdict)
 
 

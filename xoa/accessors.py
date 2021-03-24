@@ -20,23 +20,32 @@ xarray and pandas xoa accessors
 
 import warnings
 
+class _BasicCFAccessor_(object):
 
-class _CFAccessor_(object):
-    _search_category = None
-
-    def __init__(self, dsa):
-        from .cf import get_cf_specs
-        self._cfspecs = get_cf_specs()
+    def __init__(self, dsa, cfspecs=None):
+        from . import cf
+        if cfspecs is None:
+            cfspecs = cf.get_best_cf_specs(dsa)
         self._dsa = dsa
-        self._coords = None
-        self._data_vars = None
-        self._cache = {}
+        self.set_cf_specs(cfspecs)
 
     def set_cf_specs(self, cfspecs):
         """Set the :class:`CFSpecs` using by this accessor"""
-        from .cf import CFSpecs
-        assert isinstance(cfspecs, CFSpecs)
+        from . import cf
+        assert isinstance(cfspecs, cf.CFSpecs)
         self._cfspecs = cfspecs
+        if self._cfspecs.name:
+            self._dsa = cf.assign_cf_specs(self._dsa, self._cfspecs.name)
+
+
+class _CFAccessor_(_BasicCFAccessor_):
+    _search_category = None
+
+    def __init__(self, dsa, cfspecs=None):
+        _BasicCFAccessor_.__init__(self, dsa, cfspecs)
+        self._coords = None
+        self._data_vars = None
+        self._cache = {}
 
     def get(self, name, loc="any", single=True, errors="ignore"):
         """Search for a CF item with :meth:`CFSpecs.search`"""
@@ -60,30 +69,26 @@ class _CFAccessor_(object):
 
     def auto_format(self, loc=None, standardize=True):
         """Auto-format attributes with :meth:`CFSpecs.auto_format`"""
-        return self._cfspecs.auto_format(self._dsa, loc=loc,
-                                         standardize=standardize)
+        return self._cfspecs.auto_format(self._dsa, loc=loc, standardize=standardize)
 
     __call__ = auto_format
 
     def fill_attrs(self, loc=None, standardize=True):
         """Fill attributes with :meth:`CFSpecs.fill_attrs`"""
-        return self._cfspecs.fill_attrs(self._dsa, loc=loc,
-                                        standardize=standardize)
+        return self._cfspecs.fill_attrs(self._dsa, loc=loc, standardize=standardize)
 
     @property
     def coords(self):
         """Sub-accessor for coords only"""
         if self._coords is None:
-            self._coords = _CoordAccessor_(self._dsa)
-            self._coords.set_cf_specs(self._cfspecs)
+            self._coords = _CoordAccessor_(self._dsa, self._cfspecs)
         return self._coords
 
     @property
     def data_vars(self):
         """Sub-accessor for data_vars only"""
         if self._data_vars is None:
-            self._data_vars = _DataVarAccessor__(self._dsa)
-            self._data_vars.set_cf_specs(self._cfspecs)
+            self._data_vars = _DataVarAccessor__(self._dsa, self._cfspecs)
         return self._data_vars
 
 
@@ -164,7 +169,7 @@ class CFDataArrayAccessor(_CoordAccessor_):
         return _CoordAccessor_.__getattr__(self, attr)
 
 
-class SigmaAccessor(object):
+class SigmaAccessor(_BasicCFAccessor_):
     """Dataset accessor to compute depths from sigma-like coordinates
 
     This follows the CF cnventions.
@@ -175,8 +180,10 @@ class SigmaAccessor(object):
     >>> ds = ds.decode_sigma()
     """
 
-    def __init__(self, ds):
-        self._ds = ds
+    def __init__(self, ds, cfspecs=None):
+        assert hasattr(ds, "data_vars"), "ds must be a xarray.Dataset"
+        _BasicCFAccessor_.__init__(self, ds, cfspecs)
+        self._ds = self._dsa
 
     def decode(self, rename=False, errors="raise"):
         """Call :func:`decode_cf_sigma` on the dataset"""
@@ -199,7 +206,7 @@ class XoaDataArrayAccessor(CFDataArrayAccessor):
     def cf(self):
         """CF subaccessor"""
         if not hasattr(self, "_cf"):
-            self._cf = CFDataArrayAccessor(self._ds)
+            self._cf = CFDataArrayAccessor(self._ds, self._cfspecs)
         return self._cf
 
 
@@ -209,7 +216,7 @@ class XoaDatasetAccessor(CFDatasetAccessor):
     def cf(self):
         """CF subaccessor"""
         if not hasattr(self, "_cf"):
-            self._cf = CFDatasetAccessor(self._ds)
+            self._cf = CFDatasetAccessor(self._ds, self._cfspecs)
         return self._cf
 
     @property

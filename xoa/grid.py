@@ -142,7 +142,9 @@ class positive_attr(misc.IntEnumChoices):
     down = -1
 
 
-def dz2depth(dz, positive="guessed", zdim=None, base=None, cfname="depth"):
+def dz2depth(
+        dz, positive="guessed", zdim=None, base=None,
+        edge_suffix="_edges", center=False, cfname="depth"):
     """Integrate layer thicknesses to compute depths
 
     The output depths are the depths at the bottom of the layers and the top
@@ -173,7 +175,7 @@ def dz2depth(dz, positive="guessed", zdim=None, base=None, cfname="depth"):
         - If **positive down", it is expected to be the depth of ground,
           also known as **bathymetry**, which should be positive.
 
-    cfname: str
+    cfname: str, False
         CF name used to format the output depth variable.
 
     Return
@@ -226,4 +228,6 @@ def dz2depth(dz, positive="guessed", zdim=None, base=None, cfname="depth"):
 
     # Finalize
     depth.attrs["positive"] = positive
-    return cf.get_cf_specs().format_coord(depth, cfname)
+    if cfname:
+        depth = cf.get_cf_specs(dz).format_coord(depth, cfname)
+    return depth

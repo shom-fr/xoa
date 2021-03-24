@@ -25,6 +25,7 @@ import re
 import numpy as np
 
 from .__init__ import xoa_warn
+from . import misc
 from . import cf
 from . import coords as xcoords
 
@@ -89,7 +90,7 @@ def atmosphere_sigma_coordinate(sig, ps, ptop, cache=None):
     p += ptop
 
     # Format
-    return cf.get_cf_specs().format_data_var(p, "plev", format_coords=False)
+    return cf.get_cf_specs(sig).format_data_var(p, "plev", format_coords=False)
 
 
 def ocean_sigma_coordinate(sig, ssh, bathy, cache=None):
@@ -128,7 +129,7 @@ def ocean_sigma_coordinate(sig, ssh, bathy, cache=None):
     z += ssh
 
     # Format
-    return cf.get_cf_specs().format_data_var(z, "depth", format_coords=False)
+    return cf.get_cf_specs(sig).format_data_var(z, "depth", format_coords=False)
 
 
 def get_cs(sig, thetas, thetab, cs_type=None):
@@ -231,7 +232,7 @@ def ocean_s_coordinate(sig, ssh, bathy, hc, thetas, thetab, cs=None,
     z = (sig+1) * ssh + zconst
 
     # Format
-    return cf.get_cf_specs().format_data_var(z, "depth", format_coords=False)
+    return cf.get_cf_specs(sig).format_data_var(z, "depth", format_coords=False)
 
 
 def ocean_s_coordinate_g1(sig, ssh, bathy, hc, thetas=None, thetab=None,
@@ -317,7 +318,7 @@ def ocean_s_coordinate_g1(sig, ssh, bathy, hc, thetas=None, thetab=None,
     z = S + Sh1 * ssh
 
     # Format
-    return cf.get_cf_specs().format_data_var(z, "depth", format_coords=False)
+    return cf.get_cf_specs(sig).format_data_var(z, "depth", format_coords=False)
 
 
 def ocean_s_coordinate_g2(sig, ssh, bathy, hc, thetas=None, thetab=None,
@@ -401,7 +402,7 @@ def ocean_s_coordinate_g2(sig, ssh, bathy, hc, thetas=None, thetab=None,
     z = hS + (S + 1) * ssh
 
     # Format
-    return cf.get_cf_specs().format_data_var(z, "depth", format_coords=False)
+    return cf.get_cf_specs(sig).format_data_var(z, "depth", format_coords=False)
 
 
 def _ds_search_ci_(ds, name):
@@ -507,7 +508,7 @@ def get_sigma_terms(ds, loc=None, rename=False):
         - an unknown formula term name
     """
     # Get sigma arrays
-    cfspecs = cf.get_cf_specs()
+    cfspecs = cf.get_cf_specs(ds)
     single = loc not in ("any", None)
     sigs = cfspecs.search(ds, 'sig', loc=loc, single=False)
     terms = {}
@@ -517,7 +518,7 @@ def get_sigma_terms(ds, loc=None, rename=False):
         if "standard_name" not in sig.attrs:
             raise XoaSigmaError("No standard_name attribute found in sigma/s "
                                 "variable name: "+sig.name)
-        standard_name, loc = cf.get_cf_specs().sglocator.parse_attr(
+        standard_name, loc = cfspecs.sglocator.parse_attr(
             "standard_name", sig.standard_name)
         if standard_name not in SIGMA_COORDINATE_TYPES:
             raise XoaSigmaError("Sigma/s coordinate not supported: " +
@@ -562,7 +563,7 @@ def get_sigma_terms(ds, loc=None, rename=False):
     #     ds = ds.rename({da_name: term_name})
     # return ds
 
-
+@misc.ERRORS.format_function_docstring
 def decode_cf_sigma(ds, rename=False, errors="raise"):
     """Compute heights from sigma-like variable in a dataset
 
@@ -580,13 +581,17 @@ def decode_cf_sigma(ds, rename=False, errors="raise"):
     rename: bool
         Rename and format arrays ot make them compliant with
         :mod:`xoa.cf`
-    errors: str
-        How to handle errors. Choices: ignore, warn, raise
+    {errors}
+
+
+    Return
+    ------
+    xarray.Dataset
     """
     # Init
     ds = ds.copy()
-    cfspecs = cf.get_cf_specs()
-    assert errors in ('ignore', 'warn', 'raise')
+    cfspecs = cf.get_cf_specs(ds)
+    errors = misc.ERRORS[errors]
 
     # Decode formula terms
     try:

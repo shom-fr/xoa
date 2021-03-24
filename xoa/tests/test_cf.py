@@ -660,22 +660,29 @@ def test_cf_cfspecs_coords_get_dims():
     assert dims == (None,)
 
 
+def test_cf_cfspecs_assign_coords():
+    ds = xr.Dataset({"temp": ("nx", [1, 2]),
+                     "lon": ("nx", [4, 5])})
+    ds = cf.get_cf_specs().assign_coords(ds)
+    assert "lon" in ds.coords
+
+
 def test_cf_dataarraycfaccessor():
     from xoa.accessors import CFDataArrayAccessor
     with warnings.catch_warnings():
         warnings.simplefilter(
             "ignore",
             xr.core.extensions.AccessorRegistrationWarning)
-        xr.register_dataarray_accessor('cfd')(CFDataArrayAccessor)
+        xr.register_dataarray_accessor('xcf')(CFDataArrayAccessor)
 
     lon = xr.DataArray(range(5), dims='xxx', name='xxx',
                        attrs={'standard_name': 'longitude'})
     temp = xr.DataArray(range(20, 25), dims='xxx',
                         coords={'xxx': lon}, name='temp')
 
-    assert temp.cfd.lon.name == 'xxx'
-    assert temp.cfd.lat is None
-    assert temp.cfd.lon.cfd.name == "lon"
+    assert temp.xcf.lon.name == 'xxx'
+    assert temp.xcf.lat is None
+    assert temp.xcf.lon.xcf.name == "lon"
 
 
 def test_cf_datasetcfaccessor():
@@ -684,7 +691,7 @@ def test_cf_datasetcfaccessor():
         warnings.simplefilter(
             "ignore",
             xr.core.extensions.AccessorRegistrationWarning)
-        xr.register_dataset_accessor('cfd')(CFDatasetAccessor)
+        xr.register_dataset_accessor('xcf')(CFDatasetAccessor)
 
     lon = xr.DataArray(range(5), dims='xxx', name='xxx',
                        attrs={'standard_name': 'longitude'})
@@ -693,8 +700,8 @@ def test_cf_datasetcfaccessor():
                         attrs={'standard_name': 'sea_water_temperature'})
 
     ds = temp.to_dataset()
-    assert ds.cfd.temp.name == 'yoyo'
-    assert ds.cfd.sal is None
+    assert ds.xcf.temp.name == 'yoyo'
+    assert ds.xcf.sal is None
 
 
 def test_cf_register_cf_specs():
