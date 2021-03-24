@@ -494,11 +494,14 @@ def register_accessors(xoa=True, cf=False, sigma=False):
     Parameters
     ----------
     xoa: bool, str
-        Register the main accessors
+        Register the main accessors with
+        :func:`~xoa.cf.register_xoa_accessors`.
     cf: bool, str
-        Register the :mod:`xoa.cf` accessors
+        Register the :mod:`xoa.cf` module accessors with
+        :func:`~xoa.cf.register_cf_accessors`.
     sigma: bool, str
-        Register the :mod:`xoa.decode_sigma` accessor
+        Register the :mod:`xoa.sigma` module accessor with
+        :func:`~xoa.cf.register_sigma_accessor`.
 
     See also
     --------

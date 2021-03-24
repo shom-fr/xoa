@@ -84,6 +84,7 @@ intersphinx_mapping = {
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None),
     'numba:': ('https://numba.readthedocs.io/en/stable/', None),
     'numpy': ("https://numpy.org/doc/stable/", None),
+    'pandas': ('https://pandas.pydata.org/docs/', None),
     'proplot': ('https://proplot.readthedocs.io/en/latest/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
     'xarray': ('http://xarray.pydata.org/en/stable/', None),

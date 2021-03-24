@@ -235,7 +235,7 @@ def _register_xarray_accessors_(dataarrays=None, datasets=None):
                 xr.register_dataset_accessor(name)(cls)
 
 
-def register_cf_accessors(name='cfd'):
+def register_cf_accessors(name='xcf'):
     """Register the cf accessors"""
     _register_xarray_accessors_(
         dataarrays={name: CFDataArrayAccessor},

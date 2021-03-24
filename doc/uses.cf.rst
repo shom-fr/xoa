@@ -17,6 +17,10 @@ It has two intents:
   unique ``name``, and ``standard_name``, ``long_name`` and ``units``
   attributes, with support of staggered grid location syntax.
 
+The module offers capabilities for the user to extend and specialize
+default behaviors for user's special datasets.
+
+
 .. note:: This module shares common feature with the excellent and long
     awaited `xf_xarray <https://cf-xarray.readthedocs.io/en/latest/>`_
     package, but started a long time before with the Vacumm package.
@@ -255,9 +259,9 @@ can be registered with the :func:`xoa.cf.register_cf_accessors`:
 .. ipython:: python
 
     import xoa
-    xoa.register_accessors(cf="cfd")
+    xoa.register_accessors(cf="xcf")
 
-The accessor is named here `cfd` to no conflict with the
+The accessor is named here `xcf` to no conflict with the
 `cf` accessor of
 `cf-xarray <https://cf-xarray.readthedocs.io/en/latest/>`_.
 
@@ -275,20 +279,20 @@ Here are examples of use:
     :okwarning:
 
     temp
-    temp.cfd.get("lon") # access by .get
-    ds.cfd.get("temp") # access by .get
-    ds.cfd.lon # access by attribute
-    ds.cfd.coords.lon  # specific search = ds.cf.coords.get("lon")
-    ds.cfd.temp # access by attribute
-    ds.cfd["temp"].name # access by item
-    ds.cfd.data_vars.temp.name  # specific search = ds.cf.coords.get("temp")
-    ds.cfd.data_vars.bathy is None # returns None when not found
-    ds.cfd.temp.cfd.lon.name  # chaining
-    ds.cfd.temp.cfd.name # CF name, not real name
-    ds.cfd.temp.cfd.attrs # attributes, merged with CF attrs
-    ds.cfd.temp.cfd.standard_name # single attribute
-    ds.mytemp.cfd.auto_format() # or ds.temp.cfd()
-    ds.cfd.auto_format() # or ds.cfd()
+    temp.xcf.get("lon") # access by .get
+    ds.xcf.get("temp") # access by .get
+    ds.xcf.lon # access by attribute
+    ds.xcf.coords.lon  # specific search = ds.cf.coords.get("lon")
+    ds.xcf.temp # access by attribute
+    ds.xcf["temp"].name # access by item
+    ds.xcf.data_vars.temp.name  # specific search = ds.cf.coords.get("temp")
+    ds.xcf.data_vars.bathy is None # returns None when not found
+    ds.xcf.temp.xcf.lon.name  # chaining
+    ds.xcf.temp.xcf.name # CF name, not real name
+    ds.xcf.temp.xcf.attrs # attributes, merged with CF attrs
+    ds.xcf.temp.xcf.standard_name # single attribute
+    ds.mytemp.xcf.auto_format() # or ds.temp.xcf()
+    ds.xcf.auto_format() # or ds.xcf()
 
 As you can see, accessing an accessor attribute or item make an
 implicit call to :class:`~xoa.cf.DataArrayCFAccessor.get`.
@@ -441,6 +445,80 @@ Application with an accessor usage:
     mycfspecs = cf.CFSpecs({"data_vars": {"ssb":
         {"standard_name": "sea_surface_banana"}}})
     with cf.set_cf_specs(mycfspecs):
-        print(ds.cfd.get("ssb"))
+        print(ds.xcf.get("ssb"))
 
 
+Working with registered specs
+=============================
+
+Registering and accessing new specs
+-----------------------------------
+
+It is possible to register specialized :class:`~xoa.cf.CFSpecs` instances
+with :func:`~xoa.cf.register_cf_specs` for future access.
+
+Here we register new specs with a internal registration name ``"croco"``:
+
+.. ipython:: python
+
+    content = {
+        "register": {
+            "name": "croco"
+        },
+        "data_vars": {
+            "temp": {
+                "name": "supertemp"
+            }
+        }
+    }
+    mycfspecs = cf.CFSpecs(content)
+    cf.register_cf_specs(mycfspecs)
+
+
+We can now access with it the :func:`~xoa.cf.get_cf_specs` function:
+
+.. ipython:: python
+
+    these_cfspecs = cf.get_cf_specs('croco')
+    these_cfspecs is mycfspecs
+
+Automatically finding the best specs for my dataset
+---------------------------------------------------
+
+If you set the :attr:`cfspecs` attribute or encoding of a dataset
+to the name of a registered :class:`~xoa.cf.CFSpecs` instance, you can
+get it automatically with the :func:`get_best_cf_specs`.
+
+Let's register another :class:`~xoa.cf.CFSpecs` instance:
+
+.. ipython:: python
+
+    content = {
+        "register": {
+            "name": "hycom"
+        },
+        "data_vars": {
+            "sal": {
+                "name": "supersal"
+            }
+        }
+    }
+    mycfspecs2 = cf.CFSpecs(content)
+    cf.register_cf_specs(mycfspecs2)
+
+Let's create a dataset:
+
+.. ipython:: python
+
+    ds = xr.Dataset({'supertemp': [0, 2]})
+
+Now find the best registered specs instance which has the either name
+``hycom`` or ``croco``:
+
+
+.. ipython:: python
+
+    cf_specs_auto = cf.get_best_cf_specs(ds)
+    print(cf_specs_auto.name)
+
+It is ``croco`` as expected.
