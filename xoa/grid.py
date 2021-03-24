@@ -204,7 +204,7 @@ def dz2depth(dz, positive="guessed", zdim=None, base=None, cfname="depth"):
     # Positive attribute
     positive = positive_attr[positive].name
     if positive == "guess":
-        if zdim not in dz.coords and "positive" not in dz.coords["zdim"].attrs:
+        if zdim not in dz.coords and "positive" not in dz.coords[zdim].attrs:
             raise XoaError("Can't guess positive attribute from data array")
         positive = positive_attr[dz.coords["zdim"].attrs["positive"]].name
 
