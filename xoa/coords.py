@@ -560,3 +560,29 @@ def get_coords_compat_with_dims(da, include_dims=None, exclude_dims=None):
             continue
         coords.append(coord)
     return coords
+
+
+def change_index(da, dim, values):
+    """Change the values of a dataset or data array index
+
+    Parameters
+    ----------
+    da: xarray.Dataset, xarray.DataArray
+    dim: str
+    values: array_like
+
+    Return
+    ------
+    xarray.Dataset, xarray.DataArray
+
+    See also
+    --------
+    xarray.DataArray.reset_index
+    xarray.DataArray.assign_coords
+    """
+    attrs = da.coords[dim].attrs
+    if hasattr(values, "attrs"):
+        attrs.update(attrs)
+    da = da.reset_index([dim], drop=True)
+    coord = xr.DataArray(values, dims=dim, attrs=attrs)
+    return da.assign_coords({dim: coord})
