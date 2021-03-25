@@ -37,16 +37,19 @@ def test_grid_get_edges_1d():
 
 
 @pytest.mark.parametrize(
-    "positive, expected", [
-        ["down", [100., 600., 1600.]],
-        ["up", [-1600, -1500, -1000]]
+    "positive, expected, base", [
+        ["down", [0, 100., 600., 1600.], None],
+        ["down", [10, 110., 610., 1610.], 10],
+        ["up", [-1600, -1500, -1000, 0], None],
+        ["up", [-1610, -1510, -1010, -10], 1610]
         ])
-def test_dz2depth(positive, expected):
+def test_dz2depth(positive, expected, base):
 
     dz = xr.DataArray(
         np.resize([100, 500, 1000.], (2, 3)).T,
         dims=("nz", "nx"))
 
-    depth = grid.dz2depth(dz, positive)
+    depth = grid.dz2depth(dz, positive, base=base)
 
     np.testing.assert_allclose(depth.isel(nx=1), expected)
+

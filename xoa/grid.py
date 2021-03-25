@@ -22,7 +22,7 @@ import xarray as xr
 from .__init__ import XoaError
 from . import misc
 from . import cf
-from . import coords
+from . import coords as xcoords
 
 
 def get_edges_1d(da, axis=-1, name_suffix='_edges'):
@@ -201,7 +201,7 @@ def dz2depth(
     """
     # Vertical dimension
     if zdim is None:
-        zdim = coords.get_dims(dz, "z", errors="raise")[0]
+        zdim = xcoords.get_dims(dz, "z", errors="raise")[0]
 
     # Positive attribute
     positive = positive_attr[positive].name
@@ -210,21 +210,20 @@ def dz2depth(
             raise XoaError("Can't guess positive attribute from data array")
         positive = positive_attr[dz.coords["zdim"].attrs["positive"]].name
 
-    # Positive down as cumsum
+    # Integrate with base
     depth = dz.cumsum(dim=zdim)
-
-    # Positive up: integrate from the ground
+    depth = depth.pad(nz=(1, 0), mode="constant", constant_values=0)
     if positive == "up":
-
-        depth = depth.roll({zdim: 1}, roll_coords=False)
         if base is None:
-            depth[{zdim: 0}] *= -1
-        else:
-            depth[{zdim: 0}] = -base  # bath is bottom depth
-        depth[{zdim: slice(1, None)}] += depth.isel({zdim: 0}).values
-
-    elif base is not None:  # base is ssh
+            base = depth[-1]
         depth[:] -= base
+    elif base is not None:
+        depth[:] += base
+
+    # Fix index
+    if zdim in dz.indexes:
+        dnz = dz[zdim].diff(zdim).pad({zdim: (0, 1)}, mode="edge")
+        depth = xcoords.change_index(depth, zdim, dz[zdim]+0.5*dnz)
 
     # Finalize
     depth.attrs["positive"] = positive
