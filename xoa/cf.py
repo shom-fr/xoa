@@ -2723,7 +2723,7 @@ def assign_cf_specs(ds, name=None):
     Paremeters
     ----------
     ds: xarray.DataArray, xarray.Dataset
-    name: None, str, CFSpecs
+    name: None, str, CFSpecs, xarray.DataArray
         If a :class:`CFSpecs`, it must have a registration name :
 
         .. code-block:: ini
@@ -2737,6 +2737,12 @@ def assign_cf_specs(ds, name=None):
     # Name as a CFSpecs instance
     if name is None:
         cfspecs = get_best_cf_specs(ds, named=True)
+        if cfspecs.name:
+            name = cfspecs.name
+        else:
+            return ds
+    elif hasattr(name, "coords"):  # from a dataset/dataarray
+        cfspecs = get_best_cf_specs(name, named=True)
         if cfspecs.name:
             name = cfspecs.name
         else:

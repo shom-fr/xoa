@@ -583,6 +583,12 @@ def change_index(da, dim, values):
     attrs = da.coords[dim].attrs
     if hasattr(values, "attrs"):
         attrs.update(attrs)
-    da = da.reset_index([dim], drop=True)
+    if dim in da.indexes:
+        da = da.reset_index([dim], drop=True)
     coord = xr.DataArray(values, dims=dim, attrs=attrs)
     return da.assign_coords({dim: coord})
+
+
+def drop_dim_coords(da, dim):
+    """Drop coords that have a particular dim"""
+    return da.drop([c.name for c in da.coords.values() if dim in c.dims])

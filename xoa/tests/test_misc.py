@@ -89,3 +89,19 @@ def test_misc_dict_merge():
         uniquify=False)
 
     assert dict01 == expected
+
+
+def test_misc_intenum_defaultenumeta():
+
+    class regrid_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
+        linear = 1
+        bilinear = 1
+        nearest = 0
+        cellave = -1
+
+    assert regrid_methods().name == "linear"  # default method
+    assert regrid_methods(None).name == "linear"  # default method
+    assert regrid_methods(1).name == "linear"
+    assert regrid_methods[None].name == "linear"  # default method
+    assert regrid_methods['linear'].name == "linear"
+    assert regrid_methods['cellave'].name == "cellave"

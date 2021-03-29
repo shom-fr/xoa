@@ -2,6 +2,7 @@
 """
 Test the :mod:`xoa.grid` module
 """
+import functools
 import numpy as np
 import xarray as xr
 import pytest
@@ -9,31 +10,68 @@ import pytest
 from xoa import grid
 
 
-def test_grid_get_edges_1d():
+# TODO: add rotate_grid
 
-    x = np.arange(3) * 2.
-    xe = grid.get_edges_1d(x)
-    xet = np.arange(4) * 2. - 1
-    np.testing.assert_allclose(xe, xet)
+@functools.lru_cache()
+def get_da():
+    x = xr.DataArray(np.arange(4), dims='x')
+    y = xr.DataArray(np.arange(3), dims='y')
+    lon = xr.DataArray(np.resize(x*2., (3, 4)), dims=('y', 'x'))
+    lat = xr.DataArray(np.resize(y*3., (4, 3)).T, dims=('y', 'x'))
+    z = xr.DataArray(np.arange(2), dims='z')
+    dep = z*(lat+lon) * 100
+    da = xr.DataArray(
+        np.resize(lat-lon, (2, 3, 4)),
+        dims=('z', 'y', 'x'),
+        coords={'dep': dep, 'lat': lat, "z": z, 'lon': lon, 'y': y, 'x': x},
+        attrs={"long_name": "SST"},
+        name="sst")
+    da.encoding.update(cfspecs='croco')
+    return da
 
-    xx = x[np.newaxis, :, np.newaxis]
-    xxe = grid.get_edges_1d(xx, axis=1)
-    assert xxe.shape == (1, 4, 1)
-    np.testing.assert_allclose(xxe[0, :, 0], xet)
 
-    x_ = xr.DataArray(x, dims='x', name='x')
-    xe_ = grid.get_edges_1d(x_)
-    np.testing.assert_allclose(xe_, xet)
-    assert xe_.dims[0] == 'x_edges'
-    assert xe_.name == 'x_edges'
+def test_grid_get_centers():
 
-    for axis in (1, 'x'):
-        xx_ = xr.DataArray(xx, dims=('y', 'x', 't'), name='lon')
-        xxe_ = grid.get_edges_1d(xx_, axis=axis)
-        np.testing.assert_allclose(xxe_[0, :, 0], xet)
-        assert xxe_.dims[1] == 'x_edges'
-        assert xxe_.dims[0] == 'y'
-        assert xxe_.name == 'lon_edges'
+    da = get_da()
+    dac = grid.get_centers(da, dim=("y", "x"))
+    assert dac.shape == (da.shape[0], da.shape[1]-1, da.shape[2]-1)
+    assert dac.x[0] == 0.5
+    assert dac.y[0] == 0.5
+    assert dac.lon[0, 0] == 1.
+    assert dac.lat[0, 0] == 1.5
+    assert dac.dep[-1, 0, 0] == 250
+    assert dac[0, 0, 0] == 0.5
+    assert dac.name == 'sst'
+    assert dac.long_name == "SST"
+    assert dac.encoding["cfspecs"] == "croco"
+
+
+def test_grid_pad():
+
+    da = get_da()
+    dap = grid.pad(da, {"y": 1, "x": 1}, name_kwargs={'dep': {"mode": 'edge'}})
+    assert dap.shape == (da.shape[0], da.shape[1]+2, da.shape[2]+2)
+    assert dap.x[0] == -1
+    assert dap.x[-1] == da.sizes['x']
+    assert dap.y[0] == -1
+    assert dap.y[-1] == da.sizes['y']
+    assert dap.lon[0, 0] == -2
+    assert dap.lat[0, 0] == -3
+    assert dap.dep[-1, 0, 0] == da.dep[-1, 0, 0]
+    assert dap[-1, 0, 0] == da[-1, 0, 0]
+    assert dap.name == 'sst'
+    assert dap.long_name == "SST"
+    assert dap.encoding["cfspecs"] == "croco"
+
+
+def test_grid_get_edges():
+
+    da = get_da()
+    dae = grid.get_edges(da, "y")
+    assert dae.shape == (da.shape[0], da.shape[1]+1, da.shape[2])
+    np.testing.assert_allclose(dae.y[:2].values, da.y[:2] - 0.5)
+    np.testing.assert_allclose(dae.lat[:2, 0], da.lat[:2, 0] - 1.5)
+    assert dae[1, 0, 0] == da[1, 0, 0]
 
 
 @pytest.mark.parametrize(
@@ -43,13 +81,18 @@ def test_grid_get_edges_1d():
         ["up", [-1600, -1500, -1000, 0], None],
         ["up", [-1610, -1510, -1010, -10], 1610]
         ])
-def test_dz2depth(positive, expected, base):
+def test_grid_dz2depth(positive, expected, base):
 
     dz = xr.DataArray(
         np.resize([100, 500, 1000.], (2, 3)).T,
-        dims=("nz", "nx"))
+        dims=("z", "x"),
+        coords={"z": ("z", np.arange(3, dtype="d"))}
+        )
 
     depth = grid.dz2depth(dz, positive, base=base)
+    np.testing.assert_allclose(depth.isel(x=1), expected)
+    assert depth.z[0] == -0.5
 
-    np.testing.assert_allclose(depth.isel(nx=1), expected)
-
+    depth = grid.dz2depth(dz, positive, base=base, centered=True)
+    assert depth[0, 0] == 0.5 * sum(expected[:2])
+    assert depth.z[0] == 0

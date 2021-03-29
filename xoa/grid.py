@@ -25,115 +25,200 @@ from . import cf
 from . import coords as xcoords
 
 
-def get_edges_1d(da, axis=-1, name_suffix='_edges'):
-    """Get edges of coordinates from centers along a single axis
+def apply_along_dim(
+        da, dim, func, data_kwargs=None, coord_kwargs=None, name_kwargs=None, **kwargs):
+    """Apply an operator on a single dimension
+
+    The operator may potentially change size of the array.
+    It is is applied on the data array with the data_kwargs
+    arguments and the coordinate arrays with the coord_kwargs arguments.
 
     Parameters
     ----------
-    da: array
-    axis: int, str
-        Axis index to work on.
-        May be a dimension name if ``da`` is a :class:`~xarray.DataArray`
+    da: xarray.DataArray
+    dim: str, tuple(str)
+    func: callable
+    data_kwargs: None, dict
+        Parameters passed to func for the data array
+    coord_kwargs: None, dict
+        Parameters passed to func for the coordinates
+    name_kwargs: dict(dict)
+        A dict of whose keys are coordinate name and whose values
+        are passed to func only for these coordinates.
 
-    Example
-    -------
-    .. ipython:: python
+    Return
+    ------
+    xarray.DataArray
 
-        @suppress
-        import numpy as np, xarray as xr
-        @suppress
-        from xoa.grid import get_edges_1d
-
-        # 1D
-        x = np.arange(3) * 2.
-        print(get_edges_1d(x))
-
-        # 2D
-        xx = x[np.newaxis, :, np.newaxis]
-        print(xx.shape)
-        xxe = get_edges_1d(xx, axis=1)
-        print(xxe.shape)
-        print(xxe)
-
-        # Xarrays
-        x_ = xr.DataArray(x, dims='x', name='x')
-        print(get_edges_1d(x_))
-        xx_ = xr.DataArray(xx, dims=('y', 'x', 't'), name='lon')
-        print(get_edges_1d(xx_, axis='x'))  # with dim name
-        print(get_edges_1d(xx_, axis=1))
-
+    See also
+    --------
+    get_centers
+    get_edges
+    pad
     """
-    # Init
-    if isinstance(axis, str):
-        if not isinstance(da, xr.DataArray):
-            raise XoaError('da must be a DataArray is axis is a str')
-        axis = da.dims.index(axis)
-    ss = misc.get_axis_slices(da, axis)
-    shape = list(da.shape)
-    shape[axis] += 1
-    edges = np.empty(shape, dtype=da.dtype)
-    data = da.data if isinstance(da, xr.DataArray) else da
+    # Always return a copy
+    dao = da.copy()
 
-    # Compute
-    edges[ss["first"]] = (data[ss["first"]] -
-                          (data[ss["firstp1"]] - data[ss["first"]]) * .5)
-    edges[ss["mid"]] = 0.5 * (data[ss["firsts"]] + data[ss["lasts"]])
-    edges[ss["last"]] = (data[ss["last"]] -
-                         (data[ss["lastm1"]] - data[ss["last"]]) * .5)
+    # Loop on dims
+    dims = (dim,) if isinstance(dim, str) else dim
+    for dim in dims:
 
-    # Finalize
-    if isinstance(da, xr.DataArray):
-        dims = list(da.dims)
-        dims[axis] += name_suffix
-        name = (da.name+name_suffix) if da.name else da.name
-        edges = xr.DataArray(edges, dims=dims, name=name)
-    return edges
+        # Data array
+        daold = dao
+        kw = kwargs.copy()
+        if data_kwargs:
+            kw.update(data_kwargs)
+        if name_kwargs and dao.name in name_kwargs:
+            kw.update(name_kwargs.get(dao.name))
+        dao = func(xr.DataArray(dao, coords={}), dim, **kw)
+        dao.attrs = da.attrs
+        dao.name = da.name
+        dao.encoding = da.encoding
+
+        # Coordinates
+        coords = {}
+        if name_kwargs is None:
+            name_kwargs = {}
+        for coord_name, coord in daold.coords.items():
+            if da.name and coord_name == da.name:
+                continue
+            if dim in coord.dims:
+                coord = xr.DataArray(coord, coords={})
+                kw = kwargs or {}
+                for dd in (coord_kwargs, name_kwargs.get(coord_name)):
+                    if dd:
+                        kw.update(dd)
+                coord = func(coord, dim, **kw)
+            coords[coord.name] = coord
+        dao = dao.assign_coords(coords)
+
+    return dao
 
 
-def get_edges_2d(da, name_suffix='_edges'):
-    """Get edges of a 2D coordinates array
+def _pad_(da, dim, pad_width, mode, **kwargs):
+    pad_width = pad_width.get(dim, 0)
+    if not pad_width:
+        return da.copy()
+    if mode not in ("edge", "linear_extrap"):
+        return da.pad({dim: pad_width}, mode=mode, **kwargs)
+    da = da.pad({dim: pad_width}, mode="edge", **kwargs)
+    if mode == "linear_extrap":
+        if isinstance(pad_width, int):
+            pad_width = pad_width,
+        pad_width0 = pad_width[0]
+        pad_width1 = pad_width[-1]
+        if pad_width0:
+            d0 = da[{dim: pad_width0}].values - da[{dim: pad_width0+1}].values
+            for i in range(1, pad_width0+1):
+                da[{dim: pad_width0-i}] += i * d0
+        if pad_width1:
+            d1 = da[{dim: -1-pad_width1}].values - da[{dim: -2-pad_width1}].values
+            for i in range(1, pad_width1+1):
+                da[{dim: -1-pad_width1+i}] += i * d1
+    return da
+
+
+def pad(da, pad_width, mode="edge", coord_mode="linear_extrap",
+        name_kwargs=None, **kwargs):
+    """Pad data and coordinates along dimensions
+
+    This function adds the ``"linear_extrap"`` mode support to the builtin
+    :function:`xarray.pad` fonction or methods.
 
     Parameters
     ----------
-    da: array(ny, nx)
+    da: xarray.DataArray
+    pad_width: dict
+        Pad widths. Keys are dimensions and values are int or tuple of ints.
+    mode: str
+        Extrapolation mode for the data array
+    coord_mode: str
+        Extrapolation mode for the coordinates
+    name_kwargs: dict(dict)
+        Keys are coordinates names and valkues are parameters to pass
+        to :func:`xarray.pad` for this coordinate array
+    kwargs:
+        Extra arguments are passed to :func:`xarray.pad`
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    get_centers
+    get_edges
+    apply_along_dim
+    xarray.pad
     """
-
-    # Init
-    if da.ndim != 2:
-        raise ValueError(f'Input must be a 2d array, but got {da.ndim}d.')
-    ny, nx = da.shape
-    edges = np.empty((ny + 1, nx + 1), da.dtype)
-    data = da.data if isinstance(da, xr.DataArray) else da
-
-    # Inner
-    edges[1:-1, 1:-1] = 0.25 * (
-        data[1:, 1:] + data[:-1, 1:] + data[1:, :-1] + data[:-1, :-1]
-
-    )
-
-    # Lower and upper
-    edges[0] += get_edges_1d(1.5 * data[0] - 0.5 * data[1])
-    edges[-1] += get_edges_1d(1.5 * data[-1] - 0.5 * data[-2])
-
-    # Left and right
-    edges[:, 0] += get_edges_1d(1.5 * data[:, 0] - 0.5 * data[:, 1])
-    edges[:, -1] += get_edges_1d(1.5 * data[:, -1] - 0.5 * data[:, -2])
-
-    # Corners
-    edges[[0, 0, -1, -1], [0, -1, -1, 0]] *= 0.5
-
-    # Finalize
-    dims = list(da.dims)
-    dims[0] += name_suffix
-    dims[1] += name_suffix
-    name = (da.name+name_suffix) if da.name else da.name
-    if isinstance(da, xr.DataArray):
-        edges = xr.DataArray(edges, dims=dims, name=name)
-    return edges
+    return apply_along_dim(
+        da, list(pad_width.keys()), _pad_,
+        data_kwargs={"mode": mode, **kwargs},
+        coord_kwargs={"mode": coord_mode},
+        name_kwargs=name_kwargs,
+        pad_width=pad_width)
 
 
-class positive_attr(misc.IntEnumChoices):
-    """Allowed value for the positive attribute"""
+def _get_centers_(da, dim):
+    dao = da.isel({dim: slice(None, -1)})
+    dao = dao + 0.5 * da.diff(dim).values
+    return dao
+
+
+def get_centers(da, dim):
+    """Interpolate the data array at mid grid points
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+    dim: str, tuple
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    pad
+    get_edges
+    apply_along_dim
+    """
+    return apply_along_dim(da, dim, _get_centers_)
+
+
+def get_edges(da, dim, mode="edge", **kwargs):
+    """Interpolate and extrapolate a data array ate grid edges
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+    dim: str, tuple
+    mode: str
+        Extrapolation mode at grid edges
+    kwargs:
+        Extra arguments are passed to :func:`pad`
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    pad
+    get_centers
+    apply_along_dim
+    """
+    # Extrapolate
+    dims = (dim,) if isinstance(dim, str) else dim
+    pad_width = dict((dim, 1) for dim in dims)
+    da = pad(da, pad_width=pad_width, mode=mode, **kwargs)
+
+    # Inner edges
+    return get_centers(da, dim)
+
+
+class positive_attr(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
+    """Allowed value for the positive attribute argument"""
     #: Guessed from the axis coordinate
     guess = 0
     #: Coordinates are increasing up
@@ -143,8 +228,7 @@ class positive_attr(misc.IntEnumChoices):
 
 
 def dz2depth(
-        dz, positive="guessed", zdim=None, base=None,
-        edge_suffix="_edges", center=False, cfname="depth"):
+        dz, positive=None, zdim=None, base=None, centered=False, cfname="depth"):
     """Integrate layer thicknesses to compute depths
 
     The output depths are the depths at the bottom of the layers and the top
@@ -175,6 +259,8 @@ def dz2depth(
         - If **positive down", it is expected to be the depth of ground,
           also known as **bathymetry**, which should be positive.
 
+    centered: bool
+        Get depth a the middle of layers instead at their edge
     cfname: str, False
         CF name used to format the output depth variable.
 
@@ -212,7 +298,7 @@ def dz2depth(
 
     # Integrate with base
     depth = dz.cumsum(dim=zdim)
-    depth = depth.pad(nz=(1, 0), mode="constant", constant_values=0)
+    depth = pad(depth, {zdim: (1, 0)}, mode="constant", constant_values=0)
     if positive == "up":
         if base is None:
             base = depth[-1]
@@ -221,12 +307,19 @@ def dz2depth(
         depth[:] += base
 
     # Fix index
-    if zdim in dz.indexes:
-        dnz = dz[zdim].diff(zdim).pad({zdim: (0, 1)}, mode="edge")
-        depth = xcoords.change_index(depth, zdim, dz[zdim]+0.5*dnz)
+    if zdim in depth.indexes:
+        dnz = depth[zdim].diff(zdim).pad({zdim: (0, 1)}, mode="edge")
+        depth = xcoords.change_index(depth, zdim, depth[zdim]+0.5*dnz.values)
+
+    # Centered
+    if centered:
+        depth = get_centers(depth, zdim)
+        if zdim in depth.indexes:
+            depth = depth.assign_coords({zdim: dz[zdim]})
 
     # Finalize
     depth.attrs["positive"] = positive
     if cfname:
         depth = cf.get_cf_specs(dz).format_coord(depth, cfname)
+
     return depth

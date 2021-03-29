@@ -79,7 +79,7 @@ class XEnumMeta(EnumMeta):
     def _get_choices_(cls, es=""):
         choices = []
         for number, names in cls._get_groups_().items():
-            cc = [f"{number:d}"] + [f'"{name}"' for name in names]
+            cc = [f"{number}"] + [f'"{name}"' for name in names]
             choices.append(es + "|".join(cc) + es)
         return choices
 
