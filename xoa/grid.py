@@ -16,7 +16,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import xarray as xr
 
 from .__init__ import XoaError
@@ -26,8 +25,10 @@ from . import coords as xcoords
 
 
 def apply_along_dim(
-        da, dim, func, data_kwargs=None, coord_kwargs=None, name_kwargs=None, **kwargs):
-    """Apply an operator on a single dimension
+        ds, dim, func, coord_func=None,
+        data_kwargs=None, coord_kwargs=None, name_kwargs=None,
+        **kwargs):
+    """Apply an operator on data array or dataset dimensions
 
     The operator may potentially change size of the array.
     It is is applied on the data array with the data_kwargs
@@ -35,9 +36,15 @@ def apply_along_dim(
 
     Parameters
     ----------
-    da: xarray.DataArray
+    ds: xarray.DataArray, xarray.Dataset
     dim: str, tuple(str)
     func: callable
+        Operator function that works on a specific dimension.
+        It is applied to both data and coordinates, unless
+        ``coord_func`` is provided.
+    coord_func: callable, None
+        Fonction to apply to coordinates specifically, which defaults
+        to ``func``
     data_kwargs: None, dict
         Parameters passed to func for the data array
     coord_kwargs: None, dict
@@ -45,10 +52,12 @@ def apply_along_dim(
     name_kwargs: dict(dict)
         A dict of whose keys are coordinate name and whose values
         are passed to func only for these coordinates.
+    kwargs: dict
+        Extra keywords are passed to the ``func`` function
 
     Return
     ------
-    xarray.DataArray
+    xarray.DataArray, xarray.Dataset
 
     See also
     --------
@@ -57,30 +66,53 @@ def apply_along_dim(
     pad
     """
     # Always return a copy
-    dao = da.copy()
+    dso = ds.copy()
 
     # Loop on dims
+    if coord_func is None:
+        coord_func = func
     dims = (dim,) if isinstance(dim, str) else dim
     for dim in dims:
+        if dim not in dso.dims:
+            continue
 
-        # Data array
-        daold = dao
-        kw = kwargs.copy()
+        # Data array or dataset
+        old_coords = dso.coords
+        if isinstance(dso, xr.Dataset):
+            das = dso.data_vars.values()
+            dso = xr.Dataset()
+        else:
+            das = [dso]
+        daos = {}
+        kwd = kwargs.copy()
         if data_kwargs:
-            kw.update(data_kwargs)
-        if name_kwargs and dao.name in name_kwargs:
-            kw.update(name_kwargs.get(dao.name))
-        dao = func(xr.DataArray(dao, coords={}), dim, **kw)
-        dao.attrs = da.attrs
-        dao.name = da.name
-        dao.encoding = da.encoding
+            kwd.update(data_kwargs)
+        for da in das:
+            if dim not in da.dims:
+                dao = da
+            else:
+                kw = kwd.copy()
+                if name_kwargs and da.name in name_kwargs:
+                    kw.update(name_kwargs.get(da.name))
+                dao = func(xr.DataArray(da, coords={}), dim, **kw)
+                dao.name = da.name
+                dao.encoding = da.encoding
+                dao.attrs = da.attrs
+            daos[dao.name] = dao
+        if isinstance(dso, xr.Dataset):
+            dso = dso.update(daos)
+            dso.attrs = ds.attrs
+            dso.encoding = ds.encoding
+        else:
+            dso = list(daos.values())[0]
+        da_names = [name for name in daos.keys() if name]
 
         # Coordinates
         coords = {}
         if name_kwargs is None:
             name_kwargs = {}
-        for coord_name, coord in daold.coords.items():
-            if da.name and coord_name == da.name:
+        for coord_name, coord in old_coords.items():
+            if coord_name in da_names:
                 continue
             if dim in coord.dims:
                 coord = xr.DataArray(coord, coords={})
@@ -88,11 +120,13 @@ def apply_along_dim(
                 for dd in (coord_kwargs, name_kwargs.get(coord_name)):
                     if dd:
                         kw.update(dd)
-                coord = func(coord, dim, **kw)
+                coord = coord_func(coord, dim, **kw)
             coords[coord.name] = coord
-        dao = dao.assign_coords(coords)
+        dso = dso.assign_coords(coords)
 
-    return dao
+    cf.assign_cf_specs(dso, ds)
+
+    return dso
 
 
 def _pad_(da, dim, pad_width, mode, **kwargs):
@@ -168,6 +202,8 @@ def _get_centers_(da, dim):
 def get_centers(da, dim):
     """Interpolate the data array at mid grid points
 
+    .. note:: Coordinates are also centered
+
     Parameters
     ----------
     da: xarray.DataArray
@@ -187,7 +223,9 @@ def get_centers(da, dim):
 
 
 def get_edges(da, dim, mode="edge", **kwargs):
-    """Interpolate and extrapolate a data array ate grid edges
+    """Interpolate and extrapolate a data array at grid edges
+
+    .. note:: Coordinates are linearly extrapolated
 
     Parameters
     ----------
@@ -217,18 +255,51 @@ def get_edges(da, dim, mode="edge", **kwargs):
     return get_centers(da, dim)
 
 
-class positive_attr(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
-    """Allowed value for the positive attribute argument"""
-    #: Guessed from the axis coordinate
-    guess = 0
-    #: Coordinates are increasing up
-    up = 1
-    #: Coordinates are increasing down
-    down = -1
+def _get_diff_(da, dim):
+    dao = da.isel({dim: slice(None, -1)})
+    dao = 0.5 * da.diff(dim).values
+    return dao
+
+
+def get_diff(da, dim):
+    """Get the difference between consecutive grid points
+
+    .. note:: Coordinates are centered between grid point with :func:`get_centers`
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+    dim: str, tuple
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    pad
+    get_edges
+    get_centers
+    apply_along_dim
+    """
+    return apply_along_dim(da, dim, _get_diff_, coord_func=_get_centers_)
+
+
+class dz2depth_ref_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
+    """Integration ref types for :func:`dz2depth`"""
+    #: Infer it (default)
+    infer = 0
+    #: Up (SSH)
+    top = 1
+    ssh = 1
+    #: Bottom (bathy)
+    bottom = -1
+    bathy = -1
 
 
 def dz2depth(
-        dz, positive=None, zdim=None, base=None, centered=False, cfname="depth"):
+        dz, positive=None, zdim=None, ref=None, ref_type='infer',
+        centered=False, cfname="depth"):
     """Integrate layer thicknesses to compute depths
 
     The output depths are the depths at the bottom of the layers and the top
@@ -252,13 +323,17 @@ def dz2depth(
     zdim: str
         Name of the vertical dimension.
         If note set, it is infered with :func:`~xoa.coords.get_dims`.
-    base: xarray.DataArray
-        Base array from which to integrate:
+    ref: xarray.DataArray
+        Reference array converting layer thicknesses to depth:
 
         - If **positive up", it is expected to be the **SSH** (sea surface heigth)
-        - If **positive down", it is expected to be the depth of ground,
+          by default
+        - If **positive down", it is expected to be by default the depth of ground
           also known as **bathymetry**, which should be positive.
 
+    ref_type: str, int
+        Type of ``ref``:
+        {dz2depth_ref_types.rst_with_links}
     centered: bool
         Get depth a the middle of layers instead at their edge
     cfname: str, False
@@ -290,21 +365,35 @@ def dz2depth(
         zdim = xcoords.get_dims(dz, "z", errors="raise")[0]
 
     # Positive attribute
-    positive = positive_attr[positive].name
-    if positive == "guess":
-        if zdim not in dz.coords and "positive" not in dz.coords[zdim].attrs:
-            raise XoaError("Can't guess positive attribute from data array")
-        positive = positive_attr[dz.coords["zdim"].attrs["positive"]].name
+    positive = xcoords.positive_attr[positive].name
+    if positive == "infer":
+        positive = xcoords.get_positive_attr(dz, zdim)
+        if positive is None:
+            raise XoaError("Can't infer positive attribute from data array/dataset")
 
-    # Integrate with base
+    # Integrate
     depth = dz.cumsum(dim=zdim)
     depth = pad(depth, {zdim: (1, 0)}, mode="constant", constant_values=0)
+    ref_type = dz2depth_ref_types[ref_type].name
+    cfspecs = cf.get_cf_specs(dz)
+    if ref is None and ref_type == "infer":
+        if cfspecs.data_vars.match(ref, "bathy"):
+            ref_type = "bottom"
+        elif cfspecs.data_vars.match(ref, "ssh"):
+            ref_type = "top"
+        else:
+            ref_type = "top" if positive == "down" else "bottom"
     if positive == "up":
-        if base is None:
-            base = depth[-1]
-        depth[:] -= base
-    elif base is not None:
-        depth[:] += base
+        if ref is None:
+            ref = depth[-1]
+        elif ref is not None and ref_type == "top":
+            ref = depth[-1] - ref
+        depth[:] -= ref
+    else:
+        if ref is not None:
+            if ref_type == "bottom":
+                depth[:] -= depth[-1]
+            depth[:] += ref
 
     # Fix index
     if zdim in depth.indexes:
@@ -320,6 +409,6 @@ def dz2depth(
     # Finalize
     depth.attrs["positive"] = positive
     if cfname:
-        depth = cf.get_cf_specs(dz).format_coord(depth, cfname)
+        depth = cfspecs.format_coord(depth, cfname)
 
     return depth

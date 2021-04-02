@@ -10,8 +10,6 @@ import pytest
 from xoa import grid
 
 
-# TODO: add rotate_grid
-
 @functools.lru_cache()
 def get_da():
     x = xr.DataArray(np.arange(4), dims='x')
@@ -75,13 +73,16 @@ def test_grid_get_edges():
 
 
 @pytest.mark.parametrize(
-    "positive, expected, base", [
-        ["down", [0, 100., 600., 1600.], None],
-        ["down", [10, 110., 610., 1610.], 10],
-        ["up", [-1600, -1500, -1000, 0], None],
-        ["up", [-1610, -1510, -1010, -10], 1610]
+    "positive, expected, ref, ref_type", [
+        ["down", [0, 100., 600., 1600.], None, None],
+        ["down", [10, 110., 610., 1610.], 10, "top"],
+        ["down", [15, 115., 615., 1615.], 1615, "bottom"],
+        ["up", [-1600, -1500, -1000, 0], None, None],
+        ["up", [-1610, -1510, -1010, -10], 1610, "bottom"],
+        ["up", [-1595, -1495, -995, 5], 5, "top"],
+        ["up", [-1595, -1495, -995, 5], xr.DataArray(5, name="ssh"), "top"]
         ])
-def test_grid_dz2depth(positive, expected, base):
+def test_grid_dz2depth(positive, expected, ref, ref_type):
 
     dz = xr.DataArray(
         np.resize([100, 500, 1000.], (2, 3)).T,
@@ -89,10 +90,10 @@ def test_grid_dz2depth(positive, expected, base):
         coords={"z": ("z", np.arange(3, dtype="d"))}
         )
 
-    depth = grid.dz2depth(dz, positive, base=base)
+    depth = grid.dz2depth(dz, positive, ref=ref, ref_type=ref_type)
     np.testing.assert_allclose(depth.isel(x=1), expected)
     assert depth.z[0] == -0.5
 
-    depth = grid.dz2depth(dz, positive, base=base, centered=True)
+    depth = grid.dz2depth(dz, positive, ref=ref, ref_type=ref_type, centered=True)
     assert depth[0, 0] == 0.5 * sum(expected[:2])
     assert depth.z[0] == 0
