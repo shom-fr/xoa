@@ -534,19 +534,19 @@ def haversine(lon0, lat0, lon1, lat1):
 
     Parameters
     ----------
-    lon0: float
-        Longitude of the first point
-    lat0: float
-        Latitude of the first point
-    lon1: float
-        Longitude of the second point
-    lat1: float
-        Latitude of the second point
+    lon0: float, array_like
+        Longitude of the first point(s)
+    lat0: float, array_like
+        Latitude of the first point(s)
+    lon1: float, array_like
+        Longitude of the second point(s)
+    lat1: float, array_like
+        Latitude of the second point(s)
 
     Return
     ------
-    float
-        Distance
+    float, array_like
+        Distance(s)
     """
     deg2rad = np.pi / 180.
     dist = math.sin(deg2rad*(lat0-lat1)*0.5)**2
@@ -694,10 +694,9 @@ def grid2relloc(xxi, yyi, xo, yo):
 
     # Find the closest corner
     ic, jc = closest2d(xxi, yyi, xo, yo)
-
     # Curvilinear to rectangular with a loop on four candidate cells
-    for i in range(max(ic-1, 0), min(ic, nxi-2)):
-        for j in range(max(jc-1, 0), min(jc, nyi-2)):
+    for j in range(max(jc-1, 0), min(jc+1, nyi-2)):
+        for i in range(max(ic-1, 0), min(ic+1, nxi-2)):
 
             # Get relative position
             a, b = cell2relloc(
@@ -784,10 +783,11 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     nyix, nxi = xxi.shape
     nyi, nxiy = yyi.shape
     nexz, ntiz, nzi, nyiz, nxiz = zzi.shape
-    nex, nti, nzi, nyi, nxi = vi.shape
+    nexv, nti, nzi, nyi, nxi = vi.shape
     no = xo.shape[0]
 
     # Initalisations
+    nex = max(nexv, nexz)
     vo = np.full((nex, no), np.nan, dtype=vi.dtype)
     bmask = np.isnan(vi)
     ximin = xxi.min()
@@ -799,7 +799,6 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     timin = ti.min()
     timax = ti.max()
     curved = nyix != 1
-    zi = np.zeros((nexz, nzi))
 
     # Verifications
     assert not curved or (nxi == nxiy and nyi == nyix), (
@@ -821,7 +820,7 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
         if curved:
 
             p, q = grid2relloc(xxi, yyi, xo[io], yo[io])
-            if p < 1 or p > nxi or q < 1 or q > nyi:
+            if p < 0 or p > nxi-1 or q < 0 or q > nyi-1:
                 continue  # outside the grid
             i = int(p)
             j = int(q)
@@ -922,7 +921,7 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
                 dz = d
                 lz = l
 
-            zi[:] = 0.
+            zi = np.zeros((nexz, nzi))
             for ie in range(nexz):
                 for ll in range(nplz):
                     for kk in range(nzi):
@@ -951,28 +950,24 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
                         npk[ie] = 2
 
         # Interpolate
-        for ieb in range(0, nex//nexz):
-
-            ie0 = (ieb-1)*nexz - 1
-
-            for iez in range(nexz):
-                if not bmask[ie0:ie0+iez, l:l+npl,
-                             k[iez]:k[iez]+npk[iez],
-                             j:j+npj,
-                             i:i+npi].any():
-                    vo[ie0+iez, io] = 0.
-                    for ll in range(npl):
-                        for kk in range(npk[iez]):
-                            for jj in range(npj):
-                                for ii in range(npi):
-                                    vo[ie0+iez, io] = (
-                                        vo[ie0+iez, io] +
-                                        vi[ie0+iez,
-                                           l+ll, k[iez]+kk, j+jj, i+ii] *
-                                        ((1-a) * (1-ii) + a * ii) *
-                                        ((1-b) * (1-jj) + b * jj) *
-                                        ((1-c[iez]) *
-                                         (1-kk) + c[iez] * kk) *
-                                        ((1-d) * (1-ll) + d * ll))
+        for ie in range(nex):
+            if not bmask[
+                    ie % nexv, l:l+npl,
+                    k[ie % nexz]:k[ie % nexz]+npk[ie % nexz],
+                    j:j+npj, i:i+npi].any():
+                vo[ie % nex, io] = 0.
+                for ll in range(npl):
+                    for kk in range(npk[ie % nexz]):
+                        for jj in range(npj):
+                            for ii in range(npi):
+                                vo[ie % nex, io] = (
+                                    vo[ie % nex, io] +
+                                    vi[ie % nex,
+                                       l+ll, k[ie % nexz]+kk, j+jj, i+ii] *
+                                    ((1-a) * (1-ii) + a * ii) *
+                                    ((1-b) * (1-jj) + b * jj) *
+                                    ((1-c[ie % nexz]) *
+                                     (1-kk) + c[ie % nexz] * kk) *
+                                    ((1-d) * (1-ll) + d * ll))
 
     return vo

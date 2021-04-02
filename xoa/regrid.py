@@ -86,10 +86,6 @@ def _wrapper_interp1d_(vari, yi, yo, func_name, **kwargs):
     return varo.reshape(eshape+varo.shape[-1:])
 
 
-
-
-
-
 def regrid1d(
         da, coord, method=None, dim=None, coord_in_name=None,
         conserv=False, extrap=0, bias=0., tension=0.):
@@ -286,7 +282,7 @@ def grid2loc(da, loc, compat="warn"):
     vi = da_tmp.values
     for axis_type, axis in (("z", -3), ("t", -4)):
         if axis_type not in order:
-            vi = np.expand_dims(axis_type, axis)
+            vi = np.expand_dims(vi, axis)
     vi = vi.reshape((-1,)+vi.shape[-4:])
     # - xy
     glon = coords.get_lon(da_tmp)
@@ -316,12 +312,8 @@ def grid2loc(da, loc, compat="warn"):
     # - t
     if "t" in order:
         # numeric times
-        ti = (
-            (gtime.values - np.datetime64("1950-01-01", "us")) /
-            np.timedelta64(1, "us"))
-        to = (
-            (times.values - np.datetime64("1950-01-01", "us")) /
-            np.timedelta64(1, "us"))
+        ti = (gtime.values - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
+        to = (times.values - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
         dims_in.update(gtime.dims)
         coords_out.append(times)
     else:

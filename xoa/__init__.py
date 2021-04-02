@@ -435,8 +435,8 @@ def get_data_sample(filename=None):
     return os.path.join(_SAMPLE_DIR, filename)
 
 
-def open_data_sample(filename):
-    """Open a data sample with :func:`xarray.open_dataset`
+def open_data_sample(filename, **kwargs):
+    """Open a data sample with :func:`xarray.open_dataset` or :func:`pandas.read_csv`
 
     A shortcut to::
 
@@ -449,7 +449,7 @@ def open_data_sample(filename):
 
     Returns
     -------
-    xarray.Dataset
+    xarray.Dataset, pandas.DataFrame
 
     Example
     -------
@@ -465,8 +465,12 @@ def open_data_sample(filename):
     get_data_sample
     show_data_samples
     """
-    import xarray as xr
-    return xr.open_dataset(get_data_sample(filename))
+    fname = get_data_sample(filename)
+    if fname.endswith("nc"):
+        import xarray as xr
+        return xr.open_dataset(fname, **kwargs)
+    import pandas as pd
+    return pd.read_csv(fname, **kwargs)
 
 
 def show_data_samples():
