@@ -20,12 +20,13 @@ xarray and pandas xoa accessors
 
 import warnings
 
+
 class _BasicCFAccessor_(object):
 
     def __init__(self, dsa, cfspecs=None):
         from . import cf
         if cfspecs is None:
-            cfspecs = cf.get_best_cf_specs(dsa)
+            cfspecs = cf.infer_cf_specs(dsa)
         self._dsa = dsa
         self.set_cf_specs(cfspecs)
 
@@ -36,6 +37,11 @@ class _BasicCFAccessor_(object):
         self._cfspecs = cfspecs
         if self._cfspecs.name:
             self._dsa = cf.assign_cf_specs(self._dsa, self._cfspecs.name)
+
+    def get_cf_specs(self):
+        return self._cfspecs
+
+    cfspecs = property(fget=get_cf_specs, fset=set_cf_specs)
 
 
 class _CFAccessor_(_BasicCFAccessor_):
@@ -62,10 +68,10 @@ class _CFAccessor_(_BasicCFAccessor_):
             errors="ignore")
 
     def __getattr__(self, name):
-        return self.get(name, errors="warn")
+        return self.get(name, errors="ignore")
 
     def __getitem__(self, name):
-        return self.get(name, errors="warn")
+        return self.get(name, errors="ignore")
 
     def auto_format(self, loc=None, standardize=True):
         """Auto-format attributes with :meth:`CFSpecs.auto_format`"""
@@ -76,6 +82,15 @@ class _CFAccessor_(_BasicCFAccessor_):
     def fill_attrs(self, loc=None, standardize=True):
         """Fill attributes with :meth:`CFSpecs.fill_attrs`"""
         return self._cfspecs.fill_attrs(self._dsa, loc=loc, standardize=standardize)
+
+    def infer_coords(self, **kwargs):
+        return self.cfspecs.infer_coords(self._dsa, **kwargs)
+
+    def decode(self, **kwargs):
+        return self.cfspecs.decode(self._dsa, **kwargs)
+
+    def encode(self, **kwargs):
+        return self.cfspecs.encode(self._dsa, **kwargs)
 
     @property
     def coords(self):
@@ -108,8 +123,7 @@ class _CoordAccessor_(_CFAccessor_):
         if not hasattr(self, '_dims'):
             self._dims = {}
             if dim_type not in self._dims:
-                self._dims[dim_type] = self._cfspecs.coords.search_dim(
-                    self._dsa, dim_type)
+                self._dims[dim_type] = self._cfspecs.coords.search_dim(self._dsa, dim_type)
         return self._dims[dim_type]
 
     @property

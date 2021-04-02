@@ -238,9 +238,9 @@ def test_cf_sglocator_patch_attrs(isn, psn, osn, loc, replace):
      ('x', "sst", {"standard_name": ["potatoe", "banana"]},
       "sst_x", "banana_at_x_location", True),
      (None, "sst_q", {"standard_name": ["potatoe"]},
-      "sst_q", "potatoe", True),
+      "sst_q", "potatoe_at_q_location", True),
      (None, "sst", {"standard_name": ["potatoe"]},
-      "sst_t", "potatoe", True)
+      "sst_t", "potatoe_at_t_location", True)
      ]
 )
 def test_cf_sglocator_format_dataarray(
@@ -500,8 +500,13 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
     assert temp.standard_name == "sea_water_temperature"
     assert temp.long_name == "Temperature"
     assert temp.units == "degrees_celsius"
-
     assert temp.lon.standard_name == "longitude"
+
+
+def test_cf_cfspecs_format_data_var_coord():
+    da = xr.DataArray(0, attrs={'standard_name': 'longitude_at_u_location'})
+    da = cf.get_cf_specs().format_data_var(da)
+    assert da.name == "lon_u"
 
 
 def test_cf_cfspecs_format_data_var_specialize():
@@ -514,13 +519,13 @@ def test_cf_cfspecs_format_data_var_specialize():
 
 
 def test_cf_cfspecs_format_data_var_loc():
-    temp = xr.DataArray(0, name='xtemp_t',
+    temp = xr.DataArray(0, name='xtemp',
                         attrs={'standard_name': 'banana_at_x_location'})
     cfspecs = cf.get_cf_specs()
 
     temp_fmt = cfspecs.format_data_var(
         temp, "temp", format_coords=False, replace_attrs=True)
-    assert temp_fmt.name == "temp_t"
+    assert temp_fmt.name == "temp_x"
     assert temp_fmt.standard_name == "sea_water_temperature_at_x_location"
 
 
@@ -660,10 +665,10 @@ def test_cf_cfspecs_coords_get_dims():
     assert dims == (None,)
 
 
-def test_cf_cfspecs_assign_coords():
+def test_cf_cfspecs_infer_coords():
     ds = xr.Dataset({"temp": ("nx", [1, 2]),
                      "lon": ("nx", [4, 5])})
-    ds = cf.get_cf_specs().assign_coords(ds)
+    ds = cf.get_cf_specs().infer_coords(ds)
     assert "lon" in ds.coords
 
 
@@ -747,6 +752,24 @@ def test_cf_get_cf_specs_registered():
     assert cf_specs_out is cf_specs_in
 
 
+def test_cf_set_cf_specs_registered():
+
+    cf._CACHE["registered"].clear()
+    content = """
+        [register]
+        name=myname2
+
+        [data_vars]
+            [[temp]]
+            name=mytemp
+        """
+    cf_specs_in = cf.CFSpecs(content)
+    cf.register_cf_specs(cf_specs_in)
+
+    with cf.set_cf_specs("myname2") as cfspecs:
+        assert cfspecs is cf_specs_in
+
+
 def test_cf_get_cf_specs_matching_score():
 
     cf_content0 = """
@@ -786,7 +809,7 @@ def test_cf_get_cf_specs_matching_score():
         assert cf.get_cf_specs_matching_score(ds, cf_specs) == score
 
 
-def test_cf_get_best_cf_specs():
+def test_cf_infer_cf_specs():
 
     cf_content0 = """
         [register]
@@ -829,12 +852,10 @@ def test_cf_get_best_cf_specs():
     lon = xr.DataArray([1], dims="mylon")
 
     ds = xr.Dataset({"mytemp": temp, "mysal": sal}, coords={"mylon": lon})
-    assert cf.get_best_cf_specs(ds) is cf_specs1
+    assert cf.infer_cf_specs(ds) is cf_specs1
 
     ds.attrs.update(source="my hycom3d!")
-    assert cf.get_best_cf_specs(ds) is cf_specs0
+    assert cf.infer_cf_specs(ds) is cf_specs0
 
     ds.attrs.update(cfspecs="hycom3d")
-    assert cf.get_best_cf_specs(ds) is cf_specs2
-
-test_cf_get_best_cf_specs()
+    assert cf.infer_cf_specs(ds) is cf_specs2

@@ -193,22 +193,23 @@ class SGLocator(object):
         return m.group("root"), m.group("loc").lower()
 
     def get_location(self, da):
-        """Parse datarray name and attribute to find location
+        """Parse a data array name and attributes to find location
 
         Parameters
         ----------
         da: xarray.DataArray
-            Dataarray to scan
+            Data array to scan
 
-        Returns
+        Return
+        ------
         None, str
-            ``None`` if no location is found, else the correspoing string
+            ``None`` if no location is found, else the corresponding string
 
         Raises
         ------
         XoaCFError
             When locations parsed from name and attributes are conflicting.
-            Thus, this method method is a way check location consistency.
+            Thus, this method method is a way to check location consistency.
         """
         loc = None
         src = []
@@ -503,7 +504,7 @@ class SGLocator(object):
 
     def format_dataarray(
         self, da, loc=None, standardize=True, name=None, attrs=None,
-        rename=True, copy=True, replace_attrs=False
+        rename=True, copy=True, replace_attrs=False, name_with_loc=True
     ):
         """Format name and attributes of a copy of DataArray
 
@@ -517,7 +518,7 @@ class SGLocator(object):
         standardize: bool
             If True, standardize ``root`` and ``loc`` values.
         name: str, None
-            Substitute for dataarray name
+            Substitute for data array name
         attrs: str, None
             Substitute for dataarray attributes.
             If ``standard_name`` and ``long_name`` values are a list,
@@ -525,6 +526,8 @@ class SGLocator(object):
             it is left unchanged since it is considered compatible.
         rename:
             Allow renaming the array if its name is already set
+        name_with_loc: bool
+            Add the location to the name
         replace_attrs: bool
             Replace existing attributes?
         copy: bool
@@ -553,7 +556,14 @@ class SGLocator(object):
 
         # Name
         if rename or da.name is None:
-            da.name = self.merge_attr("name", da.name, name, loc)
+            kw = {"loc": loc} if name_with_loc else {}
+            da.name = self.merge_attr("name", da.name, name, **kw)
+
+        # Check location consistency
+        if loc is None or loc == "any" or loc is True:
+            loc = self.get_location(da)
+            if loc:
+                da = self.format_dataarray(da, loc=loc, rename=True, replace_attrs=True)
 
         return da
 
@@ -899,9 +909,29 @@ class CFSpecs(object):
         specs['processed'] = True
         yield category, name, specs
 
+    def get_loc(self, da):
+        """Get the staggered grid location from name and standard_name
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+
+        Return
+        ------
+        str, None
+
+        See also
+        --------
+        SGLocator.get_location
+        """
+        return self.sglocator.get_location(da)
+
+    get_location = get_loc
+
     def format_coord(self, da, name=None, loc=None, copy=True,
                      standardize=True, rename=True, rename_dim=True,
-                     specialize=False, attrs=True, replace_attrs=False):
+                     specialize=False, attrs=True, replace_attrs=False,
+                     name_with_loc=True):
         """Format a coordinate array
 
         Parameters
@@ -915,6 +945,8 @@ class CFSpecs(object):
             - False or '"": no location
         rename: bool
             Rename arrays
+        name_with_loc: bool
+            Add loc to the name
         specialize: bool
             Does not use the CF name for renaming, but the first name
             as listed in specs, which is generally a specialized one,
@@ -946,7 +978,7 @@ class CFSpecs(object):
             da, name=name, loc=loc, copy=copy, standardize=standardize,
             rename=rename, rename_dim=rename_dim,
             replace_attrs=replace_attrs, attrs=attrs,
-            specialize=specialize)
+            specialize=specialize, name_with_loc=name_with_loc)
 
     def format_data_var(
         self,
@@ -960,7 +992,9 @@ class CFSpecs(object):
         coords=None,
         loc=None,
         standardize=True,
-        copy=True
+        copy=True,
+        name_with_loc=False,
+        coord_name_with_loc=True
     ):
         """Format array name and attributes according to currents CF specs
 
@@ -969,13 +1003,22 @@ class CFSpecs(object):
         da: xarray.DataArray
         name: str, None
             CF name. If None, it is guessed.
-        loc: str, {"any", None}, {"", False}
+        loc: str, {"any", None}, {"", False}                # if cda.ndim == 1 and cname == cda.dims[0]:
+                #     ds.coords[cname] = cda
+                #     ds = ds.rename({cname: cda.name})
+                # else:
+                #     ds.coords[cda.name] = cda
+
             - str: one of these locations
             - None or "any": any
             - False or '"": no location
         rename: bool
             Not only format attribute, but also rename arrays,
             thus making a copies.
+        name_with_loc: bool
+            Add loc to the name
+        coord_name_with_loc: bool
+            Add loc to the coordinates name
         specialize: bool
             Does not use the CF name for renaming, but the first name
             as listed in specs, which is generally a specialized one,
@@ -1014,11 +1057,15 @@ class CFSpecs(object):
         rename_args = {}
 
         # Data var
-        new_name = self.data_vars.format_dataarray(
-            da, name=name, loc=loc, standardize=standardize,
-            rename=False, copy=False, replace_attrs=replace_attrs,
-            attrs=attrs, specialize=specialize
-        )
+        for cat in "data_vars", "coords":
+            new_name = self[cat].format_dataarray(
+                da, name=name, loc=loc, standardize=standardize,
+                rename=False, copy=False, replace_attrs=replace_attrs,
+                attrs=attrs, specialize=specialize,
+                name_with_loc=name_with_loc
+            )
+            if new_name:
+                break
         if rename and new_name:
             da.name = new_name
 
@@ -1033,7 +1080,8 @@ class CFSpecs(object):
                     standardize=standardize,
                     rename=False,
                     copy=False,
-                    replace_attrs=replace_attrs
+                    replace_attrs=replace_attrs,
+                    name_with_loc=coord_name_with_loc
                 )
 
         # Final renaming
@@ -1048,8 +1096,15 @@ class CFSpecs(object):
 
     def format_dataset(self, ds, loc=None, rename=True, standardize=True,
                        format_coords=True, coords=None, copy=True,
-                       replace_attrs=False):
-        """Auto-format a whole xarray.Dataset"""
+                       replace_attrs=False, name_with_loc=False,
+                       coord_name_with_loc=True):
+        """Auto-format a whole xarray.Dataset
+
+        See also
+        --------
+        format_data_var
+        format_coord
+        """
         # Copy
         if copy:
             ds = ds.copy()
@@ -1061,7 +1116,8 @@ class CFSpecs(object):
         for name, da in list(ds.items()):
             new_name = self.format_data_var(
                 da, loc=loc, rename=False, standardize=True,
-                format_coords=False, copy=False, replace_attrs=replace_attrs)
+                format_coords=False, copy=False, replace_attrs=replace_attrs,
+                name_with_loc=name_with_loc)
             if rename and new_name:
                 rename_args[da.name] = new_name
 
@@ -1070,15 +1126,10 @@ class CFSpecs(object):
             for cname, cda in list(ds.coords.items()):
                 new_name = self.format_coord(
                     cda, loc=loc, standardize=True, rename=False,
-                    rename_dim=False, copy=False, replace_attrs=replace_attrs)
-                if rename:
+                    rename_dim=False, copy=False, replace_attrs=replace_attrs,
+                    name_with_loc=coord_name_with_loc)
+                if rename and new_name:
                     rename_args[cda.name] = new_name
-
-                # if cda.ndim == 1 and cname == cda.dims[0]:
-                #     ds.coords[cname] = cda
-                #     ds = ds.rename({cname: cda.name})
-                # else:
-                #     ds.coords[cda.name] = cda
 
         # Final renaming
         if rename and rename_args:
@@ -1087,10 +1138,11 @@ class CFSpecs(object):
         return ds
 
     def auto_format(self, dsa, **kwargs):
-        """Auto-format the xarray.Dataset or xarray.DataArray
+        """Rename variables and coordinates and fill their attributes
 
         See also
         --------
+        encode
         format_dataarray
         format_dataset
         fill_attrs
@@ -1099,7 +1151,42 @@ class CFSpecs(object):
             return self.format_dataset(dsa, format_coords=True, **kwargs)
         return self.format_data_var(dsa, **kwargs)
 
-    __call__ = auto_format
+    def decode(self, dsa, **kwargs):
+        """Auto format and infer coordinates
+
+        See also
+        --------
+        auto_format
+        decode
+        format_dataarray
+        format_dataset
+        fill_attrs
+        """
+        # Names and attributes
+        dsa = self.auto_format(dsa, **kwargs)
+
+        # Coordinates
+        dsa = self.infer_coords(dsa)
+
+        # Assign cf specs
+        if self.name and self in get_registered_cf_specs():
+            dsa = assign_cf_specs(dsa, self.name)
+
+        return dsa
+
+    def encode(self, dsa, **kwargs):
+        """Same as :meth:`decode` but rename with the specialized name
+
+        See also
+        --------
+        decode
+        auto_format
+        format_dataarray
+        format_dataset
+        fill_attrs
+        """
+        kwargs.setdefault("specialize", True)
+        return self.decode(dsa, **kwargs)
 
     def fill_attrs(self, dsa, **kwargs):
         """Fill missing attributes of a xarray.Dataset or xarray.DataArray
@@ -1463,8 +1550,8 @@ class CFSpecs(object):
         return self.coords.get_dim_types(
             da, unknown=unknown, asdict=asdict)
 
-    def assign_coords(self, ds):
-        """Search for known coords and make sur they are set as cords
+    def infer_coords(self, ds):
+        """Search for known coords and make sure they are set as coords
 
         Parameters
         ----------
@@ -1840,7 +1927,7 @@ class _CFCatSpecs_(object):
     def format_dataarray(self, da, name=None, loc=None, rename=True,
                          attrs=True, standardize=True,
                          specialize=False, rename_dim=True,
-                         replace_attrs=False, copy=True):
+                         replace_attrs=False, copy=True, name_with_loc=None):
         """Format a DataArray's name and attributes
 
         Parameters
@@ -1854,6 +1941,8 @@ class _CFCatSpecs_(object):
             - False or '"": no location
         rename: bool
             Rename arrays when their name is set?
+        name_with_loc: None, bool
+            Add the loc to the name
         attrs: bool, dict
             If False, does not change attributes at all.
             If True, use Cf attributes.
@@ -1895,12 +1984,15 @@ class _CFCatSpecs_(object):
         assert name in self.names
         old_name = da.name
         cf_name = name
-        new_name = self.get_name(name, specialize=specialize)
+        new_name = self.get_name(cf_name, specialize=specialize)
+        if name_with_loc is None:
+            name_with_loc = self.categoy == "coords"
 
         # Attributes
         if attrs is True:
-            attrs = self.get_attrs(
-                cf_name, loc=None, standardize=False, multi=True)
+            attrs = self.get_attrs(cf_name, loc=None, standardize=False, multi=True)
+            if da.name and da.name not in da.indexes and "axis" in attrs:
+                del attrs["axis"]
         elif not attrs:
             attrs = {}
 
@@ -1912,18 +2004,20 @@ class _CFCatSpecs_(object):
             attrs=attrs,
             standardize=standardize,
             rename=rename,
+            name_with_loc=name_with_loc,
             replace_attrs=replace_attrs,
             copy=False
         )
 
-        # Return renaming name not renaming
+        # Return renaming name but don't rename
         if not rename:
+            if loc is None or loc == "any":
+                loc = self.sglocator.get_location(new_da)
             return self.sglocator.merge_attr("name", old_name, new_name, loc)
 
         # Rename dim if axis coordinate
         rename_dim = rename and rename_dim
-        if (rename_dim and old_name is not None and da.ndim == 1 and
-                old_name == da.dims[0]):
+        if (rename_dim and old_name and old_name in da.indexes):
             new_da = new_da.rename({old_name: new_da.name})
         return new_da
 
@@ -2402,12 +2496,28 @@ def search_similar(dsa, da):
 
 
 class set_cf_specs(object):
-    """Set the current CF specs"""
+    """Set the current CF specs
+
+    Parameters
+    ----------
+    cf_source: CFSpecs, str, list, dict
+        Either a :class:`CFSpecs` instance or the name of a registered one,
+        or an argument to instantiante one.
+
+    See also
+    --------
+    get_cf_specs
+    register_cf_specs
+    get_registered_cf_specs
+    """
 
     def __init__(self, cf_source):
-        if isinstance(cf_source, dict):
+        if isinstance(cf_source, str):
+            cfspecs = get_cf_specs_from_name(cf_source, errors="ignore")
+            if cfspecs:
+                cf_source = cfspecs
+        if not isinstance(cf_source, CFSpecs):
             cf_source = CFSpecs(cf_source)
-        assert isinstance(cf_source, CFSpecs)
         self.old_specs = _CACHE["current"]
         _CACHE["current"] = self.specs = cf_source
 
@@ -2651,7 +2761,7 @@ def get_cf_specs_matching_score(ds, cfspecs):
     return 100 * hit / total
 
 
-def get_best_cf_specs(ds, named=False):
+def infer_cf_specs(ds, named=False):
     """Get the registered CFSpecs that are best matching this dataset
 
     This accomplished with some heurestics.
@@ -2718,12 +2828,12 @@ def get_best_cf_specs(ds, named=False):
 
 
 def assign_cf_specs(ds, name=None):
-    """Set the ``cfspecs`` encoding ot ``name`` in all data vars and coords
+    """Set the ``cfspecs`` encoding to ``name`` in all data vars and coords
 
     Paremeters
     ----------
     ds: xarray.DataArray, xarray.Dataset
-    name: None, str, CFSpecs, xarray.DataArray
+    name: None, str, CFSpecs, xarray.DataArray, xarray.Dataset
         If a :class:`CFSpecs`, it must have a registration name :
 
         .. code-block:: ini
@@ -2731,19 +2841,23 @@ def assign_cf_specs(ds, name=None):
             [register]
             name=registration_name
 
-        If not provided, :func:`get_best_cf_specs` is called to guess
+        If not provided, :func:`infer_cf_specs` is called to infer
         the best named registered specs.
+
+    Return
+    ------
+    xarray.Dataset, xarray.DataArray
     """
     # Name as a CFSpecs instance
     if name is None:
-        cfspecs = get_best_cf_specs(ds, named=True)
+        cfspecs = infer_cf_specs(ds, named=True)
         if cfspecs.name:
             name = cfspecs.name
         else:
             return ds
     elif hasattr(name, "coords"):  # from a dataset/dataarray
-        cfspecs = get_best_cf_specs(name, named=True)
-        if cfspecs.name:
+        cfspecs = infer_cf_specs(name, named=True)
+        if cfspecs:
             name = cfspecs.name
         else:
             return ds
@@ -2753,11 +2867,10 @@ def assign_cf_specs(ds, name=None):
             return ds
         name = name.name
 
-    # Assign attrs and encoding
+    # Set as encoding
     targets = list(ds.coords.values())
     if hasattr(ds, "data_vars"):
         targets.extend(list(ds.data_vars.values()))
-        # ds.attrs.update(cfspecs=name)
     for target in targets:
         target.encoding.update(cfspecs=name)
     return ds
