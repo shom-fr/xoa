@@ -117,11 +117,12 @@ def get_vertical(da, errors="raise"):
     if height is None:
         height = cfspecs.search(da, 'altitude', errors="ignore")
     if height is None:
-        errors = misc.ERRORS["errors"]
+        errors = misc.ERRORS[errors]
         msg = "No vertical coordinate found"
         if errors == "raise":
             raise cf.XoaCFError(msg)
-        xoa_warn(msg)
+        elif errors == "warn":
+            xoa_warn(msg)
     else:
         return height
 
@@ -592,3 +593,52 @@ def change_index(da, dim, values):
 def drop_dim_coords(da, dim):
     """Drop coords that have a particular dim"""
     return da.drop([c.name for c in da.coords.values() if dim in c.dims])
+
+
+class positive_attr(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
+    """Allowed value for the positive attribute argument"""
+    #: Infer it from the axis coordinate
+    infer = 0
+    guess = 0
+    #: Coordinates are increasing up
+    up = 1
+    #: Coordinates are increasing down
+    down = -1
+
+
+def get_positive_attr(da, zdim=None):
+    """Get the positive attribute of a dataset
+
+    Parameters
+    ----------
+    da: xarray.Dataset, xarray.DataArray
+    zdim: None, str
+        The index coordinate name that is supposed to have this attribute,
+        which is usually the vertical dimension
+
+    Return
+    ------
+    None, "up" or "down"
+    """
+    # Targets
+    if zdim is None:
+        zdim = get_dims(da, "z", errors="ignore")
+        if zdim:
+            zdim = zdim[0]
+    if zdim and zdim in da.coords:
+        targets = [da.coords[zdim]]
+    else:
+        targets = list(da.coords.values())
+        if isinstance(da, xr.Dataset):
+            targets.extend(da.data_vars.values())
+
+    # Loop on targets
+    for target in targets:
+        if "positive" in target.attrs:
+            positive = da.coords[zdim].attrs["positive"]
+        positive = positive_attr[positive].name
+        return positive
+
+    # Fall back to current CFSpecs
+    cfspecs = cf.get_cf_specs(da)
+    return cfspecs["coords"]["_vertical_"]["positive"]
