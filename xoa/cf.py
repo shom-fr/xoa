@@ -931,7 +931,7 @@ class CFSpecs(object):
     def format_coord(self, da, name=None, loc=None, copy=True,
                      standardize=True, rename=True, rename_dim=True,
                      specialize=False, attrs=True, replace_attrs=False,
-                     name_with_loc=True):
+                     name_with_loc=True, rename_dims=True):
         """Format a coordinate array
 
         Parameters
@@ -994,7 +994,8 @@ class CFSpecs(object):
         standardize=True,
         copy=True,
         name_with_loc=False,
-        coord_name_with_loc=True
+        coord_name_with_loc=True,
+        rename_dims=True
     ):
         """Format array name and attributes according to currents CF specs
 
@@ -1003,15 +1004,12 @@ class CFSpecs(object):
         da: xarray.DataArray
         name: str, None
             CF name. If None, it is guessed.
-        loc: str, {"any", None}, {"", False}                # if cda.ndim == 1 and cname == cda.dims[0]:
-                #     ds.coords[cname] = cda
-                #     ds = ds.rename({cname: cda.name})
-                # else:
-                #     ds.coords[cda.name] = cda
+        loc: str, {"any", None}, {"", False}
 
             - str: one of these locations
             - None or "any": any
             - False or '"": no location
+
         rename: bool
             Not only format attribute, but also rename arrays,
             thus making a copies.
@@ -1023,6 +1021,8 @@ class CFSpecs(object):
             Does not use the CF name for renaming, but the first name
             as listed in specs, which is generally a specialized one,
             like a name adopted by specialized dataset.
+        rename_dims:
+            Also rename dimensions that are not coordinates
         attrs: bool, dict
             If False, does not change attributes at all.
             If True, use Cf attributes.
@@ -1084,6 +1084,12 @@ class CFSpecs(object):
                     name_with_loc=coord_name_with_loc
                 )
 
+        # Dimensions
+        if rename_dims:
+            rename_dims_args = self.coords.get_rename_dims_args(
+                da, loc=loc, specialize=specialize, exclude=list(rename_args.keys()))
+            rename_args.update(rename_dims_args)
+
         # Final renaming
         if rename and rename_args:
             da = da.rename(rename_args)
@@ -1097,7 +1103,8 @@ class CFSpecs(object):
     def format_dataset(self, ds, loc=None, rename=True, standardize=True,
                        format_coords=True, coords=None, copy=True,
                        replace_attrs=False, name_with_loc=False,
-                       coord_name_with_loc=True):
+                       coord_name_with_loc=True, specialize=False,
+                       rename_dims=True):
         """Auto-format a whole xarray.Dataset
 
         See also
@@ -1117,7 +1124,7 @@ class CFSpecs(object):
             new_name = self.format_data_var(
                 da, loc=loc, rename=False, standardize=True,
                 format_coords=False, copy=False, replace_attrs=replace_attrs,
-                name_with_loc=name_with_loc)
+                name_with_loc=name_with_loc, specialize=specialize)
             if rename and new_name:
                 rename_args[da.name] = new_name
 
@@ -1127,9 +1134,15 @@ class CFSpecs(object):
                 new_name = self.format_coord(
                     cda, loc=loc, standardize=True, rename=False,
                     rename_dim=False, copy=False, replace_attrs=replace_attrs,
-                    name_with_loc=coord_name_with_loc)
+                    name_with_loc=coord_name_with_loc, specialize=specialize)
                 if rename and new_name:
                     rename_args[cda.name] = new_name
+
+        # Dimensions
+        if rename_dims:
+            rename_dims_args = self.coords.get_rename_dims_args(
+                ds, loc=loc, specialize=specialize, exclude=list(rename_args.keys()))
+            rename_args.update(rename_dims_args)
 
         # Final renaming
         if rename and rename_args:
@@ -2323,7 +2336,6 @@ class CFCoordSpecs(_CFCatSpecs_):
             raise XoaCFError(
                 f"No dataarray coord found from dim: {dim}")
 
-
     @ERRORS.format_method_docstring
     def get_dims(self, da, dim_types, allow_positional=False,
                  positions='tzyx', errors="warn"):
@@ -2385,6 +2397,22 @@ class CFCoordSpecs(_CFCatSpecs_):
                     xoa_warn(msg)
 
         return tuple(scanned.values())
+
+    def get_rename_dims_args(self, dsa, loc=None, specialize=False, exclude=None):
+        """Get args for renaming dimensions"""
+        rename_args = {}
+        for dim in dsa.dims:
+            if exclude and dim in exclude:
+                continue
+            dim_type = self.get_dim_type(dim, dsa)
+            if dim_type:
+                if specialize:
+                    new_name = self.dims[dim_type][0]
+                else:
+                    new_name = dim_type
+                new_name = self.sglocator.merge_attr('name', dim, new_name, loc=loc)
+                rename_args[dim] = new_name
+        return rename_args
 
 
 for meth in ('get_axis', 'get_dim_type', 'get_dim_types',
