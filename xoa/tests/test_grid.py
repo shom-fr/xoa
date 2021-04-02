@@ -72,6 +72,15 @@ def test_grid_get_edges():
     assert dae[1, 0, 0] == da[1, 0, 0]
 
 
+def test_grid_shift():
+    da = get_da()
+    dae = grid.shift(da, {"x": "left", "y": 1})
+    assert dae.shape == da.shape
+    np.testing.assert_allclose(dae.x.values, da.x - 0.5)
+    np.testing.assert_allclose(dae.y.values, da.y + 0.5)
+    assert dae[1, 0, 1] == float(da[1, :2, :2].mean())
+
+
 @pytest.mark.parametrize(
     "positive, expected, ref, ref_type", [
         ["down", [0, 100., 600., 1600.], None, None],

@@ -65,6 +65,11 @@ class XEnumMeta(EnumMeta):
     #         return next(iter(cls))
     #     return super().__call__(value, *args, **kwargs)
 
+    def __getitem__(cls, name):
+        if not isinstance(name, str):
+            return cls(name)
+        return cls._member_map_[name]
+
     def __contains__(cls, value):
         if isinstance(value, str):
             return value in list(cls._member_map_.keys())

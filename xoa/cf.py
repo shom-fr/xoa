@@ -1563,6 +1563,9 @@ class CFSpecs(object):
         return self.coords.get_dim_types(
             da, unknown=unknown, asdict=asdict)
 
+    def parse_dims(self, dims, dsa):
+        return self.coords.parse_dims(dims, dsa)
+
     def infer_coords(self, ds):
         """Search for known coords and make sure they are set as coords
 
@@ -2413,6 +2416,34 @@ class CFCoordSpecs(_CFCatSpecs_):
                 new_name = self.sglocator.merge_attr('name', dim, new_name, loc=loc)
                 rename_args[dim] = new_name
         return rename_args
+
+
+    def parse_dims(self, dims, dsa):
+        """Convert from generic dim names to specialized names
+
+        Parameters
+        ----------
+        dims: str, tuple, list, dict
+        dsa: xarray.Dataset, xarray.DataArray
+
+        Return
+        ------
+        Same type as dims
+        """
+        dim_types = self.get_dim_types(dsa, asdict=True)
+        def _parse_dim_(dim):
+            if dim not in dsa.dims:
+                for dsadim, dim_type in dim_types.items():
+                    if dim == dim_type:
+                        dim = dsadim
+                        break
+            return dim
+
+        if isinstance(dims, str):
+            return _parse_dim_(dims)
+        if isinstance(dims, dict):
+            return dict((_parse_dim_(dim), value) for dim, value in dims.items())
+        return type(dims)(_parse_dim_(dim) for dim in dims)
 
 
 for meth in ('get_axis', 'get_dim_type', 'get_dim_types',

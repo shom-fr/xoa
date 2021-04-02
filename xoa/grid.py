@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-1d to nD grid utilities
+This module provides 1d to nD grid utilities to get information
+or perform operation on a grid.
+
+For operations between different grids, please see :mod:`xoa.regrid`.
 """
 # Copyright 2020-2021 Shom
 #
@@ -71,6 +74,7 @@ def apply_along_dim(
     # Loop on dims
     if coord_func is None:
         coord_func = func
+    dim = cf.get_cf_specs(ds).parse_dims(dim, ds)
     dims = (dim,) if isinstance(dim, str) else dim
     for dim in dims:
         if dim not in dso.dims:
@@ -185,6 +189,7 @@ def pad(da, pad_width, mode="edge", coord_mode="linear_extrap",
     apply_along_dim
     xarray.pad
     """
+    pad_width = cf.get_cf_specs(da).parse_dims(pad_width, da)
     return apply_along_dim(
         da, list(pad_width.keys()), _pad_,
         data_kwargs={"mode": mode, **kwargs},
@@ -219,6 +224,7 @@ def get_centers(da, dim):
     get_edges
     apply_along_dim
     """
+    dim = cf.get_cf_specs(da).parse_dims(dim, da)
     return apply_along_dim(da, dim, _get_centers_)
 
 
@@ -247,12 +253,63 @@ def get_edges(da, dim, mode="edge", **kwargs):
     apply_along_dim
     """
     # Extrapolate
+    dim = cf.get_cf_specs(da).parse_dims(dim, da)
     dims = (dim,) if isinstance(dim, str) else dim
     pad_width = dict((dim, 1) for dim in dims)
     da = pad(da, pad_width=pad_width, mode=mode, **kwargs)
 
     # Inner edges
     return get_centers(da, dim)
+
+
+class shift_directions(misc.IntEnumChoices, metaclass=misc.XEnumMeta):
+    """Shift directions for :func:`shift``"""
+    #: To the left/bottom/west
+    left = -1
+    bottom = -1
+    south = -1
+    #: To the right/top/north
+    right = 1
+    top = 1
+    north = 1
+
+
+def shift(da, shift_dirs, mode="edge", **kwargs):
+    f"""Shift the grid by an half grid cell along specified dimensions and directions
+
+    This is typically useful with Arakawa grids.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+    shift_dirs: dict
+        Keys are dimension names and values are directions:
+        {shift_directions.rst_with_links}
+    mode: str
+        Extrapolation mode at grid edges
+    kwargs:
+        Extra arguments are passed to :func:`pad`
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+
+    See also
+    --------
+    pad
+    get_edges
+    get_centers
+    """
+    shift_dirs = cf.get_cf_specs(da).parse_dims(shift_dirs, da)
+
+    # Extrapolate
+    pad_width = {}
+    for dim, shift_dir in shift_dirs.items():
+        pad_width[dim] = (1, 0) if shift_directions[shift_dir] < 0 else (0, 1)
+    da = pad(da, pad_width=pad_width, mode=mode, **kwargs)
+
+    # Inner edges
+    return get_centers(da, list(shift_dirs.keys()))
 
 
 def _get_diff_(da, dim):
@@ -300,7 +357,7 @@ class dz2depth_ref_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
 def dz2depth(
         dz, positive=None, zdim=None, ref=None, ref_type='infer',
         centered=False, cfname="depth"):
-    """Integrate layer thicknesses to compute depths
+    f"""Integrate layer thicknesses to compute depths
 
     The output depths are the depths at the bottom of the layers and the top
     is at a depth of zero. Thus, the output array has the same dimensions
@@ -312,7 +369,7 @@ def dz2depth(
         Layer thinknesses
     positive: str, int, None
         Direction over wich coordinates are increasing:
-        {positive_attr.rst_with_links}
+        {xcoords.positive_attr.rst_with_links}
         When "up", the first level is supposed to be the bottom
         and the output coordinates are negative.
         When "down", first level is supposed to be the top
