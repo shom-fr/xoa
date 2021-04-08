@@ -75,8 +75,11 @@ Description of specification keys:
       - Type
       - Description
     * - name
+      - str
+      - Specialized name for decoding and encoding which is empty by default
+    * - alt_name
       - list(str)
-      - Names
+      - Alternate names for decoding
     * - ``standard_name``
       - list(str)
       - "standard_name" attributes
@@ -105,8 +108,8 @@ Description of specification keys:
       - list(str)
       - List of dimensions that must be squeezed out
 
-.. note:: The `standard_name`, `long_name` and `units` attributes are
-    internally stored in as a dict in the `attrs` key.
+.. note:: The ``standard_name``, ``long_name`` and ``units`` specifications are
+    internally stored in as a dict in the ``attrs`` key.
 
 Get name and attributes only:
 
@@ -132,8 +135,11 @@ Description of specification keys:
       - Type
       - Description
     * - name
+      - str
+      - Specialized name for decoding and encoding which is empty by default
+    * - alt_name
       - list(str)
-      - Names
+      - Alternate names for decoding
     * - ``standard_name``
       - list(str)
       - "standard_name" attributes
@@ -153,8 +159,8 @@ Description of specification keys:
       - str
       - Inherit specification from another data variable
 
-.. note:: The `standard_name`, `long_name`, `units` and `axis` attributes are
-    internally stored in as a dict in the `attrs` key.
+.. note:: The ``standard_name``, ``long_name``, ``units`` and ``axis`` specifications are
+    internally stored in as a dict in the ``attrs`` key.
 
 Get name and attributes only:
 
@@ -219,13 +225,16 @@ You can also search for coordinates in datasets, for instance like this:
       :meth:`xoa.cf.CFCoordSpecs.search` :meth:`xoa.cf.CFVarSpecs.search`
 
 
-Formatting
-==========
+Formatting i.e encoding and decoding
+====================================
 
+The idea
+--------
+Formatting means changing ot setting names and attributes.
 It is possible to format, or even auto-format data variables and coordinates.
 
 During an auto-formatting, each array is matched against CF specs,
-and the array is formatting when a matching is successfull.
+and the array is formatted when a matching is successfull.
 If the array contains coordinates, the same process is applied on them,
 as soon as the ``format_coords`` keyword is ``True``.
 
@@ -244,11 +253,32 @@ as soon as the ``format_coords`` keyword is ``True``.
     ds2.temp
     ds2.lon
 
+It can be applied to a data array or a full dataset.
+
 .. seealso::
     :meth:`xoa.cf.CFSpecs.format_coord`
     :meth:`xoa.cf.CFSpecs.format_data_var`
     :meth:`xoa.cf.CFSpecs.auto_format`
-    :meth:`xoa.cf.CFSpecs.auto_format`
+
+Encoding and decoding
+---------------------
+
+By default, formatting rename known arrays to their generic name,
+like "temp" in the example above. We speak here of **encoding**.
+If the ``specialize`` keyword is set to ``True``, arrays are
+renamed with their specialized name if set in the specs with the ``name`` key.
+We speak here of **decoding**.
+Two shortcut methods exists for these tasks:
+
+- Decoding: :meth:`~xoa.cf.CFSpecs.decode`
+- Encoding: :meth:`~xoa.cf.CFSpecs.encode`
+
+Chaining the two methods should lead to the initial dataset or data array.
+
+
+.. seealso::
+    :meth:`xoa.cf.CFSpecs.decode`
+    :meth:`xoa.cf.CFSpecs.encode`
 
 Using the accessors
 ===================
@@ -396,7 +426,7 @@ An config created **from two other configs**:
     cfspecs_banana = cf.CFSpecs(banana_specs, default=False, user=False)
     apple_specs = {"data_vars": {"apple": {"attrs": {"long_name": "Big apple"}}}}
     cfspecs_apple = cf.CFSpecs(apple_specs, default=False, user=False)
-    cfspecs_fruits = cf.CFSpecs([cfspecs_apple, cfspecs_banana],
+    cfspecs_fruits = cf.CFSpecs((cfspecs_apple, cfspecs_banana),
         default=False, user=False)
     cfspecs_fruits.data_vars.names
 
@@ -474,7 +504,6 @@ Here we register new specs with a internal registration name ``"croco"``:
     mycfspecs = cf.CFSpecs(content)
     cf.register_cf_specs(mycfspecs)
 
-
 We can now access with it the :func:`~xoa.cf.get_cf_specs` function:
 
 .. ipython:: python
@@ -482,12 +511,12 @@ We can now access with it the :func:`~xoa.cf.get_cf_specs` function:
     these_cfspecs = cf.get_cf_specs('croco')
     these_cfspecs is mycfspecs
 
-Automatically finding the best specs for my dataset
----------------------------------------------------
+Inferring the best specs for my dataset
+---------------------------------------
 
 If you set the :attr:`cfspecs` attribute or encoding of a dataset
 to the name of a registered :class:`~xoa.cf.CFSpecs` instance, you can
-get it automatically with the :func:`get_best_cf_specs`.
+get it automatically with the :func:`infer_cf_specs`.
 
 Let's register another :class:`~xoa.cf.CFSpecs` instance:
 
@@ -501,6 +530,11 @@ Let's register another :class:`~xoa.cf.CFSpecs` instance:
             "sal": {
                 "name": "supersal"
             }
+        },
+        "coords": {
+            "lon": {
+                "name": "mylon"
+            }
         }
     }
     mycfspecs2 = cf.CFSpecs(content)
@@ -510,7 +544,7 @@ Let's create a dataset:
 
 .. ipython:: python
 
-    ds = xr.Dataset({'supertemp': [0, 2]})
+    ds = xr.Dataset({'supertemp': ("mylon", [0, 2])}, coords={"mylon": [10, 20]})
 
 Now find the best registered specs instance which has the either name
 ``hycom`` or ``croco``:
@@ -518,7 +552,42 @@ Now find the best registered specs instance which has the either name
 
 .. ipython:: python
 
-    cf_specs_auto = cf.get_best_cf_specs(ds)
+    cf_specs_auto = cf.infer_cf_specs(ds)
     print(cf_specs_auto.name)
+    ds_decoded = cf_specs_auto.decode(ds)
+    ds_decoded
+    cf_specs_auto.encode(ds)
 
 It is ``croco`` as expected.
+
+
+Assigning registered specs to a dataset or data array
+-----------------------------------------------------
+
+All xoa routines that needs to access specific coordinates
+or variables try to infer the approriate specs, which default
+to the current specs.
+When the :attr:`cfspecs` **attribute** or **encoding** is set,
+:meth:`~xoa.cf.CFSpecs.get_cf_specs` uses it to search within
+registered specs.
+
+.. ipython:: python
+
+    ds.encoding.update(cfspecs="croco")
+    cfspecs = cf.get_cf_specs(ds)
+    cfspecs.encode(ds)
+
+The :attr:`cfspecs` encoding is set at the dataset level,
+not at the data array level:
+
+.. ipython:: python
+
+    cf.get_cf_specs(ds.supertemp) is cfspecs
+
+To propagate to all the data arrays, use :func:`~xoa.cf.assign_cf_specs`:
+
+.. ipython:: python
+
+    cf.assign_cf_specs(ds, "croco")
+    ds.mylon.encoding
+    cf.get_cf_specs(ds.supertemp) is cfspecs

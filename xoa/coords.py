@@ -641,4 +641,4 @@ def get_positive_attr(da, zdim=None):
 
     # Fall back to current CFSpecs
     cfspecs = cf.get_cf_specs(da)
-    return cfspecs["coords"]["_vertical_"]["positive"]
+    return cfspecs["vertical"]["positive"]

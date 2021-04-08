@@ -11,7 +11,7 @@ skip_keys = ["inherit", "processed"]
 cat_titles = {
     "data_vars": "Data variables (:attr:`~xoa.cf.CFSpecs.data_vars`)",
     "coords": "Coordinates (:attr:`~xoa.cf.CFSpecs.coords`)",
-    "dims": "Dimensions (:attr:`~xoa.cf.CFSpecs.dims`)"
+    "dims": "Dimensions (:attr:`~xoa.cf.CFSpecs.dims`)",
     }
 
 roles = {

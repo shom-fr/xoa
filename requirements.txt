@@ -1,5 +1,4 @@
 appdirs
-cartopy
 cmocean
 configobj
 matplotlib-base

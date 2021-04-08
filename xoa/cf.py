@@ -26,7 +26,6 @@ import os
 import pickle
 import re
 import operator
-import warnings
 import pprint
 import fnmatch
 
@@ -64,6 +63,7 @@ _CF_DICT_MERGE_KWARGS = dict(
 
 _CACHE = {
     "current": None,     # current active specs
+    "default": None,     # default xoa specs
     "loaded_dicts": {},  # for pure caching of dicts by key
     "registered": []     # for registration and matching purpose
 }
@@ -806,25 +806,28 @@ class CFSpecs(object):
             self._dict[category].update(items[category])
 
         # Updates valid dimensions
+        alt_names = {}
         for name, coord_specs in self._dict['coords'].items():
             if coord_specs["attrs"]["axis"]:
                 axis = coord_specs["attrs"]['axis'].lower()
-                names = [name] + coord_specs['name']
-                self._dict['dims'][axis].extend(names)
+                self._dict['dims'][axis].append(name)  # generic name
+                if coord_specs['name']:  # specialized names
+                    self._dict['dims'][axis].append(coord_specs['name'])
+                alt_names.setdefault(axis, []).extend(coord_specs['alt_names'])  # alternate names
+        for axis in self._dict['dims']:
+            if axis in alt_names:
+                self._dict['dims'][axis].extend(alt_names[axis])
 
-        # Shortcut name
+        # Force the registration name
         if self._name:
             self._dict["register"]["name"] = self._name
 
     def _process_entry_(self, category, name):
         """Process an entry
 
-        - Makes sure to have lists, except for 'axis' and 'inherit'
-        - Check geo coords
         - Check inheritance
-        - Makes sure that coords specs have no 'coords' key
-        - Add standard_name to list of names
-        - Check duplications to other locations ('toto' -> 'toto_u')
+        - Set a default long_name from standard_name
+        - Process the "select" key
 
         Yield
         -----
@@ -900,12 +903,6 @@ class CFSpecs(object):
                 except Exception:
                     pass
 
-        # # Standard_names in names
-        # if specs["standard_name"]:
-        #     for standard_name in specs["standard_name"]:
-        #         if standard_name not in specs["name"]:
-        #             specs["name"].append(standard_name)
-
         specs['processed'] = True
         yield category, name, specs
 
@@ -931,7 +928,7 @@ class CFSpecs(object):
     def format_coord(self, da, name=None, loc=None, copy=True,
                      standardize=True, rename=True, rename_dim=True,
                      specialize=False, attrs=True, replace_attrs=False,
-                     name_with_loc=True, rename_dims=True):
+                     name_with_loc=None, rename_dims=True):
         """Format a coordinate array
 
         Parameters
@@ -993,8 +990,8 @@ class CFSpecs(object):
         loc=None,
         standardize=True,
         copy=True,
-        name_with_loc=False,
-        coord_name_with_loc=True,
+        name_with_loc=None,
+        coord_name_with_loc=None,
         rename_dims=True
     ):
         """Format array name and attributes according to currents CF specs
@@ -1085,9 +1082,9 @@ class CFSpecs(object):
                 )
 
         # Dimensions
-        if rename_dims:
+        if rename and rename_dims:
             rename_dims_args = self.coords.get_rename_dims_args(
-                da, loc=loc, specialize=specialize, exclude=list(rename_args.keys()))
+                da, loc=loc, specialize=specialize)#, exclude=list(rename_args.keys()))
             rename_args.update(rename_dims_args)
 
         # Final renaming
@@ -1100,11 +1097,11 @@ class CFSpecs(object):
 
         return da
 
-    def format_dataset(self, ds, loc=None, rename=True, standardize=True,
-                       format_coords=True, coords=None, copy=True,
-                       replace_attrs=False, name_with_loc=False,
-                       coord_name_with_loc=True, specialize=False,
-                       rename_dims=True):
+    def format_dataset(
+            self, ds, loc=None, rename=True, standardize=True, format_coords=True,
+            coords=None, copy=True, replace_attrs=False, name_with_loc=None,
+            coord_name_with_loc=None, specialize=False,
+            rename_dims=True):
         """Auto-format a whole xarray.Dataset
 
         See also
@@ -1141,7 +1138,7 @@ class CFSpecs(object):
         # Dimensions
         if rename_dims:
             rename_dims_args = self.coords.get_rename_dims_args(
-                ds, loc=loc, specialize=specialize, exclude=list(rename_args.keys()))
+                ds, loc=loc, specialize=specialize)#, exclude=list(rename_args.keys()))
             rename_args.update(rename_dims_args)
 
         # Final renaming
@@ -1705,8 +1702,13 @@ class _CFCatSpecs_(object):
             ):
                 if attr[0] != sm:
                     continue
-                if attr == "name" and "name" in specs:
-                    match_specs["name"] = [name] + specs["name"]
+                # if attr == "name" and "name" in specs:
+                if attr == "name":
+                    match_specs["name"] = [name]
+                    if "name" in specs and specs["name"]:
+                        match_specs["name"].append(specs["name"])
+                    if "alt_names" in specs:
+                        match_specs["name"].extend(specs["alt_names"])
                 elif "attrs" in specs and attr in specs["attrs"]:
                     match_specs[attr] = specs["attrs"][attr]
         return match_specs
@@ -1863,8 +1865,7 @@ class _CFCatSpecs_(object):
             Get standard_name and long_name attribute as a list of possible
             values
         {errors}
-
-        **extra
+        extra: dict
           Extra params are included as extra attributes
 
         Return
@@ -1937,13 +1938,12 @@ class _CFCatSpecs_(object):
         if name is None:
             return
         if specialize and self[name]["name"]:
-            name = self[name]["name"][0]
+            name = self[name]["name"]
         return self.sglocator.format_attr("name", name, loc=loc)
 
-    def format_dataarray(self, da, name=None, loc=None, rename=True,
-                         attrs=True, standardize=True,
-                         specialize=False, rename_dim=True,
-                         replace_attrs=False, copy=True, name_with_loc=None):
+    def format_dataarray(
+            self, da, name=None, loc=None, rename=True, attrs=True, standardize=True,
+            specialize=False, rename_dim=True, replace_attrs=False, copy=True, name_with_loc=None):
         """Format a DataArray's name and attributes
 
         Parameters
@@ -1958,7 +1958,7 @@ class _CFCatSpecs_(object):
         rename: bool
             Rename arrays when their name is set?
         name_with_loc: None, bool
-            Add the loc to the name
+            Add the loc to the name, overriding the specs.
         attrs: bool, dict
             If False, does not change attributes at all.
             If True, use Cf attributes.
@@ -2002,7 +2002,9 @@ class _CFCatSpecs_(object):
         cf_name = name
         new_name = self.get_name(cf_name, specialize=specialize)
         if name_with_loc is None:
-            name_with_loc = self.categoy == "coords"
+            name_with_loc = self[cf_name]["add_loc"]
+        if name_with_loc is None and old_name:
+            name_with_loc = bool(self.sglocator.parse_attr("name", old_name)[1])
 
         # Attributes
         if attrs is True:
@@ -2027,6 +2029,8 @@ class _CFCatSpecs_(object):
 
         # Return renaming name but don't rename
         if not rename:
+            if not name_with_loc:
+                return new_name
             if loc is None or loc == "any":
                 loc = self.sglocator.get_location(new_da)
             return self.sglocator.merge_attr("name", old_name, new_name, loc)
@@ -2037,9 +2041,9 @@ class _CFCatSpecs_(object):
             new_da = new_da.rename({old_name: new_da.name})
         return new_da
 
-    def rename_dataarray(self, da, name=None, specialize=False, loc=None,
-                         standardize=True, rename_dim=True,
-                         copy=True):
+    def rename_dataarray(
+            self, da, name=None, specialize=False, loc=None, standardize=True, rename_dim=True,
+            copy=True, name_with_loc=None):
         """Rename a DataArray
 
         It is a specialized call to :meth:`format_dataarray` where
@@ -2073,7 +2077,8 @@ class _CFCatSpecs_(object):
         """
         return self.format_dataarray(
             da, name=name, specialize=specialize, loc=loc, attrs=False,
-            standardize=standardize, rename_dim=rename_dim, copy=copy)
+            standardize=standardize, rename_dim=rename_dim, copy=copy,
+            name_with_loc=name_with_loc)
 
 
 class CFVarSpecs(_CFCatSpecs_):
@@ -2123,11 +2128,10 @@ class CFCoordSpecs(_CFCatSpecs_):
         """Get the type of a dimension
 
         Three cases:
+
         - This dimension is registered in CF dims.
-        - da has dim as dim and has an axis attribute inferred with
-          :meth:`get_axis`.
-        - da has a coord named dim with an axis attribute inferred with
-          :meth:`get_axis`.
+        - da has dim as dim and has an axis attribute inferred with :meth:`get_axis`.
+        - da has a coord named dim with an axis attribute inferred with :meth:`get_axis`.
 
         Parameters
         ----------
@@ -2149,9 +2153,12 @@ class CFCoordSpecs(_CFCatSpecs_):
         get_axis
         """
         # Remove location
+        dim_loc = dim
         dim = self.sglocator.parse_attr('name', dim)[0]
 
         # Loop on types
+        if dim.lower() in self.dims:
+            return dim.lower()
         for dim_type, dims in self.dims.items():
             if dim.lower() in dims:
                 return dim_type
@@ -2160,13 +2167,12 @@ class CFCoordSpecs(_CFCatSpecs_):
         if da is not None:
 
             # Check dim validity
-            if dim not in da.dims:
+            if dim_loc not in da.dims:
                 raise XoaCFError(f"dimension '{dim}' does not belong to da")
 
             # Check axis from coords
-            for name, coord in da.coords.items():
-                if name == dim:
-                    return self.get_axis(coord, lower=True)
+            if dim in da.indexes:
+                return self.get_axis(da.coords[dim], lower=True)
 
             # Check da axis itself
             axis = self.get_axis(da, lower=True)
@@ -2270,10 +2276,11 @@ class CFCoordSpecs(_CFCatSpecs_):
 
         # Failed
         errors = ERRORS[errors]
-        if errors == "raise":
-            #TODO: warn here
-            raise XoaCFError(
-                f"No dimension found in dataarray matching type: {dim_type}")
+        if errors != "ignore":
+            msg = f"No dimension found in dataarray matching type: {dim_type}"
+            if errors == "raise":
+                raise XoaCFError(msg)
+            xoa_warn(msg)
         if with_dim_type:
             return
         return None, None
@@ -2282,8 +2289,9 @@ class CFCoordSpecs(_CFCatSpecs_):
     def search_from_dim(self, da, dim, errors="ignore"):
         """Search a dataarray for a coordinate from a dimension name
 
-        It first searches for a coordinate with the same name and that is
+        It first searches for a coordinate with a different name and that is
         the only one having this dimension.
+        Then check if it is an index.
         Then look for coordinates with the same type like x, y, etc.
 
         Parameters
@@ -2305,39 +2313,37 @@ class CFCoordSpecs(_CFCatSpecs_):
         if dim not in da.dims:
             raise XoaError(f"Invalid dimension: {dim}")
 
-        # Coord as dim only
-        if dim in da.coords:
+        # A coord with a different name
+        coords = [coord for name, coord in da.coords.items() if name != dim and dim in coord.dims]
+        if len(coords) == 1:
+            return coords[0]
 
-            # Check if another coordinate has this dim
-            #  like depth that also have the level dim
-            for coord in da.coords.values():
-                if coord.name != dim and dim in coord.dims:
-                    break
-            else:
-                return da.coords[dim]
+        # As an index
+        if dim in da.indexes:
+            return da.coords[dim]
 
         # Get dim_type from known dim name
-        #  like dim is not explicit but the coordinate is known
         dim_type = self.get_dim_type(dim, da=da, lower=True)
 
         # So we can do something
         if dim_type is not None:
 
             # Look for a coordinate with this dim_type
-            # starting from coordinates with a greater number of dimensions
+            #  starting from coordinates with a higher number of dimensions
             #  like depth that have more dims than level
-            for coord in sorted(da.coords.values(),
-                                key=operator.attrgetter('ndim'),
-                                reverse=True):
+            for coord in sorted(da.coords.values(), key=operator.attrgetter('ndim'), reverse=True):
                 if dim in coord.dims:
                     coord_dim_type = self.get_axis(coord, lower=True)
                     if coord_dim_type and coord_dim_type == dim_type:
                         return coord
 
         # Nothing found
-        if ERRORS[errors] == "raise":
-            raise XoaCFError(
-                f"No dataarray coord found from dim: {dim}")
+        errors = ERRORS[errors]
+        if errors != "ignore":
+            msg = f"No dataarray coord found from dim: {dim}"
+            if errors == "raise":
+                raise XoaCFError(msg)
+            xoa_warn(msg)
 
     @ERRORS.format_method_docstring
     def get_dims(self, da, dim_types, allow_positional=False,
@@ -2401,15 +2407,15 @@ class CFCoordSpecs(_CFCatSpecs_):
 
         return tuple(scanned.values())
 
-    def get_rename_dims_args(self, dsa, loc=None, specialize=False, exclude=None):
-        """Get args for renaming dimensions"""
+    def get_rename_dims_args(self, dsa, loc=None, specialize=False):
+        """Get args for renaming dimensions that are not coordinates"""
         rename_args = {}
         for dim in dsa.dims:
-            if exclude and dim in exclude:
+            if dim in dsa.coords:
                 continue
             dim_type = self.get_dim_type(dim, dsa)
             if dim_type:
-                if specialize:
+                if specialize and self.dims[dim_type]:
                     new_name = self.dims[dim_type][0]
                 else:
                     new_name = dim_type
@@ -2609,6 +2615,7 @@ def reset_cache(disk=True, memory=False):
     if memory:
         _CACHE["loaded_dicts"].clear()
         _CACHE["current"] = None
+        _CACHE["default"] = None
         _CACHE["registered"].clear()
 
 
@@ -2621,8 +2628,8 @@ def show_cache():
 def get_cf_specs_from_name(name, errors="warn"):
     """Get a registered CF specs instance from its name
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     name: str
     {errors}
 
@@ -2640,6 +2647,7 @@ def get_cf_specs_from_name(name, errors="warn"):
         raise XoaCFError(msg)
     elif errors == "warn":
         xoa_warn(msg)
+        xxx
 
 
 def get_cf_specs_from_encoding(ds):
@@ -2660,23 +2668,85 @@ def get_cf_specs_from_encoding(ds):
                     return get_cf_specs_from_name(value.lower(), errors="warn")
 
 
-def get_cf_specs(name=None, cache="rw"):
-    """Get the current or a registered CF specifications instance
+def get_default_cf_specs(cache="rw"):
+    """Get the default CF specifications
 
     Parameters
     ----------
-    name: str, None, xarray.Dataset, xarray.DataArray
-        A registration name for these specs.
-        When set, ``cache`` is ignored.
-        Raises a :class:`XoaCFError` is case of invalid name.
-        In case of a dataset or data array, the :attr:`cfspecs` attribute
-        or encoding is searched for and its value is used as a
-        registration name.
     cache: str, bool, None
         Cache default specs on disk with pickling for fast loading.
         If ``None``, it defaults to boolean option :xoaoption:`cf.cache`.
         Possible string values: ``"ignore"``, ``"rw"``, ``"read"``,
         ``"write"``, ``"clean"``.
+        If ``True``, it is set to ``"rw"``.
+        If ``False``, it is set to ``"ignore"``.
+    """
+    if cache is None:
+        cache = get_option('cf.cache')
+    if cache is True:
+        cache = "rw"
+    elif cache is False:
+        cache = "ignore"
+    assert cache in ("ignore", "rw", "read", "write", "clean")
+    if _CACHE["default"] is not None:
+        return _CACHE["default"]
+    cfspecs = None
+
+    # Try from disk cache
+    if cache in ("read", "rw"):
+        if os.path.exists(USER_CF_CACHE_FILE) and (
+            os.stat(_CFGFILE).st_mtime <
+            os.stat(USER_CF_CACHE_FILE).st_mtime
+        ):
+            try:
+                with open(USER_CF_CACHE_FILE, "rb") as f:
+                    cfspecs = pickle.load(f)
+            except Exception as e:
+                xoa_warn(
+                    "Error while loading cached cf specs: " + str(e.args)
+                )
+
+    # Compute it from scratch
+    if cfspecs is None:
+
+        # Setup
+        cfspecs = CFSpecs()
+
+        # Cache it on disk
+        if cache in ("write", "rw"):
+            try:
+                cachedir = os.path.dirname(USER_CF_CACHE_FILE)
+                if not os.path.exists(cachedir):
+                    os.makedirs(cachedir)
+                with open(USER_CF_CACHE_FILE, "wb") as f:
+                    pickle.dump(cfspecs, f)
+            except Exception as e:
+                xoa_warn("Error while caching cf specs: " + str(e.args))
+
+    _CACHE["default"] = cfspecs
+    if not is_registered_cf_specs(cfspecs):
+        register_cf_specs(cfspecs)
+    return cfspecs
+
+
+def get_cf_specs(name=None, cache="rw"):
+    """Get the current or a registered CF specifications instance
+
+    Parameters
+    ----------
+    name: str, "current", "default", None, xarray.Dataset, xarray.DataArray
+        "default" means the default xoa specs.
+        "current" is equivalent to None and means the currents specs,
+        which defaults to the xoa defaults!
+        Else registration name for these specs or a data array or dataset
+        that can be used to get the registration name if it set in the
+        :attr:`cfspecs` attribute or encoding.
+        When set, ``cache`` is ignored.
+        Raises a :class:`XoaCFError` is case of invalid name.
+    cache: str, bool, None
+        Cache default specs on disk with pickling for fast loading.
+        If ``None``, it defaults to boolean option :xoaoption:`cf.cache`.
+        Possible string values: ``"ignore"``, ``"rw"``, ``"read"``, ``"write"``.
         If ``True``, it is set to ``"rw"``.
         If ``False``, it is set to ``"ignore"``.
 
@@ -2690,61 +2760,31 @@ def get_cf_specs(name=None, cache="rw"):
     XoaCFError
         When ``name`` is provided as a string and is invalid.
     """
-    # Look into the registration base
-    if name is not None:
-        if isinstance(name, str):  # Explicit name
-            return get_cf_specs_from_name(name, errors="raise")
-        else:  # Name as dataset or data array so we guess the name
-            cfspecs = get_cf_specs_from_encoding(name)
-            if cfspecs:
-                return cfspecs
+    # Explicit request
+    if name is None:
+        name = "current"
+    if not isinstance(name, str) or name not in ("current", "default"):
 
-    # Not named => default specs
-    if cache is None:
-        cache = get_option('cf.cache')
-    if cache is True:
-        cache = "rw"
-    elif cache is False:
-        cache = "ignore"
-    assert cache in ("ignore", "rw", "read", "write", "clean")
-    if _CACHE["current"] is None:
+        # Registered name
+        if isinstance(name, str):
+           return get_cf_specs_from_name(name, errors="raise")
 
-        # Try from disk cache
-        if cache in ("read", "rw"):
-            if os.path.exists(USER_CF_CACHE_FILE) and (
-                os.stat(_CFGFILE).st_mtime <
-                os.stat(USER_CF_CACHE_FILE).st_mtime
-            ):
-                try:
-                    with open(USER_CF_CACHE_FILE, "rb") as f:
-                        set_cf_specs(pickle.load(f))
-                except Exception as e:
-                    xoa_warn(
-                        "Error while loading cached cf specs: " + str(e.args)
-                    )
+        # Name as dataset or data array so we guess the name
+        cfspecs = get_cf_specs_from_encoding(name)
+        if cfspecs:
+            return cfspecs
+        else:
+            name = "current"
 
-        # Compute it from scratch
+    # Not named => current or default specs
+    if name == "current":
         if _CACHE["current"] is None:
+            _CACHE["current"] = get_default_cf_specs()
+        cfspecs =  _CACHE["current"]
+    else:
+        cfspecs = get_default_cf_specs()
 
-            # Setup
-            set_cf_specs(CFSpecs())
-
-            # Cache it on disk
-            if cache in ("write", "rw"):
-                try:
-                    cachedir = os.path.dirname(USER_CF_CACHE_FILE)
-                    if not os.path.exists(cachedir):
-                        os.makedirs(cachedir)
-                    with open(USER_CF_CACHE_FILE, "wb") as f:
-                        pickle.dump(_CACHE["current"], f)
-                except Exception as e:
-                    xoa_warn("Error while caching cf specs: " + str(e.args))
-
-    # Clean cache
-    if cache == "clean":
-        reset_cache()
-
-    return _CACHE["current"]
+    return cfspecs
 
 
 def register_cf_specs(*args, **kwargs):
@@ -2788,6 +2828,26 @@ def get_registered_cf_specs(current=True, reverse=True, named=False):
     if named:
         cfl = [c for c in cfl if c.name]
     return cfl
+
+
+def is_registered_cf_specs(name):
+    """Check if given cf specs set is registered
+
+    Parameters
+    ----------
+    name: str, CFSpecs
+
+    Return
+    ------
+    bool
+    """
+    for cfspecs in get_registered_cf_specs():
+        if (isinstance(name, str) and cfspecs["register"]["name"] and
+                cfspecs["register"]["name"] == name):
+            return True
+        if isinstance(name, CFSpecs) and name is cfspecs:
+            return True
+    return False
 
 
 def get_cf_specs_matching_score(ds, cfspecs):
@@ -2889,7 +2949,7 @@ def infer_cf_specs(ds, named=False):
 def assign_cf_specs(ds, name=None):
     """Set the ``cfspecs`` encoding to ``name`` in all data vars and coords
 
-    Paremeters
+    Parameters
     ----------
     ds: xarray.DataArray, xarray.Dataset
     name: None, str, CFSpecs, xarray.DataArray, xarray.Dataset

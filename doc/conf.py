@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.join(os.path.abspath(
 # %% Project information
 
 project = 'xoa'
-copyright = '2020, Shom/Ifremer/Actimar'
-author = 'Shom/Ifremer/Actimar'
+copyright = '2020-2021, Shom'
+author = 'Shom'
 
 # The full version, including alpha/beta/rc tags
 import xoa
@@ -80,6 +80,7 @@ autosummary_generate = True
 
 # %% Intersphinx
 intersphinx_mapping = {
+    'python': ('https://docs.python.org/fr/3/', None),
     'cmocean': ('https://matplotlib.org/cmocean/', None),
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None),
     'numba:': ('https://numba.readthedocs.io/en/stable/', None),

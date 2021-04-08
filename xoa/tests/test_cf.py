@@ -11,6 +11,7 @@ import pytest
 import numpy as np
 import xarray as xr
 
+import xoa
 from xoa import cf
 
 
@@ -280,7 +281,7 @@ def test_cf_get_cfg_specs(cache):
 
 def test_cf_get_cfg_specs_var():
     specs = cf.get_cf_specs().data_vars["temp"]
-    assert specs["name"][0] == "temperature"
+    assert specs["alt_names"][0] == "temperature"
     assert specs["attrs"]["standard_name"][0] == "sea_water_temperature"
     assert specs["cmap"] == "cmo.thermal"
     new_specs = cf.get_cf_specs()["temp"]
@@ -295,29 +296,29 @@ def test_cf_get_cfg_specs_var_inherit():
 
 def test_cf_get_cfg_specs_coord():
     specs = cf.get_cf_specs().coords["lon"]
-    assert specs["name"][0] == "longitude"
-    assert "longitude" in specs["name"]
+    assert specs["alt_names"][0] == "longitude"
+    assert "longitude" in specs["alt_names"]
     new_specs = cf.get_cf_specs()["lon"]
     assert new_specs is specs
 
 
 def test_cf_get_cfg_specs_coord_inherit():
     specs = cf.get_cf_specs().coords["depth"]
-    assert specs["name"][0] == "dep"
+    assert specs["alt_names"][0] == "dep"
     assert specs["attrs"]["long_name"][0] == "Depth"
 
 
 @pytest.mark.parametrize(
     "cfg,key,name",
     [
-        ({"data_vars": {"temp": {"name": "mytemp"}}}, "temp", "mytemp"),
-        ("[data_vars]\n[[sal]]\nname=mysal", "sal", "mysal"),
+        ({"data_vars": {"temp": {"alt_names": "mytemp"}}}, "temp", "mytemp"),
+        ("[data_vars]\n[[sal]]\nalt_names=mysal", "sal", "mysal"),
     ],
 )
 def test_cf_cfspecs_load_cfg(cfg, key, name):
     cfspecs = cf.get_cf_specs()
     cfspecs.load_cfg(cfg)
-    assert name in cfspecs["data_vars"][key]["name"]
+    assert name in cfspecs["data_vars"][key]["alt_names"]
 
 
 def test_cf_cfspecs_copy():
@@ -333,7 +334,7 @@ def test_cf_cfspecs_copy():
         == cfspecs1._dict["data_vars"]["temp"]
     )
     assert "temp" in cfspecs1["data_vars"]
-    assert "temperature" in cfspecs1["data_vars"]["temp"]["name"]
+    assert "temperature" in cfspecs1["data_vars"]["temp"]["alt_names"]
 
 
 def test_cf_set_cf_specs():
@@ -346,7 +347,7 @@ def test_cf_set_cf_specs():
 
 def test_cf_set_cf_specs_context():
     cfspecs0 = cf.get_cf_specs()
-    cfspecs1 = cf.CFSpecs({"data_vars": {"temp": {"name": "tempouille"}}})
+    cfspecs1 = cf.CFSpecs({"data_vars": {"temp": {"alt_names": "tempouille"}}})
     assert cf.get_cf_specs() is cfspecs0
     with cf.set_cf_specs(cfspecs1) as cfspecs:
         assert cfspecs is cfspecs1
@@ -362,7 +363,7 @@ def test_cf_set_cf_specs_context():
      ]
 )
 def test_cf_cfspecs_get_name(specialize, expected):
-    cfspecs = cf.get_cf_specs()
+    cfspecs = cf.CFSpecs({"data_vars": {"temp": {"name": "temperature"}}})
     assert (cfspecs.data_vars.get_name("temp", specialize=specialize)
             == expected)
 
@@ -523,10 +524,16 @@ def test_cf_cfspecs_format_data_var_loc():
                         attrs={'standard_name': 'banana_at_x_location'})
     cfspecs = cf.get_cf_specs()
 
-    temp_fmt = cfspecs.format_data_var(
-        temp, "temp", format_coords=False, replace_attrs=True)
-    assert temp_fmt.name == "temp_x"
+    temp_fmt = cfspecs.format_data_var(temp, "temp", format_coords=False, replace_attrs=True)
+    assert temp_fmt.name == "temp"
     assert temp_fmt.standard_name == "sea_water_temperature_at_x_location"
+
+    temp_fmt = cfspecs.format_data_var(temp, "temp", format_coords=False, replace_attrs=True, name_with_loc=True)
+    assert temp_fmt.name == "temp_x"
+
+    cfspecs = cf.CFSpecs({"data_vars": {"temp": {"add_loc": True}}})
+    temp_fmt = cfspecs.format_data_var(temp, "temp", format_coords=False, replace_attrs=True)
+    assert temp_fmt.name == "temp_x"
 
 
 def test_cf_cfspecs_format_data_var_unkown():
@@ -620,30 +627,33 @@ def test_cf_cfspecs_coords_search_dim():
 def test_cf_cfspecs_coords_search_from_dim():
 
     lon = xr.DataArray([1, 2], dims='lon')
-    level = xr.DataArray([1, 2, 3], dims='aa',
-                         attrs={'standard_name': 'ocean_sigma_coordinate'})
+    level = xr.DataArray(
+        [1, 2, 3], dims='aa', attrs={'standard_name': 'ocean_sigma_coordinate'})
     mem = xr.DataArray(range(3), dims='mem')
-    temp = xr.DataArray(np.zeros((mem.size, level.size, lon.size)),
-                        dims=('mem', 'aa', 'lon'),
-                        coords={'mem': mem, 'aa': level, 'lon': lon})
+    temp = xr.DataArray(
+        np.zeros((mem.size, level.size, lon.size)),
+        dims=('mem', 'aa', 'lon'),
+        coords={'mem': mem, 'aa': level, 'lon': lon})
 
     cfspecs = cf.get_cf_specs().coords
 
     # Direct coordinate
     assert cfspecs.search_from_dim(temp, 'aa').name == 'aa'
 
-    # Depth coordinate from thanks to dim_type of 1D coordinate
-    depth = xr.DataArray(np.ones((level.size, lon.size)),
-                         dims=('aa', 'lon'),
-                         coords={'aa': level, 'lon': lon})
+    # Depth coordinate because the only one with this dim
+    depth = xr.DataArray(
+        np.ones((level.size, lon.size)), dims=('aa', 'lon'), coords={'aa': level, 'lon': lon})
     temp.coords['depth'] = depth
     assert cfspecs.search_from_dim(temp, 'aa').name == 'depth'
 
-    # Cannot get dim_type
+    # Cannot get dim_type and we have multiple coords with this dim
     del temp.coords['aa']
+    fake = xr.DataArray(
+        np.ones((level.size, lon.size)), dims=('aa', 'lon'), coords={'lon': lon})
+    temp.coords['fake'] = fake
     assert cfspecs.search_from_dim(temp, 'aa') is None
 
-    # Cen get dim_type back from name
+    # Can get dim_type back from name
     temp = temp.rename(aa='level')
     assert cfspecs.search_from_dim(temp, 'level').name == 'depth'
 
@@ -670,6 +680,27 @@ def test_cf_cfspecs_infer_coords():
                      "lon": ("nx", [4, 5])})
     ds = cf.get_cf_specs().infer_coords(ds)
     assert "lon" in ds.coords
+
+
+def test_cf_cfspecs_decode_encode():
+    ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
+    cfspecs = cf.CFSpecs(xoa.get_data_sample("croco.cfg"))
+
+    dsc = cfspecs.decode(ds)
+    assert list(dsc) == [
+        'akt', 'cs_r', 'cs_w', 'Vtransform', 'angle', 'el', 'corio',
+        'bathy', 'hbl', 'hc', 'mask_rho', 'ex', 'ey', 'sal',
+        'sc_r', 'sc_w', 'ptemp', 'time_step', 'u', 'v', 'w', 'xl', 'ssh']
+    assert list(dsc.coords) == [
+        'y_rho', 'y_v', 'lat_rho', 'lat_u', 'lat_v', 'lon_rho', 'lon_u', 'lon_v',
+        'sig_rho', 'sig_w', 'time', 'x_rho', 'x_u']
+    assert list(dsc.dims) == ['auxil', 'sig_rho', 'sig_w', 'time', 'x_rho', 'x_u', 'y_rho', 'y_v']
+
+    dse = cfspecs.encode(dsc)
+    assert list(dse) == list(ds)
+    assert list(dse.coords) == list(ds.coords)
+    assert list(dse.dims) == list(ds.dims)
+    ds.close()
 
 
 def test_cf_dataarraycfaccessor():
@@ -750,6 +781,39 @@ def test_cf_get_cf_specs_registered():
 
     cf_specs_out = cf.get_cf_specs(name='myname')
     assert cf_specs_out is cf_specs_in
+
+
+def test_cf_get_cf_specs_from_encoding():
+
+    cf._CACHE["registered"].clear()
+    content = """
+        [register]
+        name=mynam234
+
+        [data_vars]
+            [[temp]]
+            name=mytemp
+        """
+    cf_specs_in = cf.CFSpecs(content)
+    cf.register_cf_specs(cf_specs_in)
+
+    ds = xr.Dataset(
+         {"mytemp": (["mylat", "mylon"], np.ones((2, 2))),
+          "mysal": (["mylat", "mylon"], np.ones((2, 2)))},
+         coords={"mylon": np.arange(2),
+                 "mylat": np.arange(2)}
+         )
+
+    ds.encoding.update(cfspecs="mynam234")
+    assert cf.get_cf_specs_from_encoding(ds) is cf_specs_in
+
+    ds.mytemp.encoding.update(cfspecs="mynam234")
+    assert cf.get_cf_specs_from_encoding(ds.mytemp) is cf_specs_in
+
+    ds.mylon.encoding.update(cfspecs="mynam234")
+    assert cf.get_cf_specs_from_encoding(ds.mylon) is cf_specs_in
+
+    assert cf.get_cf_specs_from_encoding(ds.mylat) is None
 
 
 def test_cf_set_cf_specs_registered():

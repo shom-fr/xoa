@@ -91,7 +91,7 @@ class XoaWarning(UserWarning):
     pass
 
 
-def xoa_warn(message):
+def xoa_warn(message, stacklevel=2):
     """Issue a :class:`XoaWarning` warning
 
     Example
@@ -103,7 +103,7 @@ def xoa_warn(message):
         from xoa import xoa_warn
         xoa_warn('Be careful!')
     """
-    warnings.warn(message, XoaWarning, stacklevel=2)
+    warnings.warn(message, XoaWarning, stacklevel=stacklevel)
 
 
 def load_options(cfgfile=None):

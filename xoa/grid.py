@@ -156,12 +156,11 @@ def _pad_(da, dim, pad_width, mode, **kwargs):
     return da
 
 
-def pad(da, pad_width, mode="edge", coord_mode="linear_extrap",
-        name_kwargs=None, **kwargs):
+def pad(da, pad_width, mode="edge", coord_mode="linear_extrap", name_kwargs=None, **kwargs):
     """Pad data and coordinates along dimensions
 
     This function adds the ``"linear_extrap"`` mode support to the builtin
-    :function:`xarray.pad` fonction or methods.
+    :meth:`xarray.DataArray.pad` methods.
 
     Parameters
     ----------
@@ -356,7 +355,7 @@ class dz2depth_ref_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
 
 def dz2depth(
         dz, positive=None, zdim=None, ref=None, ref_type='infer',
-        centered=False, cfname="depth"):
+        centered=False):
     f"""Integrate layer thicknesses to compute depths
 
     The output depths are the depths at the bottom of the layers and the top
@@ -393,8 +392,6 @@ def dz2depth(
         {dz2depth_ref_types.rst_with_links}
     centered: bool
         Get depth a the middle of layers instead at their edge
-    cfname: str, False
-        CF name used to format the output depth variable.
 
     Return
     ------
@@ -465,7 +462,6 @@ def dz2depth(
 
     # Finalize
     depth.attrs["positive"] = positive
-    if cfname:
-        depth = cfspecs.format_coord(depth, cfname)
+    depth = cfspecs.format_coord(depth, "depth")
 
     return depth
