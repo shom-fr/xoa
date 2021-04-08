@@ -3,10 +3,12 @@
 Test the :mod:`xoa.grid` module
 """
 import functools
+import warnings
 import numpy as np
 import xarray as xr
 import pytest
 
+from xoa import XoaWarning
 from xoa import grid
 
 
@@ -31,7 +33,9 @@ def get_da():
 def test_grid_get_centers():
 
     da = get_da()
-    dac = grid.get_centers(da, dim=("y", "x"))
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        dac = grid.get_centers(da, dim=("y", "x"))
     assert dac.shape == (da.shape[0], da.shape[1]-1, da.shape[2]-1)
     assert dac.x[0] == 0.5
     assert dac.y[0] == 0.5
@@ -47,7 +51,9 @@ def test_grid_get_centers():
 def test_grid_pad():
 
     da = get_da()
-    dap = grid.pad(da, {"y": 1, "x": 1}, name_kwargs={'dep': {"mode": 'edge'}})
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        dap = grid.pad(da, {"y": 1, "x": 1}, name_kwargs={'dep': {"mode": 'edge'}})
     assert dap.shape == (da.shape[0], da.shape[1]+2, da.shape[2]+2)
     assert dap.x[0] == -1
     assert dap.x[-1] == da.sizes['x']
@@ -65,7 +71,9 @@ def test_grid_pad():
 def test_grid_get_edges():
 
     da = get_da()
-    dae = grid.get_edges(da, "y")
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        dae = grid.get_edges(da, "y")
     assert dae.shape == (da.shape[0], da.shape[1]+1, da.shape[2])
     np.testing.assert_allclose(dae.y[:2].values, da.y[:2] - 0.5)
     np.testing.assert_allclose(dae.lat[:2, 0], da.lat[:2, 0] - 1.5)
@@ -74,7 +82,9 @@ def test_grid_get_edges():
 
 def test_grid_shift():
     da = get_da()
-    dae = grid.shift(da, {"x": "left", "y": 1})
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        dae = grid.shift(da, {"x": "left", "y": 1})
     assert dae.shape == da.shape
     np.testing.assert_allclose(dae.x.values, da.x - 0.5)
     np.testing.assert_allclose(dae.y.values, da.y + 0.5)
