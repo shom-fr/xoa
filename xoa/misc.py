@@ -238,14 +238,14 @@ class Choices(object):
         indent = (" " * indent) if isinstance(indent, int) else indent
         pindent = indent + 4 * " "
         types = "{" + ", ".join([repr(c) for c in self.choices]) + "}"
-        rst = f"{indent}{self._parameter}: {types}\n"
+        rst = f"{self._parameter}: {types}\n"
         if self._description:
             rst += f"{pindent}{self._description}\n"
         if self._docs:
             rst += "\n"
             for choice, doc in self._docs.items():
                 rst += f"{pindent}- ``{choice}``: {doc}\n"
-            rst += "\n"
+            # rst += "\n"
         return rst
 
     def format_function_docstring(self, func):

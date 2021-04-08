@@ -817,11 +817,10 @@ class ConfigManager(object):
         return self._validator
 
     def get_spec(self, sec, key, **kwargs):
-        """
-        See :func:`get_spec`
+        """See :func:`get_spec`
 
-        If sec is a basestring, use configspec[sec][key]
-        Otherwise use sec as a configspec, sec[key]
+        If sec is a basestring, use ``configspec[sec][key]``
+        Otherwise use sec as a ``configspec, sec[key]``
         """
         return get_spec(
             (self._configspec[sec] if isinstance(sec, str) else sec)[key],
@@ -1661,13 +1660,12 @@ def get_spec(spec, validator=None):
             if the value is list-like
         func:
             the validation function
-        opttype:
-            the function used with :mod:`optparse`
         argtype:
             the function used with :mod:`argparse`
 
+
     Read access to these keys can also be done as attribute
-    of the returned dict (d.funcname == d['funcname'], ...)
+    of the returned dict (``d.funcname == d['funcname']``, ...)
 
     For example, a specification file containing::
 
@@ -1676,7 +1674,7 @@ def get_spec(spec, validator=None):
 
     Would return::
 
-        ``{'funcname': integer, 'args': [],
+        {'funcname': integer, 'args': [],
         'kwargs': {'min': '-10', 'max': '10'}, 'default:' 0,
         'opttype': 'int', 'argtype': int,
         'func':is_integer, 'iterable': None}
@@ -2032,11 +2030,11 @@ def cfg2rst(cfg, mode="basic", optrole="confopt", secrole="confsec", **kwargs):
 
                     desd c
 
-    Then one can reference an option with for example ``:confopt:`[s1][s2]c`.
+    Then one can reference an option with for example ``:confopt:`[s1][s2]c```.
 
     Parameters
     ----------
-    cfg: :class:`ConfigObj`, :class:`ConfigManager`
+    cfg: configobj.ConfigObj, ConfigManager
         In the case of a :class:`ConfigManager`,
         the :meth:`~ConfigManager.get_defaults`
         are used.
