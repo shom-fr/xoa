@@ -30,11 +30,16 @@ def get_parser(formatter_class=argparse.ArgumentDefaultsHelpFormatter):
         formatter_class=formatter_class)
     subparsers = parser.add_subparsers(help='sub-command help')
 
-    parser_info = subparsers.add_parser('info', help='info about xoa')
-    parser_info.add_argument('category', help='info category', nargs='?',
-                             choices=('all', 'paths', 'versions', 'options'),
-                             default='all')
+    parser_info = subparsers.add_parser(
+        'info', help='info about xoa')
+    parser_info.add_argument(
+        'category', help='info category', nargs='?',
+        choices=('all', 'paths', 'versions', 'options'), default='all')
     parser_info.set_defaults(func=main_info)
+
+    parser_reset_cf_cache = subparsers.add_parser(
+        'reset_cf_cache', help='remove the CF cache file')
+    parser_reset_cf_cache.set_defaults(func=main_reset_cf_cache)
 
     return parser
 
@@ -55,3 +60,8 @@ def main_info(parser, args):
         show_paths()
     elif args.category == "options":
         show_options()
+
+def main_reset_cf_cache(parser, args):
+    from . import cf
+    cf.reset_cache(disk=True)
+    print("Removed CF cache file: "+cf.USER_CF_CACHE_FILE)
