@@ -487,17 +487,22 @@ Registering and accessing new specs
 It is possible to register specialized :class:`~xoa.cf.CFSpecs` instances
 with :func:`~xoa.cf.register_cf_specs` for future access.
 
-Here we register new specs with a internal registration name ``"croco"``:
+Here we register new specs with a internal registration name ``"mycroco"``:
 
 .. ipython:: python
 
     content = {
         "register": {
-            "name": "croco"
+            "name": "mycroco"
         },
         "data_vars": {
             "temp": {
                 "name": "supertemp"
+            }
+        },
+        "coords": {
+            "lon": {
+                "name": "mylon"
             }
         }
     }
@@ -508,7 +513,7 @@ We can now access with it the :func:`~xoa.cf.get_cf_specs` function:
 
 .. ipython:: python
 
-    these_cfspecs = cf.get_cf_specs('croco')
+    these_cfspecs = cf.get_cf_specs('mycroco')
     these_cfspecs is mycfspecs
 
 Inferring the best specs for my dataset
@@ -524,18 +529,13 @@ Let's register another :class:`~xoa.cf.CFSpecs` instance:
 
     content = {
         "register": {
-            "name": "hycom"
+            "name": "myhycom"
         },
         "data_vars": {
             "sal": {
                 "name": "supersal"
             }
         },
-        "coords": {
-            "lon": {
-                "name": "mylon"
-            }
-        }
     }
     mycfspecs2 = cf.CFSpecs(content)
     cf.register_cf_specs(mycfspecs2)
@@ -547,7 +547,7 @@ Let's create a dataset:
     ds = xr.Dataset({'supertemp': ("mylon", [0, 2])}, coords={"mylon": [10, 20]})
 
 Now find the best registered specs instance which has the either name
-``hycom`` or ``croco``:
+``myhycom`` or ``mycroco``:
 
 
 .. ipython:: python
@@ -558,7 +558,7 @@ Now find the best registered specs instance which has the either name
     ds_decoded
     cf_specs_auto.encode(ds)
 
-It is ``croco`` as expected.
+It is ``mycroco`` as expected.
 
 
 Assigning registered specs to a dataset or data array
@@ -573,7 +573,7 @@ registered specs.
 
 .. ipython:: python
 
-    ds.encoding.update(cfspecs="croco")
+    ds.encoding.update(cfspecs="mycroco")
     cfspecs = cf.get_cf_specs(ds)
     cfspecs.encode(ds)
 
@@ -588,6 +588,6 @@ To propagate to all the data arrays, use :func:`~xoa.cf.assign_cf_specs`:
 
 .. ipython:: python
 
-    cf.assign_cf_specs(ds, "croco")
+    cf.assign_cf_specs(ds, "mycroco")
     ds.mylon.encoding
     cf.get_cf_specs(ds.supertemp) is cfspecs

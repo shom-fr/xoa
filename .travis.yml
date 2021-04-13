@@ -19,7 +19,7 @@ install:
 - pip install -e .
 - export PYTHONPATH=$PWD:$PYTHONPATH
 
-script: pytest -s
+script: pytest -sv
 
 notifications:
   slack:
