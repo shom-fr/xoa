@@ -30,13 +30,17 @@ class _BasicCFAccessor_(object):
         self._dsa = dsa
         self.set_cf_specs(cfspecs)
 
+    def _assign_cf_specs_(self):
+        from . import cf
+        if self._cfspecs.name:
+            self._dsa = cf.assign_cf_specs(self._dsa, self._cfspecs.name)
+
     def set_cf_specs(self, cfspecs):
         """Set the :class:`CFSpecs` using by this accessor"""
         from . import cf
         assert isinstance(cfspecs, cf.CFSpecs)
         self._cfspecs = cfspecs
-        if self._cfspecs.name:
-            self._dsa = cf.assign_cf_specs(self._dsa, self._cfspecs.name)
+        self._assign_cf_specs_()
 
     def get_cf_specs(self):
         return self._cfspecs
@@ -52,6 +56,8 @@ class _CFAccessor_(_BasicCFAccessor_):
         self._coords = None
         self._data_vars = None
         self._cache = {}
+        self._dsa = self.infer_coords()
+        self._assign_cf_specs_()
 
     def get(self, name, loc="any", single=True, errors="ignore"):
         """Search for a CF item with :meth:`CFSpecs.search`"""
@@ -152,10 +158,18 @@ class _DataVarAccessor__(_CFAccessor_):
 
 
 class CFDatasetAccessor(_CFAccessor_):
-    pass
+
+    @property
+    def ds(self):
+        return self._dsa
 
 
 class CFDataArrayAccessor(_CoordAccessor_):
+
+
+    @property
+    def da(self):
+        return self._dsa
 
     @property
     def name(self):
