@@ -1991,9 +1991,8 @@ def _redent(text, n=1, indent="    "):
 def cfg2rst(cfg, mode="basic", optrole="confopt", secrole="confsec", **kwargs):
     """Convert a configuration to rst format
 
-    Configuration sections are declared with the rst directive
-    "confsec" and options are declared with the rst directive
-    "confopt".
+    Configuration sections are declared by default with the rst :rst:dir:`confsec` directive
+    and options are declared with the rst :rst:dir:`confopt` directive
 
     For instance:
 
@@ -2038,6 +2037,16 @@ def cfg2rst(cfg, mode="basic", optrole="confopt", secrole="confsec", **kwargs):
         In the case of a :class:`ConfigManager`,
         the :meth:`~ConfigManager.get_defaults`
         are used.
+    mode: {"basic", "values", "specs"}
+
+        ``"basic"``:
+            Only display the config section and option names and description.
+        ``"values"``:
+            Also display the option values.
+            A classic config.
+        ``"specs"``:
+            Also display the type and default value.
+            Config specifications are expected for cfg.
 
     Return
     ------
