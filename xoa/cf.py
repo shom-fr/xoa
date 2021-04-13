@@ -2678,6 +2678,28 @@ def get_cf_specs_from_name(name, errors="warn"):
         xoa_warn(msg)
 
 
+def get_cf_specs_encoding(ds):
+    """Get the ``cfspecs`` encoding value
+
+    Parameters
+    ----------
+    ds: xarray.DataArray, xarray.Dataset
+
+    Return
+    ------
+    str or None
+
+    See also
+    --------
+    get_cf_specs_from_encoding
+    """
+    if ds is not None and not isinstance(ds, str):
+        for source in ds.encoding, ds.attrs:
+            for attr, value in source.items():
+                if attr.lower() == "cfspecs":
+                    return value
+
+
 def get_cf_specs_from_encoding(ds):
     """Get a registered CF specs instance from the ``cfspecs`` encoding value
 
@@ -2688,12 +2710,15 @@ def get_cf_specs_from_encoding(ds):
     Return
     ------
     CFSpecs or None
+
+    See also
+    --------
+    get_cf_specs_encoding
     """
     if ds is not None and not isinstance(ds, str):
-        for source in ds.encoding, ds.attrs:
-            for attr, value in source.items():
-                if attr.lower() == "cfspecs":
-                    return get_cf_specs_from_name(value.lower(), errors="warn")
+        name = get_cf_specs_encoding(ds)
+        if name is not None:
+            return get_cf_specs_from_name(name, errors="warn")
 
 
 def get_default_cf_specs(cache="rw"):
@@ -3026,10 +3051,8 @@ def assign_cf_specs(ds, name=None):
         else:
             return ds
     elif hasattr(name, "coords"):  # from a dataset/dataarray
-        cfspecs = infer_cf_specs(name, named=True)
-        if cfspecs:
-            name = cfspecs.name
-        else:
+        name = get_cf_specs_encoding(ds)
+        if name is None:
             return ds
     if not isinstance(name, str):
         if not name.name:
