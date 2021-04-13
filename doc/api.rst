@@ -7,14 +7,15 @@ API Reference
 
     xoa
     xoa.accessors
-    xoa.misc
-    xoa.color
     xoa.cf
-    xoa.coords
-    xoa.sigma
-    xoa.grid
-    xoa.regrid
-    xoa.filter
-    xoa.interp
     xoa.cfgm
     xoa.cli
+    xoa.color
+    xoa.coords
+    xoa.filter
+    xoa.geo
+    xoa.grid
+    xoa.interp
+    xoa.misc
+    xoa.regrid
+    xoa.sigma

@@ -23,6 +23,7 @@ import math
 import numpy as np
 import numba
 
+from .geo import _haversine_
 
 NOT_CI = os.environ.get("CI", "false") == "false"
 
@@ -528,34 +529,6 @@ def cellave1d(vari, yib, yob, conserv=False, extrap="no"):
 
 # %% 2D routines
 
-@numba.vectorize
-def haversine(lon0, lat0, lon1, lat1):
-    """Haversine distance between two points on a unit sphere
-
-    Parameters
-    ----------
-    lon0: float, array_like
-        Longitude of the first point(s)
-    lat0: float, array_like
-        Latitude of the first point(s)
-    lon1: float, array_like
-        Longitude of the second point(s)
-    lat1: float, array_like
-        Latitude of the second point(s)
-
-    Return
-    ------
-    float, array_like
-        Distance(s)
-    """
-    deg2rad = np.pi / 180.
-    dist = math.sin(deg2rad*(lat0-lat1)*0.5)**2
-    dist += (math.cos(deg2rad*lat0) * math.cos(deg2rad*lat1) *
-             math.sin(deg2rad*(lon0-lon1)*0.5)**2)
-    dist = 2. * math.asin(math.sqrt(dist))
-    return dist
-
-
 @numba.njit(fastmath=True)
 def closest2d(xxi, yyi, xo, yo):
     """Find indices of closest point on 2D lon/lat grid
@@ -580,10 +553,12 @@ def closest2d(xxi, yyi, xo, yo):
     """
     nyi, nxi = xxi.shape
     mindist = np.pi
-    for it in range(0, nxi):
-        for jt in range(0, nyi):
-            dist = haversine(xo, yo, xxi[jt, it], yyi[jt, it])
-            if dist < mindist:
+    i = 0
+    j = 0
+    for jt in range(0, nyi):
+        for it in range(0, nxi):
+            dist = _haversine_(xo, yo, xxi[jt, it], yyi[jt, it])
+            if dist <= mindist:
                 i = it
                 j = jt
                 mindist = dist
@@ -694,9 +669,10 @@ def grid2relloc(xxi, yyi, xo, yo):
 
     # Find the closest corner
     ic, jc = closest2d(xxi, yyi, xo, yo)
+
     # Curvilinear to rectangular with a loop on four candidate cells
-    for j in range(max(jc-1, 0), min(jc+1, nyi-2)):
-        for i in range(max(ic-1, 0), min(ic+1, nxi-2)):
+    for j in range(max(jc-1, 0), min(jc+1, nyi-1)):
+        for i in range(max(ic-1, 0), min(ic+1, nxi-1)):
 
             # Get relative position
             a, b = cell2relloc(
@@ -710,7 +686,6 @@ def grid2relloc(xxi, yyi, xo, yo):
                 p = np.float64(i) + a
                 q = np.float64(j) + b
                 return p, q
-
     return p, q
 
 
@@ -748,7 +723,7 @@ def grid2rellocs(xxi, yyi, xo, yo):
     return pp, qq
 
 
-@numba.njit(parallel=NOT_CI, cache=NOT_CI)
+@numba.njit(parallel=False, cache=NOT_CI)
 def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     """Linear interpolation of gridded data to random positions
 
@@ -814,6 +789,7 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
                 (nyi != 1 and (yo[io] < yimin or yo[io] > yimax)) or
                 (nzi != 1 and (zo[io] < zimin or zo[io] > zimax)) or
                 (nti != 1 and (to[io] < timin or to[io] > timax))):
+            # print('outside limits')
             continue
 
         # Weights
@@ -821,6 +797,8 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
 
             p, q = grid2relloc(xxi, yyi, xo[io], yo[io])
             if p < 0 or p > nxi-1 or q < 0 or q > nyi-1:
+                # print('outside cells')
+                print(xo[io], yo[io])
                 continue  # outside the grid
             i = int(p)
             j = int(q)
@@ -946,7 +924,7 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
                         npk[ie] = 1
                     else:
                         c[ie] = ((zo[io]-zi[ie, k[ie]]) /
-                                 (zi[ie, k[ie]+1] - zi[ie, k[ie]]))
+                                  (zi[ie, k[ie]+1] - zi[ie, k[ie]]))
                         npk[ie] = 2
 
         # Interpolate
@@ -963,11 +941,11 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
                                 vo[ie % nex, io] = (
                                     vo[ie % nex, io] +
                                     vi[ie % nex,
-                                       l+ll, k[ie % nexz]+kk, j+jj, i+ii] *
+                                        l+ll, k[ie % nexz]+kk, j+jj, i+ii] *
                                     ((1-a) * (1-ii) + a * ii) *
                                     ((1-b) * (1-jj) + b * jj) *
                                     ((1-c[ie % nexz]) *
-                                     (1-kk) + c[ie % nexz] * kk) *
+                                      (1-kk) + c[ie % nexz] * kk) *
                                     ((1-d) * (1-ll) + d * ll))
 
     return vo

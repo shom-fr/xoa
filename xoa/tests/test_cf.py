@@ -694,10 +694,12 @@ def test_cf_cfspecs_decode_encode():
     assert list(dsc.coords) == [
         'y_rho', 'y_v', 'lat_rho', 'lat_u', 'lat_v', 'lon_rho', 'lon_u', 'lon_v',
         'sig_rho', 'sig_w', 'time', 'x_rho', 'x_u']
-    assert list(dsc.dims) == ['auxil', 'sig_rho', 'sig_w', 'time', 'x_rho', 'x_u', 'y_rho', 'y_v']
+    assert list(dsc.dims) == [
+        'auxil', 'sig_rho', 'sig_w', 'time', 'x_rho', 'x_u', 'y_rho', 'y_v']
 
     dse = cfspecs.encode(dsc)
     assert list(dse) == list(ds)
+    print(cfspecs.coords["sig"])
     assert list(dse.coords) == list(ds.coords)
     assert list(dse.dims) == list(ds.dims)
     ds.close()
