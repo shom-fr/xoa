@@ -37,3 +37,13 @@ Print only info about paths:
 .. command-output:: xoa info paths
 
 
+:command:`xoa reset_cf_cache`
+=============================
+
+.. argparse::
+    :module: xoa.cli
+    :func: get_parser
+    :prog: xoa
+    :path: reset_cf_cache
+
+

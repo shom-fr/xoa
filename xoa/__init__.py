@@ -57,13 +57,11 @@ cmapcyc = string(default="cmo.phase")   # default cyclic colormap
 
 #: Default xoa user configuration file
 DEFAULT_USER_CONFIG_FILE = os.path.join(
-    appdirs.user_data_dir("xoa"), "xoa.cfg"
+    appdirs.user_config_dir("xoa"), "xoa.cfg"
 )
 
 # Directory of sample files
 _SAMPLE_DIR = os.path.join(os.path.dirname(__file__), '_samples')
-
-_CACHE = {}
 
 _PACKAGES = [
     "appdirs",
@@ -106,6 +104,13 @@ def xoa_warn(message, stacklevel=2):
     warnings.warn(message, XoaWarning, stacklevel=stacklevel)
 
 
+def _get_cache_():
+    from . import __init__
+    if not hasattr(__init__, "_XOA_CACHE"):
+        __init__._XOA_CACHE = {}
+    return  __init__._XOA_CACHE
+
+
 def load_options(cfgfile=None):
     """Load specified options
 
@@ -126,40 +131,43 @@ def load_options(cfgfile=None):
         optlines = "[plot]\\n cmappos=mycmap".split('\\n')
         load_options(optlines)
     """
+    _get_cache_()
+    xoa_cache = _get_cache_()
 
-    if "cfgspecs" not in _CACHE:
-        _CACHE["cfgspecs"] = configobj.ConfigObj(
+    if "cfgspecs" not in xoa_cache:
+        xoa_cache["cfgspecs"] = configobj.ConfigObj(
             CONFIG_SPECS.split("\n"),
             list_values=False,
             interpolation=False,
             raise_errors=True,
             file_error=True,
         )
-    if "options" not in _CACHE:
-        _CACHE["options"] = configobj.ConfigObj(
+    if "options" not in xoa_cache:
+        xoa_cache["options"] = configobj.ConfigObj(
             (
                 DEFAULT_USER_CONFIG_FILE
                 if os.path.exists(DEFAULT_USER_CONFIG_FILE)
                 else None
             ),
-            configspec=_CACHE["cfgspecs"],
+            configspec=xoa_cache["cfgspecs"],
             file_error=False,
             raise_errors=True,
             list_values=True,
         )
     if cfgfile:
-        _CACHE["options"].merge(
+        xoa_cache["options"].merge(
             configobj.ConfigObj(
                 cfgfile, file_error=True, raise_errors=True, list_values=True
             )
         )
-    _CACHE["options"].validate(validate.Validator(), copy=True)
+    xoa_cache["options"].validate(validate.Validator(), copy=True)
 
 
 def _get_options_():
-    if "options" not in _CACHE:
+    xoa_cache = _get_cache_()
+    if "options" not in xoa_cache:
         load_options()
-    return _CACHE["options"]
+    return xoa_cache["options"]
 
 
 def get_option(section, option=None):
@@ -223,9 +231,11 @@ class set_options(object):
     """
 
     def __init__(self, section=None, **options):
-        # Fromat before being ingested
-        self.old_options = _CACHE.get("options")
-        del _CACHE["options"]
+        # Format before being ingested
+        self.xoa_cache = _get_cache_()
+        self.old_options = self.xoa_cache.get("options")
+        if "options" in self.xoa_cache:
+            del self.xoa_cache["options"]
         opts = {}
         for option, value in options.items():
             m = _RE_OPTION_MATCH(option)
@@ -234,8 +244,7 @@ class set_options(object):
             else:
                 if section is None:
                     raise XoaConfigError(
-                        "You must specify the section explicitly or "
-                        "through the the option name")
+                        "You must specify the section explicitly or through the option name")
                 sec = section
             opts.setdefault(sec, {})[option] = value
 
@@ -243,13 +252,13 @@ class set_options(object):
         load_options(opts)
 
     def __enter__(self):
-        return _CACHE["options"]
+        return self.xoa_cache["options"]
 
     def __exit__(self, type, value, traceback):
         if self.old_options:
-            _CACHE["options"] = self.old_options
+            self.xoa_cache["options"] = self.old_options
         else:
-            del _CACHE["options"]
+            del self.xoa_cache["options"]
 
 
 def set_option(option, value):
@@ -288,7 +297,8 @@ def reset_options():
         reset_options()
         print(get_option('plot.cmapdiv'))
     """
-    del _CACHE['options']
+    xoa_cache = _get_cache_()
+    del xoa_cache['options']
 
 
 def show_options(specs=False):

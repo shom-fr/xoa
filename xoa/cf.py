@@ -28,6 +28,7 @@ import re
 import operator
 import pprint
 import fnmatch
+import copy
 
 import appdirs
 
@@ -61,14 +62,6 @@ _CF_DICT_MERGE_KWARGS = dict(
     unique=True
 )
 
-_CACHE = {
-    "current": None,     # current active specs
-    "default": None,     # default xoa specs
-    "loaded_dicts": {},  # for pure caching of dicts by key
-    "registered": []     # for registration and matching purpose
-}
-
-
 ATTRS_PATCH_MODE = Choices(
     {'fill': 'do not erase existing attributes, just fill missing ones',
      'replace': 'replace existing attributes'},
@@ -79,6 +72,18 @@ ATTRS_PATCH_MODE = Choices(
 
 class XoaCFError(XoaError):
     pass
+
+
+def _get_cache_():
+    from . import cf
+    if not hasattr(cf, "_CF_CACHE"):
+        cf._CF_CACHE = {
+            "current": None,     # current active specs
+            "default": None,     # default xoa specs
+            "loaded_dicts": {},  # for pure caching of dicts by key
+            "registered": []     # for registration and matching purpose
+        }
+    return  cf._CF_CACHE
 
 
 def _compile_sg_match_(re_match, attrs, formats, root_patterns,
@@ -599,10 +604,12 @@ class CFSpecs(object):
     name: str, None
         Assign a shortcut name. It defaults the the `[register] name`
         option of the specs.
+    cache: bool
+        Use in-memory cache system?
 
     """
 
-    def __init__(self, cfg=None, default=True, user=True, name=None):
+    def __init__(self, cfg=None, default=True, user=True, name=None, cache=None):
 
         # Initialiase categories
         self._cfs = {}
@@ -617,7 +624,7 @@ class CFSpecs(object):
         self._cfgs = []
         self._load_default = default
         self._load_user = user
-        self.load_cfg(cfg)
+        self.load_cfg(cfg, cache=cache)
 
     def _load_cfg_as_dict_(self, cfg, cache=None):
         """Load a single cfg, validate it and return it as a dict
@@ -644,15 +651,16 @@ class CFSpecs(object):
                            (isinstance(cfg, dict) and "register" in cfg and
                             cfg["register"]["name"]))
         if cache:
+
             # Init cache
             if isinstance(cfg, str):
                 cache_key = cfg
-            elif (isinstance(cfg, dict) and "register" in cfg and
-                  cfg["register"]["name"]):
+            elif (isinstance(cfg, dict) and "register" in cfg and cfg["register"]["name"]):
                 cache_key = cfg["register"]["name"]
-            if cache_key in _CACHE["loaded_dicts"]:
-                # print("CFG FROM CACHE: " + cfg)
-                return _CACHE["loaded_dicts"][cfg]
+            cf_cache = _get_cache_()
+            if cache_key in cf_cache["loaded_dicts"]:
+                # a copy is needed because of the post processing
+                return copy.deepcopy(cf_cache["loaded_dicts"][cache_key])
 
         # Check input type
         if isinstance(cfg, str) and '\n' in cfg:
@@ -665,7 +673,8 @@ class CFSpecs(object):
 
         # Cache it
         if cache:
-            _CACHE["loaded_dicts"][cache_key] = cfg_dict
+            # a copy is needed because of the post processing
+            cf_cache["loaded_dicts"][cache_key] = copy.deepcopy(cfg_dict)
 
         return cfg_dict
 
@@ -2477,11 +2486,12 @@ for meth in ('get_axis', 'get_dim_type', 'get_dim_types',
 def _get_cfgm_():
     """Get a :class:`~xoa.cfgm.ConfigManager` instance to manage
     coords and data_vars spécifications"""
-    if "cfgm" not in _CACHE:
+    cf_cache = _get_cache_()
+    if "cfgm" not in cf_cache:
         from .cfgm import ConfigManager
 
-        _CACHE["cfgm"] = ConfigManager(_INIFILE)
-    return _CACHE["cfgm"]
+        cf_cache["cfgm"] = ConfigManager(_INIFILE)
+    return cf_cache["cfgm"]
 
 
 def get_matching_item_specs(da, loc="any"):
@@ -2599,17 +2609,18 @@ class set_cf_specs(object):
                 cf_source = cfspecs
         if not isinstance(cf_source, CFSpecs):
             cf_source = CFSpecs(cf_source)
-        self.old_specs = _CACHE["current"]
-        _CACHE["current"] = self.specs = cf_source
+        self.cf_cache = _get_cache_()
+        self.old_specs = self.cf_cache["current"]
+        self.cf_cache["current"] = self.specs = cf_source
 
     def __enter__(self):
         return self.specs
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.old_specs is None:
-            del _CACHE["current"]
+            del self.cf_cache["current"]
         else:
-            _CACHE["current"] = self.old_specs
+            self.cf_cache["current"] = self.old_specs
 
 
 def reset_cache(disk=True, memory=False):
@@ -2629,10 +2640,11 @@ def reset_cache(disk=True, memory=False):
         os.remove(USER_CF_CACHE_FILE)
 
     if memory:
-        _CACHE["loaded_dicts"].clear()
-        _CACHE["current"] = None
-        _CACHE["default"] = None
-        _CACHE["registered"].clear()
+        cf_cache = _get_cfgm_()
+        cf_cache["loaded_dicts"].clear()
+        cf_cache["current"] = None
+        cf_cache["default"] = None
+        cf_cache["registered"].clear()
 
 
 def show_cache():
@@ -2654,7 +2666,8 @@ def get_cf_specs_from_name(name, errors="warn"):
     CFSpecs or None
         Issue a warning if not found
     """
-    for cfspecs in _CACHE["registered"][::-1]:
+    cf_cache = _get_cache_()
+    for cfspecs in cf_cache["registered"][::-1]:
         if cfspecs["register"]["name"] and cfspecs["register"]["name"] == name.lower():
             return cfspecs
     errors = ERRORS[errors]
@@ -2703,8 +2716,9 @@ def get_default_cf_specs(cache="rw"):
     elif cache is False:
         cache = "ignore"
     assert cache in ("ignore", "rw", "read", "write", "clean")
-    if _CACHE["default"] is not None:
-        return _CACHE["default"]
+    cf_cache = _get_cache_()
+    if cf_cache["default"] is not None:
+        return cf_cache["default"]
     cfspecs = None
 
     # Try from disk cache
@@ -2738,7 +2752,7 @@ def get_default_cf_specs(cache="rw"):
             except Exception as e:
                 xoa_warn("Error while caching cf specs: " + str(e.args))
 
-    _CACHE["default"] = cfspecs
+    cf_cache["default"] = cfspecs
     if not is_registered_cf_specs(cfspecs):
         register_cf_specs(cfspecs)
     return cfspecs
@@ -2793,9 +2807,10 @@ def get_cf_specs(name=None, cache="rw"):
 
     # Not named => current or default specs
     if name == "current":
-        if _CACHE["current"] is None:
-            _CACHE["current"] = get_default_cf_specs()
-        cfspecs =  _CACHE["current"]
+        cf_cache = _get_cache_()
+        if cf_cache["current"] is None:
+            cf_cache["current"] = get_default_cf_specs()
+        cfspecs =  cf_cache["current"]
     else:
         cfspecs = get_default_cf_specs()
 
@@ -2813,8 +2828,9 @@ def register_cf_specs(*args, **kwargs):
     for cfspecs in args:
         if not isinstance(cfspecs, CFSpecs):
             cfspecs = CFSpecs(cfspecs)
-        if cfspecs not in _CACHE["registered"]:
-            _CACHE["registered"].append(cfspecs)
+        cf_cache = _get_cache_()
+        if cfspecs not in cf_cache["registered"]:
+            cf_cache["registered"].append(cfspecs)
 
 
 def get_registered_cf_specs(current=True, reverse=True, named=False):
@@ -2837,11 +2853,12 @@ def get_registered_cf_specs(current=True, reverse=True, named=False):
     --------
     register_cf_specs
     """
-    cfl = _CACHE["registered"]
+    cf_cache = _get_cache_()
+    cfl = cf_cache["registered"]
     if reverse:
         cfl = cfl[::-1]
-    if current and _CACHE["current"] is not None:
-        cfl.append(_CACHE["current"])
+    if current and cf_cache["current"] is not None:
+        cfl.append(cf_cache["current"])
     if named:
         cfl = [c for c in cfl if c.name]
     return cfl
@@ -2878,7 +2895,7 @@ def get_cf_specs_matching_score(ds, cfspecs):
     Return
     ------
     float
-        A percentage of the number of identified data arrays vs 
+        A percentage of the number of identified data arrays vs
         the total number of data arrays
     """
     hit = 0
