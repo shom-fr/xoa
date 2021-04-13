@@ -267,10 +267,12 @@ class shift_directions(misc.IntEnumChoices, metaclass=misc.XEnumMeta):
     left = -1
     bottom = -1
     south = -1
+    low = -1
     #: To the right/top/north
     right = 1
     top = 1
     north = 1
+    high = 1
 
 
 def shift(da, shift_dirs, mode="edge", **kwargs):
@@ -311,14 +313,12 @@ def shift(da, shift_dirs, mode="edge", **kwargs):
     return get_centers(da, list(shift_dirs.keys()))
 
 
-def _get_diff_(da, dim):
-    dao = da.isel({dim: slice(None, -1)})
-    dao = 0.5 * da.diff(dim).values
-    return dao
+def _diff_(da, dim):
+    return da.diff(dim)
 
 
-def get_diff(da, dim):
-    """Get the difference between consecutive grid points
+def diff(da, dim):
+    """Compute the difference between consecutive grid points
 
     .. note:: Coordinates are centered between grid point with :func:`get_centers`
 
@@ -338,7 +338,7 @@ def get_diff(da, dim):
     get_centers
     apply_along_dim
     """
-    return apply_along_dim(da, dim, _get_diff_, coord_func=_get_centers_)
+    return apply_along_dim(da, dim, _diff_, coord_func=_get_centers_)
 
 
 class dz2depth_ref_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
