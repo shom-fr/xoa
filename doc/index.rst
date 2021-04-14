@@ -15,8 +15,8 @@
    :hidden:
 
    uses
-   cli
    examples
+   cli
 
 
 .. toctree::

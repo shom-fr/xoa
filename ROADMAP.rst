@@ -68,7 +68,7 @@ accelarated with numba.
 They are designed to provide efficient and pure numeric routines
 to perform interpolations that are not provided by other packages
 because of the complex ocean coordinates.
-The :func:`xoa.regrid` module is intended to provide routines that help
+The :mod:`xoa.regrid` module is intended to provide routines that help
 calling the low level routines with xarray data and coordinates.
 
 Graphics
