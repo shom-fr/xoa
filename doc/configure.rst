@@ -5,7 +5,7 @@ List of xoa options
 ===================
 
 Some options are accessible to alter the default behavior of xoa.
-These options are of particular **type** and have a **default value**,
+These options are of a particular **type** and have a **default value**,
 as shown in the following table.
 
 .. include:: genoptions/table.txt

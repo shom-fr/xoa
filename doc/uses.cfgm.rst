@@ -1,4 +1,4 @@
-.. _usages.cfgm:
+.. _uses.cfgm:
 
 Config management with  :mod:`xoa.cfgm`
 #######################################
@@ -189,24 +189,29 @@ The result is the following.
 
 .. include:: uses.cfgm.cfg2rst.txt
 
-These above sphinx declarations need two objet types to be declared, either
-in the :file:`conf.py` file of the documentation or
-in an home-made extension::
+These above sphinx declarations need two objet types to be declared::
 
-    def setup(app):
-
-        app.add_css_file('custom.css')
-
-        app.add_object_type('confopt', 'confopt',
-                            objname='configuration option',
-                            indextemplate='pair: %s; configuration option')
-        app.add_object_type('confsec', 'confsec',
-                            objname='configuration section',
-                            indextemplate='pair: %s; configuration section')
+    app.add_object_type('confopt', 'confopt',
+                        objname='configuration option',
+                        indextemplate='pair: %s; configuration option')
+    app.add_object_type('confsec', 'confsec',
+                        objname='configuration section',
+                        indextemplate='pair: %s; configuration section')
 
 The name of these types are parameters of the
 :func:`~xoa.cfgm.cfg2rst` function
-(and :func:`~xoa.cfgm.CofigManager.get_rst` method).
+(and :func:`xoa.cfgm.ConfigManager.get_rst` method).
 
-Combined with a little sphinx extension, one can easily
-document a python package configuration system.
+Fortunately, the :mod:`xoa.cfgm` comes also as a **Sphinx extension**:
+
+- Add ``"xoa.cfgm"`` to the list of Sphinx extensions that are declared in the :file:`conf.py` file.
+- Declare the following Sphinx config variables in the :file:`conf.py`:
+
+  .. confval:: cfgm_get_cfgm_func
+
+     Function that returns a :class:`xoa.cfgm.ConfigManager` instance.
+
+  .. confval:: cfgm_rst_file
+
+     Name of the outfile file in which rst declarations are written.
+

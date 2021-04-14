@@ -93,10 +93,10 @@ intersphinx_mapping = {
     }
 
 # %% Napoleon
-napoleon_use_admonition_for_examples = True
+napoleon_use_admonition_for_examples = False
 napoleon_use_admonition_for_notes = True
-napoleon_use_admonition_for_references = True
-napoleon_use_rtype = True
+napoleon_use_admonition_for_references = False
+napoleon_use_rtype = False
 
 # %% genoptions
 genoptions_table = 'genoptions/table.txt'
@@ -117,3 +117,6 @@ def setup(app):
     app.add_object_type('confsec', 'confsec',
                         objname='configuration section',
                         indextemplate='pair: %s; configuration section')
+    app.add_object_type('confval', 'confval',
+                        objname='sphinx configuration value',
+                        indextemplate='pair: %s; sphinx configuration value')

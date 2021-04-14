@@ -122,7 +122,7 @@ def get_extent(extent, margin=0, square=False):
     extent: xarray.DataArray, xarray.Dataset, dict, tuple, list
         Either:
 
-        - Array or dataset with longitude and latitude coordinates.
+        - An array or dataset with longitude and latitude coordinates.
         - A dict with ``lon`` and ``lat`` keys: ``dict(lon=..., lat=...)``
         - A two-element tuple of longitudes and latitudes: ``(lon, lat)``
         - A extent list: ``[xmin, xmax, ymin, ymax]``.

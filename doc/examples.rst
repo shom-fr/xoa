@@ -22,4 +22,5 @@ on `mybinder <http://mybinder.org>`_!
 .. toctree::
     :maxdepth: 1
 
-    examples/croco_read_plot_section.ipynb
+    examples/croco_section.ipynb
+    examples/hycom_gdp.ipynb

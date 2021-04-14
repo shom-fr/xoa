@@ -58,7 +58,7 @@ def get_iminmax(data1d):
     return imin, imax
 
 
-@numba.njit(parallel=NOT_CI, cache=NOT_CI)
+@numba.njit(parallel=False, cache=NOT_CI)
 def nearest1d(vari, yi, yo):
     """Nearest interpolation of nD data along an axis with varying coordinates
 
@@ -130,7 +130,7 @@ def nearest1d(vari, yi, yo):
     return varo
 
 
-@numba.njit(parallel=NOT_CI, cache=NOT_CI)
+@numba.njit(parallel=False, cache=NOT_CI)
 def linear1d(vari, yi, yo):
     """Linear interpolation of nD data along an axis with varying coordinates
 
@@ -213,7 +213,7 @@ def linear1d(vari, yi, yo):
     return varo
 
 
-@numba.njit(parallel=NOT_CI, cache=NOT_CI)
+@numba.njit(parallel=False, cache=NOT_CI)
 def cubic1d(vari, yi, yo):
     """Cubic interpolation of nD data along an axis with varying coordinates
 
@@ -300,7 +300,7 @@ def cubic1d(vari, yi, yo):
     return varo
 
 
-@numba.njit(parallel=NOT_CI, cache=NOT_CI)
+@numba.njit(parallel=False, cache=NOT_CI)
 def hermit1d(vari, yi, yo, bias=0., tension=0.):
     """Hermitian interp. of nD data along an axis with varying coordinates
 
@@ -399,7 +399,7 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
     return varo
 
 
-@numba.njit(parallel=NOT_CI, fastmath=True)
+@numba.njit(parallel=False, fastmath=True)
 def extrap1d(vari, extrap):
     """Extrapolate valid data to the top and/or bottom
 
@@ -436,7 +436,7 @@ def extrap1d(vari, extrap):
     return varo.reshape(ishape)
 
 
-@numba.njit(parallel=NOT_CI, cache=NOT_CI)
+@numba.njit(parallel=False, cache=NOT_CI)
 def cellave1d(vari, yib, yob, conserv=False, extrap="no"):
     """Cell average regrid. of nD data along an axis with varying coordinates
 

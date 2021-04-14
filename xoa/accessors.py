@@ -80,22 +80,68 @@ class _CFAccessor_(_BasicCFAccessor_):
         return self.get(name, errors="ignore")
 
     def auto_format(self, loc=None, standardize=True):
-        """Auto-format attributes with :meth:`CFSpecs.auto_format`"""
+        """Auto-format attributes with :meth:`CFSpecs.auto_format`
+
+        Return
+        ------
+        xarray.Dataset, xarray.DataArray
+        """
         return self._cfspecs.auto_format(self._dsa, loc=loc, standardize=standardize)
 
     __call__ = auto_format
 
     def fill_attrs(self, loc=None, standardize=True):
-        """Fill attributes with :meth:`CFSpecs.fill_attrs`"""
+        """Fill attributes with :meth:`CFSpecs.fill_attrs`
+
+        Return
+        ------
+        xarray.Dataset, xarray.DataArray
+
+        See also
+        --------
+        xoa.cf.CFSpecs.fill_attrs
+        """
         return self._cfspecs.fill_attrs(self._dsa, loc=loc, standardize=standardize)
 
     def infer_coords(self, **kwargs):
+        """Infer coordinates and set them as coordinates
+
+        Return
+        ------
+        xarray.Dataset, xarray.DataArray
+
+        See also
+        --------
+        xoa.cf.CFSpecs.infer_coords
+        """
         return self.cfspecs.infer_coords(self._dsa, **kwargs)
 
     def decode(self, **kwargs):
+        """Rename variables and coordinates to generic names
+
+        Return
+        ------
+        xarray.Dataset, xarray.DataArray
+
+        See also
+        --------
+        xoa.cf.CFSpecs.decode
+        """
         return self.cfspecs.decode(self._dsa, **kwargs)
 
     def encode(self, **kwargs):
+        """Rename variables and coordinates to specialized names
+
+        If no specialized name is declared, generic names are used.
+
+        Return
+        ------
+        xarray.Dataset, xarray.DataArray
+
+        See also
+        --------
+        xoa.cf.CFSpecs.encode
+        """
         return self.cfspecs.encode(self._dsa, **kwargs)
 
     @property

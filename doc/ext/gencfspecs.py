@@ -20,20 +20,27 @@ roles = {
     }
 
 
-def add_items(rst, data):
+def add_items(rst, data, indent=0, subformat='[`{key}`]'):
+    rst += "\t"*indent + ".. list-table::\n\n"
+    nest = {}
     for key, value in data.items():
         if key in skip_keys:
             continue
         if isinstance(value, dict):
-            rst = add_items(rst, value)
+            nest[key] = value
         else:
             if isinstance(value, list):
                 value = " ".join(f"``{v!r}``" for v in value)
             else:
                 value = f"``{value!r}``"
-            rst += f"\t    * - **{key}**\n"
-            rst += f"\t      - {value}\n"
-        return rst
+            rst += "\t"*indent + f"    * - **{key}**\n"
+            rst += "\t"*indent + f"      - {value}\n"
+
+    for key, dvalue in nest.items():
+        if dvalue:
+            rst += "\n" + "\t"*indent + f'.. rubric:: [``"{key}"``]\n\n'
+            rst = add_items(rst, dvalue, indent=indent)
+    return rst
 
 
 def genrst(app):
@@ -67,8 +74,7 @@ def genrst(app):
                 title += "\n" + len(title) * "="
                 rst = title + "\n\n"
                 rst += f".. {role}:: {cfname}\n\n"
-                rst += "\t.. list-table::\n\n"
-                rst = add_items(rst, cfspecs[cfcat][cfname])
+                rst = add_items(rst, cfspecs[cfcat][cfname], indent=1)
                 f.write(rst)
 
             # Append to table
@@ -113,7 +119,5 @@ def setup(app):
         'cfdim', 'cfdim',
         objname='xoa.cf CFSpecs.coords.dims item',
         indextemplate='pair: %s; xoa.cf CFSpecs.coords.dims item')
-
-    app.connect('builder-inited', genrst)
 
     return {'version': '0.1'}

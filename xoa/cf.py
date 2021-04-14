@@ -1187,12 +1187,12 @@ class CFSpecs(object):
         return self.format_data_var(dsa, **kwargs)
 
     def decode(self, dsa, **kwargs):
-        """Auto format and infer coordinates
+        """Auto format, infer coordinates and rename to generic names
 
         See also
         --------
         auto_format
-        decode
+        encode
         format_dataarray
         format_dataset
         fill_attrs

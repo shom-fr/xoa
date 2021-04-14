@@ -1,13 +1,14 @@
-.. _usages.cf:
+.. _uses.cf:
 
-CF compliant data with :mod:`xoa.cf`
-####################################
+Naming conventions with :mod:`xoa.cf`
+#####################################
 
 Introduction
 ============
 
 This module is an application and extension of a subset of the
-`CF conventions <http://cfconventions.org/>`_.
+`CF conventions <http://cfconventions.org/>`_ in application
+to naming conventions.
 It has two intents:
 
 * Searching :class:`xarray.DataArray` variables or coordinates with another
@@ -23,14 +24,14 @@ default behaviors for user's special datasets.
 
 .. note:: This module shares common feature with the excellent and long
     awaited `xf_xarray <https://cf-xarray.readthedocs.io/en/latest/>`_
-    package, but started a long time before with the Vacumm package.
-    Among the main differences are :
+    package and started a long time before with the Vacumm package.
+    The most differences differences include:
 
     - The current module is also designed for data variables, not only
       coordinates.
     - It is not only available as accessors, but also as independant
       objects that can be configured for each type of dataset or in
-      contexts.
+      contexts by the user.
 
 Accessing the current specifications
 ====================================
@@ -74,10 +75,10 @@ Description of specification keys:
     * - Key
       - Type
       - Description
-    * - name
+    * - ``name``
       - str
       - Specialized name for decoding and encoding which is empty by default
-    * - alt_name
+    * - ``alt_names``
       - list(str)
       - Alternate names for decoding
     * - ``standard_name``
@@ -100,7 +101,7 @@ Description of specification keys:
       - Colormap specification
     * - ``inherit``
       - str
-      - Inherit specification from another data variable
+      - Inherit specifications from another data variable
     * - ``select``
       - eval
       - Item selection evaluated and applied to the array
@@ -109,7 +110,7 @@ Description of specification keys:
       - List of dimensions that must be squeezed out
 
 .. note:: The ``standard_name``, ``long_name`` and ``units`` specifications are
-    internally stored in as a dict in the ``attrs`` key.
+    internally stored as a dict in the ``attrs`` key.
 
 Get name and attributes only:
 
@@ -134,10 +135,10 @@ Description of specification keys:
     * - Key
       - Type
       - Description
-    * - name
+    * - ``name``
       - str
       - Specialized name for decoding and encoding which is empty by default
-    * - alt_name
+    * - ``alt_names``
       - list(str)
       - Alternate names for decoding
     * - ``standard_name``
@@ -157,10 +158,10 @@ Description of specification keys:
       - Search order within properties as combination of letters: `[n]name`, `[s]tandard_name`, `[u]nits`
     * - ``inherit``
       - str
-      - Inherit specification from another data variable
+      - Inherit specifications from another data variable or coordinate
 
-.. note:: The ``standard_name``, ``long_name``, ``units`` and ``axis`` specifications are
-    internally stored in as a dict in the ``attrs`` key.
+.. note:: Like for data variables, the ``standard_name``, ``long_name``, ``units``
+    and ``axis`` specifications are internally stored as a dict in the ``attrs`` key.
 
 Get name and attributes only:
 
@@ -230,13 +231,16 @@ Formatting i.e encoding and decoding
 
 The idea
 --------
-Formatting means changing ot setting names and attributes.
+Formatting means changing or setting names and attributes.
 It is possible to format, or even auto-format data variables and coordinates.
 
 During an auto-formatting, each array is matched against CF specs,
 and the array is formatted when a matching is successfull.
 If the array contains coordinates, the same process is applied on them,
 as soon as the ``format_coords`` keyword is ``True``.
+If the ``name`` key is set in the matching item specs, its value is used
+to name the variable or coordinate array, else the generic name is used
+like ``"lon"``.
 
 **Explicit formatting:**
 
@@ -263,7 +267,7 @@ It can be applied to a data array or a full dataset.
 Encoding and decoding
 ---------------------
 
-By default, formatting rename known arrays to their generic name,
+By default, formatting renames known arrays to their generic name,
 like "temp" in the example above. We speak here of **encoding**.
 If the ``specialize`` keyword is set to ``True``, arrays are
 renamed with their specialized name if set in the specs with the ``name`` key.
@@ -274,6 +278,8 @@ Two shortcut methods exists for these tasks:
 - Encoding: :meth:`~xoa.cf.CFSpecs.encode`
 
 Chaining the two methods should lead to the initial dataset or data array.
+See the last section of this page for an exemple:
+:ref:`uses.cf.croco`.
 
 
 .. seealso::
@@ -291,15 +297,15 @@ can be registered with the :func:`xoa.cf.register_cf_accessors`:
     import xoa
     xoa.register_accessors(cf="xcf")
 
-The accessor is named here `xcf` to no conflict with the
-`cf` accessor of
+The accessor is named here :class:`xcf <~xoa.accessors.CFDatasetAccessor>` to not conflict with the
+:class:`cf` accessor of
 `cf-xarray <https://cf-xarray.readthedocs.io/en/latest/>`_.
 
 
 .. note:: All xoa accessors can be be registered with
-    :func:`xoa.egister_accessors`. Note also that all functionalities
+    :func:`xoa.register_accessors`. Note also that all functionalities
     of the `cf` accessor are also available with the more global
-    `xoa` accessor.
+    :class:`xoa <~xoa.accessors.XoaDatasetAccessor>` accessor.
 
 These accessors make it easy to use some of the :class:`xoa.cf.CFSpecs`
 capabilities.
@@ -363,7 +369,7 @@ From a well **structured dictionary**:
     cfspecs.data_vars["banana"]
 
 From a **configuration file**: instead of the dictionary as an argument
-to :meth:`~xoa.cf.CfSpecs.load_cfg` method, you can give either a
+to :meth:`~xoa.cf.CFSpecs.load_cfg` method, you can give either a
 file name or a **multi-line string** with the same content as
 the file.
 Following the previous example:
@@ -521,7 +527,8 @@ Inferring the best specs for my dataset
 
 If you set the :attr:`cfspecs` attribute or encoding of a dataset
 to the name of a registered :class:`~xoa.cf.CFSpecs` instance, you can
-get it automatically with the :func:`infer_cf_specs`.
+get it automatically with the :func:`~xoa.cf.get_cf_specs` or
+:func:`~xoa.cf.infer_cf_specs` functions.
 
 Let's register another :class:`~xoa.cf.CFSpecs` instance:
 
@@ -546,7 +553,7 @@ Let's create a dataset:
 
     ds = xr.Dataset({'supertemp': ("mylon", [0, 2])}, coords={"mylon": [10, 20]})
 
-Now find the best registered specs instance which has the either name
+Now find the best registered specs instance which has either the name
 ``myhycom`` or ``mycroco``:
 
 
@@ -568,7 +575,7 @@ All xoa routines that needs to access specific coordinates
 or variables try to infer the approriate specs, which default
 to the current specs.
 When the :attr:`cfspecs` **attribute** or **encoding** is set,
-:meth:`~xoa.cf.CFSpecs.get_cf_specs` uses it to search within
+:meth:`~xoa.cf.get_cf_specs` uses it to search within
 registered specs.
 
 .. ipython:: python
@@ -591,3 +598,53 @@ To propagate to all the data arrays, use :func:`~xoa.cf.assign_cf_specs`:
     cf.assign_cf_specs(ds, "mycroco")
     ds.mylon.encoding
     cf.get_cf_specs(ds.supertemp) is cfspecs
+
+
+.. _uses.cf.croco:
+
+Example: decoding/encoding Croco model outputs
+==============================================
+
+Here are the specs for Croco:
+
+.. literalinclude:: ../xoa/_samples/croco.cfg
+    :language: ini
+
+Register them:
+
+.. ipython:: python
+
+    @suppress
+    import xoa, xoa.cf
+    xoa.cf.register_cf_specs(xoa.get_data_sample("croco.cfg"))
+    xoa.cf.is_registered_cf_specs("croco")
+
+
+Register the :class:`xoa <~xoa.accessors.XoaDatasetAccessor>` accessor:
+
+.. ipython:: python
+
+    xoa.register_accessors()
+
+Now let's open a Croco sample as a xarray dataset:
+
+.. ipython:: python
+
+    ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
+    ds
+
+Let's **decode** it:
+
+.. ipython:: python
+
+    dsd = ds.xoa.decode()
+    dsd
+
+Let's **re-encode** it!
+
+.. ipython:: python
+
+    dse = ds.xoa.encode()
+    dse
+
+Et voilà !
