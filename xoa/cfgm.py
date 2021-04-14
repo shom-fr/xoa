@@ -32,6 +32,7 @@ from argparse import HelpFormatter as ArgHelpFormatter
 from argparse import _HelpAction
 from collections import OrderedDict
 from warnings import warn
+import logging
 
 import validate
 from configobj import ConfigObj, flatten_errors
@@ -2209,3 +2210,38 @@ class _AP_VeryShortHelpAction(_HelpAction):
     def __call__(self, parser, namespace, values, option_string=None):
         print_short_help(parser, compressed=True)
         parser.exit()
+
+
+# %% Sphinx extension
+
+def gen_cfgm_rst(app):
+
+    logging.info("Generating rst declarations for the ConfigManager")
+
+    rst = app.config.cfgm_get_cfgm_func().get_rst()
+
+    outfile = os.path.abspath(app.config.cfgm_rst_file)
+    outdir = os.path.dirname(outfile)
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+    with open(outfile, "w") as f:
+        f.write(rst)
+
+    logging.info("Created: " + app.config.cfgm_rst_file)
+
+
+def setup(app):
+
+    app.add_object_type('confopt', 'confopt',
+                        objname='configuration option',
+                        indextemplate='pair: %s; configuration option')
+    app.add_object_type('confsec', 'confsec',
+                        objname='configuration section',
+                        indextemplate='pair: %s; configuration section')
+
+    app.add_config_value('cfgm_get_cfgm_func', None, 'html')
+    app.add_config_value('cfgm_rst_file', 'cfgm.rst', 'html', types=[str])
+
+    app.connect('builder-inited', gen_cfgm_rst)
+
+    return {'version': '0.1'}
