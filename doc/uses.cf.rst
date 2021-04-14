@@ -644,7 +644,7 @@ Let's **re-encode** it!
 
 .. ipython:: python
 
-    dse = ds.xoa.encode()
+    dse = dsd.xoa.encode()
     dse
 
 Et voilà !
