@@ -12,7 +12,7 @@ before_install:
 - conda update -q conda
 - conda info -a
 - conda config --add channels conda-forge
-- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION appdirs cmocean configobj matplotlib-base netcdf4 numba pytest setuptools scipy xarray xesmf
+- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION appdirs cmocean configobj matplotlib-base netcdf4 numba pytest setuptools scipy xarray
 
 install:
 - source activate test-environment
