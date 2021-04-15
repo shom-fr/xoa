@@ -17,7 +17,7 @@ To this end, the library relies on the following libraries, among others:
     All numerical vectors are by default supposed to be of
     :class:`xarray.DataArray` type, i.e. with numerical values, attributes and
     potentially multi-dimensional coordinates.
-    The library adds some :ref:`CF support <usages.cf>`
+    The library adds some :ref:`CF support <uses.cf>`
     to identify known data arrays and coordinates in datasets.
 `matplotlib <https://matplotlib.org>`_ and `cartopy <https://scitools.org.uk/cartopy/docs/latest/>`_
     All plots are made with them, with an extra layer that
@@ -28,7 +28,7 @@ To this end, the library relies on the following libraries, among others:
     structured grids.
     :mod:`scipy.interpolate` helps performing interpolations
     between unstructured data.
-    :mod:`xoa.regrid` is a convenient interface to these libraries.
+    :mod:`xoa.regrid` plans to be convenient interface to these libraries.
     xoa adds missing capabilities such as the ability to make 1D interpolations
     with coordinates that varies along other dimensions, which is often
     the case for the vertical coordinate of ocean models.

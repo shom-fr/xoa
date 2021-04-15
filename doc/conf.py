@@ -48,7 +48,8 @@ extensions = [
     'gencfspecs',
     # 'genfortran',
     'sphinxarg.ext',
-    'sphinxcontrib.programoutput'
+    'sphinxcontrib.programoutput',
+    'xoa.cfgm'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -102,8 +103,10 @@ napoleon_use_rtype = False
 genoptions_table = 'genoptions/table.txt'
 genoptions_declarations = 'genoptions/declarations.txt'
 
-# %% genfortran
-#genfortran_src_files = ["api.rst"]
+# %% cfgm
+import xoa.cf
+cfgm_get_cfgm_func = xoa.cf._get_cfgm_
+cfgm_rst_file = "cf.txt"
 
 # %% User directives
 

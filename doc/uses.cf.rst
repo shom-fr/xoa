@@ -59,8 +59,22 @@ with the :func:`~xoa.cf.get_cf_specs` function:
 See the appendix :ref:`appendix.cf.default` for the
 list of available default specifications.
 
+An instance of the :class:`CFSpecs` has other configuration
+:ref:`sections <appendix.cf.sections>`
+than
+:cfgmsec:`data_vars <[data_vars]>`,
+:cfgmsec:`coords <[coords]>` and
+:cfgmsec:`dims <[dims]>`:
+:cfgmsec:`registration <[registration]>`,
+:cfgmsec:`sglocator <[sglocator]>`,
+:cfgmsec:`vertical <[vertical]>` and
+:cfgmsec:`accessors <[accessors]>`.
+
+
 Data variables
 --------------
+
+Here is the example of the :cfdatavar:`sst` data variable:
 
 .. ipython:: python
 
@@ -116,12 +130,14 @@ Get name and attributes only:
 
 .. ipython:: python
 
-    print(cfspecs.data_vars.get_name("sst"))
-    print(cfspecs.data_vars.get_attrs("sst"))
+    cfspecs.data_vars.get_name("sst")
+    cfspecs.data_vars.get_attrs("sst")
 
 
 Coordinates
 -----------
+
+Here is the example of the :cfdatavar:`lon` coordinate:
 
 .. ipython:: python
 
@@ -167,8 +183,64 @@ Get name and attributes only:
 
 .. ipython:: python
 
-    print(cfspecs.coords.get_name("lon"))
-    print(cfspecs.coords.get_attrs("lon"))
+    cfspecs.coords.get_name("lon")
+    cfspecs.coords.get_attrs("lon")
+
+
+Dimensions
+----------
+
+.. list-table:: CF specs for :ref:`appendix.cf.dims`
+
+    * - Key
+      - Type
+      - Description
+    * - ``x``
+      - list(str)
+      - Possible names of X-type dimensions
+    * - ``y``
+      - list(str)
+      - Possible names of Y-type dimensions
+    * - ``z``
+      - list(str)
+      - Possible names of Z-type vertical dimensions
+    * - ``t``
+      - list(str)
+      - Possible names of time dimensions
+    * - ``f``
+      - list(str)
+      - Possible names of forecast dimensions
+
+
+This section of the specs defines the names that the dimensions
+of type ``x``, ``y``, ``z``, ``t`` and ``f`` (forecast) can take.
+It is automatically by default with possible names (``name`` and ``alt_names``)
+of the coordinates that have their ``axis`` defined.
+The use can also add more spcific names.
+
+Theses list of names are used when searching for **dimensions that are not coordinate**:
+since they don't have attribute, their type can only guessed from their name.
+
+.. warning:: It is recommended to not fill this section by fill in
+    the coordinate section instead.
+
+Here is the content:
+
+.. ipython:: python
+
+    cfspecs.dims  # or cfspecs["dims"]
+
+
+Other sections
+--------------
+
+.. ipython:: python
+
+    cfspecs["register"]
+    cfspecs["sglocator"]
+    cfspecs["accessors"]
+    cfspecs["vertical"]
+
 
 Searching within a :class:`~xarray.Dataset` or  :class:`~xarray.DataArray`
 ==========================================================================
@@ -226,6 +298,28 @@ You can also search for coordinates in datasets, for instance like this:
       :meth:`xoa.cf.CFCoordSpecs.search` :meth:`xoa.cf.CFVarSpecs.search`
 
 
+The staggered-grid locator :class:`~xoa.cf.SGLocator`
+=====================================================
+
+A :class:`~xoa.cf.CFSpecs` instance comes with :class:`~xoa.cf.SGLocator`
+that is accessible through the :attr:`~xoa.cf.CFSpecs.sglocator` attribute.
+A :class:`~xoa.cf.SGLocator` helps parsing and formatting staggered grid
+location from :attr:`name`, :attr:`standard_name` and :attr:`long_name`
+data array attributes.
+It is configured at the :cfgmsec:`sglocator <[sglocator]>` section
+in which you can specify the
+format of the name (:cfgmopt:`name_format <[sglocator] name_format>` and
+the allowed location names :cfgmopt:`allowed_locations <[sglocator] allowed_locations>`.
+
+.. ipython:: python
+
+    sglocator = cfspecs.sglocator
+    sglocator.formats
+    sglocator.format_attr("name", "lon", "rho")
+    sglocator.format_attr("standard_name", "lon", "rho")
+    sglocator.format_attr("long_name", "lon", "rho")
+    sglocator.parse_attr("name", "lon_rho")
+
 Formatting i.e encoding and decoding
 ====================================
 
@@ -247,6 +341,7 @@ like ``"lon"``.
 .. ipython:: python
 
     cfspecs.format_coord(lon, "lon")
+    cfspecs.format_coord(lon, "lon", loc="rho")
     cfspecs.format_data_var(temp, "temp")
 
 **Auto-formatting:**
@@ -270,7 +365,8 @@ Encoding and decoding
 By default, formatting renames known arrays to their generic name,
 like "temp" in the example above. We speak here of **encoding**.
 If the ``specialize`` keyword is set to ``True``, arrays are
-renamed with their specialized name if set in the specs with the ``name`` key.
+renamed with their specialized name if set in the specs with the
+:cfgmopt:`name <[data_vars] [__many__] name>` option.
 We speak here of **decoding**.
 Two shortcut methods exists for these tasks:
 

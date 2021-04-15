@@ -2218,7 +2218,7 @@ def gen_cfgm_rst(app):
 
     logging.info("Generating rst declarations for the ConfigManager")
 
-    rst = app.config.cfgm_get_cfgm_func().get_rst()
+    rst = app.config.cfgm_get_cfgm_func().get_rst(secrole="cfgmsec", optrole="cfgmopt")
 
     outfile = os.path.abspath(app.config.cfgm_rst_file)
     outdir = os.path.dirname(outfile)
@@ -2232,10 +2232,10 @@ def gen_cfgm_rst(app):
 
 def setup(app):
 
-    app.add_object_type('confopt', 'confopt',
+    app.add_object_type('cfgmopt', 'cfgmopt',
                         objname='configuration option',
                         indextemplate='pair: %s; configuration option')
-    app.add_object_type('confsec', 'confsec',
+    app.add_object_type('cfgmsec', 'cfgmsec',
                         objname='configuration section',
                         indextemplate='pair: %s; configuration section')
 

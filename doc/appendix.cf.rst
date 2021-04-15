@@ -6,7 +6,7 @@ CF specs and defaults
 This appendix refers to the searching and formatting specifications
 for data variables and coordinates, and related tools,
 available in the :mod:`xoa.cf` module.
-Their usage is introduced in the :ref:`usages.cf` section.
+Their usage is introduced in the :ref:`uses.cf` section.
 
 .. _appendix.cf.default:
 
@@ -27,6 +27,14 @@ The configuration specifications
 All configurations are validated with these specifications.
 
 See `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_.
+
+Details
+^^^^^^^
+
+.. include:: cf.txt
+
+File
+^^^^
 
 .. literalinclude:: ../xoa/cf.ini
     :language: ini

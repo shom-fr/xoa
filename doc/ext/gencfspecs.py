@@ -12,6 +12,7 @@ cat_titles = {
     "data_vars": "Data variables (:attr:`~xoa.cf.CFSpecs.data_vars`)",
     "coords": "Coordinates (:attr:`~xoa.cf.CFSpecs.coords`)",
     "dims": "Dimensions (:attr:`~xoa.cf.CFSpecs.dims`)",
+    'sections': 'Other sections',
     }
 
 roles = {
@@ -21,7 +22,7 @@ roles = {
 
 
 def add_items(rst, data, indent=0, subformat='[`{key}`]'):
-    rst += "\t"*indent + ".. list-table::\n\n"
+    local = ""
     nest = {}
     for key, value in data.items():
         if key in skip_keys:
@@ -33,13 +34,17 @@ def add_items(rst, data, indent=0, subformat='[`{key}`]'):
                 value = " ".join(f"``{v!r}``" for v in value)
             else:
                 value = f"``{value!r}``"
-            rst += "\t"*indent + f"    * - **{key}**\n"
-            rst += "\t"*indent + f"      - {value}\n"
+            local += "\t"*indent + f"    * - **{key}**\n"
+            local += "\t"*indent + f"      - {value}\n"
+    if local:
+        rst += "\t"*indent + ".. list-table::\n\n" + local
 
     for key, dvalue in nest.items():
+        rst += "\n" + "\t"*indent + f'.. rubric:: [``"{key}"``]\n\n'
         if dvalue:
-            rst += "\n" + "\t"*indent + f'.. rubric:: [``"{key}"``]\n\n'
             rst = add_items(rst, dvalue, indent=indent)
+        else:
+            rst += "\t"*indent + "Empty dictionary\n\n"
     return rst
 
 
@@ -52,15 +57,18 @@ def genrst(app):
         os.makedirs(gendir)
 
     cfspecs = xoa.cf.get_cf_specs()
+    comments = xoa.cf._get_cfgm_().specs.inline_comments
 
     rst_tables = {}
     rst_toctrees = {}
+
+    # Data vars and coordinates
     for cfcat in ["data_vars", "coords"]:
 
         rst_tables[cfcat] = ".. list-table::\n\n"
         rst_toctrees[cfcat] = ".. toctree::\n    :hidden:\n\n"
 
-        logging.info(f"Generating rst files for xoa.cf {cfcat}specs")
+        logging.info(f"Generating rst files for xoa.cf {cfcat} specs")
         for cfname in cfspecs[cfcat]:
 
             decdir = os.path.join(gendir, cfcat)
@@ -85,22 +93,51 @@ def genrst(app):
             # Append to toctree
             rst_toctrees[cfcat] += f"    gencfspecs/{cfcat}/{cfname}\n"
 
+    # Dimensions
     rst_tables["dims"] = ".. list-table::\n\n"
     for dim_type, dims in cfspecs["dims"].items():
         rst_tables["dims"] += f"    * - :cfdim:`{dim_type}`\n"
         rst_tables["dims"] += "      - {}\n".format(
             ", ".join([f"``{dim}``" for dim in dims]))
 
+    # Other sections
+    rst_tables["sections"] = ".. list-table::\n\n"
+    rst_toctrees["sections"] = ".. toctree::\n    :hidden:\n\n"
+    for section in "register", "sglocator", "vertical", "accessors":
+
+        logging.info(f"Generating rst files for xoa.cf {section} specs")
+        with open(os.path.join(gendir, section+".rst"), "w") as f:
+            title = f':attr:`~xoa.cf.CFSpecs` [``"{section}"``]'
+            title += "\n" + len(title) * "="
+            rst = title + "\n\n"
+            rst += f".. cfsec:: {section}\n\n"
+            rst = add_items(rst, cfspecs[section], indent=1)
+            f.write(rst)
+
+        # Append to table
+        rst_tables["sections"] += f"    * - :cfsec:`{section}`\n"
+        rst_tables["sections"] += "      - {}\n".format(
+            comments[section].strip("# "))
+
+        # Append to toctree
+        rst_toctrees["sections"] += f"    gencfspecs/{section}\n"
+
+    # Write the index.txt
     with open(os.path.join(gendir, "index.txt"), "w") as f:
 
-        for cfcat in rst_tables.keys():
+        for key, title in cat_titles.items():
 
-            title = cat_titles[cfcat]
+            # Title
             title = title + "\n" + len(title)*"^"
-            f.write(f".. _appendix.cf.{cfcat}:\n\n" + title + "\n\n")
-            if cfcat in rst_toctrees:
-                f.write(rst_toctrees[cfcat]+"\n")
-            f.write(rst_tables[cfcat]+"\n\n")
+            f.write(f".. _appendix.cf.{key}:\n\n" + title + "\n\n")
+
+            # Hidden toctree
+            if key in rst_toctrees:
+                f.write(rst_toctrees[key]+"\n")
+
+            # Table
+            f.write(rst_tables[key]+"\n\n")
+
 
 
 def setup(app):
@@ -119,5 +156,12 @@ def setup(app):
         'cfdim', 'cfdim',
         objname='xoa.cf CFSpecs.coords.dims item',
         indextemplate='pair: %s; xoa.cf CFSpecs.coords.dims item')
+
+    app.add_object_type(
+        'cfsec', 'cfsec',
+        objname='xoa.cf CFSpecs section',
+        indextemplate='pair: %s; xoa.cf CFSpec section')
+
+    app.connect('builder-inited', genrst)
 
     return {'version': '0.1'}
