@@ -1397,9 +1397,11 @@ class ConfigManager(object):
 
         return shelp
 
-    def get_rst(self, mode="specs", **kwargs):
+    def to_rst(self, mode="specs", **kwargs):
         """Convert the default config to rst with :func:`cfg2rst`"""
         return cfg2rst(self, mode=mode, **kwargs)
+
+    get_rst = to_rst  # compat
 
 
 def filter_section(sec, cfgfilter, default=False):
@@ -1650,7 +1652,9 @@ def get_spec(spec, validator=None):
         A dict with keys:
 
         funcname:
-            the validation function name
+            the validation type name
+        type:
+            same as funcname
         args:
             the positionnal arguments
         kwargs:
@@ -1691,7 +1695,7 @@ def get_spec(spec, validator=None):
         funcname, dict(func=None, iterable=None, opttype=None, argtype=None)
     ).copy()
     spec.update(
-        dict(funcname=funcname, args=args, kwargs=kwargs, default=default)
+        dict(funcname=funcname, args=args, kwargs=kwargs, default=default, type=funcname)
     )
     return _attdict_(spec)
 
@@ -2080,7 +2084,7 @@ def _walker_cfg2rst_(
     mode="basic",
     validator=None,
     dir_fmt=".. {conftype}:: {name}\n\n{desc}\n",
-    desc_fmt_desc_item="| {key}: ``{val}``\n",
+    desc_fmt_desc_item="| {key}: {val}\n",
 ):
 
     assert mode in ("basic", "values", "specs")
@@ -2110,7 +2114,10 @@ def _walker_cfg2rst_(
 
             spec = get_spec(cfg[key], validator=validator)
             specs["default"] = spec["default"]
-            specs["type"] = spec["funcname"]
+            func = spec["base_func"]
+            funcpath = f"{func.__module__}.{func.__name__}"
+            funcname = spec['funcname']
+            specs["type"] = f":func:`{funcname} <{funcpath}>`"
             if spec["args"]:
                 skey = "possible choices" if name == "choice" else "args"
                 specs[skey] = spec["args"]
@@ -2134,6 +2141,8 @@ def _walker_cfg2rst_(
         for key, val in specs.items():
             if val == "":
                 val = " "
+            elif not isinstance(val, str) or not val.startswith(":"):
+                val = f"``{val!s}``"
             sdesc = sdesc + desc_fmt_desc_item.format(**locals())
         desc = sdesc + "\n" + desc
     # - directive
