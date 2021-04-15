@@ -36,16 +36,17 @@ class _BasicCFAccessor_(object):
             self._dsa = cf.assign_cf_specs(self._dsa, self._cfspecs.name)
 
     def set_cf_specs(self, cfspecs):
-        """Set the :class:`CFSpecs` using by this accessor"""
+        """Set the internal :class:`CFSpecs` used by this accessor"""
         from . import cf
         assert isinstance(cfspecs, cf.CFSpecs)
         self._cfspecs = cfspecs
         self._assign_cf_specs_()
 
     def get_cf_specs(self):
+        """Get the internal :class:`CFSpecs` instance used by this accessor"""
         return self._cfspecs
 
-    cfspecs = property(fget=get_cf_specs, fset=set_cf_specs)
+    cfspecs = property(fget=get_cf_specs, fset=set_cf_specs, doc="The CFSpecs instance")
 
 
 class _CFAccessor_(_BasicCFAccessor_):
@@ -278,7 +279,7 @@ class XoaDataArrayAccessor(CFDataArrayAccessor):
 
     @property
     def cf(self):
-        """CF subaccessor"""
+        """The :class:`CFDataArrayAccessor` subaccessor"""
         if not hasattr(self, "_cf"):
             self._cf = CFDataArrayAccessor(self._ds, self._cfspecs)
         return self._cf
@@ -288,14 +289,14 @@ class XoaDatasetAccessor(CFDatasetAccessor):
 
     @property
     def cf(self):
-        """CF subaccessor"""
+        """The :class:`CFDatasetAccessor` subaccessor"""
         if not hasattr(self, "_cf"):
             self._cf = CFDatasetAccessor(self._ds, self._cfspecs)
         return self._cf
 
     @property
     def decode_sigma(self):
-        """Sigma coordinate subacessor"""
+        """The :class:`SigmaAccessor` subaccessor for sigma coordinates"""
         if not hasattr(self, "_sigma"):
             self._sigma = SigmaAccessor(self._ds)
         return self._sigma

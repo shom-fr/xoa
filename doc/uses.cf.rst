@@ -393,15 +393,16 @@ can be registered with the :func:`xoa.cf.register_cf_accessors`:
     import xoa
     xoa.register_accessors(cf="xcf")
 
-The accessor is named here :class:`xcf <~xoa.accessors.CFDatasetAccessor>` to not conflict with the
-:class:`cf` accessor of
+The accessor is named here :class:`xcf <xoa.accessors.CFDatasetAccessor>`
+to not conflict with the :class:`cf` accessor of
 `cf-xarray <https://cf-xarray.readthedocs.io/en/latest/>`_.
 
 
 .. note:: All xoa accessors can be be registered with
     :func:`xoa.register_accessors`. Note also that all functionalities
-    of the `cf` accessor are also available with the more global
-    :class:`xoa <~xoa.accessors.XoaDatasetAccessor>` accessor.
+    of the :class:`xcf <xoa.accessors.CFDatasetAccessor>`
+    accessor are also available with the more global
+    :class:`xoa <xoa.accessors.XoaDatasetAccessor>` accessor.
 
 These accessors make it easy to use some of the :class:`xoa.cf.CFSpecs`
 capabilities.
@@ -428,7 +429,7 @@ Here are examples of use:
 
 As you can see, accessing an accessor attribute or item make an
 implicit call to :class:`~xoa.cf.DataArrayCFAccessor.get`.
-The root accessor :attr:`cf` agive accessor to
+The root accessor :attr:`cf` give access to
 two sub-accessors, :attr:`~xoa.cf.DatasetCFAccessor.data_vars`
 and :attr:`~xoa.cf.DatasetCFAccessor.coords`,
 for being able to specialize the searches.
