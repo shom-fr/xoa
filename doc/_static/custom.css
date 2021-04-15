@@ -3,8 +3,12 @@
     background: #28B934; /*hue 125 */
 }
 
+.wy-side-nav-search input[type="text"] {
+    /*border-color: #2472a4;*/
+    border-color: #24A42E;  /*hue 125 */
+    }
 
-.rst-content dl:not(.docutils) dt {
+html.writer-html4 .rst-content dl:not(.docutils) > dt, html.writer-html5 .rst-content dl[class]:not(.option-list):not(.field-list):not(.footnote):not(.glossary):not(.simple) > dt {
 	/*background: #e7f2fa;
 	color: #2980B9;
 	border-top: solid 3px #6ab0de;*/
