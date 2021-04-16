@@ -597,6 +597,7 @@ def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
         :func:`generate_kernel`.
 
     Return
+    ------
     xarray.DataArray
         Data array similar to input array, with its eroded
         along x and y dimensions.
