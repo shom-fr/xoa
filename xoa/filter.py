@@ -19,7 +19,7 @@ import numpy as np
 import xarray as xr
 
 from .__init__ import XoaError, xoa_warn
-from .coords import transpose, get_dims
+from . import coords as xcoords
 
 
 def get_window_func(window, *args, **kwargs):
@@ -424,7 +424,7 @@ def generate_kernel(
                        f"are not a subset of {data.dims}")
 
     # Finalize
-    return transpose(kernel, data, mode="insert").astype(data.dtype)
+    return xcoords.transpose(kernel, data, mode="insert").astype(data.dtype)
 
 
 def shapiro_kernel(dims):
@@ -554,11 +554,13 @@ def convolve(data, kernel, normalize=False):
 
 def _get_xydims_(data, xdim, ydim):
     if xdim is None:
-        xdim = get_dims(
-            data, 'x', allow_positional=True, errors="raise")[0]
+        xdim = xcoords.get_xdims(data, 'x', allow_positional=False, errors="raise")
+    else:
+        assert xdim in data.dims, f"Invalid x dimension: {xdim}"
     if ydim is None:
-        ydim = get_dims(
-            data, 'y', allow_positional=True, errors="raise")[0]
+        ydim = xcoords.get_ydims(data, 'y', allow_positional=False, errors="raise")
+    else:
+        assert ydim in data.dims, f"Invalid y dimension: {ydim}"
     return xdim, ydim
 
 
@@ -573,7 +575,7 @@ def _convolve_and_fill_(data, kernel):
     return data.fillna(convolve(data, kernel, normalize=True))
 
 
-def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
+def erode_mask(data, until=1, kernel=None):
     """Erode the horizontal mask using smoothing
 
     Missing values are filled with the smoothed field in a iterative way.
@@ -587,12 +589,11 @@ def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
     ----------
     data: xarray.DataArray
         Array of at least 2 dimensions, that are supposed to be horizontal.
-    until: array_like, int
+    until: xarray.DataArray, int
         Either a minimal mask, or a max number of iteration.
-    kernel:
-        Defaults to a :func:`shapiro <shapiro_kernel>` kernel.
-        In this case, ``xdim`` and ``ydim`` can be set to the
-        horizontal dimensions, otherwise they are inferred.
+    kernel: None, "shapiro", xarray.DataArray
+        Defaults to a :func:`shapiro <shapiro_kernel>` kernel designed
+        with all data dimensions.
         If ``kernel`` is provided, it must a compatible with
         :func:`generate_kernel`.
 
@@ -601,10 +602,19 @@ def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
     xarray.DataArray
         Data array similar to input array, with its eroded
         along x and y dimensions.
-    """
 
-    if data.ndim < 2:
-        raise XoaError("input array must have at least 2 dimensions")
+    See also
+    --------
+    erode_coast
+    sharpiro_kernel
+    """
+    # Kernel
+    if kernel is None:
+        kernel = "shapiro"
+    if isinstance(kernel, str) and kernel == "shapiro":
+        kernel = shapiro_kernel(data.dims)
+    kernel = generate_kernel(kernel, data)
+    kdims = kernel.squeeze().dims
 
     # Iteration or mask
     if isinstance(until, int):
@@ -612,23 +622,9 @@ def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
         mask = None
     else:
         mask = until
-        if isinstance(mask, np.ndarray):
-            xdim, ydim = _get_xydims_(data, xdim, ydim)
-            if mask.ndim > 2:
-                raise XoaError("mask must be two-dimensional")
-            mask = xr.DataArray(mask, dims=(ydim, xdim))
         if not set(mask.dims).issubset(data.dims):
             raise XoaError('mask dims must be a subset of data dims')
-        mask = transpose(mask, data, mode="compat")
-
-    # Kernel
-    if kernel is None:
-        xdim, ydim = _get_xydims_(data, xdim, ydim)
-        kernel = shapiro_kernel((ydim, xdim))
-    kernel = generate_kernel(kernel, data)
-    kdims = kernel.squeeze().dims
-    if len(kdims) > 2:
-        raise XoaError("Kernel must be two-dimensional")
+        mask = xcoords.transpose(mask, data, mode="compat")
 
     # Filter
     if mask is not None:
@@ -644,3 +640,57 @@ def erode_mask(data, until=1, kernel=None, xdim=None, ydim=None):
 
     return data
 
+
+def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
+    """Just like :func:`erode_mask` but specialized for the horizontal dimensions
+
+    Parameters
+    ----------
+    data: xarray.DataArray
+        Array of at least 2 dimensions, that are supposed to be horizontal.
+    until: array_like, int
+        Either a minimal mask, or a max number of iteration.
+    kernel:
+        Defaults to a :func:`shapiro <shapiro_kernel>` kernel.
+        In this case, ``xdim`` and ``ydim`` can be set to the
+        horizontal dimensions, otherwise they are inferred.
+    xdim: None
+        Name of the X dimension, which is infered by default.
+    ydim: None
+        Name of the Y dimension, which is infered by default.
+
+    Return
+    ------
+    xarray.DataArray
+        Data array similar to input array, with its eroded
+        along x and y dimensions.
+
+    See also
+    --------
+    erode_mask
+    sharpiro_kernel
+    """
+    # We must have X and Y dimensions
+    if xdim is None:
+        xdim = xcoords.get_xdim(data, errors="raise")
+    else:
+        assert xdim in data.dims, f"Invalid x dimension: {xdim}"
+    if ydim is None:
+        ydim = xcoords.get_ydim(data, errors="raise")
+    else:
+        assert ydim in data.dims, f"Invalid y dimension: {ydim}"
+
+    # Kernel
+    if isinstance(kernel, xr.DataArray):
+        assert xdim in kernel.dims, f"kernel must have dimension: {xdim}"
+        assert ydim in kernel.dims, f"kernel must have dimension: {ydim}"
+    elif kernel is None or kernel == "shapiro":
+        kernel = shapiro_kernel((ydim, xdim))
+
+    # Mask array
+    if not isinstance(until, int):
+        assert xdim in until.dims, f"mask must have dimension: {xdim}"
+        assert ydim in until.dims, f"mask must have dimension: {ydim}"
+
+    # Filter
+    return erode_mask(data, until=until, kernel=kernel)
