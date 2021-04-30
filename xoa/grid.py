@@ -146,11 +146,11 @@ def _pad_(da, dim, pad_width, mode, **kwargs):
         pad_width0 = pad_width[0]
         pad_width1 = pad_width[-1]
         if pad_width0:
-            d0 = da[{dim: pad_width0}].values - da[{dim: pad_width0+1}].values
+            d0 = da[{dim: pad_width0}].data - da[{dim: pad_width0+1}].data
             for i in range(1, pad_width0+1):
                 da[{dim: pad_width0-i}] += i * d0
         if pad_width1:
-            d1 = da[{dim: -1-pad_width1}].values - da[{dim: -2-pad_width1}].values
+            d1 = da[{dim: -1-pad_width1}].data - da[{dim: -2-pad_width1}].data
             for i in range(1, pad_width1+1):
                 da[{dim: -1-pad_width1+i}] += i * d1
     return da
@@ -199,7 +199,7 @@ def pad(da, pad_width, mode="edge", coord_mode="linear_extrap", name_kwargs=None
 
 def _get_centers_(da, dim):
     dao = da.isel({dim: slice(None, -1)})
-    dao = dao + 0.5 * da.diff(dim).values
+    dao = dao + 0.5 * da.diff(dim).data
     return dao
 
 
@@ -452,7 +452,7 @@ def dz2depth(
     # Fix index
     if zdim in depth.indexes:
         dnz = depth[zdim].diff(zdim).pad({zdim: (0, 1)}, mode="edge")
-        depth = xcoords.change_index(depth, zdim, depth[zdim]+0.5*dnz.values)
+        depth = xcoords.change_index(depth, zdim, depth[zdim]+0.5*dnz.data)
 
     # Centered
     if centered:
