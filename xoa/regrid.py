@@ -54,33 +54,33 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     #: No extrapolation (default)
     no = 0
     none = 0
-    #: Above (after)
+    false = 0
+    #: Toward the top (after)
+    top = 1
     above = 1
-    #: Below (before)
+    after = 1
+    #: Toward the bottom (before)
+    bottom = -1
     below = -1
     #: Both below and above
     both = 2
     all = 2
     yes = 2
+    true = 2
 
 
-def _wrapper_interp1d_(vari, yi, yo, func_name, **kwargs):
-    """To make sure vari, yi and yo are 2D when passed to interp routines
+def _wrapper1d_(vari, *args, func_name, **kwargs):
+    """To make sure arrays have a 2D shape
 
-    Output arrays are reshaped back accordindly
+    Output array is reshaped back accordindly
     """
     # To 2D
-    if vari.ndim > yo.ndim:
-        eshape = vari.shape[:-1]
-    else:
-        eshape = yo.shape[:-1]
-    vari = np.reshape(vari, (-1, vari.shape[-1]))
-    yi = np.reshape(yi, (-1, yi.shape[-1]))
-    yo = np.reshape(yo, (-1, yo.shape[-1]))
+    eshape = vari.shape[:-1]
+    args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in (vari, ) + args]
 
     # Call
     func = getattr(interp, func_name)
-    varo = func(vari, yi, yo,**kwargs)
+    varo = func(*args, **kwargs)
 
     # From 2D
     return varo.reshape(eshape+varo.shape[-1:])
@@ -88,7 +88,8 @@ def _wrapper_interp1d_(vari, yi, yo, func_name, **kwargs):
 
 def regrid1d(
         da, coord, method=None, dim=None, coord_in_name=None,
-        conserv=False, extrap=0, bias=0., tension=0.):
+        conserv=False, extrap="no", bias=0., tension=0.,
+        dask='allowed'):
     """Regrid along a single dimension
 
     The input and output coordinates may vary along other dimensions,
@@ -121,6 +122,7 @@ def regrid1d(
     extrap: str, int
         Extrapolation mode as one of the following:
         {extrap_modes.rst_with_links}
+    dask: str
 
     Returns
     -------
@@ -134,6 +136,8 @@ def regrid1d(
     xoa.interp.cubic2d
     xoa.interp.hermit1d
     xoa.interp.cellave1d
+    xoa.interp.extrap1d
+    xarray.apply_ufunc
     """
     # Get the working dimensions
     if not isinstance(dim, (tuple, list)):
@@ -182,13 +186,14 @@ def regrid1d(
         raise XoaRegridError("cellerr regrid method is works only "
                              "with 1D input and output cordinates")
     # func = getattr(interp, func_name)
-    func_kwargs = {"func_name": func_name}
+    extrap = str(extrap_modes[extrap])
+    func_kwargs = {"func_name": func_name, "extrap": extrap}
     if method == "hermit":
         func_kwargs.update(bias=bias, tension=tension)
 
     # Apply
     da_out = xr.apply_ufunc(
-        _wrapper_interp1d_,
+        _wrapper1d_,
         da,
         coord_in,
         coord,
@@ -197,7 +202,8 @@ def regrid1d(
         input_core_dims=input_core_dims,
         output_core_dims=output_core_dims,
         exclude_dims={dim_in, dim_out},
-        dask_gufunc_kwargs={"output_sizes": output_sizes}
+        dask_gufunc_kwargs={"output_sizes": output_sizes},
+        dask=dask
         )
 
     # Transpose
@@ -213,6 +219,53 @@ def regrid1d(
 
 
 regrid1d.__doc__ = regrid1d.__doc__.format(**locals())
+
+
+def extrap1d(da, dim, mode, **kwargs):
+    """Extrapolate along a single dimension
+
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Array to interpolate
+    dim:  str
+        Dimension on which to operate.
+    mode: str, int
+        Extrapolation mode as one of the following:
+        {extrap_modes.rst_with_links}
+    kwargs: dict
+        Extra arguments are passed to :func:`xarray.apply_ufunc`
+
+    Returns
+    -------
+    xarray.DataArray
+        Extrapolated array.
+
+    See also
+    --------
+    xoa.interp.extrap1d
+    xarray.apply_ufunc
+    """
+    da_out = xr.apply_ufunc(
+        _wrapper1d_,
+        da,
+        join="override",
+        kwargs={"func_name": "extrap1d", "mode": str(extrap_modes[mode])},
+        input_core_dims=[[dim]],
+        output_core_dims=[[dim]],
+        exclude_dims={dim},
+        dask_gufunc_kwargs={"output_sizes": da.sizes},
+        **kwargs
+        )
+    da_out = da_out.transpose(*da.dims)
+    da_out = da_out.assign_coords(da.coords)
+    da_out.attrs.update(da.attrs)
+    da_out.encoding.update(da.encoding)
+    return da_out
+
+
+extrap1d.__doc__ = extrap1d.__doc__.format(**locals())
 
 
 def grid2loc(da, loc, compat="warn"):
@@ -279,7 +332,7 @@ def grid2loc(da, loc, compat="warn"):
 
     # To numpy with singletons
     # - data
-    vi = da_tmp.values
+    vi = da_tmp.data
     for axis_type, axis in (("z", -3), ("t", -4)):
         if axis_type not in order:
             vi = np.expand_dims(vi, axis)
@@ -303,7 +356,7 @@ def grid2loc(da, loc, compat="warn"):
         for axis_type, axis in (("x", -1), ("y", -2), ("t", -4)):
             if axis_type not in gdep_order:
                 zi = np.expand_dims(zi, axis)
-        zo = deps.values
+        zo = deps.data
         coords_out.append(deps)
     else:
         zi = np.zeros((1, 1, 1, 1))

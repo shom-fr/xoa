@@ -59,7 +59,7 @@ def get_iminmax(data1d):
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def nearest1d(vari, yi, yo):
+def nearest1d(vari, yi, yo, extrap="no"):
     """Nearest interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -127,11 +127,15 @@ def nearest1d(vari, yi, yo):
                 else:
                     varo[ix, iyo] = vari[ixi, iyi+1]
 
+    # Extrapolation
+    if extrap != "no":
+        varo = extrap1d(varo, extrap)
+
     return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def linear1d(vari, yi, yo):
+def linear1d(vari, yi, yo, extrap="no"):
     """Linear interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -194,27 +198,21 @@ def linear1d(vari, yi, yo):
                     iyomin = iyo + 1
 
                 # Interpolation
-                elif dy0 >= 0 and dy1 >= 0:
+                elif dy0 > 0 or dy1 > 0:
 
                     varo[ix, iyo] = (
                         (vari[ixi, iyi]*dy1 + vari[ixi, iyi+1]*dy0) /
                         (dy0+dy1))
 
-        # # Extrapolation with nearest
-        # if extrap != "no":
-        #     for iyo in range(0, nyo):
-        #         if extrap == "both" or extrap == "bottom":
-        #             if yo[ixoy, iyo] < yi[ixiy, 0]:
-        #                 varo[ix, iyo] = vari[ixi, 0]
-        #         if extrap == "both" or extrap == "top":
-        #             if yo[ixoy, iyo] > yi[ixiy, -1]:
-        #                 varo[ix, iyo] = vari[ixi, -1]
+    # Extrapolation
+    if extrap != "no":
+        varo = extrap1d(varo, extrap)
 
     return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def cubic1d(vari, yi, yo):
+def cubic1d(vari, yi, yo, extrap="no"):
     """Cubic interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -297,11 +295,15 @@ def cubic1d(vari, yi, yo):
                     varo[ix, iyo] += mu*(vari[ix, iyi+1] - vc0)
                     varo[ix, iyo] += vari[ix, iyi]
 
+    # Extrapolation
+    if extrap != "no":
+        varo = extrap1d(varo, extrap)
+
     return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def hermit1d(vari, yi, yo, bias=0., tension=0.):
+def hermit1d(vari, yi, yo, extrap="no", bias=0., tension=0.):
     """Hermitian interp. of nD data along an axis with varying coordinates
 
     Warning
@@ -396,17 +398,20 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
                         (1-bias)*(1-tension)/2)
                     varo[ix, iyo] += a3*vari[ix, iyi+1]
 
+    if extrap != "no":
+        varo = extrap1d(varo, extrap)
+
     return varo
 
 
-@numba.njit(parallel=False, fastmath=True)
-def extrap1d(vari, extrap):
+@numba.njit(parallel=False)
+def extrap1d(vari, mode):
     """Extrapolate valid data to the top and/or bottom
 
     Parameters
     ----------
     vari: array_like(nx, ny)
-    extrap: {"top", "bottom", "both", "no"}
+    mode: {"top", "bottom", "both", "no"}
         Extrapolation mode
 
     Return
@@ -414,30 +419,25 @@ def extrap1d(vari, extrap):
     array_like(nx, ny): varo
     """
     varo = vari.copy()
-    if extrap == "no":
+    if mode == "no":
         return varo
-    ishape = vari.shape
-    if vari.ndim > 2:
-        vari = np.ascontiguousarray(vari).reshape(-1, vari.shape[-1])
     nx, ny = vari.shape
 
     # Loop on varying dim
     for ix in numba.prange(0, nx):
-
         iybot, iytop = get_iminmax(vari[ix])
         if iybot == -1:
             continue
-
-        if extrap == "both" or extrap == "bottom":
+        if mode == "both" or mode == "bottom":
             varo[ix, :iybot] = varo[ix, iybot]
-        if extrap == "both" or extrap == "top":
+        if mode == "both" or mode == "top":
             varo[ix, iytop+1:] = varo[ix, iytop]
 
-    return varo.reshape(ishape)
+    return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def cellave1d(vari, yib, yob, conserv=False, extrap="no"):
+def cellave1d(vari, yib, yob, extrap="no", conserv=False):
     """Cell average regrid. of nD data along an axis with varying coordinates
 
     Warning
