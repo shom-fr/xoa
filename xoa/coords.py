@@ -57,7 +57,7 @@ def get_lat(da, errors="raise"):
 
 @misc.ERRORS.format_function_docstring
 def get_depth(da, errors="raise"):
-    """Get the depth coordinate
+    """Get or compute the depth coordinate
 
     Parameters
     ----------
@@ -67,7 +67,38 @@ def get_depth(da, errors="raise"):
     ------
     xarray.DataArray or None
     """
-    return cf.get_cf_specs(da).search(da, 'depth', errors=errors)
+    cfspecs = cf.get_cf_specs(da)
+    errors = misc.ERRORS[errors]
+    ztype = cfspecs["vertical"]["type"]
+
+    # From variable
+    depth = cfspecs.search(da, 'depth', errors="ignore")
+    if depth is not None:
+        return depth
+    if ztype == "z" or not hasattr(da, "data_vars"):  # explicitly
+        msg = "No depth coordinate found"
+        if errors == "raise":
+            raise XoaError(msg)
+        xoa_warn(msg)
+        return
+
+    # Decode the dataset
+    if ztype == "sigma" or ztype is None:
+        err = "ignore" if ztype is None else errors
+        from .sigma import decode_cf_sigma
+        da = decode_cf_sigma(da, errors=err)
+        if "depth" in da:
+            return da.depth
+    if ztype == "dz2depth" or ztype is None:
+        err = "ignore" if ztype is None else errors
+        from .grid import decode_cf_dz2depth
+        da = decode_cf_dz2depth(da, errors=err)
+        if "depth" in da:
+            return da.depth
+    msg = "Can't infer depth coordinate from dataset"
+    if errors == "raise":
+        raise XoaError(msg)
+    xoa_warn(msg)
 
 
 @misc.ERRORS.format_function_docstring

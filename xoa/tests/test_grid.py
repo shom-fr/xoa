@@ -8,6 +8,7 @@ import numpy as np
 import xarray as xr
 import pytest
 
+import xoa
 from xoa import XoaWarning
 from xoa import grid
 
@@ -116,3 +117,11 @@ def test_grid_dz2depth(positive, expected, ref, ref_type):
     depth = grid.dz2depth(dz, positive, ref=ref, ref_type=ref_type, centered=True)
     assert depth[0, 0] == 0.5 * sum(expected[:2])
     assert depth.z[0] == 0
+
+
+def test_coords_decode_cf_dz2depth():
+
+    ds = xoa.open_data_sample("hycom.gdp.h.nc")
+    ds = ds.rename(h="dz")
+    dsd = grid.decode_cf_dz2depth(ds)
+    assert "depth" in dsd.coords

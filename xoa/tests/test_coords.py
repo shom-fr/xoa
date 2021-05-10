@@ -7,6 +7,7 @@ import pytest
 import numpy as np
 import xarray as xr
 
+import xoa
 from xoa import coords
 
 
@@ -30,59 +31,29 @@ def test_coords_transpose(inshape, indims, tdims, mode, outshape, outdims):
     assert dao.shape == outshape
 
 
-def test_coords_dimflusher1d():
+def test_coords_get_depth_from_variable():
 
-    nz0 = 5
-    nz1 = 7
-    nlon = 4
-    nmem = 2
-    dep0 = xr.DataArray(np.linspace(-100., 0., nz0), dims='nz', name='nz')
-    dep1 = xr.DataArray(np.linspace(-1000., 0., nz1), dims='nk', name='nk')
-    lon = xr.DataArray(range(nlon), dims='lon')
-    mem = xr.DataArray(range(nmem), dims='mem')
+    da = xr.DataArray(
+        np.ones((2, 3)),
+        dims=("depth", "lon"),
+        coords={"depth": ("depth", [0, 1]), "lon": [1, 2, 3]})
+    depth = coords.get_depth(da)
+    assert depth is not None
+    np.testing.assert_allclose(depth.values, [0, 1])
 
-    da = xr.DataArray(np.ones((mem.size, dep0.size, lon.size)),
-                      dims=('mem', 'nz', 'lon'),
-                      coords=(mem, dep0, lon),
-                      attrs={'long_name': 'Big banana'})
-    coord_out = xr.DataArray(np.ones((dep1.size, lon.size)),
-                             dims=('nk', 'lon'), name='mydepth',
-                             attrs={'standard_name': 'ocean_layer_depth'})
 
-    # 1d -> 1d
-    coord = dep1
-    dfl = coords.DimFlusher1D(da, coord)
-    assert dfl.da_in_data.shape == (nmem*nlon, nz0)
-    assert dfl.coord_in_data.shape == (1, nz0)
-    assert dfl.coord_out_data.shape == (1, nz1)
-    assert dfl.work_dims == ("mem", "lon", "nk")
-    assert dfl.work_shape == (nmem, nlon, nz1)
-    da_out_data = np.ones((nmem*nlon, nz1))
-    da_out = dfl.get_back(da_out_data)
-    assert da_out.coords["nk"].shape == (nz1,)
-    assert da_out.long_name == "Big banana"
+def test_coords_get_depth_from_sigma():
 
-    # 1d -> nd
-    dfl = coords.DimFlusher1D(da, coord_out)
-    assert dfl.da_in_data.shape == (nmem*nlon, nz0)
-    assert dfl.coord_in_data.shape == (nlon, nz0)
-    assert dfl.coord_out_data.shape == (nlon, nz1)
-    assert dfl.work_dims == ("mem", "lon", "nk")
-    assert dfl.work_shape == (nmem, nlon, nz1)
-    da_out_data = np.ones((nmem*nlon, nz1))
-    da_out = dfl.get_back(da_out_data)
-    assert da_out.coords["mydepth"].dims == ("nk", "lon")
+    ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
+    depth = coords.get_depth(ds)
+    assert depth is not None
+    assert depth.name == "depth"
 
-    # nd -> nd
-    coord_in = xr.DataArray(np.ones((nmem, dep0.size)),
-                            dims=('mem', 'nz'))
-    da.coords['dep'] = coord_in
-    dfl = coords.DimFlusher1D(da, coord_out)
-    assert dfl.da_in_data.shape == (nmem*nlon, nz0)
-    assert dfl.coord_in_data.shape == (nmem*nlon, nz0)
-    assert dfl.coord_out_data.shape == (nmem*nlon, nz1)
-    assert dfl.work_dims == ("mem", "lon", "nk")
-    assert dfl.work_shape == (nmem, nlon, nz1)
-    da_out_data = np.ones((nmem*nlon, nz1))
-    da_out = dfl.get_back(da_out_data)
-    assert da_out.coords["mydepth"].dims == ("nk", "lon")
+
+def test_coords_get_depth_from_dz():
+
+    ds = xoa.open_data_sample("hycom.gdp.h.nc")
+    ds = ds.rename(h="dz")
+    depth = coords.get_depth(ds)
+    assert depth is not None
+    assert depth.name == "depth"

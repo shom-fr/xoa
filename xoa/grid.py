@@ -21,7 +21,7 @@ For operations between different grids, please see :mod:`xoa.regrid`.
 
 import xarray as xr
 
-from .__init__ import XoaError
+from .__init__ import XoaError, xoa_warn
 from . import misc
 from . import cf
 from . import coords as xcoords
@@ -465,3 +465,65 @@ def dz2depth(
     depth = cfspecs.format_coord(depth, "depth")
 
     return depth
+
+
+@misc.ERRORS.format_function_docstring
+def decode_cf_dz2depth(ds, errors="raise", **kwargs):
+    """Compute depth from layer thickness in a dataset
+
+    Needed stuff is inferred from CF conventions.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        Dataset than contains everything
+    {errors}
+    kwargs: dict
+        Extra keywords are passed to :func:`dz2depth`
+
+    Return
+    ------
+    xarray.Dataset
+        A new dataset with a depth coordinate
+
+    See also
+    --------
+    dz2depth
+    """
+    ds = ds.copy()
+    errors = misc.ERRORS[errors]
+
+    # Find needed stuff
+    cfspecs = cf.get_cf_specs(ds)
+    dz = cfspecs.search(ds, 'dz', errors=errors)
+    if dz is None:
+        return ds
+    zdims = xcoords.get_dims(dz, "z", errors=errors)
+    if zdims is None:
+        return ds
+    zdim = zdims[0]
+    positive = cfspecs["vertical"]["positive"]
+    if positive is None:
+        positive = xcoords.get_positive_attr(ds, zdim)
+    if positive is None:
+        msg = "Can't infer positive attribute from data dataset"
+        if errors == "raise":
+            raise XoaError(msg)
+        xoa_warn(msg)
+        return ds
+    ssh = cfspecs.search(ds, 'ssh', errors="ignore")
+    bathy = cfspecs.search(ds, 'bathy', errors="ignore")
+
+    # Make choices
+    if ssh is None and bathy is None:
+        ref, ref_type = None, "infer"
+    else:
+        for ref, ref_type in [(bathy, "bathy"), (ssh, "ssh")][::int(positive)]:
+            if ref is not None:
+                break
+
+    # Compute depth
+    depth = dz2depth(dz, positive=positive, zdim=zdim, ref=ref, ref_type=ref_type, centered=True)
+
+    # Assign to dataset
+    return ds.assign_coords(depth=depth)
