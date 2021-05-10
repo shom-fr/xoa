@@ -9,7 +9,6 @@ import xarray as xr
 import pytest
 
 import xoa
-from xoa import XoaWarning
 from xoa import grid
 
 

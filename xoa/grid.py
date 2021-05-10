@@ -468,7 +468,6 @@ def dz2depth(
     return depth
 
 
-<<<<<<< HEAD
 @misc.ERRORS.format_function_docstring
 def decode_cf_dz2depth(ds, errors="raise", **kwargs):
     """Compute depth from layer thickness in a dataset
