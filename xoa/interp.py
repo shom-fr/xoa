@@ -635,7 +635,7 @@ def cell2relloc(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
     return p, q
 
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=True, cache=NOT_CI)
 def grid2relloc(xxi, yyi, xo, yo):
     """Compute coordinates of point relative to a curvilinear grid
 
@@ -689,7 +689,7 @@ def grid2relloc(xxi, yyi, xo, yo):
     return p, q
 
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=True, cache=NOT_CI)
 def grid2rellocs(xxi, yyi, xo, yo):
     """Compute coordinates of points relative to a curvilinear grid
 
@@ -738,7 +738,7 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
         must be set to 1. `nexz` may be equal or a multiple of `nex`.
     ti:  array_like(nti)
         Input times
-    vi: array_like(nex, nti, nzi, nyi, nxi)
+    vi: array_like(nexz, ntiz, nzi, nyiz, nxiz)
         Input values.
     xo: array_like(no)
         Points longitude
@@ -765,6 +765,7 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     nex = max(nexv, nexz)
     vo = np.full((nex, no), np.nan, dtype=vi.dtype)
     bmask = np.isnan(vi)
+    masko = np.isnan(xo) | np.isnan(yo) | np.isnan(zo) | np.isnan(to)
     ximin = xxi.min()
     ximax = xxi.max()
     yimin = yyi.min()
@@ -785,11 +786,14 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     # Loop on ouput points
     for io in numba.prange(no):
     # for io in range(no):
+
+        if masko[io]:
+            continue
+
         if ((nxi != 1 and (xo[io] < ximin or xo[io] > ximax)) or
                 (nyi != 1 and (yo[io] < yimin or yo[io] > yimax)) or
                 (nzi != 1 and (zo[io] < zimin or zo[io] > zimax)) or
                 (nti != 1 and (to[io] < timin or to[io] > timax))):
-            # print('outside limits')
             continue
 
         # Weights
@@ -797,8 +801,6 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
 
             p, q = grid2relloc(xxi, yyi, xo[io], yo[io])
             if p < 0 or p > nxi-1 or q < 0 or q > nyi-1:
-                # print('outside cells')
-                print(xo[io], yo[io])
                 continue  # outside the grid
             i = int(p)
             j = int(q)
