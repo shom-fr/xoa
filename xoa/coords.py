@@ -31,6 +31,7 @@ def get_lon(da, errors="raise"):
 
     Parameters
     ----------
+    da: xarray.DataArray
     {errors}
 
     Return
@@ -38,6 +39,19 @@ def get_lon(da, errors="raise"):
     xarray.DataArray or None
     """
     return cf.get_cf_specs(da).search(da, 'lon', errors=errors)
+
+
+def is_lon(da, loc="any"):
+    """Tell if a data array is identified as longitudes
+
+    Parameters
+    da: xarray.DataArray
+
+    Return
+    ------
+    bool
+    """
+    return cf.get_cf_specs(da).coords.match(da, "lon", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -53,6 +67,20 @@ def get_lat(da, errors="raise"):
     xarray.DataArray or None
     """
     return cf.get_cf_specs(da).search(da, 'lat', errors=errors)
+
+
+def is_lat(da, loc="any"):
+    """Tell if a data array is identified as latitudes
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+
+    Return
+    ------
+    bool
+    """
+    return cf.get_cf_specs(da).coords.match(da, "lat", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -101,6 +129,20 @@ def get_depth(da, errors="raise"):
     xoa_warn(msg)
 
 
+def is_depth(da, loc="any"):
+    """Tell if a data array is identified as depths
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+
+    Return
+    ------
+    bool
+    """
+    return cf.get_cf_specs(da).coords.match(da, "depth", loc=loc)
+
+
 @misc.ERRORS.format_function_docstring
 def get_altitude(da, errors="raise"):
     """Get the altitude coordinate
@@ -116,6 +158,20 @@ def get_altitude(da, errors="raise"):
     return cf.get_cf_specs(da).search(da, 'altitude', errors=errors)
 
 
+def is_altitude(da, loc="any"):
+    """Tell if a data array is identified as altitudes
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+
+    Return
+    ------
+    bool
+    """
+    return cf.get_cf_specs(da).coords.match(da, "altitude", loc=loc)
+
+
 @misc.ERRORS.format_function_docstring
 def get_level(da, errors="raise"):
     """Get the level coordinate
@@ -129,6 +185,20 @@ def get_level(da, errors="raise"):
     xarray.DataArray or None
     """
     return cf.get_cf_specs(da).coords.search(da, 'level', errors=errors)
+
+
+def is_level(da, loc="any"):
+    """Tell if a data array is identified as levels
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+
+    Return
+    ------
+    bool
+    """
+    return cf.get_cf_specs(da).coords.match(da, "levels", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -171,6 +241,20 @@ def get_time(da, errors="raise"):
     xarray.DataArray or None
     """
     return cf.get_cf_specs(da).coords.search(da, 'time', errors=errors)
+
+
+def is_time(da):
+    """Tell if a data array is identified as time
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+
+    Return
+    ------
+    bool
+    """
+    return cf.get_cf_specs(da).match(da, "time")
 
 
 @misc.ERRORS.format_function_docstring

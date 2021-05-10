@@ -57,3 +57,14 @@ def test_coords_get_depth_from_dz():
     depth = coords.get_depth(ds)
     assert depth is not None
     assert depth.name == "depth"
+
+
+def test_coords_is_lon():
+
+    x = xr.DataArray([5], dims="lon", name="lon")
+    y = xr.DataArray([5], dims="lat")
+    temp = xr.DataArray(np.ones((1, 1)), dims=('lat', 'lon'), coords={'lon': x, 'lat': y})
+
+    assert coords.is_lon(x)
+    assert coords.is_lon(temp.lon)
+    assert not coords.is_lon(temp.lat)

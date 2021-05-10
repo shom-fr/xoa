@@ -19,6 +19,7 @@ For operations between different grids, please see :mod:`xoa.regrid`.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import xarray as xr
 
 from .__init__ import XoaError, xoa_warn
@@ -467,6 +468,7 @@ def dz2depth(
     return depth
 
 
+<<<<<<< HEAD
 @misc.ERRORS.format_function_docstring
 def decode_cf_dz2depth(ds, errors="raise", **kwargs):
     """Compute depth from layer thickness in a dataset
@@ -527,3 +529,44 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
 
     # Assign to dataset
     return ds.assign_coords(depth=depth)
+
+
+def to_rect(da, tol=1e-5):
+    """Convert a curvilinear coordinate array to a rectangular 1d coordinate array
+
+    It checks if the coordinates may be converted to 1D without loss of information.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+        In case of a dataset, it must contain longitudes and latitudes.
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+    """
+    da = da.copy()
+    new_coords = {}
+    rename_args = {}
+    for name, coord in da.coords.items():
+        if coord.ndim != 2:
+            continue
+        if xcoords.is_lon(coord):
+            odim = xcoords.get_ydim(coord, errors="ignore")
+        elif xcoords.is_lat(coord):
+            odim = xcoords.get_xdim(coord, errors="ignore")
+        else:
+            continue
+        dims = [odim] if odim else coord.dims
+        for odim in dims:
+            if np.allclose(coord.min(odim), coord.max(odim), atol=tol):
+                new_coords[name] = xr.DataArray(coord.isel(
+                    {odim: 0}).values, dims=name, attrs=coord.attrs)
+                new_coords[name].encoding.update(coord.encoding)
+                dim = coord.dims[0] if coord.dims[1] == odim else coord.dims[1]
+                rename_args[dim] = name
+                break
+    if new_coords:
+        return da.reset_coords(list(new_coords), drop=True).rename(
+            rename_args).assign_coords(new_coords)
+    return da
