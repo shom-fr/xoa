@@ -143,6 +143,20 @@ def is_depth(da, loc="any"):
     return cf.get_cf_specs(da).coords.match(da, "depth", loc=loc)
 
 
+def is_depth(da, loc="any"):
+    """Tell if a data array is identified as depths
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+
+    Return
+    ------
+    bool
+    """
+    return cf.get_cf_specs(da).coords.match(da, "depth", loc=loc)
+
+
 @misc.ERRORS.format_function_docstring
 def get_altitude(da, errors="raise"):
     """Get the altitude coordinate
