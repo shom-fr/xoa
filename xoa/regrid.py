@@ -77,11 +77,12 @@ def _wrapper1d_(vari, *args, func_name, **kwargs):
     # To 2D
     eshape = vari.shape[:-1]
     args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in (vari, ) + args]
-
+    args = [np.asarray(arr) for arr in args]
+    
     # Call
     func = getattr(interp, func_name)
     varo = func(*args, **kwargs)
-
+    
     # From 2D
     return varo.reshape(eshape+varo.shape[-1:])
 
