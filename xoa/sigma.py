@@ -567,6 +567,7 @@ def get_sigma_terms(ds, loc=None, rename=False):
 def decode_cf_sigma(ds, rename=False, errors="raise"):
     """Compute heights from sigma-like variable in a dataset
 
+    Needed stuff is inferred from CF conventions.
     If the dataset is not found to have sigma-like coordinates,
     a simple copy of the dataset is returned.
 

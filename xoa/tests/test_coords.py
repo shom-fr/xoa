@@ -7,6 +7,7 @@ import pytest
 import numpy as np
 import xarray as xr
 
+import xoa
 from xoa import coords
 
 
@@ -39,3 +40,31 @@ def test_coords_is_lon():
     assert coords.is_lon(x)
     assert coords.is_lon(temp.lon)
     assert not coords.is_lon(temp.lat)
+
+
+def test_coords_get_depth_from_variable():
+
+    da = xr.DataArray(
+        np.ones((2, 3)),
+        dims=("depth", "lon"),
+        coords={"depth": ("depth", [0, 1]), "lon": [1, 2, 3]})
+    depth = coords.get_depth(da)
+    assert depth is not None
+    np.testing.assert_allclose(depth.values, [0, 1])
+
+
+def test_coords_get_depth_from_sigma():
+
+    ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
+    depth = coords.get_depth(ds)
+    assert depth is not None
+    assert depth.name == "depth"
+
+
+def test_coords_get_depth_from_dz():
+
+    ds = xoa.open_data_sample("hycom.gdp.h.nc")
+    ds = ds.rename(h="dz")
+    depth = coords.get_depth(ds)
+    assert depth is not None
+    assert depth.name == "depth"
