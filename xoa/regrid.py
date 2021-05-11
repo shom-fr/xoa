@@ -22,9 +22,9 @@ import xarray as xr
 
 from .__init__ import XoaError
 from . import misc
-from . import cf
-from . import coords
-from . import grid
+from . import cf as xcf
+from . import coords as xcoords
+from . import grid as xgrid
 from . import interp
 
 
@@ -144,8 +144,8 @@ def regrid1d(
     if not isinstance(dim, (tuple, list)):
         dim = (dim, dim)
     dim_in, dim_out = dim
-    cfspecs_in = cf.get_cf_specs(da)
-    cfspecs_out = cf.get_cf_specs(coord)
+    cfspecs_in = xcf.get_cf_specs(da)
+    cfspecs_out = xcf.get_cf_specs(coord)
     # - dim out
     if dim_out is None:  # get dim_out from coord_out
         dim_out, dim_type = cfspecs_out.search_dim(coord, errors="raise")
@@ -173,8 +173,8 @@ def regrid1d(
     input_core_dims = [[dim_in]]
     method = regrid1d_methods[method]
     if int(method) < 0:
-        coord_in = grid.get_edges_1d(coord_in, axis=dim_in)
-        coord = grid.get_edges_1d(coord, axis=dim_out)
+        coord_in = xgrid.get_edges_1d(coord_in, axis=dim_in)
+        coord = xgrid.get_edges_1d(coord, axis=dim_out)
         input_core_dims.extend([[dim_in+"_edges"], [dim_out+"_edges"]])
     else:
         input_core_dims.extend([[dim_in], [dim_out]])
@@ -311,25 +311,26 @@ def grid2loc(da, loc, compat="warn"):
         loc = loc.to_xarray()
     # - horizontal
     order = "yx"
-    lons = coords.get_lon(loc)
-    lats = coords.get_lat(loc)
+    lons = xcoords.get_lon(loc)
+    lats = xcoords.get_lat(loc)
     xo = lons.values
     yo = lats.values
     # - vertical
-    deps = coords.get_vertical(loc, errors="ignore")
+    deps = xcoords.get_vertical(loc, errors="ignore")
     if deps is not None:
-        gdep = coords.get_vertical(da, errors=compat)
+        gdep = xcoords.get_vertical(da, errors=compat)
         if gdep is not None:
             order = "z" + order
     # - temporal
-    times = coords.get_time(loc, errors="ignore")
+    times = xcoords.get_time(loc, errors="ignore")
     if times is not None:
-        gtime = coords.get_time(da, errors=compat)
+        gtime = xcoords.get_time(da, errors=compat)
         if gtime is not None:
             order = "t" + order
 
     # Transpose following the tzyx order
-    da_tmp = coords.reorder(da, order)
+    da_tmp = xgrid.to_rect(da)
+    da_tmp = xcoords.reorder(da_tmp, order)
 
     # To numpy with singletons
     # - data
@@ -339,8 +340,8 @@ def grid2loc(da, loc, compat="warn"):
             vi = np.expand_dims(vi, axis)
     vi = vi.reshape((-1,)+vi.shape[-4:])
     # - xy
-    glon = coords.get_lon(da_tmp)
-    glat = coords.get_lat(da_tmp)
+    glon = xcoords.get_lon(da_tmp)
+    glat = xcoords.get_lat(da_tmp)
     xi = glon.values
     yi = glat.values
     dims_in = set(glon.dims).union(glat.dims)
@@ -351,7 +352,7 @@ def grid2loc(da, loc, compat="warn"):
         yi = yi.reshape(-1, 1)
     # - z
     if "z" in order:
-        gdep_order = coords.get_order(da_tmp[gdep.name])
+        gdep_order = xcoords.get_order(da_tmp[gdep.name])
         dims_in.update(gdep.dims)
         zi = da_tmp[gdep.name].values
         for axis_type, axis in (("x", -1), ("y", -2), ("t", -4)):
@@ -382,7 +383,7 @@ def grid2loc(da, loc, compat="warn"):
     sizes_out = [size for dim, size in da.sizes.items() if dim in dims_out]
     dims_out.extend(loc.dims)
     sizes_out.append(lons.shape[-1])
-    coords_out = coords_out + coords.get_coords_compat_with_dims(
+    coords_out = coords_out + xcoords.get_coords_compat_with_dims(
         da, exclude_dims=dims_in)
     da_out = xr.DataArray(
         vo.reshape(sizes_out),
@@ -393,6 +394,6 @@ def grid2loc(da, loc, compat="warn"):
     )
 
     # Transpose
-    da_out = coords.transpose(da_out, da.dims, mode="compat")
+    da_out = xcoords.transpose(da_out, da.dims, mode="compat")
 
     return da_out
