@@ -24,7 +24,7 @@ from .__init__ import XoaError
 from . import coords as xcoords
 from . import grid as xgrid
 from xoa.interp import grid2locs
-from xoa.geo import EARTH_RADIUS, haversine
+from xoa.geo import EARTH_RADIUS
 
 
 def _get_uv2d_(t, txy, gx, gy, gz, gt, guv):
@@ -95,9 +95,9 @@ def flow2d(u, v, xy0, duration, step, date=None):
     v: xarray.DataArray
         Gridded meridional velocity
     duration: int, numpy.timedelta64
-        Total integration time
+        Total integration time in seconds
     step: int, numpy.timedelta64
-        Integratin step
+        Integratiin step in seconds
     xy0: int, xarray.Dataset, tuple
         Either a number of particles or a dataset of initial positions
         with longitude and latitude coordinates
