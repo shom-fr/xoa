@@ -22,7 +22,7 @@ import xarray as xr
 
 from .__init__ import XoaError, xoa_warn
 from . import misc
-from . import cf
+from . import cf as xcf
 
 
 @misc.ERRORS.format_function_docstring
@@ -37,21 +37,41 @@ def get_lon(da, errors="raise"):
     Return
     ------
     xarray.DataArray or None
+
+    See also
+    --------
+    get_lat
+    get_depth
+    get_altitude
+    get_level
+    get_vertical
+    get_time
+    xoa.cf.CFSpecs.search_coord
     """
-    return cf.get_cf_specs(da).search(da, 'lon', errors=errors)
+    return xcf.get_cf_specs(da).search(da, 'lon', errors=errors)
 
 
 def is_lon(da, loc="any"):
     """Tell if a data array is identified as longitudes
 
-    Parameters
+    Parameters    is_vertical
+
     da: xarray.DataArray
 
     Return
     ------
     bool
+
+    See also
+    --------
+    is_lat
+    is_depth
+    is_altitude
+    is_level
+    is_time
+    xoa.cf.CFCoordSpecs.match
     """
-    return cf.get_cf_specs(da).coords.match(da, "lon", loc=loc)
+    return xcf.get_cf_specs(da).coords.match(da, "lon", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -65,8 +85,18 @@ def get_lat(da, errors="raise"):
     Return
     ------
     xarray.DataArray or None
+
+    See also
+    --------
+    get_lon
+    get_depth
+    get_altitude
+    get_level
+    get_vertical
+    get_time
+    xoa.cf.CFSpecs.search_coord
     """
-    return cf.get_cf_specs(da).search(da, 'lat', errors=errors)
+    return xcf.get_cf_specs(da).search(da, 'lat', errors=errors)
 
 
 def is_lat(da, loc="any"):
@@ -79,13 +109,25 @@ def is_lat(da, loc="any"):
     Return
     ------
     bool
+
+    See also
+    --------
+    is_lon
+    is_depth
+    is_altitude
+    is_level
+    is_time
+    xoa.cf.CFCoordSpecs.match
     """
-    return cf.get_cf_specs(da).coords.match(da, "lat", loc=loc)
+    return xcf.get_cf_specs(da).coords.match(da, "lat", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
 def get_depth(da, errors="raise"):
     """Get or compute the depth coordinate
+
+    If a depth variable cannot be found, it tries to compute either
+    from sigma-like coordinates or from layer thinknesses.
 
     Parameters
     ----------
@@ -94,8 +136,20 @@ def get_depth(da, errors="raise"):
     Return
     ------
     xarray.DataArray or None
+
+    See also
+    --------
+    get_lon
+    get_lat
+    get_time
+    get_altitude
+    get_level
+    get_vertical
+    xoa.cf.CFSpecs.search_coord
+    xoa.sigma.decode_cf_sigma
+    xoa.grid.decode_cf_dz2depth
     """
-    cfspecs = cf.get_cf_specs(da)
+    cfspecs = xcf.get_cf_specs(da)
     errors = misc.ERRORS[errors]
     ztype = cfspecs["vertical"]["type"]
 
@@ -139,22 +193,17 @@ def is_depth(da, loc="any"):
     Return
     ------
     bool
+
+    See also
+    --------
+    is_lon
+    is_lat
+    is_altitude
+    is_level
+    is_time
+    xoa.cf.CFCoordSpecs.match
     """
-    return cf.get_cf_specs(da).coords.match(da, "depth", loc=loc)
-
-
-def is_depth(da, loc="any"):
-    """Tell if a data array is identified as depths
-
-    Parameters
-    ----------
-    da: xarray.DataArray
-
-    Return
-    ------
-    bool
-    """
-    return cf.get_cf_specs(da).coords.match(da, "depth", loc=loc)
+    return xcf.get_cf_specs(da).coords.match(da, "depth", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -168,8 +217,18 @@ def get_altitude(da, errors="raise"):
     Return
     ------
     xarray.DataArray or None
+
+    See also
+    --------
+    get_lon
+    get_lat
+    get_depth
+    get_level
+    get_vertical
+    get_time
+    xoa.cf.CFSpecs.search_coord
     """
-    return cf.get_cf_specs(da).search(da, 'altitude', errors=errors)
+    return xcf.get_cf_specs(da).search(da, 'altitude', errors=errors)
 
 
 def is_altitude(da, loc="any"):
@@ -182,8 +241,17 @@ def is_altitude(da, loc="any"):
     Return
     ------
     bool
+
+    See also
+    --------
+    is_lon
+    is_lat
+    is_depth
+    is_level
+    is_time
+    xoa.cf.CFCoordSpecs.match
     """
-    return cf.get_cf_specs(da).coords.match(da, "altitude", loc=loc)
+    return xcf.get_cf_specs(da).coords.match(da, "altitude", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -197,8 +265,17 @@ def get_level(da, errors="raise"):
     Return
     ------
     xarray.DataArray or None
+
+    See also
+    --------
+    get_lon
+    get_lat
+    get_depth
+    get_altitude
+    get_time
+    xoa.cf.CFSpecs.search_coord
     """
-    return cf.get_cf_specs(da).coords.search(da, 'level', errors=errors)
+    return xcf.get_cf_specs(da).coords.search(da, 'level', errors=errors)
 
 
 def is_level(da, loc="any"):
@@ -211,8 +288,17 @@ def is_level(da, loc="any"):
     Return
     ------
     bool
+
+    See also
+    --------
+    is_lon
+    is_lat
+    is_depth
+    is_altitude
+    is_time
+    xoa.cf.CFCoordSpecs.match
     """
-    return cf.get_cf_specs(da).coords.match(da, "levels", loc=loc)
+    return xcf.get_cf_specs(da).coords.match(da, "levels", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -226,8 +312,18 @@ def get_vertical(da, errors="raise"):
     Return
     ------
     xarray.DataArray or None
+
+    See also
+    --------
+    get_lon
+    get_lat
+    get_depth
+    get_altitude
+    get_level
+    get_time
+    xoa.cf.CFSpecs.search_coord
     """
-    cfspecs = cf.get_cf_specs()
+    cfspecs = xcf.get_cf_specs()
     height = cfspecs.search(da, 'depth', errors="ignore")
     if height is None:
         height = cfspecs.search(da, 'altitude', errors="ignore")
@@ -235,7 +331,7 @@ def get_vertical(da, errors="raise"):
         errors = misc.ERRORS[errors]
         msg = "No vertical coordinate found"
         if errors == "raise":
-            raise cf.XoaCFError(msg)
+            raise xcf.XoaCFError(msg)
         elif errors == "warn":
             xoa_warn(msg)
     else:
@@ -253,8 +349,18 @@ def get_time(da, errors="raise"):
     Return
     ------
     xarray.DataArray or None
+
+    See also
+    --------
+    get_lon
+    get_lat
+    get_depth
+    get_altitude
+    get_level
+    get_vertical
+    xoa.cf.CFSpecs.search_coord
     """
-    return cf.get_cf_specs(da).coords.search(da, 'time', errors=errors)
+    return xcf.get_cf_specs(da).coords.search(da, 'time', errors=errors)
 
 
 def is_time(da):
@@ -267,8 +373,17 @@ def is_time(da):
     Return
     ------
     bool
+
+    See also
+    --------
+    is_lon
+    is_lat
+    is_depth
+    is_altitude
+    is_level
+    xoa.cf.CFCoordSpecs.match
     """
-    return cf.get_cf_specs(da).match(da, "time")
+    return xcf.get_cf_specs(da).match(da, "time")
 
 
 @misc.ERRORS.format_function_docstring
@@ -282,8 +397,12 @@ def get_cf_coords(da, coord_names, errors="raise"):
     Return
     ------
     list(xarray.DataArray)
+
+    See also
+    --------
+    xoa.cf.CFSpecs.search_coord
     """
-    cfspecs = cf.get_cf_specs(da)
+    cfspecs = xcf.get_cf_specs(da)
     return [cfspecs.search_coord(da, coord_name, errors=errors)
             for coord_name in coord_names]
 
@@ -313,7 +432,7 @@ def get_dims(da, dim_types, allow_positional=False, positions='tzyx', errors="wa
     --------
     xoa.cf.CFSpecs.get_dims
     """
-    return cf.get_cf_specs(da).get_dims(
+    return xcf.get_cf_specs(da).get_dims(
         da, dim_types, allow_positional=allow_positional,
         positions=positions, errors=errors)
 
@@ -600,7 +719,7 @@ def get_dim_types(da, unknown=None, asdict=False):
     ------
     tuple
     """
-    return cf.get_cf_specs(da).coords.get_dim_types(
+    return xcf.get_cf_specs(da).coords.get_dim_types(
         da, unknown=unknown, asdict=asdict)
 
 
@@ -761,5 +880,5 @@ def get_positive_attr(da, zdim=None):
             return positive_attr[positive].name
 
     # Fall back to current CFSpecs
-    cfspecs = cf.get_cf_specs(da)
+    cfspecs = xcf.get_cf_specs(da)
     return cfspecs["vertical"]["positive"]
