@@ -159,6 +159,11 @@ class _CFAccessor_(_BasicCFAccessor_):
             self._data_vars = _DataVarAccessor__(self._dsa, self._cfspecs)
         return self._data_vars
 
+    def get_depth(self):
+        """Get the depth"""
+        from .coords import get_depth
+        return get_depth(self._dsa)
+
 
 class _CoordAccessor_(_CFAccessor_):
     _search_category = 'coords'
@@ -212,7 +217,6 @@ class CFDatasetAccessor(_CFAccessor_):
 
 
 class CFDataArrayAccessor(_CoordAccessor_):
-
 
     @property
     def da(self):

@@ -99,14 +99,23 @@ napoleon_use_admonition_for_notes = True
 napoleon_use_admonition_for_references = False
 napoleon_use_rtype = False
 
-# %% genoptions
+# %% Genoptions
 genoptions_table = 'genoptions/table.txt'
 genoptions_declarations = 'genoptions/declarations.txt'
 
-# %% cfgm
+# %% Cfgm
 import xoa.cf
 cfgm_get_cfgm_func = xoa.cf._get_cfgm_
 cfgm_rst_file = "cf.txt"
+
+# %% Extlinks
+extlinks = {
+    "issue": ("https://github.com/pydata/xarray/issues/%s", "GH"),
+    "pull": ("https://github.com/pydata/xarray/pull/%s", "PR"),
+}
+
+# %% Nbsphinx
+nbsphinx_timeout = 120  # in seconds
 
 # %% User directives
 

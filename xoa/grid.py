@@ -19,9 +19,10 @@ For operations between different grids, please see :mod:`xoa.regrid`.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import xarray as xr
 
-from .__init__ import XoaError
+from .__init__ import XoaError, xoa_warn
 from . import misc
 from . import cf
 from . import coords as xcoords
@@ -146,11 +147,11 @@ def _pad_(da, dim, pad_width, mode, **kwargs):
         pad_width0 = pad_width[0]
         pad_width1 = pad_width[-1]
         if pad_width0:
-            d0 = da[{dim: pad_width0}].values - da[{dim: pad_width0+1}].values
+            d0 = da[{dim: pad_width0}].data - da[{dim: pad_width0+1}].data
             for i in range(1, pad_width0+1):
                 da[{dim: pad_width0-i}] += i * d0
         if pad_width1:
-            d1 = da[{dim: -1-pad_width1}].values - da[{dim: -2-pad_width1}].values
+            d1 = da[{dim: -1-pad_width1}].data - da[{dim: -2-pad_width1}].data
             for i in range(1, pad_width1+1):
                 da[{dim: -1-pad_width1+i}] += i * d1
     return da
@@ -199,7 +200,7 @@ def pad(da, pad_width, mode="edge", coord_mode="linear_extrap", name_kwargs=None
 
 def _get_centers_(da, dim):
     dao = da.isel({dim: slice(None, -1)})
-    dao = dao + 0.5 * da.diff(dim).values
+    dao = dao + 0.5 * da.diff(dim).data
     return dao
 
 
@@ -452,7 +453,7 @@ def dz2depth(
     # Fix index
     if zdim in depth.indexes:
         dnz = depth[zdim].diff(zdim).pad({zdim: (0, 1)}, mode="edge")
-        depth = xcoords.change_index(depth, zdim, depth[zdim]+0.5*dnz.values)
+        depth = xcoords.change_index(depth, zdim, depth[zdim]+0.5*dnz.data)
 
     # Centered
     if centered:
@@ -465,3 +466,106 @@ def dz2depth(
     depth = cfspecs.format_coord(depth, "depth")
 
     return depth
+
+
+@misc.ERRORS.format_function_docstring
+def decode_cf_dz2depth(ds, errors="raise", **kwargs):
+    """Compute depth from layer thickness in a dataset
+
+    Needed stuff is inferred from CF conventions.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        Dataset than contains everything
+    {errors}
+    kwargs: dict
+        Extra keywords are passed to :func:`dz2depth`
+
+    Return
+    ------
+    xarray.Dataset
+        A new dataset with a depth coordinate
+
+    See also
+    --------
+    dz2depth
+    """
+    ds = ds.copy()
+    errors = misc.ERRORS[errors]
+
+    # Find needed stuff
+    cfspecs = cf.get_cf_specs(ds)
+    dz = cfspecs.search(ds, 'dz', errors=errors)
+    if dz is None:
+        return ds
+    zdims = xcoords.get_dims(dz, "z", errors=errors)
+    if zdims is None:
+        return ds
+    zdim = zdims[0]
+    positive = cfspecs["vertical"]["positive"]
+    if positive is None:
+        positive = xcoords.get_positive_attr(ds, zdim)
+    if positive is None:
+        msg = "Can't infer positive attribute from data dataset"
+        if errors == "raise":
+            raise XoaError(msg)
+        xoa_warn(msg)
+        return ds
+    ssh = cfspecs.search(ds, 'ssh', errors="ignore")
+    bathy = cfspecs.search(ds, 'bathy', errors="ignore")
+
+    # Make choices
+    if ssh is None and bathy is None:
+        ref, ref_type = None, "infer"
+    else:
+        for ref, ref_type in [(bathy, "bathy"), (ssh, "ssh")][::int(positive)]:
+            if ref is not None:
+                break
+
+    # Compute depth
+    depth = dz2depth(dz, positive=positive, zdim=zdim, ref=ref, ref_type=ref_type, centered=True)
+
+    # Assign to dataset
+    return ds.assign_coords(depth=depth)
+
+
+def to_rect(da, tol=1e-5):
+    """Convert a curvilinear coordinate array to a rectangular 1d coordinate array
+
+    It checks if the coordinates may be converted to 1D without loss of information.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+        In case of a dataset, it must contain longitudes and latitudes.
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+    """
+    da = da.copy()
+    new_coords = {}
+    rename_args = {}
+    for name, coord in da.coords.items():
+        if coord.ndim != 2:
+            continue
+        if xcoords.is_lon(coord):
+            odim = xcoords.get_ydim(coord, errors="ignore")
+        elif xcoords.is_lat(coord):
+            odim = xcoords.get_xdim(coord, errors="ignore")
+        else:
+            continue
+        dims = [odim] if odim else coord.dims
+        for odim in dims:
+            if np.allclose(coord.min(odim), coord.max(odim), atol=tol):
+                new_coords[name] = xr.DataArray(coord.isel(
+                    {odim: 0}).values, dims=name, attrs=coord.attrs)
+                new_coords[name].encoding.update(coord.encoding)
+                dim = coord.dims[0] if coord.dims[1] == odim else coord.dims[1]
+                rename_args[dim] = name
+                break
+    if new_coords:
+        return da.reset_coords(list(new_coords), drop=True).rename(
+            rename_args).assign_coords(new_coords)
+    return da

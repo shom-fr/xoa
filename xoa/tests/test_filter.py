@@ -61,8 +61,7 @@ def test_convolve():
 
 def test_erode_mask():
 
-    da_in = xr.DataArray(
-        np.random.normal(size=(2, 9, 11)), dims=('nt', 'ny', 'nx'))
+    da_in = xr.DataArray(np.random.normal(size=(2, 9, 11)), dims=('nt', 'ny', 'nx'))
     nt, ny, nx = da_in.shape
     i0, n = 2, 5
     da_in[:, i0:i0+n, i0:i0+n] = np.nan
@@ -76,3 +75,14 @@ def test_erode_mask():
     mask = np.isnan(da_out_iter)
     da_out_until = xfilter.erode_mask(da_in, mask)
     np.testing.assert_allclose(da_out_iter, da_out_until)
+
+
+def test_erode_coast():
+
+    da_in = xr.DataArray(np.random.normal(size=(3, 3, 3)), dims=('nt', 'ny', 'nx'))
+    da_in[:, 1, 1] = np.nan
+
+    np_out = xfilter.erode_coast(da_in, 1).values
+    np_in = da_in.values
+    np.testing.assert_allclose(
+        np_out[1, 1, 1], 0.25*(np_in[1, 0, 1]+np_in[1, 2, 1]+np_in[1, 1, 0]+np_in[1, 1, 2]))

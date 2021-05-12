@@ -5,6 +5,7 @@ Test the :mod:`xoa.regrid` module
 
 import numpy as np
 import xarray as xr
+import pytest
 
 from xoa import regrid
 from test_interp import get_grid2locs_coords, vfunc, get_interp1d_data
@@ -56,6 +57,32 @@ def test_regrid_regrid1d():
     da_out = regrid.regrid1d(da_in, depth_out, method="linear")
     assert da_out.dims == ('time', "nk", "lon")
     assert not np.isnan(da_out).all()
+
+
+@pytest.mark.parametrize(
+    "mode,expected", [
+        ["no", [np.nan, 1, np.nan]],
+        ["bottom", [1, 1, np.nan]],
+        ["below", [1, 1, np.nan]],
+        [-1, [1, 1, np.nan]],
+        ['top', [np.nan, 1, 1]],
+        ['both', [1, 1, 1]],
+        ]
+    )
+def test_regrid_extrap1d(mode, expected):
+    nz, ny, nx = 4, 3, 5
+    zi = np.linspace(3, 10, nz)
+    zi = xr.DataArray(np.arange(nz), dims="z")
+    vi = xr.DataArray(np.ones((nz, ny, nx)), dims=('z', 'y', 'x'), coords={"z": zi})
+    vi[:, 0] = np.nan
+    vi[:, -1] = np.nan
+    vi.attrs["long_name"] = "Long name"
+    vi.name = "toto"
+    vo = regrid.extrap1d(vi, "y", mode)
+    np.testing.assert_allclose(vo.values[0, :, 0], expected)
+    assert vo.name == vi.name
+    assert vo.attrs == vi.attrs
+    assert 'z' in vo.coords
 
 
 def test_regrid_grid2loc():

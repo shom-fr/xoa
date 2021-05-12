@@ -8,7 +8,7 @@ import numpy as np
 import xarray as xr
 import pytest
 
-from xoa import XoaWarning
+import xoa
 from xoa import grid
 
 
@@ -116,3 +116,32 @@ def test_grid_dz2depth(positive, expected, ref, ref_type):
     depth = grid.dz2depth(dz, positive, ref=ref, ref_type=ref_type, centered=True)
     assert depth[0, 0] == 0.5 * sum(expected[:2])
     assert depth.z[0] == 0
+
+
+def test_coords_decode_cf_dz2depth():
+
+    ds = xoa.open_data_sample("hycom.gdp.h.nc")
+    ds = ds.rename(h="dz")
+    dsd = grid.decode_cf_dz2depth(ds)
+    assert "depth" in dsd.coords
+
+
+def test_grid_torect():
+
+    x = xr.DataArray(np.arange(4), dims='x')
+    y = xr.DataArray(np.arange(3), dims='y')
+    lon = xr.DataArray(np.ones((3, 4)), dims=('y', 'x'), coords={"y": y, "x": x})
+    lat = xr.DataArray(np.ones((3, 4)), dims=('y', 'x'), coords={"y": y, "x": x})
+    temp = xr.DataArray(
+        np.ones((2, 3, 4)), dims=('time', 'y', 'x'),
+        coords={'lon': lon, 'lat': lat, "y": y, "x": x})
+
+    tempr = grid.to_rect(temp)
+    assert tempr.dims == ('time', 'lat', 'lon')
+    assert tempr.lon.ndim == 1
+    np.testing.assert_allclose(tempr.lon.values, temp.lon[0].values)
+    print(tempr)
+
+    ds = xr.Dataset({"temp": temp})
+    dsr = grid.to_rect(ds)
+    assert dsr.temp.dims == tempr.dims

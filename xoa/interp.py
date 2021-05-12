@@ -59,7 +59,7 @@ def get_iminmax(data1d):
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def nearest1d(vari, yi, yo):
+def nearest1d(vari, yi, yo, extrap="no"):
     """Nearest interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -127,11 +127,15 @@ def nearest1d(vari, yi, yo):
                 else:
                     varo[ix, iyo] = vari[ixi, iyi+1]
 
+    # Extrapolation
+    if extrap != "no":
+        varo = extrap1d(varo, extrap)
+
     return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def linear1d(vari, yi, yo):
+def linear1d(vari, yi, yo, extrap="no"):
     """Linear interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -194,27 +198,21 @@ def linear1d(vari, yi, yo):
                     iyomin = iyo + 1
 
                 # Interpolation
-                elif dy0 >= 0 and dy1 >= 0:
+                elif dy0 > 0 or dy1 > 0:
 
                     varo[ix, iyo] = (
                         (vari[ixi, iyi]*dy1 + vari[ixi, iyi+1]*dy0) /
                         (dy0+dy1))
 
-        # # Extrapolation with nearest
-        # if extrap != "no":
-        #     for iyo in range(0, nyo):
-        #         if extrap == "both" or extrap == "bottom":
-        #             if yo[ixoy, iyo] < yi[ixiy, 0]:
-        #                 varo[ix, iyo] = vari[ixi, 0]
-        #         if extrap == "both" or extrap == "top":
-        #             if yo[ixoy, iyo] > yi[ixiy, -1]:
-        #                 varo[ix, iyo] = vari[ixi, -1]
+    # Extrapolation
+    if extrap != "no":
+        varo = extrap1d(varo, extrap)
 
     return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def cubic1d(vari, yi, yo):
+def cubic1d(vari, yi, yo, extrap="no"):
     """Cubic interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -297,11 +295,15 @@ def cubic1d(vari, yi, yo):
                     varo[ix, iyo] += mu*(vari[ix, iyi+1] - vc0)
                     varo[ix, iyo] += vari[ix, iyi]
 
+    # Extrapolation
+    if extrap != "no":
+        varo = extrap1d(varo, extrap)
+
     return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def hermit1d(vari, yi, yo, bias=0., tension=0.):
+def hermit1d(vari, yi, yo, extrap="no", bias=0., tension=0.):
     """Hermitian interp. of nD data along an axis with varying coordinates
 
     Warning
@@ -396,17 +398,20 @@ def hermit1d(vari, yi, yo, bias=0., tension=0.):
                         (1-bias)*(1-tension)/2)
                     varo[ix, iyo] += a3*vari[ix, iyi+1]
 
+    if extrap != "no":
+        varo = extrap1d(varo, extrap)
+
     return varo
 
 
-@numba.njit(parallel=False, fastmath=True)
-def extrap1d(vari, extrap):
+@numba.njit(parallel=False)
+def extrap1d(vari, mode):
     """Extrapolate valid data to the top and/or bottom
 
     Parameters
     ----------
     vari: array_like(nx, ny)
-    extrap: {"top", "bottom", "both", "no"}
+    mode: {"top", "bottom", "both", "no"}
         Extrapolation mode
 
     Return
@@ -414,30 +419,25 @@ def extrap1d(vari, extrap):
     array_like(nx, ny): varo
     """
     varo = vari.copy()
-    if extrap == "no":
+    if mode == "no":
         return varo
-    ishape = vari.shape
-    if vari.ndim > 2:
-        vari = np.ascontiguousarray(vari).reshape(-1, vari.shape[-1])
     nx, ny = vari.shape
 
     # Loop on varying dim
     for ix in numba.prange(0, nx):
-
         iybot, iytop = get_iminmax(vari[ix])
         if iybot == -1:
             continue
-
-        if extrap == "both" or extrap == "bottom":
+        if mode == "both" or mode == "bottom":
             varo[ix, :iybot] = varo[ix, iybot]
-        if extrap == "both" or extrap == "top":
+        if mode == "both" or mode == "top":
             varo[ix, iytop+1:] = varo[ix, iytop]
 
-    return varo.reshape(ishape)
+    return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def cellave1d(vari, yib, yob, conserv=False, extrap="no"):
+def cellave1d(vari, yib, yob, extrap="no", conserv=False):
     """Cell average regrid. of nD data along an axis with varying coordinates
 
     Warning
@@ -635,7 +635,7 @@ def cell2relloc(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
     return p, q
 
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=True, cache=NOT_CI)
 def grid2relloc(xxi, yyi, xo, yo):
     """Compute coordinates of point relative to a curvilinear grid
 
@@ -689,7 +689,7 @@ def grid2relloc(xxi, yyi, xo, yo):
     return p, q
 
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=True, cache=NOT_CI)
 def grid2rellocs(xxi, yyi, xo, yo):
     """Compute coordinates of points relative to a curvilinear grid
 
@@ -738,7 +738,7 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
         must be set to 1. `nexz` may be equal or a multiple of `nex`.
     ti:  array_like(nti)
         Input times
-    vi: array_like(nex, nti, nzi, nyi, nxi)
+    vi: array_like(nexz, ntiz, nzi, nyiz, nxiz)
         Input values.
     xo: array_like(no)
         Points longitude
@@ -765,6 +765,7 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     nex = max(nexv, nexz)
     vo = np.full((nex, no), np.nan, dtype=vi.dtype)
     bmask = np.isnan(vi)
+    masko = np.isnan(xo) | np.isnan(yo) | np.isnan(zo) | np.isnan(to)
     ximin = xxi.min()
     ximax = xxi.max()
     yimin = yyi.min()
@@ -785,11 +786,14 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     # Loop on ouput points
     for io in numba.prange(no):
     # for io in range(no):
+
+        if masko[io]:
+            continue
+
         if ((nxi != 1 and (xo[io] < ximin or xo[io] > ximax)) or
                 (nyi != 1 and (yo[io] < yimin or yo[io] > yimax)) or
                 (nzi != 1 and (zo[io] < zimin or zo[io] > zimax)) or
                 (nti != 1 and (to[io] < timin or to[io] > timax))):
-            # print('outside limits')
             continue
 
         # Weights
@@ -797,8 +801,6 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
 
             p, q = grid2relloc(xxi, yyi, xo[io], yo[io])
             if p < 0 or p > nxi-1 or q < 0 or q > nyi-1:
-                # print('outside cells')
-                print(xo[io], yo[io])
                 continue  # outside the grid
             i = int(p)
             j = int(q)
