@@ -8,6 +8,25 @@ Current  (unreleased)
 New features
 ------------
 
+Documentation
+-------------
+
+Deprecations
+------------
+
+Breaking changes
+----------------
+
+Bug fixes
+---------
+
+
+v0.3.0
+======
+
+New features
+------------
+
 - Add the :func:`xoa.plot.plot_flow` function [:pull:`9`].
 - Improve :func:`xoa.coords.get_depth` so that it can compute
   depth from sigma coordinates or layer thinknesses [:pull:`8`].
