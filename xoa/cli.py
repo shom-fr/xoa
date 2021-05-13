@@ -61,6 +61,7 @@ def main_info(parser, args):
     elif args.category == "options":
         show_options()
 
+
 def main_reset_cf_cache(parser, args):
     from . import cf
     cf.reset_cache(disk=True)
