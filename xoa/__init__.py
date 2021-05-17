@@ -44,7 +44,6 @@ _RE_OPTION_MATCH = re.compile(r"^(\w+)\W(\w+)$").match
 #: Specifications of configuration options
 CONFIG_SPECS = """
 [cf] # cf module
-accessors=boolean(default=True) # automatically load the :mod:`~xoa.cf` accessors?
 cache=boolean(default=True) # use the :mod:`~xoa.cf` in memory and file caches
 
 [plot] # plot parameters
