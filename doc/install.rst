@@ -8,7 +8,7 @@ Dependencies
 
 xoa requires ``python>3`` and depends on the following packages:
 
-.. list-table:: Requirements
+.. list-table::
    :widths: 10 90
 
    * - `appdirs <http://github.com/ActiveState/appdirs>`_
@@ -36,9 +36,19 @@ xoa requires ``python>3`` and depends on the following packages:
      - xarray is an open source project and Python package that makes working
        with labelled multi-dimensional arrays simple, efficient, and fun!
 
-You can install them with `conda <https://docs.conda.io/en/latest/>`_::
 
-    $ conda install -c conda-forge appdirs cmocean configobj matplotlib numba pandas scipy xarray
+
+From packages
+-------------
+
+xoa is on `conda-forge <https://anaconda.org/conda-forge>`_
+and `pypi <https://pypi.org>`_::
+
+    $ conda install -c conda-forge xoa
+
+or::
+
+    $ pip install xoa
 
 
 From sources

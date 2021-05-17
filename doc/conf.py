@@ -115,7 +115,7 @@ extlinks = {
 }
 
 # %% Nbsphinx
-nbsphinx_timeout = 120  # in seconds
+#nbsphinx_timeout = 120  # in seconds
 
 # %% User directives
 

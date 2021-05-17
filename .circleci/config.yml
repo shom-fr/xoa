@@ -37,7 +37,6 @@ deps-run: &deps-install
         pandas \
         scipy \
         xarray \
-        xesmf \
         sphinx \
         sphinx_rtd_theme \
         sphinx-argparse \
