@@ -3,6 +3,10 @@
 Naming conventions with :mod:`xoa.cf`
 #####################################
 
+.. warning::
+    Have a quick loop to the appendix :ref:`appendix.cf.default`
+    before going any further!
+
 Introduction
 ============
 
@@ -25,10 +29,12 @@ default behaviors for user's special datasets.
 .. note:: This module shares common feature with the excellent and long
     awaited `xf_xarray <https://cf-xarray.readthedocs.io/en/latest/>`_
     package and started a long time before with the Vacumm package.
-    The most differences differences include:
+    The most notable differences differences include:
 
     - The current module is also designed for data variables, not only
       coordinates.
+    - It search for items not only using standard_names but also
+      specialized names.
     - It is not only available as accessors, but also as independant
       objects that can be configured for each type of dataset or in
       contexts by the user.
@@ -126,7 +132,7 @@ Description of specification keys:
 .. note:: The ``standard_name``, ``long_name`` and ``units`` specifications are
     internally stored as a dict in the ``attrs`` key.
 
-Get name and attributes only:
+Get the specialized name and the attributes only:
 
 .. ipython:: python
 
@@ -179,7 +185,7 @@ Description of specification keys:
 .. note:: Like for data variables, the ``standard_name``, ``long_name``, ``units``
     and ``axis`` specifications are internally stored as a dict in the ``attrs`` key.
 
-Get name and attributes only:
+Get the specialized name and the attributes only:
 
 .. ipython:: python
 
@@ -214,17 +220,17 @@ Dimensions
 
 This section of the specs defines the names that the dimensions
 of type ``x``, ``y``, ``z``, ``t`` and ``f`` (forecast) can take.
-It is automatically by default with possible names (``name`` and ``alt_names``)
+It is filled automatically by default with possible names (``name`` and ``alt_names``)
 of the coordinates that have their ``axis`` defined.
-The use can also add more spcific names.
+The user can also add more spcific names.
 
-Theses list of names are used when searching for **dimensions that are not coordinate**:
-since they don't have attribute, their type can only guessed from their name.
+Theses list of names are used when searching for **dimensions that are not coordinates**:
+since they don't have attribute, their type can only be guessed from their name.
 
-.. warning:: It is recommended to not fill this section by fill in
-    the coordinate section instead.
+.. warning:: It is recommended to not fill the  **dims** section,
+    but fill the coordinate section instead.
 
-Here is the content:
+Here is the default content:
 
 .. ipython:: python
 
@@ -332,7 +338,7 @@ During an auto-formatting, each array is matched against CF specs,
 and the array is formatted when a matching is successfull.
 If the array contains coordinates, the same process is applied on them,
 as soon as the ``format_coords`` keyword is ``True``.
-If the ``name`` key is set in the matching item specs, its value is used
+If the ``name`` key is set in the matching item specs, its value can be used
 to name the variable or coordinate array, else the generic name is used
 like ``"lon"``.
 
@@ -391,7 +397,7 @@ can be registered with the :func:`xoa.cf.register_cf_accessors`:
 .. ipython:: python
 
     import xoa
-    xoa.register_accessors(cf="xcf")
+    xoa.register_accessors(xcf=True)
 
 The accessor is named here :class:`xcf <xoa.accessors.CFDatasetAccessor>`
 to not conflict with the :class:`cf` accessor of

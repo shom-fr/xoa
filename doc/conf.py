@@ -25,6 +25,7 @@ author = 'Shom'
 # The full version, including alpha/beta/rc tags
 import xoa
 release = xoa.__version__
+xoa.register_accessors(xoa=True, xcf=True, decode_sigma=True)
 
 
 # %% General configuration
@@ -49,11 +50,13 @@ extensions = [
     # 'genfortran',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput',
+    'sphinx_autosummary_accessors',
     'xoa.cfgm'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+import sphinx_autosummary_accessors
+templates_path = ['_templates', sphinx_autosummary_accessors.templates_path]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -84,6 +87,7 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/fr/3/', None),
     'cmocean': ('https://matplotlib.org/cmocean/', None),
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None),
+    'matplotlib': ('https://matplotlib.org/', None),
     'numba:': ('https://numba.readthedocs.io/en/stable/', None),
     'numpy': ("https://numpy.org/doc/stable/", None),
     'pandas': ('https://pandas.pydata.org/docs/', None),

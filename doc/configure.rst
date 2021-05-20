@@ -23,15 +23,14 @@ Permanent settings
 You can permanently change default settings by editing
 the xoa user configuration file, which is typicall here on linux:
 :file:`~/.local/share/xoa/xoa.cfg`.
-Use the following command to see if this file is at
-this place:
+Use the following command to see where this is located:
 
 .. code-block:: bash
 
     $ xoa info paths
 
 This file is organised in sections, which correspond to the
-string before the dot "." in the flat options name.
+string before the dot "." in the "flat" view of the option names.
 
 Inline settings
 ---------------

@@ -13,6 +13,9 @@ Their usage is introduced in the :ref:`uses.cf` section.
 The default configuration
 -------------------------
 
+.. note:: You can define you own specifications for each of your datasets.
+    Have a look to the :ref:`uses.cf` section and to the :ref:`examples`.
+
 .. include:: gencfspecs/index.txt
 
 As a :file:`.cfg` file
@@ -21,10 +24,10 @@ As a :file:`.cfg` file
 .. literalinclude:: ../xoa/cf.cfg
     :language: ini
 
-The configuration specifications
---------------------------------
+The configuration syntax specifications
+---------------------------------------
 
-All configurations are validated with these specifications.
+The syntax of all configurations are validated with these specifications.
 
 See `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_.
 

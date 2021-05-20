@@ -60,7 +60,7 @@ def plot_flow(
 
     Return
     ------
-    mpl.collections.LineCollection
+    matplotlib.collections.LineCollection
         The duration and step are set as attributes with values in seconds.
 
     Example

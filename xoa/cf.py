@@ -587,8 +587,18 @@ def _solve_rename_conflicts_(rename_args):
             used[new_name] = old_name
     return rename_args
 
+
 class CFSpecs(object):
-    """CF specification manager
+    """Manager for CF specifications
+
+    CF specifications are defined here an extension of a subset of
+    CF conventions: known variables and coordinates are described through
+    a generic name, a specialized name, alternates names, some properties
+    and attributes like standard_name, long_name, axis.
+
+    Have a look to the :ref:`default specifications <appendix.cf.default>`
+    and to the :ref:`uses.cf` section.
+
 
     Parameters
     ----------
@@ -607,6 +617,13 @@ class CFSpecs(object):
     cache: bool
         Use in-memory cache system?
 
+    See also
+    --------
+    CFCoordSpecs
+    CFVarSpecs
+    SGLocator
+    :ref:`uses.cf`
+    :ref:`appendix.cf.default`
     """
 
     def __init__(self, cfg=None, default=True, user=True, name=None, cache=None):
@@ -1355,7 +1372,7 @@ class CFSpecs(object):
         loc: str, {{"any", None}}, {{"", False}}
             - str: one of these locations
             - None or "any": any
-            - False or '"": no location
+            - False or "": no location
         get: {{"obj", "name"}}
             When found, get the object found or its name.
         single: bool
@@ -1404,6 +1421,11 @@ class CFSpecs(object):
         loc:
             Location
         {errors}
+
+        Return
+        ------
+        str, (str, str)
+            Dim name OR, (dim name, dim_type) if dim_type is None
 
         See also
         --------
@@ -2263,8 +2285,9 @@ class CFCoordSpecs(_CFCatSpecs_):
 
         Return
         ------
-        str, (str, str)
-            Dim name OR, (dim name, dim_type) if dim_type is None
+        str, (str, str), None
+            Dim name OR, (dim name, dim_type) if dim_type is None.
+            None if nothing found.
         """
         # Fixed dim type?
         with_dim_type = dim_type is not None
@@ -3007,7 +3030,7 @@ def infer_cf_specs(ds, named=False):
     return cfspecs
 
 
-def assign_cf_specs(ds, name=None):
+def assign_cf_specs(ds, name=None, register=False):
     """Set the ``cfspecs`` encoding to ``name`` in all data vars and coords
 
     Parameters
@@ -3023,6 +3046,9 @@ def assign_cf_specs(ds, name=None):
 
         If not provided, :func:`infer_cf_specs` is called to infer
         the best named registered specs.
+
+    register: bool
+        Register the specs if name is a named, unregistered :class:`CFSpecs` instance.
 
     Return
     ------
@@ -3058,6 +3084,8 @@ def assign_cf_specs(ds, name=None):
         if not name.name:
             xoa_warn("CFSpecs instance has no registration name")
             return ds
+        if register and not is_registered_cf_specs(name):
+            register_cf_specs(name)
         name = name.name
 
     # Set as encoding

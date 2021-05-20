@@ -20,9 +20,9 @@ Miscellaneaous low level utilities
 import types
 from enum import IntEnum, EnumMeta
 
-from .__init__ import XoaError
-
 import numpy as np
+
+from .__init__ import XoaError
 
 
 class XEnumMeta(EnumMeta):
