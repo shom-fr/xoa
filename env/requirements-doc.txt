@@ -10,7 +10,7 @@ numba
 pandas
 pip
 scipy
-xarray
+xarray>=0.17
 sphinx
 sphinx-autosummary-accessors
 sphinx_rtd_theme

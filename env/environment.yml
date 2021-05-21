@@ -11,6 +11,5 @@ dependencies:
   - matplotlib-base
   - numba
   - python>=3
-  #- scipy
-  - xarray
-  - xesmf
+  - scipy
+  - xarray>=0.17
