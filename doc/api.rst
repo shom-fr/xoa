@@ -1,6 +1,9 @@
+.. _api:
+
 API Reference
 =============
 
+.. note:: Accessors are better documented in section :ref:`accessors`.
 
 .. autosummary::
     :toctree: api

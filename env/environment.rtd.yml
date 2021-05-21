@@ -16,11 +16,12 @@ dependencies:
   - numba
   - pip
   - python>=3.7
-  - xarray
+  - xarray>=0.17
   - pip:
       - configobj
       - nbsphinx
       - sphinx
+      - sphinx-autosummary-accessors
       - sphinx_rtd_theme
       - sphinx-argparse
       - sphinxcontrib-programoutput

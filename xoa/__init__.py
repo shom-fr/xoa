@@ -44,7 +44,6 @@ _RE_OPTION_MATCH = re.compile(r"^(\w+)\W(\w+)$").match
 #: Specifications of configuration options
 CONFIG_SPECS = """
 [cf] # cf module
-accessors=boolean(default=True) # automatically load the :mod:`~xoa.cf` accessors?
 cache=boolean(default=True) # use the :mod:`~xoa.cf` in memory and file caches
 
 [plot] # plot parameters
@@ -502,7 +501,7 @@ def show_data_samples():
     print(' '.join(get_data_sample()))
 
 
-def register_accessors(xoa=True, cf=False, sigma=False):
+def register_accessors(xoa=True, xcf=False, decode_sigma=False):
     """Register xarray accessors
 
     Parameters
@@ -510,10 +509,10 @@ def register_accessors(xoa=True, cf=False, sigma=False):
     xoa: bool, str
         Register the main accessors with
         :func:`~xoa.cf.register_xoa_accessors`.
-    cf: bool, str
+    xcf: bool, str
         Register the :mod:`xoa.cf` module accessors with
         :func:`~xoa.cf.register_cf_accessors`.
-    sigma: bool, str
+    decode_sigma: bool, str
         Register the :mod:`xoa.sigma` module accessor with
         :func:`~xoa.cf.register_sigma_accessor`.
 
@@ -523,13 +522,13 @@ def register_accessors(xoa=True, cf=False, sigma=False):
     """
     if xoa:
         from .accessors import register_xoa_accessors
-        kw = {"name": cf} if isinstance(cf, str) else {}
+        kw = {"name": xoa} if isinstance(xoa, str) else {}
         register_xoa_accessors(**kw)
-    if cf:
+    if xcf:
         from .accessors import register_cf_accessors
-        kw = {"name": cf} if isinstance(cf, str) else {}
+        kw = {"name": xcf} if isinstance(xcf, str) else {}
         register_cf_accessors(**kw)
-    if sigma:
+    if decode_sigma:
         from .accessors import register_sigma_accessor
-        kw = {"name": sigma} if isinstance(sigma, str) else {}
+        kw = {"name": decode_sigma} if isinstance(decode_sigma, str) else {}
         register_sigma_accessor(**kw)

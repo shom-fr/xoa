@@ -497,7 +497,7 @@ def get_sigma_terms(ds, loc=None, rename=False):
 
     Raises
     ------
-    XoaSigmaError
+    xoa.sigma.XoaSigmaError
         In case of:
 
         - inconsistent staggered grid location in dataarrays
@@ -567,9 +567,11 @@ def get_sigma_terms(ds, loc=None, rename=False):
 def decode_cf_sigma(ds, rename=False, errors="raise"):
     """Compute heights from sigma-like variable in a dataset
 
-    Needed stuff is inferred from CF conventions.
+    This makes use of the :meth:`~xoa.cf.CFSpecs` instance that is retreived
+    with :func:`xoa.cf.get_cf_specs` with ds as an argument in order to
+    find needed variables.
     If the dataset is not found to have sigma-like coordinates,
-    a simple copy of the dataset is returned.
+    a simple copy is returned.
 
     When a data variable that have the same dimensions is found, the
     the computed coordinate is transposed properly and assigned
@@ -583,7 +585,6 @@ def decode_cf_sigma(ds, rename=False, errors="raise"):
         Rename and format arrays ot make them compliant with
         :mod:`xoa.cf`
     {errors}
-
 
     Return
     ------

@@ -10,10 +10,11 @@ numba
 pandas
 pip
 scipy
-xarray
-xesmf
+xarray>=0.17
 sphinx
+sphinx-autosummary-accessors
 sphinx_rtd_theme
 sphinx-argparse
 sphinxcontrib-programoutput
+
 

@@ -27,7 +27,7 @@ from . import dyn
 
 def plot_flow(
         u, v, duration=None, step=None, particles=2000, axes=None,
-        alpha=(.2, 1), linewidth=.3, color="k", **kwargs):
+        alpha=(.2, 1), linewidth=.3, color="k", autolim=None, **kwargs):
     """Plot currents as a windy-like plot with random little lagrangian tracks
 
     Parameters
@@ -47,16 +47,20 @@ def plot_flow(
         The axes instance
     alpha: float, tuple
         Alpha transparency. If a tuple, apply a linear alpha ramp to the track
-        from its start to is end.
-    linewidth: float, tuple.
+        from its start to its end.
+    linewidth: float, tuple
         Linewidth of the track. If a tuple, apply a linear linewidth ramp to the track
-        from its start to is end.
+        from its start to its end.
     color:
         Single color for the track.
+    autolim: None, bool
+        Wether to auto-update the data limits.
+        A value of None sets autolim to True if "axes" is not provided,
+        else to None. See :meth:`matplotlib.axes.Axes.add_collection`.
 
     Return
     ------
-    mpl.collections.LineCollection
+    matplotlib.collections.LineCollection
         The duration and step are set as attributes with values in seconds.
 
     Example
@@ -83,8 +87,13 @@ def plot_flow(
 
         # Plot
         lc = plot_flow(ds["u"], ds["v"])
+        @savefig api.plot.plot_flow.png
         lc.duration, lc.step
 
+    See also
+    --------
+    xoa.dyn.flow2d
+    matplotlib.axes.Axes.add_collection
     """
     # Infer parameters
     if duration is None or step is None:
@@ -145,9 +154,9 @@ def plot_flow(
     newaxes = axes is None
     if newaxes:
         axes = plt.gca()
-    axes.add_collection(lc)
-    if newaxes:
-        axes.autoscale_view()
+    if autolim is None:
+        autolim = newaxes
+    axes.add_collection(lc, autolim=autolim)
 
     return lc
 

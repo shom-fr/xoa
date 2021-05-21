@@ -20,30 +20,58 @@ xarray and pandas xoa accessors
 
 import warnings
 
+from .misc import ERRORS
+
 
 class _BasicCFAccessor_(object):
 
-    def __init__(self, dsa, cfspecs=None):
+    def __init__(self, obj, cfspecs=None):
         from . import cf
         if cfspecs is None:
-            cfspecs = cf.infer_cf_specs(dsa)
-        self._dsa = dsa
+            cfspecs = cf.infer_cf_specs(obj)
+        self._obj = obj
         self.set_cf_specs(cfspecs)
 
     def _assign_cf_specs_(self):
         from . import cf
         if self._cfspecs.name:
-            self._dsa = cf.assign_cf_specs(self._dsa, self._cfspecs.name)
+            self._obj = cf.assign_cf_specs(self._obj, self._cfspecs, register=True)
 
     def set_cf_specs(self, cfspecs):
-        """Set the internal :class:`CFSpecs` used by this accessor"""
+        """Set the internal :class:`~xoa.cf.CFSpecs` used by this accessor
+
+        If the specs object has a :cfsec:`registration name <register>`,
+        it is assigned to
+        the current object and its children with function
+        :func:`~xoa.cf.assign_cf_specs`. This set the "cfspecs" encoding
+        to the name.
+
+        Parameters
+        ----------
+        cfspecs: xoa.cf.CFSpecs
+
+        See also
+        --------
+        :ref:`uses.cf`
+        """
         from . import cf
         assert isinstance(cfspecs, cf.CFSpecs)
         self._cfspecs = cfspecs
         self._assign_cf_specs_()
 
     def get_cf_specs(self):
-        """Get the internal :class:`CFSpecs` instance used by this accessor"""
+        """Get the internal :class:`~xoa.cf.CFSpecs` instance used by this accessor
+
+        If not provided at the initialization, it is infered with :func:`xoa.cf.infer_cf_specs`.
+
+        Return
+        ------
+        xoa.cf.CFSpecs
+
+        See also
+        --------
+        :ref:`uses.cf`
+        """
         return self._cfspecs
 
     cfspecs = property(fget=get_cf_specs, fset=set_cf_specs, doc="The CFSpecs instance")
@@ -52,47 +80,83 @@ class _BasicCFAccessor_(object):
 class _CFAccessor_(_BasicCFAccessor_):
     _search_category = None
 
-    def __init__(self, dsa, cfspecs=None):
-        _BasicCFAccessor_.__init__(self, dsa, cfspecs)
+    def __init__(self, obj, cfspecs=None):
+        _BasicCFAccessor_.__init__(self, obj, cfspecs)
         self._coords = None
         self._data_vars = None
         self._cache = {}
-        self._dsa = self.infer_coords()
+        self._obj = self.infer_coords()
         self._assign_cf_specs_()
 
+    @ERRORS.format_method_docstring
     def get(self, name, loc="any", single=True, errors="ignore"):
-        """Search for a CF item with :meth:`CFSpecs.search`"""
+        """Search for a data array or coordinate knowing its generic name
+
+        Search is made with the :meth:`~xoa.cf.CFSpecs.search` method of the
+        :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+
+        Parameters
+        ----------
+        name: str
+        loc: str, {{"any", None}}, {{"", False}}
+            - str: one of these locations
+            - None or "any": any
+            - False or "": no location
+        {errors}
+
+        See also
+        --------
+        :meth:`xoa.cf.CFSpecs.search`
+        :meth:`xoa.cf.CFCoordSpecs.search`
+        :meth:`xoa.cf.CFVarSpecs.search`
+        """
         kwargs = dict(name=name, loc=loc, get="obj", single=single,
                       errors=errors)
         if self._search_category is None:
-            return self._cfspecs.search(self._dsa, **kwargs)
-        return self._cfspecs[self._search_category].search(self._dsa, **kwargs)
+            return self._cfspecs.search(self._obj, **kwargs)
+        return self._cfspecs[self._search_category].search(self._obj, **kwargs)
 
-    def get_coord(self, name, loc="any", single=True):
-        """Search for a CF coord with :meth:`CFCoordSpecs.search`"""
-        return self._cfspecs.coords.search(
-            self._dsa, name=name, loc=loc, get="obj", single=single,
+    @ERRORS.format_method_docstring
+    def get_coord(self, name, loc="any", single=True, errors="ignore"):
+        """Search for a coordinate knowing its generic name
+
+        Search is made with the :meth:`~xoa.cf.CFSpecs.search_coord` method of the
+        :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+
+        Parameters
+        ----------
+        name: str
+        loc: str, {{"any", None}}, {{"", False}}
+            - str: one of these locations
+            - None or "any": any
+            - False or "": no location
+        {errors}
+
+        See also
+        --------
+        :meth:`xoa.cf.CFSpecs.search`
+        :meth:`xoa.cf.CFCoordSpecs.search`
+        :meth:`xoa.cf.CFVarSpecs.search`
+        """
+        return self._cfspecs.search_coord(
+            self._obj, name=name, loc=loc, get="obj", single=single,
             errors="ignore")
 
     def __getattr__(self, name):
+        """Shortcut to :meth:`get`"""
         return self.get(name, errors="ignore")
 
     def __getitem__(self, name):
+        """Shortcut to :meth:`get`"""
         return self.get(name, errors="ignore")
 
     def auto_format(self, loc=None, standardize=True):
-        """Auto-format attributes with :meth:`CFSpecs.auto_format`
+        """Rename variables and coordinates and fill their attributes
 
-        Return
-        ------
-        xarray.Dataset, xarray.DataArray
-        """
-        return self._cfspecs.auto_format(self._dsa, loc=loc, standardize=standardize)
-
-    __call__ = auto_format
-
-    def fill_attrs(self, loc=None, standardize=True):
-        """Fill attributes with :meth:`CFSpecs.fill_attrs`
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
 
         Return
         ------
@@ -100,40 +164,69 @@ class _CFAccessor_(_BasicCFAccessor_):
 
         See also
         --------
-        xoa.cf.CFSpecs.fill_attrs
+        :meth:`xoa.cf.CFSpecs.auto_format`
+        :ref:`uses.cf`
         """
-        return self._cfspecs.fill_attrs(self._dsa, loc=loc, standardize=standardize)
+        return self._cfspecs.auto_format(self._obj, loc=loc, standardize=standardize)
+
+    def fill_attrs(self, loc=None, standardize=True):
+        """Fill missing attributes
+
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+
+        Return
+        ------
+        xarray.Dataset, xarray.DataArray
+
+        See also
+        --------
+        :meth:`xoa.cf.CFSpecs.fill_attrs`
+        :ref:`uses.cf`
+        """
+        return self._cfspecs.fill_attrs(self._obj, loc=loc, standardize=standardize)
 
     def infer_coords(self, **kwargs):
         """Infer coordinates and set them as coordinates
 
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+
         Return
         ------
         xarray.Dataset, xarray.DataArray
 
         See also
         --------
-        xoa.cf.CFSpecs.infer_coords
+        :meth:`xoa.cf.CFSpecs.infer_coords`
+        :ref:`uses.cf`
         """
-        return self.cfspecs.infer_coords(self._dsa, **kwargs)
+        return self.cfspecs.infer_coords(self._obj, **kwargs)
 
     def decode(self, **kwargs):
         """Rename variables and coordinates to generic names
 
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+
         Return
         ------
         xarray.Dataset, xarray.DataArray
 
         See also
         --------
-        xoa.cf.CFSpecs.decode
+        :meth:`xoa.cf.CFSpecs.decode`
+        :meth:`xoa.cf.CFSpecs.encode`
+        :ref:`uses.cf`
         """
-        return self.cfspecs.decode(self._dsa, **kwargs)
+        return self.cfspecs.decode(self._obj, **kwargs)
 
     def encode(self, **kwargs):
         """Rename variables and coordinates to specialized names
 
-        If no specialized name is declared, generic names are used.
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+        If no specialized name is declared in the specs, generic names are used.
 
         Return
         ------
@@ -141,28 +234,50 @@ class _CFAccessor_(_BasicCFAccessor_):
 
         See also
         --------
-        xoa.cf.CFSpecs.encode
+        :meth:`xoa.cf.CFSpecs.encode`
+        :meth:`xoa.cf.CFSpecs.decode`
+        :ref:`uses.cf`
         """
-        return self.cfspecs.encode(self._dsa, **kwargs)
+        return self.cfspecs.encode(self._obj, **kwargs)
+
+    @ERRORS.format_method_docstring
+    def get_depth(self, errors="ignore"):
+        """Get the depth as computed or recognized by the :meth:`~xoa.cf.CFSpecs`
+
+        If a depth variable cannot be found, it tries to compute either
+        from sigma-like coordinates or from layer thinknesses.
+
+        Parameters
+        ----------
+        {errors}
+
+        Return
+        ------
+        xarray.DataArray, None
+
+        See also
+        --------
+        :func:`xoa.coords.get_depth`
+        :func:`xoa.grid.decode_cf_dz2depth`
+        :func:`xoa.sigma.decode_cf_sigma`
+        :ref:`uses.cf`
+        """
+        from .coords import get_depth
+        return get_depth(self._obj, errors=errors)
 
     @property
     def coords(self):
         """Sub-accessor for coords only"""
         if self._coords is None:
-            self._coords = _CoordAccessor_(self._dsa, self._cfspecs)
+            self._coords = _CoordAccessor_(self._obj, self._cfspecs)
         return self._coords
 
     @property
     def data_vars(self):
         """Sub-accessor for data_vars only"""
         if self._data_vars is None:
-            self._data_vars = _DataVarAccessor__(self._dsa, self._cfspecs)
+            self._data_vars = _DataVarAccessor__(self._obj, self._cfspecs)
         return self._data_vars
-
-    def get_depth(self):
-        """Get the depth"""
-        from .coords import get_depth
-        return get_depth(self._dsa)
 
 
 class _CoordAccessor_(_CFAccessor_):
@@ -172,36 +287,114 @@ class _CoordAccessor_(_CFAccessor_):
     def dim(self):
         from .cf import XoaError
         try:
-            return self._cfspecs.coords.search_dim(self._dsa)[0]
+            return self._cfspecs.coords.search_dim(self._obj)[0]
         except XoaError:
             return
 
-    def get_dim(self, dim_type):
+    def get_dim(self, dim_type, loc="any"):
+        """Get a dimension name knowing its type
+
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+        If no specialized name is declared in the specs, generic names are used.
+
+        Parameters
+        ----------
+        dim_type: None, {{"x", "y", "z", "t", "f"}}
+            Dimension type
+        loc:
+            Location
+
+        Return
+        ------
+        str, None
+            Dimension name or None of not found
+
+        See also
+        --------
+        :meth:`xoa.cf.CFSpecs.search_dim`
+        """
         dim_type = dim_type.lower()
         if not hasattr(self, '_dims'):
             self._dims = {}
             if dim_type not in self._dims:
-                self._dims[dim_type] = self._cfspecs.coords.search_dim(self._dsa, dim_type)
+                self._dims[dim_type] = self._cfspecs.coords.search_dim(
+                    self._obj, dim_type, loc=loc)
         return self._dims[dim_type]
 
     @property
     def xdim(self):
+        """X dimension
+
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+        If no specialized name is declared in the specs, generic names are used.
+
+
+        See also
+        -------
+        :meth:`xoa.cf.CFSpecs.search_dim`
+        """
         return self.get_dim("x")
 
     @property
     def ydim(self):
+        """Y dimension name
+
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+        If no specialized name is declared in the specs, generic names are used.
+
+
+        See also
+        -------
+        :meth:`xoa.cf.CFSpecs.search_dim`
+        """
         return self.get_dim("y")
 
     @property
     def zdim(self):
+        """Z dimension name
+
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+        If no specialized name is declared in the specs, generic names are used.
+
+
+        See also
+        -------
+        :meth:`xoa.cf.CFSpecs.search_dim`
+        """
         return self.get_dim("z")
 
     @property
     def tdim(self):
+        """T (time) dimension name
+
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+        If no specialized name is declared in the specs, generic names are used.
+
+
+        See also
+        -------
+        :meth:`xoa.cf.CFSpecs.search_dim`
+        """
         return self.get_dim("t")
 
     @property
     def fdim(self):
+        """F (forecast) dimension name
+
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+        If no specialized name is declared in the specs, generic names are used.
+
+
+        See also
+        -------
+        :meth:`xoa.cf.CFSpecs.search_dim`
+        """
         return self.get_dim("f")
 
 
@@ -213,31 +406,51 @@ class CFDatasetAccessor(_CFAccessor_):
 
     @property
     def ds(self):
-        return self._dsa
+        return self._obj
 
 
 class CFDataArrayAccessor(_CoordAccessor_):
 
     @property
     def da(self):
-        return self._dsa
+        return self._obj
 
     @property
     def name(self):
+        """Get the generic name that matches this array
+
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+        If no specialized name is declared in the specs, generic names are used.
+
+        See also
+        --------
+        :meth:`xoa.cf.CFSpecs.match`
+        """
         if 'name' not in self._cache:
-            category, name = self._cfspecs.match(self._dsa)
+            category, name = self._cfspecs.match(self._obj)
             self._cache["category"] = category
             self._cache["name"] = name
         return self._cache["name"]
 
     @property
     def attrs(self):
+        """Get the generic attributes that matches this array
+
+        This makes use of the :meth:`~xoa.cf.CFSpecs` instance was set at initialisation or
+        inferred with :func:`xoa.cf.infer_cf_specs`.
+        If no specialized name is declared in the specs, generic names are used.
+
+        See also
+        --------
+        :meth:`xoa.cf.CFSpecs.get_attrs`
+        """
         if "attrs" not in self._cache:
             if self.name:
                 cf_attrs = self._cfspecs[self._cache["category"]].get_attrs(
                     self._cache["name"], multi=True)
                 self._cache["attrs"] = self._cfspecs.sglocator.patch_attrs(
-                    self._dsa.attrs, cf_attrs)
+                    self._obj.attrs, cf_attrs)
             else:
                 self._cache["attrs"] = {}
         return self._cache["attrs"]
@@ -262,10 +475,27 @@ class SigmaAccessor(_BasicCFAccessor_):
     def __init__(self, ds, cfspecs=None):
         assert hasattr(ds, "data_vars"), "ds must be a xarray.Dataset"
         _BasicCFAccessor_.__init__(self, ds, cfspecs)
-        self._ds = self._dsa
+        self._ds = self._obj
 
+    @ERRORS.format_method_docstring
     def decode(self, rename=False, errors="raise"):
-        """Call :func:`decode_cf_sigma` on the dataset"""
+        """Compute depth from sigma coordinates
+
+        Parameters
+        ----------
+        rename: bool
+            Rename and format arrays ot make them compliant with
+            :mod:`xoa.cf`
+        {errors}
+
+        Return
+        ------
+        xarray.Dataset
+
+        See also
+        --------
+        :func:`xoa.sigma.decode_cf_sigma`
+        """
         from .sigma import decode_cf_sigma
         return decode_cf_sigma(self._ds, rename=rename, errors=errors)
 
@@ -274,7 +504,54 @@ class SigmaAccessor(_BasicCFAccessor_):
         return self.decode()
 
     def get_sigma_terms(self, loc=None, rename=False):
-        """Call :func:`get_sigma_terms` on the dataset"""
+        """Call :func:`get_sigma_terms` on the dataset
+
+
+        It operates like this:
+
+        1. Search for the sigma variables.
+        2. Parse their ``formula_terms`` attribute.
+        3. Create a dict for each locations from names in datasets to
+           :mod:`xoa.cf` compliant names that are also used in conversion
+           functions.
+
+        Parameters
+        ----------
+        ds: xarray.Dataset
+        loc: str, {"any", None}
+            Staggered grid location.
+            If any or None, results for all locations are returned.
+
+        Returns
+        -------
+        dict, dict of dict
+            A dict is generated for a given sigma variable,
+            whose keys are array names, like ``"sc_r"``,
+            and values are :mod:`~xoa.cf` names, like ``"sig"``.
+            A special key is the ``"type"`` whose corresponding value
+            is the ``standard_name``, stripped from its potential staggered grid
+            location indicator.
+            If ``loc`` is ``"any"`` or ``None``,
+            each dict is embedded in a master dict
+            whose keys are staggered grid location. If no location is found,
+            the key is set ``None``.
+
+        Raises
+        ------
+        xoa.sigma.XoaSigmaError
+            In case of:
+
+            - inconsistent staggered grid location in dataarrays
+              as checked by :meth:`xoa.cf.SGLocator.get_location`
+            - no standard_name in sigma/s variable
+            - a malformed formula
+            - a formula term variable that is not found in the dataset
+            - an unknown formula term name
+
+        See also
+        --------
+        :func:`xoa.sigma.get_sigma_terms`
+        """
         from .sigma import get_sigma_terms
         return get_sigma_terms(self._ds, loc=loc, rename=rename)
 
@@ -293,14 +570,14 @@ class XoaDatasetAccessor(CFDatasetAccessor):
 
     @property
     def cf(self):
-        """The :class:`CFDatasetAccessor` subaccessor"""
+        """The :class:`~xoa.accessors.CFDatasetAccessor` subaccessor"""
         if not hasattr(self, "_cf"):
             self._cf = CFDatasetAccessor(self._ds, self._cfspecs)
         return self._cf
 
     @property
     def decode_sigma(self):
-        """The :class:`SigmaAccessor` subaccessor for sigma coordinates"""
+        """The :class:`~xoa.accessors.SigmaAccessor` subaccessor for sigma coordinates"""
         if not hasattr(self, "_sigma"):
             self._sigma = SigmaAccessor(self._ds)
         return self._sigma
