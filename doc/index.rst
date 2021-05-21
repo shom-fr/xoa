@@ -8,16 +8,16 @@
 
    install
    configure
+   howtostart
 
 .. toctree::
    :caption: User Guide
    :maxdepth: 1
    :hidden:
 
-   uses
    examples
+   uses
    cli
-
 
 .. toctree::
    :caption: Reference
@@ -25,6 +25,7 @@
    :hidden:
 
    api
+   accessors
    changes
    roadmap
    appendix

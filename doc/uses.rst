@@ -1,3 +1,5 @@
+.. _uses:
+
 Using the modules
 =================
 

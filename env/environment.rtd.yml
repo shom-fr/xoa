@@ -21,6 +21,7 @@ dependencies:
       - configobj
       - nbsphinx
       - sphinx
+      - sphinx-autosummary-accessors
       - sphinx_rtd_theme
       - sphinx-argparse
       - sphinxcontrib-programoutput

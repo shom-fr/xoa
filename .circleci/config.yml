@@ -38,6 +38,7 @@ deps-run: &deps-install
         scipy \
         xarray \
         sphinx \
+        sphinx-autosummary-accessors \
         sphinx_rtd_theme \
         sphinx-argparse \
         sphinxcontrib-programoutput

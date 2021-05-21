@@ -472,12 +472,14 @@ def dz2depth(
 def decode_cf_dz2depth(ds, errors="raise", **kwargs):
     """Compute depth from layer thickness in a dataset
 
-    Needed stuff is inferred from CF conventions.
+    This makes use of the :meth:`~xoa.cf.CFSpecs` instance that is retreived
+    with :func:`xoa.cf.get_cf_specs` with ds as an argument in order to
+    find needed variables.
 
     Parameters
     ----------
     ds: xarray.Dataset
-        Dataset than contains everything
+        Dataset that contains everything
     {errors}
     kwargs: dict
         Extra keywords are passed to :func:`dz2depth`
@@ -490,6 +492,7 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
     See also
     --------
     dz2depth
+    xoa.cf.get_cf_specs
     """
     ds = ds.copy()
     errors = misc.ERRORS[errors]
