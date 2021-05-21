@@ -16,6 +16,9 @@ xoa - xarray-based ocean analysis library
 .. image:: https://anaconda.org/conda-forge/xoa/badges/downloads.svg
     :alt: Number of downloads on anaconda.org/conda-forge
     :target: https://anaconda.org/conda-forge/xoa/
+.. image:: https://pepy.tech/badge/xoa
+    :alt: Number of downloads on pypi
+    :target: https://pypi.org/project/xoa
 
 xoa is intended to help reading and manipulating observed
 and simulated ocean data.
