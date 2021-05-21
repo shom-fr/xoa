@@ -87,6 +87,7 @@ def plot_flow(
 
         # Plot
         lc = plot_flow(ds["u"], ds["v"])
+        @savefig api.plot.plot_flow.png
         lc.duration, lc.step
 
     See also

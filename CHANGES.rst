@@ -2,25 +2,14 @@ What's new
 ##########
 
 
-Current (unreleased)
-====================
+v0.3.1 (2021-05-21)
+===================
 
 New features
 ------------
 
 - Add an ``autolim`` keyword to :func:`xoa.plot.plot_flow` to speedup
   the processing with cartopy maps.
-
-Documentation
--------------
-
-- Add a "How to start" section.
-- Accessors are not documented separately with ``sphinx-autosummary-accessors``
-  [:pull:`20`].
-- The Hycom-GDP example now uses :func:`xoa.plot.plot_flow`.
-
-Deprecations
-------------
 
 Breaking changes
 ----------------
@@ -36,9 +25,17 @@ Bug fixes
 - Fix the access to the xoa executable on windows.
 - Fix the minimal version for xarray [:pull:`23`].
 
+Documentation
+-------------
 
-v0.3.0
-======
+- Add a "How to start" section.
+- Accessors are not documented separately with ``sphinx-autosummary-accessors``
+  [:pull:`20`].
+- The Hycom-GDP example now uses :func:`xoa.plot.plot_flow`.
+
+
+v0.3.0 (2021-05-12)
+===================
 
 New features
 ------------
@@ -62,3 +59,19 @@ Bug fixes
 
 0.2.0
 =====
+
+New features
+------------
+
+Breaking changes
+----------------
+
+Deprecations
+------------
+
+Bug fixes
+---------
+
+Documentation
+-------------
+

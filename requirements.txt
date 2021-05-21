@@ -5,6 +5,6 @@ numba
 python>=3
 setuptools
 scipy
-xarray
+xarray>=0.17
 
 

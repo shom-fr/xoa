@@ -479,7 +479,7 @@ class SigmaAccessor(_BasicCFAccessor_):
 
     @ERRORS.format_method_docstring
     def decode(self, rename=False, errors="raise"):
-        """Call :func:`decode_cf_sigma` on the dataset to infer depth from sigma coordinates
+        """Compute depth from sigma coordinates
 
         Parameters
         ----------
@@ -570,14 +570,14 @@ class XoaDatasetAccessor(CFDatasetAccessor):
 
     @property
     def cf(self):
-        """The :class:`CFDatasetAccessor` subaccessor"""
+        """The :class:`~xoa.accessors.CFDatasetAccessor` subaccessor"""
         if not hasattr(self, "_cf"):
             self._cf = CFDatasetAccessor(self._ds, self._cfspecs)
         return self._cf
 
     @property
     def decode_sigma(self):
-        """The :class:`SigmaAccessor` subaccessor for sigma coordinates"""
+        """The :class:`~xoa.accessors.SigmaAccessor` subaccessor for sigma coordinates"""
         if not hasattr(self, "_sigma"):
             self._sigma = SigmaAccessor(self._ds)
         return self._sigma
