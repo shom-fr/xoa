@@ -53,6 +53,7 @@ def test_grid_pad():
     da = get_da()
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", ".*cf.*")
+        warnings.filterwarnings("error", ".*ist-or-tuple.*")
         dap = grid.pad(da, {"y": 1, "x": 1}, name_kwargs={'dep': {"mode": 'edge'}})
     assert dap.shape == (da.shape[0], da.shape[1]+2, da.shape[2]+2)
     assert dap.x[0] == -1
@@ -140,7 +141,6 @@ def test_grid_torect():
     assert tempr.dims == ('time', 'lat', 'lon')
     assert tempr.lon.ndim == 1
     np.testing.assert_allclose(tempr.lon.values, temp.lon[0].values)
-    print(tempr)
 
     ds = xr.Dataset({"temp": temp})
     dsr = grid.to_rect(ds)

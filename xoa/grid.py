@@ -99,7 +99,7 @@ def apply_along_dim(
                 kw = kwd.copy()
                 if name_kwargs and da.name in name_kwargs:
                     kw.update(name_kwargs.get(da.name))
-                dao = func(xr.DataArray(da, coords={}), dim, **kw)
+                dao = func(xr.DataArray(da.data, dims=da.dims), dim, **kw)
                 dao.name = da.name
                 dao.encoding = da.encoding
                 dao.attrs = da.attrs
@@ -116,17 +116,20 @@ def apply_along_dim(
         coords = {}
         if name_kwargs is None:
             name_kwargs = {}
-        for coord_name, coord in old_coords.items():
+        for coord_name, old_coord in old_coords.items():
             if coord_name in da_names:
                 continue
-            if dim in coord.dims:
-                coord = xr.DataArray(coord, coords={})
+            if dim in old_coord.dims:
                 kw = kwargs or {}
                 for dd in (coord_kwargs, name_kwargs.get(coord_name)):
                     if dd:
                         kw.update(dd)
-                coord = coord_func(coord, dim, **kw)
-            coords[coord.name] = coord
+                coord = coord_func(xr.DataArray(old_coord.data, dims=old_coord.dims), dim, **kw)
+                coord.attrs = old_coord.attrs
+                coord.encoding = old_coord.encoding
+            else:
+                coord = old_coord
+            coords[coord_name] = coord
         dso = dso.assign_coords(coords)
 
     cf.assign_cf_specs(dso, ds)
@@ -135,26 +138,32 @@ def apply_along_dim(
 
 
 def _pad_(da, dim, pad_width, mode, **kwargs):
+
     pad_width = pad_width.get(dim, 0)
     if not pad_width:
         return da.copy()
-    if mode not in ("edge", "linear_extrap"):
+
+    if mode != "linear_extrap":
         return da.pad({dim: pad_width}, mode=mode, **kwargs)
-    da = da.pad({dim: pad_width}, mode="edge", **kwargs)
-    if mode == "linear_extrap":
-        if isinstance(pad_width, int):
-            pad_width = pad_width,
-        pad_width0 = pad_width[0]
-        pad_width1 = pad_width[-1]
-        if pad_width0:
-            d0 = da[{dim: pad_width0}].data - da[{dim: pad_width0+1}].data
-            for i in range(1, pad_width0+1):
-                da[{dim: pad_width0-i}] += i * d0
-        if pad_width1:
-            d1 = da[{dim: -1-pad_width1}].data - da[{dim: -2-pad_width1}].data
-            for i in range(1, pad_width1+1):
-                da[{dim: -1-pad_width1+i}] += i * d1
-    return da
+
+    to_concat = []
+    if isinstance(pad_width, int):
+        pad_width = pad_width,
+    pad_width0 = pad_width[0]
+    pad_width1 = pad_width[-1]
+    if not pad_width0 and not pad_width1:
+        return da
+    if pad_width0:
+        ramp0 = xr.DataArray(np.arange(pad_width0, 0, -1, dtype=da.dtype), dims=dim)
+        da0 = da[{dim: 0}] + (da[{dim: 0}] - da[{dim: 1}]) * ramp0
+        to_concat.append(da0.transpose(*da.dims))
+    to_concat.append(da)
+    if pad_width1:
+        ramp1 = xr.DataArray(np.arange(1, pad_width1+1, dtype=da.dtype), dims=dim)
+        da1 = da[{dim: -1}] + (da[{dim: -1}] - da[{dim: -2}]) * ramp1
+        to_concat.append(da1.transpose(*da.dims))
+
+    return xr.concat(to_concat, dim=dim)
 
 
 def pad(da, pad_width, mode="edge", coord_mode="linear_extrap", name_kwargs=None, **kwargs):
