@@ -1,14 +1,15 @@
 .. _accessors:
 
-Accessors
-=========
+Accessors API
+=============
 
 
 .. currentmodule:: xarray
 
+.. _accessors.dataarray:
+
 DataArray
 ---------
-
 
 Attributes
 ~~~~~~~~~~
@@ -49,6 +50,8 @@ Methods
 
 Dataset
 -------
+
+.. _accessors.dataset:
 
 Attributes
 ~~~~~~~~~~

@@ -1,7 +1,7 @@
 .. _api:
 
-API Reference
-=============
+Package API
+===========
 
 .. note:: Accessors are better documented in section :ref:`accessors`.
 
