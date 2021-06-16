@@ -15,7 +15,7 @@
    :maxdepth: 1
    :hidden:
 
-   examples/index
+   examples
    uses
    cli
 

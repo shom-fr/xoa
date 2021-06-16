@@ -1,6 +1,9 @@
 xoa - xarray-based ocean analysis library
 =========================================
 
+.. image:: https://mybinder.org/badge_logo.svg
+    :alt: Run examples live on binder!
+    :target: https://mybinder.org/v2/gh/VACUMM/xoa/master?filepath=doc%2Fexamples
 .. image:: https://travis-ci.org/VACUMM/xoa.svg?branch=master
     :alt: Building and testing status
     :target: https://travis-ci.org/VACUMM/xoa

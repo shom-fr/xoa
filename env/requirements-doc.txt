@@ -5,6 +5,7 @@ configobj
 ipython
 jupyter_client
 matplotlib-base
+nbsphinx
 numba
 pandas
 pip
@@ -15,6 +16,5 @@ sphinx-autosummary-accessors
 sphinx_rtd_theme
 sphinx-argparse
 sphinxcontrib-programoutput
-sphinx-gallery
 
 

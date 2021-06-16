@@ -44,12 +44,13 @@ extensions = [
     "sphinx.ext.githubpages",
     "IPython.sphinxext.ipython_directive",
     "IPython.sphinxext.ipython_console_highlighting",
+    'nbsphinx',
     'genoptions',
     'gencfspecs',
+    # 'genfortran',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput',
     'sphinx_autosummary_accessors',
-    'sphinx_gallery.gen_gallery',
     'xoa.cfgm'
 ]
 
@@ -119,25 +120,6 @@ extlinks = {
 
 # %% Nbsphinx
 #nbsphinx_timeout = 120  # in seconds
-
-# %% Sphinx gallery
-sphinx_gallery_conf = {
-    "examples_dirs": "../examples",
-    "gallery_dirs": "examples",
-    "binder": {
-        'org': 'VACUMM',
-        'repo': 'xoa',
-        'branch': 'master',
-        'binderhub_url': 'https://mybinder.org',
-        'dependencies': [
-            './binder/environment.yml',
-            './binder/apt.txt',
-            './binder/setup.py'
-            ],
-        'notebooks_dir': 'notebooks',
-        'use_jupyter_lab': True,
-        },
-    }
 
 # %% User directives
 
