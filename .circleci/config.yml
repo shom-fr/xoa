@@ -33,7 +33,6 @@ deps-run: &deps-install
         jupyter_client \
         matplotlib-base \
         numba \
-        nbsphinx \
         pandas \
         scipy \
         "xarray>=0.17" \
@@ -41,7 +40,8 @@ deps-run: &deps-install
         sphinx-autosummary-accessors \
         sphinx_rtd_theme \
         sphinx-argparse \
-        sphinxcontrib-programoutput
+        sphinxcontrib-programoutput \
+        sphinx-gallery
     conda list -n test-environment
 
 cp-run: &cp-install
