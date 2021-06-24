@@ -116,6 +116,126 @@ def _bearing_(lon0, lat0, lon1, lat1):
     return a * 180 / math.pi
 
 
+def cdist(XA, XB, radius=EARTH_RADIUS):
+    """Compute the haversine distances between positions of two datasets
+
+    Parameters
+    ----------
+    XA: numpy.array
+        An m by 2 array of coordinates in a geographical space.
+    XB: numpy.array
+        An m by 2 array of coordinates in a geographical space.
+    radius: float
+        Radius of the sphere which defaults to the earth radius
+
+    Returns
+    -------
+    numpy.array
+        2D array of distances
+
+    See also
+    --------
+    haversine
+    pdist
+    scipy.sparial.distances.cdist
+    scipy.sparial.distances.pdist
+    """
+    lons0 = XA[:, 0]
+    lats0 = XA[:, 1]
+    lons1 = XB[:, 0]
+    lats1 = XB[:, 1]
+    xx = np.meshgrid(lons1, lons0)
+    yy = np.meshgrid(lats1, lats0)
+    return haversine(xx[0], yy[0], xx[1], yy[1], radius=radius)
+
+
+def pdist(X, compact=False, radius=EARTH_RADIUS):
+    """Compute the pairwise haversine distances between positions of a single dataset
+
+    Parameters
+    ----------
+    X: numpy.array
+        An m by 2 array of coordinates in a geographical space.
+    compact: bool
+        Compact the distance matrix to remove duplicate and zeros.
+        It is the strict upper triangle of the distance matrix.
+    radius: float
+        Radius of the sphere which defaults to the earth radius
+
+    Returns
+    -------
+    numpy.array
+        Either 2D (square form) or 1D (compact form) the distance matrix
+
+    See also
+    --------
+    haversine
+    cdist
+    numpy.triu
+    scipy.sparial.distances.pdist
+    scipy.sparial.distances.cdist
+    scipy.sparial.distances.squareform
+    """
+    dd = cdist(X, X, radius=radius)
+    if compact:
+        return dd[np.triu_indices(dd.shape[0], 1)]
+    return dd
+
+
+def _adapative_cdist_(XA, XB, method="haversine", **kwargs):
+    if method == "haversine":
+        return cdist(XA, XB, **kwargs)
+    import scipy.spatial.distance
+
+    return scipy.spatial.distance.cdist(XA, XB, method=method, **kwargs)
+
+
+def _adapative_pdist_(X, method="haversine", **kwargs):
+    if method == "haversine":
+        return pdist(X, **kwargs)
+    import scipy.spatial.distance
+
+    return scipy.spatial.distance.pdist(X, method=method, **kwargs)
+
+
+class ScipyDistContext(object):
+    """Context to switch the :func:`scipy.spatial.distance.cdist` fonction to :func:`cdist`
+
+    Parameters
+    ----------
+    force: bool
+        If true, this function will be used whatever the distance method asked for is.
+    """
+
+    def __init__(self, cdist=True, pdist=True, force=False):
+        self.switch_cdist = cdist
+        self.switch_pdist = pdist
+        import scipy.spatial.distance
+
+        self.distmod = scipy.spatial.distance
+        if force:
+            self.cdist = cdist
+            self.pdist = pdist
+        else:
+            self.cdist = _adapative_cdist_
+            self.pdist = _adapative_pdist_
+
+    def __enter__(self):
+        if self.switch_cdist:
+            self._old_cdist = getattr(self.distmod, "cdist")
+            setattr(self.distmod, "cdist", self.cdist)
+        if self.switch_pdist:
+            self._old_pdist = getattr(self.distmod, "pdist")
+            setattr(self.distmod, "pdist", self.pdist)
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.switch_cdist:
+            setattr(self.distmod, "cdist", self._old_cdist)
+        if self.switch_pdist:
+            setattr(self.distmod, "pdist", self._old_pdist)
+
+
 def get_extent(extent, margin=0, square=False):
     """Compute the geographic extent in degrees
 

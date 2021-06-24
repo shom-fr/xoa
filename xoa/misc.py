@@ -78,7 +78,7 @@ class XEnumMeta(EnumMeta):
     def _get_groups_(cls):
         groups = {}
         for name, number in cls._member_map_.items():
-            groups.setdefault(number, []).append(name)
+            groups.setdefault(int(number), []).append(name)
         return groups
 
     def _get_choices_(cls, es=""):

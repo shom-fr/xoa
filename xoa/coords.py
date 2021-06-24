@@ -168,12 +168,14 @@ def get_depth(da, errors="raise"):
     if ztype == "sigma" or ztype is None:
         err = "ignore" if ztype is None else errors
         from .sigma import decode_cf_sigma
+
         da = decode_cf_sigma(da, errors=err)
         if "depth" in da:
             return da.depth
     if ztype == "dz2depth" or ztype is None:
         err = "ignore" if ztype is None else errors
         from .grid import decode_cf_dz2depth
+
         da = decode_cf_dz2depth(da, errors=err)
         if "depth" in da:
             return da.depth
@@ -403,8 +405,7 @@ def get_cf_coords(da, coord_names, errors="raise"):
     xoa.cf.CFSpecs.search_coord
     """
     cfspecs = xcf.get_cf_specs(da)
-    return [cfspecs.search_coord(da, coord_name, errors=errors)
-            for coord_name in coord_names]
+    return [cfspecs.search_coord(da, coord_name, errors=errors) for coord_name in coord_names]
 
 
 @misc.ERRORS.format_function_docstring
@@ -434,8 +435,8 @@ def get_cf_dims(da, cf_args, allow_positional=False, positions='tzyx', errors="w
     xoa.cf.CFSpecs.get_dims
     """
     return xcf.get_cf_specs(da).get_dims(
-        da, cf_args, allow_positional=allow_positional,
-        positions=positions, errors=errors)
+        da, cf_args, allow_positional=allow_positional, positions=positions, errors=errors
+    )
 
 
 @misc.ERRORS.format_function_docstring
@@ -590,6 +591,7 @@ def get_fdim(da, errors="warn", **kwargs):
 
 class transpose_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     """Supported :func:`transpose` modes"""
+
     #: Basic xarray transpose with :meth:`xarray.DataArray.transpose`
     classic = 0
     basic = 0
@@ -672,21 +674,23 @@ def transpose(da, dims, mode='compat'):
     for dim in dims:
         if dim is Ellipsis:
             with_ell = True
-            odims += dim,
+            odims += (dim,)
         elif dim in da.dims:
-            odims += dim,
+            odims += (dim,)
         elif mode == "insert":
             expand_dims[dim] = 1
-            odims += dim,
+            odims += (dim,)
         elif mode == "resize":
             if sizes is None or dim not in sizes:
-                xoa_warn(f"new dim '{dim}' in transposition is set to one"
-                         " since no size is provided to it")
+                xoa_warn(
+                    f"new dim '{dim}' in transposition is set to one"
+                    " since no size is provided to it"
+                )
                 size = 1
             else:
                 size = sizes[dim]
             expand_dims[dim] = size
-            odims += dim,
+            odims += (dim,)
 
     # Expand
     if expand_dims:
@@ -720,8 +724,7 @@ def get_dim_types(da, unknown=None, asdict=False):
     ------
     tuple
     """
-    return xcf.get_cf_specs(da).coords.get_dim_types(
-        da, unknown=unknown, asdict=asdict)
+    return xcf.get_cf_specs(da).coords.get_dim_types(da, unknown=unknown, asdict=asdict)
 
 
 def get_order(da):
@@ -750,23 +753,21 @@ def reorder(da, order):
     if isinstance(order, dict):
         order = tuple(order.values())
     if isinstance(order, tuple):
-        order = ''.join([
-            ('-' if o not in "ftzyx" else o) for o in order])
+        order = ''.join([('-' if o not in "ftzyx" else o) for o in order])
 
     # From order to dims
     to_dims = ()
     dim_types = get_dim_types(da, asdict=True)
     ndim = len(dim_types)
     for i, o in enumerate(order[::-1]):
-        if i+1 == ndim:
+        if i + 1 == ndim:
             break
         for dim in da.dims:
             if o == dim_types[dim]:
-                to_dims = (dim, ) + to_dims
+                to_dims = (dim,) + to_dims
                 break
         else:
-            raise XoaError(
-                f"Coordinate type not found: {o}. Dims are: {da.dims}")
+            raise XoaError(f"Coordinate type not found: {o}. Dims are: {da.dims}")
 
     # Final transpose
     return transpose(da, to_dims)
@@ -839,6 +840,7 @@ def drop_dim_coords(da, dim):
 
 class positive_attr(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     """Allowed value for the positive attribute argument"""
+
     #: Infer it from the axis coordinate
     infer = 0
     guess = 0
@@ -904,3 +906,46 @@ def get_binding_data_vars(ds, coord, as_names=False):
     if as_names:
         out = [da.name for da in out]
     return out
+
+
+def geo_stack(obj, stack_dim, rename=False, drop=False):
+    """Stack the dimensions of longitude and latitude coordinates
+
+    .. note:: If already stacked or similar, a simple copy is returned,
+        except if `rename` is True.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with valid longitude and latitude coordinates
+    stack_dim: str
+        Name of the new stack dimension
+    rename: False
+        Rename longitude to `lon` and `lat` for convenience.
+        If no need to stack, rename the single dimension to `stack_dim`.
+    drop: bool
+        Drop all variables and coordinates that does not contain final stack dimension
+
+    See also
+    --------
+    xarray.DataArray.stack
+    """
+    lon = get_lon(obj)
+    lat = get_lat(obj)
+    if rename:
+        obj = obj.rename({lon.name: "lon", lat.name: "lat"})
+    if lon.ndim == 1 and lat.ndim == 1 and lon.dims == lat.dims:
+        if rename:
+            obj = obj.rename_dims({lon.dims[0]: stack_dim})
+        else:
+            stack_dim = lon.dims[0]
+            obj = obj.copy()
+    else:
+        obj = obj.stack({stack_dim: set(lon.dims).union(lat.dims)})
+    if drop:
+        names = list(obj) if hasattr(obj, "data_vars") else []
+        for name in list(names):
+            if stack_dim in obj[name].dims:
+                names.remove(name)
+        obj = obj.drop(names)
+    return obj
