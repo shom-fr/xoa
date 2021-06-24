@@ -78,11 +78,11 @@ def _wrapper1d_(vari, *args, func_name, **kwargs):
     eshape = vari.shape[:-1]
     args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in (vari, ) + args]
     args = [np.asarray(arr) for arr in args]
-    
+
     # Call
     func = getattr(interp, func_name)
     varo = func(*args, **kwargs)
-    
+
     # From 2D
     return varo.reshape(eshape+varo.shape[-1:])
 
@@ -329,6 +329,9 @@ def grid2loc(da, loc, compat="warn"):
             order = "t" + order
 
     # Transpose following the tzyx order
+    glon = xcoords.get_lon(da)  # before to_rect
+    glat = xcoords.get_lat(da) # before to_rect
+    dims_in = set(glon.dims).union(glat.dims)
     da_tmp = xgrid.to_rect(da)
     da_tmp = xcoords.reorder(da_tmp, order)
 
@@ -340,11 +343,10 @@ def grid2loc(da, loc, compat="warn"):
             vi = np.expand_dims(vi, axis)
     vi = vi.reshape((-1,)+vi.shape[-4:])
     # - xy
-    glon = xcoords.get_lon(da_tmp)
-    glat = xcoords.get_lat(da_tmp)
+    glon = xcoords.get_lon(da_tmp)  # after to_rect
+    glat = xcoords.get_lat(da_tmp)  # after to_rect
     xi = glon.values
     yi = glat.values
-    dims_in = set(glon.dims).union(glat.dims)
     coords_out = [lons, lats]
     if xi.ndim == 1:
         xi = xi.reshape(1, - 1)
@@ -373,7 +375,7 @@ def grid2loc(da, loc, compat="warn"):
         coords_out.append(times)
     else:
         ti = np.zeros(1)
-        to = np.zeros(lons.values)
+        to = np.zeros(lons.shape)
 
     # Interpolate
     vo = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
@@ -383,8 +385,7 @@ def grid2loc(da, loc, compat="warn"):
     sizes_out = [size for dim, size in da.sizes.items() if dim in dims_out]
     dims_out.extend(loc.dims)
     sizes_out.append(lons.shape[-1])
-    coords_out = coords_out + xcoords.get_coords_compat_with_dims(
-        da, exclude_dims=dims_in)
+    coords_out = coords_out + xcoords.get_coords_compat_with_dims(da, exclude_dims=dims_in)
     da_out = xr.DataArray(
         vo.reshape(sizes_out),
         dims=dims_out,
