@@ -148,7 +148,9 @@ def regrid1d(
     cfspecs_out = xcf.get_cf_specs(coord)
     # - dim out
     if dim_out is None:  # get dim_out from coord_out
-        dim_out, dim_type = cfspecs_out.search_dim(coord, errors="raise")
+        dim_dict = cfspecs_out.search_dim(coord, errors="raise")
+        dim_out = dim_dict["dim"]
+        dim_type = dim_dict["type"]
     else:  # dim_out is provided
         dim_type = cfspecs_out.coords.get_dim_type(dim_out, coord)
     # - dim in

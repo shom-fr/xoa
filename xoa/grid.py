@@ -388,7 +388,7 @@ def dz2depth(
         a valid positive attribute.
     zdim: str
         Name of the vertical dimension.
-        If note set, it is infered with :func:`~xoa.coords.get_dims`.
+        If note set, it is infered with :func:`~xoa.coords.get_cf_dims`.
     ref: xarray.DataArray
         Reference array converting layer thicknesses to depth:
 
@@ -426,7 +426,7 @@ def dz2depth(
     """
     # Vertical dimension
     if zdim is None:
-        zdim = xcoords.get_dims(dz, "z", errors="raise")[0]
+        zdim = xcoords.get_zdim(dz, errors="raise")
 
     # Positive attribute
     positive = xcoords.positive_attr[positive].name
@@ -472,7 +472,7 @@ def dz2depth(
 
     # Finalize
     depth.attrs["positive"] = positive
-    depth = cfspecs.format_coord(depth, "depth")
+    depth = cfspecs.format_coord(depth, "depth", rename=False, format_coords=False)
 
     return depth
 
@@ -511,7 +511,7 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
     dz = cfspecs.search(ds, 'dz', errors=errors)
     if dz is None:
         return ds
-    zdims = xcoords.get_dims(dz, "z", errors=errors)
+    zdims = xcoords.get_cf_dims(dz, "z", errors=errors)
     if zdims is None:
         return ds
     zdim = zdims[0]
