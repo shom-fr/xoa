@@ -408,15 +408,16 @@ def get_cf_coords(da, coord_names, errors="raise"):
 
 
 @misc.ERRORS.format_function_docstring
-def get_dims(da, dim_types, allow_positional=False, positions='tzyx', errors="warn"):
+def get_cf_dims(da, cf_args, allow_positional=False, positions='tzyx', errors="warn"):
     """Get the data array dimensions names from their type
 
     Parameters
     ----------
     da: xarray.DataArray
         Array to scan
-    dim_types: str, list
-        Letters among "x", "y", "z", "t" and "f".
+    cf_args: str, list
+        Letters among "x", "y", "z", "t" and "f",
+        or generic CF names.
     allow_positional: bool
         Fall back to positional dimension of types if unkown.
     positions: str
@@ -433,7 +434,7 @@ def get_dims(da, dim_types, allow_positional=False, positions='tzyx', errors="wa
     xoa.cf.CFSpecs.get_dims
     """
     return xcf.get_cf_specs(da).get_dims(
-        da, dim_types, allow_positional=allow_positional,
+        da, cf_args, allow_positional=allow_positional,
         positions=positions, errors=errors)
 
 
@@ -462,7 +463,7 @@ def get_xdim(da, errors="warn", **kwargs):
     --------
     get_dims
     """
-    dims = get_dims(da, "x", errors=errors)
+    dims = get_cf_dims(da, "x", errors=errors)
     if dims:
         return dims[0]
 
@@ -492,7 +493,7 @@ def get_ydim(da, errors="warn", **kwargs):
     --------
     get_dims
     """
-    dims = get_dims(da, "y", errors=errors)
+    dims = get_cf_dims(da, "y", errors=errors)
     if dims:
         return dims[0]
 
@@ -522,7 +523,7 @@ def get_zdim(da, errors="warn", **kwargs):
     --------
     get_dims
     """
-    dims = get_dims(da, "z", errors=errors)
+    dims = get_cf_dims(da, "z", errors=errors)
     if dims:
         return dims[0]
 
@@ -552,7 +553,7 @@ def get_tdim(da, errors="warn", **kwargs):
     --------
     get_dims
     """
-    dims = get_dims(da, "t", errors=errors)
+    dims = get_cf_dims(da, "t", errors=errors)
     if dims:
         return dims[0]
 
@@ -582,7 +583,7 @@ def get_fdim(da, errors="warn", **kwargs):
     --------
     get_dims
     """
-    dims = get_dims(da, "f", errors=errors)
+    dims = get_cf_dims(da, "f", errors=errors)
     if dims:
         return dims[0]
 
@@ -863,7 +864,7 @@ def get_positive_attr(da, zdim=None):
     """
     # Targets
     if zdim is None:
-        zdim = get_dims(da, "z", errors="ignore")
+        zdim = get_cf_dims(da, "z", errors="ignore")
         if zdim:
             zdim = zdim[0]
     if zdim and zdim in da.coords:
@@ -882,3 +883,24 @@ def get_positive_attr(da, zdim=None):
     # Fall back to current CFSpecs
     cfspecs = xcf.get_cf_specs(da)
     return cfspecs["vertical"]["positive"]
+
+
+def get_binding_data_vars(ds, coord, as_names=False):
+    """Get the data_vars that have this coordinate
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+    coord_name: str
+
+    Return
+    ------
+    list
+        List of data_var names
+    """
+    if not isinstance(coord, str):
+        coord = coord.name
+    out = [da for da in ds if coord in da.coords]
+    if as_names:
+        out = [da.name for da in out]
+    return out
