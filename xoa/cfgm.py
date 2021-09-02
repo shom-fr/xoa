@@ -459,6 +459,23 @@ def is_daterange64(value, default=None):
     return np.arange(value[0], value[1], dtype="M8[{}]".format(value[2]))
 
 
+def is_boolstr(value, default=None):
+    """Validation function of a boolean or a string"""
+    if str(value) == "None":
+        return
+    if isinstance(value, str):
+        try:
+            return validate.bool_dict[value.lower()]
+        except KeyError:
+            return value
+    if value == False:
+        return False
+    elif value == True:
+        return True
+    else:
+        raise VdtTypeError(value)
+
+
 def is_eval(value, default=None, unchanged_if_failed=True):
     """Validate a string that can be evaluated"""
     try:
@@ -585,6 +602,7 @@ VALIDATOR_SPECS = {
     "cmap": is_cmap,
     "color": is_color,
     "dict": is_dict,
+    "boolstr": is_boolstr
     # lists validators for these scalars will be automatically generated
 }
 
@@ -1614,7 +1632,7 @@ def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
 def _opt2cfgname_(name, nested):
     cfgkey = name.replace("-", "_")
     if nested and cfgkey.startswith(nested + "_"):
-        cfgkey = cfgkey[len(nested + "_") :]
+        cfgkey = cfgkey[len(nested + "_"):]
     return cfgkey
 
 
