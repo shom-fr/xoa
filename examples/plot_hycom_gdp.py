@@ -60,24 +60,17 @@ with open(xoa.get_data_sample("hycom.cfg")) as f:
 # U and V are stored in separate files at U and V locations on the Hycom Arakawa C-Grid.
 # We choose to rename the dataset contents so that we can use generic names to access it.
 # We call for that the :meth:`~xarray.Dataset.xoa.decode` accessor method.
-# Note that the staggered grid location is automatically appended to horizontal
-# coordinates and dimensions of the U and V velocity components since they are
-# placed at U and V locations. This prevent any conflict with the bathymetry and
-# layer thickness horizontal coordinates and dimensions, which point to the T location.
-
-# %%
+#
 # U velocity component
 u_hycom = xoa.open_data_sample("hycom.gdp.u.nc").xoa.decode().u.squeeze(drop=True)
-print(u_hycom)
 
 # %%
 # V velocity component
 v_hycom = xoa.open_data_sample("hycom.gdp.v.nc").xoa.decode().v.squeeze(drop=True)
 
 # %%
-# Layer thicknesses dataset
+# Layer thicknesses
 hycom = xoa.open_data_sample("hycom.gdp.h.nc").xoa.decode().squeeze(drop=True)
-print(hycom)
 
 # %%
 # We now compute the depths from the layer thicknesses at the T location
@@ -87,13 +80,10 @@ print(hycom)
 hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
 
 # %%
-# Then we interpolate the velocity components to the T location with
-# the :func:`xoa.grid.shift` function.
-# The call to :meth:`reloc <xoa.cf.CFSpecs.reloc>` helps removing the
-# staggered grid location prefixes.
+# Then we interpolate the velocity components to the T location with the :func:`xoa.grid.shift` function.
 
-ut_hycom = shift(u_hycom, {"x": "left", "y": "left"}).xoa.reloc(u=False)
-vt_hycom = shift(v_hycom, {"x": "left", "y": "left"}).xoa.reloc(v=False)
+ut_hycom = shift(u_hycom, {"x": "left", "y": "left"})
+vt_hycom = shift(v_hycom, {"x": "left", "y": "left"})
 hycom["u"] = ut_hycom.assign_coords(**hycom.coords)
 hycom["v"] = vt_hycom.assign_coords(**hycom.coords)
 

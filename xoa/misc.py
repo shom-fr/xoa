@@ -563,11 +563,9 @@ def dict_merge(*dd, mergesubdicts=True, mergelists=False, mergetuples=False,
         for key, val in d.items():
             if skipnones and val is None:
                 continue
-
             # Not set so we set
             if key not in outd or (overwriteempty and is_empty(outd[key])):
                 outd[key] = val
-
             # Merge subdict
             elif (
                 mergesubdicts
@@ -575,7 +573,6 @@ def dict_merge(*dd, mergesubdicts=True, mergelists=False, mergetuples=False,
                 and isinstance(val, dict)
             ):
                 outd[key] = dict_merge(outd[key], val, **kwargs)
-
             # Merge lists
             elif (
                 mergelists
@@ -585,7 +582,6 @@ def dict_merge(*dd, mergesubdicts=True, mergelists=False, mergetuples=False,
                 outd[key] += val
                 if uniquify:
                     outd[key] = gunique(list(outd[key]))
-
             # Merge tuples
             elif (
                 mergetuples
@@ -612,8 +608,6 @@ def dict_merge(*dd, mergesubdicts=True, mergelists=False, mergetuples=False,
 
 def is_empty(x):
     """Check if empty"""
-    if isinstance(x, bool):
-        return False
     try:
         return not bool(x)
     except Exception:

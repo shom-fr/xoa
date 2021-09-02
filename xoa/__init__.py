@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-xarray-based ocean analysis library
+xarray-base ocean analysis library
 
 The successor of Vacumm.
 """

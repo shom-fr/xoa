@@ -347,6 +347,7 @@ like ``"lon"``.
 .. ipython:: python
 
     cfspecs.format_coord(lon, "lon")
+    cfspecs.format_coord(lon, "lon", loc="rho")
     cfspecs.format_data_var(temp, "temp")
 
 **Auto-formatting:**
@@ -750,56 +751,3 @@ Let's **re-encode** it!
     dse
 
 Et voilà !
-
-.. _uses.cf.hycom:
-
-Example: decoding and merging Hycom splitted outputs
-====================================================
-
-At Shom, the Hycom model outputs are splitted into separate files, one for each variable.
-Conflicts may occur when using variables that are not at the same staggered grid location,
-since all variables are stored with dimensions ``(y, x)`` and ``lon`` and ``lat``
-coordinates, all with the same name.
-To avoid this problem, the horizontal dimensions and coordinates of
-staggered variables are renamed to indicate their location.
-
-Here are the specs to take care of the staggered grid indicators in the names:
-
-.. literalinclude:: ../xoa/_samples/hycom.cfg
-    :language: ini
-
-Note the ``add_coords_loc`` sections.
-Location is not added to the ``u`` and ``v`` variables
-but to their dimensions and coordinates.
-
-Register them:
-
-.. ipython:: python
-
-    @suppress
-    import xoa, xoa.cf
-    xoa.cf.register_cf_specs(xoa.get_data_sample("hycom.cfg"))
-    xoa.cf.is_registered_cf_specs("hycom")
-
-Overview of the U dataset:
-
-.. ipython:: python
-
-    dsu = xoa.open_data_sample("hycom.gdp.u.nc")
-    dsu
-
-Decoding:
-
-.. ipython:: python
-
-    dsu = dsu.xoa.decode()
-    dsu
-
-Now we can read, decode and merge all files without any conflict:
-
-.. ipython:: python
-
-    dsv = xoa.open_data_sample("hycom.gdp.u.nc").xoa.decode()
-    dsh = xoa.open_data_sample("hycom.gdp.h.nc").xoa.decode()
-    ds = xr.merge([dsu, dsv, dsh])
-    ds

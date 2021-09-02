@@ -1,39 +1,6 @@
 What's new
 ##########
 
-0.4.0 (2021-09-02)
-==================
-
-New features
-------------
-- :meth:`xoa.cf.CFSpecs.decode` better supports staggered grids.
-- :meth:`xoa.cf.CFSpecs.search_dim` supports generic names in addition
-  to dimension types as second argument.
-- Add the :meth:`xoa.cf.CFSpecs.match_dim` method to check if a given
-  dimension name is known.
-- Add the :meth:`~xoa.cf.CFSpecs.reloc` and :meth:`~xoa.cf.CFSpecs.to_loc` methods
-  to :class:`xoa.cf.CFSpecs` for quickly changing the staggered grid indicators
-  in names.
-- Add the :meth:`xoa.cf.SGLocator.add_loc` method to quickly change the location
-  markers in a data array.
-
-Breaking changes
-----------------
-- :func:`xoa.coords.get_dims` is renamed to func:`xoa.coords.get_cf_dims`.
-- The `name` argument of :class:`xoa.cf.CFSpecs` methods is renamed to `cf_name`,
-  and the `dim_type(s)` argument is renamed to `cf_arg(s)`.
-- :meth:`xoa.cf.SGLocator.get_location` is renamed to
-  :meth:`~xoa.cf.SGLocator.get_loc_from_da` and the :meth:`~xoa.cf.SGLocator.get_loc` is added.
-
-Bug fixes
----------
-- Fix the output formatting of :func:`xoa.grid.dz2depth`.
-
-Documentation
--------------
-- The :ref:`uses.cf` section and :ref:`sphx_glr_examples_plot_hycom_gdp.py` example
-  are adapted to reflect changes.
-
 
 v0.3.1 (2021-05-21)
 ===================
