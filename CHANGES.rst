@@ -1,7 +1,7 @@
 What's new
 ##########
 
-0.4.1 (2021-09-01)
+0.4.0 (2021-09-02)
 ==================
 
 New features
@@ -24,9 +24,6 @@ Breaking changes
   and the `dim_type(s)` argument is renamed to `cf_arg(s)`.
 - :meth:`xoa.cf.SGLocator.get_location` is renamed to
   :meth:`~xoa.cf.SGLocator.get_loc_from_da` and the :meth:`~xoa.cf.SGLocator.get_loc` is added.
-
-Deprecations
-------------
 
 Bug fixes
 ---------
