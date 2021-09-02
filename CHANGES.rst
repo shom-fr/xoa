@@ -19,7 +19,7 @@ New features
 
 Breaking changes
 ----------------
-- :func:`xoa.coords.get_dims` is renamed to func:`xoa.coords.get_cf_dims`.
+- :func:`xoa.coords.get_dims` is renamed to :func:`xoa.coords.get_cf_dims`.
 - The `name` argument of :class:`xoa.cf.CFSpecs` methods is renamed to `cf_name`,
   and the `dim_type(s)` argument is renamed to `cf_arg(s)`.
 - :meth:`xoa.cf.SGLocator.get_location` is renamed to
