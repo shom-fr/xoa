@@ -214,7 +214,7 @@ def _get_centers_(da, dim):
 
 
 def get_centers(da, dim):
-    """Interpolate the data array at mid grid points
+    """Interpolate the data array at mid grid points along the `dim` dimension(s)
 
     .. note:: Coordinates are also centered
 
@@ -222,6 +222,7 @@ def get_centers(da, dim):
     ----------
     da: xarray.DataArray
     dim: str, tuple
+        Single or tuple of data-array or generic dimension names.
 
     Return
     ------
@@ -238,7 +239,7 @@ def get_centers(da, dim):
 
 
 def get_edges(da, dim, mode="edge", **kwargs):
-    """Interpolate and extrapolate a data array at grid edges
+    """Interpolate and extrapolate a data array at grid edges along the `dim` dimension(s)
 
     .. note:: Coordinates are linearly extrapolated
 
@@ -246,6 +247,7 @@ def get_edges(da, dim, mode="edge", **kwargs):
     ----------
     da: xarray.DataArray
     dim: str, tuple
+        Single or tuple of data-array or generic dimension names.
     mode: str
         Extrapolation mode at grid edges
     kwargs:
@@ -366,7 +368,7 @@ class dz2depth_ref_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
 def dz2depth(
         dz, positive=None, zdim=None, ref=None, ref_type='infer',
         centered=False):
-    f"""Integrate layer thicknesses to compute depths
+    """Integrate layer thicknesses to compute depths
 
     The output depths are the depths at the bottom of the layers and the top
     is at a depth of zero. Thus, the output array has the same dimensions
@@ -392,20 +394,20 @@ def dz2depth(
     ref: xarray.DataArray
         Reference array converting layer thicknesses to depth:
 
-        - If **positive up", it is expected to be the **SSH** (sea surface heigth)
+        - If **positive up**, it is expected to be the **SSH** (sea surface heigth)
           by default
-        - If **positive down", it is expected to be by default the depth of ground
+        - If **positive down**, it is expected to be by default the depth of ground
           also known as **bathymetry**, which should be positive.
 
     ref_type: str, int
-        Type of ``ref``:
+        Type of `ref`:
         {dz2depth_ref_types.rst_with_links}
     centered: bool
         Get depth a the middle of layers instead at their edge
 
     Return
     ------
-    xr.DataArray
+    xarray.DataArray
         Output depths with the same dimensions as input array.
 
     Example
@@ -475,6 +477,9 @@ def dz2depth(
     depth = cfspecs.format_coord(depth, "depth", rename=False, format_coords=False)
 
     return depth
+
+
+dz2depth.__doc__ = dz2depth.__doc__.format(**locals())
 
 
 @misc.ERRORS.format_function_docstring

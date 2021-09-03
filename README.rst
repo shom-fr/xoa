@@ -1,6 +1,9 @@
 xoa - xarray-based ocean analysis library
 =========================================
 
+.. image:: https://anaconda.org/conda-forge/xoa/badges/installer/conda.svg
+    :alt: Install with conda
+    :target: https://conda.anaconda.org/conda-forge
 .. image:: https://travis-ci.org/VACUMM/xoa.svg?branch=master
     :alt: Building and testing status
     :target: https://travis-ci.org/VACUMM/xoa
@@ -32,7 +35,7 @@ https://xoa.readthedocs.io
 Sources and help
 -----------------
 
-Source are available on the xoa github page:
+Sources are available on the xoa github page:
 https://github.com/VACUMM/xoa.
 Here you can also
 participate to `discussions <https://github.com/VACUMM/xoa/discussions>`_
