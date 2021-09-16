@@ -37,8 +37,12 @@ import logging
 import validate
 from configobj import ConfigObj, flatten_errors
 from validate import (
-    ValidateError, Validator, VdtTypeError,
-    VdtValueTooBigError, VdtValueTooSmallError)
+    ValidateError,
+    Validator,
+    VdtTypeError,
+    VdtValueTooBigError,
+    VdtValueTooSmallError,
+)
 
 from .__init__ import XoaError, XoaWarning, xoa_warn
 
@@ -69,9 +73,9 @@ def _valwrap_(validator):
     validator._parse_with_caching(configspec[section][option])
     """
     # Already wrapped
-    if validator.__name__.startswith(
-        "validator_wrapper-"
-    ) or validator.__name__.startswith("list_validator_wrapper-"):
+    if validator.__name__.startswith("validator_wrapper-") or validator.__name__.startswith(
+        "list_validator_wrapper-"
+    ):
         return validator
 
     # Wrapper
@@ -130,36 +134,26 @@ def _valwraplist_(validator):
         # Do list checks
         n = kwargs.pop("n", None)
         if n is not None and len(value) != int(n):
-            raise VdtSizeError(
-                "Incorrect size: {}, {} values expected".format(len(value), n)
-            )
+            raise VdtSizeError("Incorrect size: {}, {} values expected".format(len(value), n))
         nmin = kwargs.pop("nmin", None)
         if nmin is not None and len(value) < int(nmin):
             raise VdtSizeError(
-                "Incorrect size: {}, at least {} values expected".format(
-                    len(value), nmin
-                )
+                "Incorrect size: {}, at least {} values expected".format(len(value), nmin)
             )
         nmax = kwargs.pop("nmax", None)
         if nmax is not None and len(value) > int(nmax):
             raise VdtSizeError(
-                "Incorrect size: {}, at most {} values expected".format(
-                    len(value), nmax
-                )
+                "Incorrect size: {}, at most {} values expected".format(len(value), nmax)
             )
         odd = validate.is_boolean(kwargs.pop("odd", False))
         if odd and not len(value) % 2:
             raise VdtSizeError(
-                "Incorrect size: {}, odd number of values expected".format(
-                    len(value)
-                )
+                "Incorrect size: {}, odd number of values expected".format(len(value))
             )
         even = validate.is_boolean(kwargs.pop("even", False))
         if even and len(value) % 2:
             raise VdtSizeError(
-                "Incorrect size: {}, even number of values expected".format(
-                    len(value)
-                )
+                "Incorrect size: {}, even number of values expected".format(len(value))
             )
 
         shape = kwargs.pop("shape", None)
@@ -171,9 +165,7 @@ def _valwraplist_(validator):
                     shape, vshape = list(map(int, shape)), numpy.shape(value)
                     if vshape != shape:
                         raise VdtSizeError(
-                            "Incorrect shape: {}, {} shape expected".format(
-                                vshape, shape
-                            )
+                            "Incorrect shape: {}, {} shape expected".format(vshape, shape)
                         )
                 except Exception:
                     raise ValidateError(
@@ -210,9 +202,7 @@ def is_bbox(value, default=None):
     return list(map(float, c))
 
 
-def is_numerics(
-    value, default=None, min=None, max=None, type="float", n=None
-):
+def is_numerics(value, default=None, min=None, max=None, type="float", n=None):
     """Validation function of a tuple of numeric values"""
     if isinstance(value, str):
         value = value.strip("()[] ")
@@ -255,13 +245,9 @@ def is_numerics(
     return out
 
 
-def is_minmax(
-    value, min=None, max=None, default=(0, 100), type="float"
-):
+def is_minmax(value, min=None, max=None, default=(0, 100), type="float"):
     """Validation function of a min,max pair"""
-    value = is_numerics(
-        value, min=min, max=max, default=default, type=type, n=2
-    )
+    value = is_numerics(value, min=min, max=max, default=default, type=type, n=2)
     if value is not None:
         out = list(value)
         out.sort()
@@ -271,9 +257,7 @@ def is_minmax(
 
 def is_figsize(value, default=(6, 6), min=0, max=20):
     """Validation function of a figure size (xsize,ysize)"""
-    return is_numerics(
-        value, default=default, min=min, max=max, type="float", n=2
-    )
+    return is_numerics(value, default=default, min=min, max=max, type="float", n=2)
 
 
 def is_interval(value, default=None):
@@ -655,9 +639,7 @@ def _update_registry_():
 
     # Dict of functions
     VALIDATOR_FUNCTIONS.clear()
-    VALIDATOR_FUNCTIONS.update(
-        ((k, v["func"]) for k, v in VALIDATOR_SPECS.items() if "func" in v)
-    )
+    VALIDATOR_FUNCTIONS.update(((k, v["func"]) for k, v in VALIDATOR_SPECS.items() if "func" in v))
 
 
 _update_registry_()
@@ -717,6 +699,7 @@ def print_validation_functions(pattern="*"):
 
     """
     from fnmatch import fnmatch
+
     for name in VALIDATOR_TYPES:
         specs = VALIDATOR_SPECS[name]
         func = specs["base_func"]
@@ -740,7 +723,7 @@ class ConfigManager(object):
     Example
     -------
     >>> Cfg = Config('config.ini', interpolation='template')
-    >>> Cfg.opt_parse()
+    >>> Cfg.arg_parse()
     >>> cfg = Cfg.load('config.cfg')
 
     See also
@@ -880,9 +863,7 @@ class ConfigManager(object):
 
     defaults = property(fget=get_defaults, doc="Default config")
 
-    def reset(
-        self, cfgfile="config.cfg", backup=True, nocomments=True, verbose=True
-    ):
+    def reset(self, cfgfile="config.cfg", backup=True, nocomments=True, verbose=True):
         """Reset a config file to default values
 
         Parameters
@@ -970,11 +951,7 @@ class ConfigManager(object):
         """
 
         # Load the config
-        if (
-            cfgfile is not None
-            and isinstance(cfgfile, str)
-            and not os.path.exists(cfgfile)
-        ):
+        if cfgfile is not None and isinstance(cfgfile, str) and not os.path.exists(cfgfile):
             cfgfile = None
 
         # Instantiate / Copy
@@ -1019,7 +996,9 @@ class ConfigManager(object):
                     else:
                         section = ""
                     msg = "Config value error: {}{}: {}".format(
-                        section, key, getattr(error, "message", error),
+                        section,
+                        key,
+                        getattr(error, "message", error),
                     )
 
                     # Raise explicit error
@@ -1217,31 +1196,25 @@ class ConfigManager(object):
             parser.add_argument(
                 *cfgfileopt,
                 dest="cfgfile",
-                help="user configuration file that overrides defauts"
-                ' [default: "{default}"]',
+                help="user configuration file that overrides defauts",
                 default=cfgfile,
             )
 
         # Default config
         defaults = self.defaults
+        print("defautsss", defaults)
 
         # Create global group of options from defaults
         # - inits
-        re_match_initcom = re.compile(
-            r"#\s*-\*-\s*coding\s*:\s*\S+\s*-\*-\s*"
-        ).match
+        re_match_initcom = re.compile(r"#\s*-\*-\s*coding\s*:\s*\S+\s*-\*-\s*").match
         if (
             len(defaults.initial_comment) == 0
             or re_match_initcom(defaults.initial_comment[0]) is None
         ):
             desc = ["global configuration options"]
         else:
-            re_match_initcom(
-                defaults.initial_comment[0]
-            ), defaults.initial_comment[0]
-            icom = int(
-                re_match_initcom(defaults.initial_comment[0]) is not None
-            )
+            re_match_initcom(defaults.initial_comment[0]), defaults.initial_comment[0]
+            icom = int(re_match_initcom(defaults.initial_comment[0]) is not None)
             if len(defaults.initial_comment) > icom:
                 desc = defaults.initial_comment[icom].strip("# ").split(":", 1)
         group = parser.add_argument_group(*desc)
@@ -1279,7 +1252,7 @@ class ConfigManager(object):
                 exc=exc,
                 nested=nested,
                 boolean_false=self._boolean_false,
-                validator=self.validator
+                validator=self.validator,
             )
 
         # Now create a configuration instance from passed options
@@ -1293,19 +1266,13 @@ class ConfigManager(object):
             options = parser.parse_args(list(args))
 
             # Create a configuration to feed
-            cfg = ConfigObj(
-                interpolation=self._interpolation, encoding=self._encoding
-            )
+            cfg = ConfigObj(interpolation=self._interpolation, encoding=self._encoding)
 
             # Initial config from defaults or the one supplied
             if patch:
-                self.patch(
-                    cfg, patch if isinstance(patch, ConfigObj) else defaults
-                )
+                self.patch(cfg, patch if isinstance(patch, ConfigObj) else defaults)
             if cfgfilepatch:
-                if isinstance(
-                    cfgfilepatch, str
-                ) and cfgfilepatch.strip().lower().startswith("a"):
+                if isinstance(cfgfilepatch, str) and cfgfilepatch.strip().lower().startswith("a"):
                     cfgfilepatch = "after"
                 else:
                     cfgfilepatch = "before"
@@ -1351,9 +1318,7 @@ class ConfigManager(object):
         """
 
         # Create a patch configuration from commandline arguments
-        cfgpatch, args = self.arg_parse(
-            parser, exc=exc, cfgfileopt=cfgfileopt, getargs=True
-        )
+        cfgpatch, args = self.arg_parse(parser, exc=exc, cfgfileopt=cfgfileopt, getargs=True)
 
         #  Load personal config file and default values
         cfg = self.load(args.cfgfile)
@@ -1378,15 +1343,9 @@ class ConfigManager(object):
         """
 
         # Standard options
-        parser = ArgumentParser(
-            usage=usage, description=description, add_help=False
-        )
-        parser.add_argument(
-            "-h", "--help", action="store_true", help="show a reduced help"
-        )
-        parser.add_argument(
-            "--long-help", action="store_true", help="show an extended help"
-        )
+        parser = ArgumentParser(usage=usage, description=description, add_help=False)
+        parser.add_argument("-h", "--help", action="store_true", help="show a reduced help")
+        parser.add_argument("--long-help", action="store_true", help="show an extended help")
         parser.add_argument(
             "--short-help",
             action="store_true",
@@ -1451,9 +1410,7 @@ def filter_section(sec, cfgfilter, default=False):
 
     # First pass on level 0
     for key in sec:
-        kdefault = (
-            default if excepts is None or key not in excepts else not default
-        )
+        kdefault = default if excepts is None or key not in excepts else not default
         if not cfgfilter.get(key, kdefault):
             del sec[key]
 
@@ -1550,10 +1507,7 @@ def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
     s_lopt = rf"(?:--[\w\-]+(?:[= ]+{s_param})?)"
     s_optsep = r"(?:, +)"  # option separator
     s_desc = r"(?:  (.+))"
-    s_tot = (
-        rf"^  (?:  )?((?:{s_sopt}|{s_lopt})(?:{s_optsep}"
-        rf"(?:{s_sopt}|{s_lopt}))*){s_desc}?$"
-    )
+    s_tot = rf"^  (?:  )?((?:{s_sopt}|{s_lopt})(?:{s_optsep}" rf"(?:{s_sopt}|{s_lopt}))*){s_desc}?$"
     re_opt = re.compile(s_tot).match
     re_sec = re.compile(r"^(?:  )?([\w\s]+):(?: (.+))?$").match
     secname = None
@@ -1594,11 +1548,7 @@ def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
             if m.group(2) is not None:
                 rhelp.append("\t\t" + m.group(2).strip())
 
-        elif (
-            secname
-            and secname.lower() == "positional arguments"
-            and line.startswith(" " * 2)
-        ):
+        elif secname and secname.lower() == "positional arguments" and line.startswith(" " * 2):
 
             sline = line.split()
             rhelp.extend(["", "\t.. cmdoption:: " + sline[0], ""])
@@ -1632,7 +1582,7 @@ def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
 def _opt2cfgname_(name, nested):
     cfgkey = name.replace("-", "_")
     if nested and cfgkey.startswith(nested + "_"):
-        cfgkey = cfgkey[len(nested + "_"):]
+        cfgkey = cfgkey[len(nested + "_") :]
     return cfgkey
 
 
@@ -1655,7 +1605,7 @@ class _attdict_(dict):
 
 
 def get_spec(spec, validator=None):
-    """ Get an option specification
+    """Get an option specification
 
     Parameters
     ----------
@@ -1712,9 +1662,7 @@ def get_spec(spec, validator=None):
     spec = VALIDATOR_SPECS.get(
         funcname, dict(func=None, iterable=None, opttype=None, argtype=None)
     ).copy()
-    spec.update(
-        dict(funcname=funcname, args=args, kwargs=kwargs, default=default, type=funcname)
-    )
+    spec.update(dict(funcname=funcname, args=args, kwargs=kwargs, default=default, type=funcname))
     return _attdict_(spec)
 
 
@@ -1796,14 +1744,7 @@ def _walker_argcfg_setcfg_(sec, key, cfg=None, options=None, nested=None):
 
 
 def _walker_argcfg_setarg_(
-    sec,
-    key,
-    group=None,
-    exc=None,
-    nested=None,
-    encoding=None,
-    boolean_false=True,
-    validator=None
+    sec, key, group=None, exc=None, nested=None, encoding=None, boolean_false=True, validator=None
 ):
     """Walker to set options"""
     # Find option key and output var name
@@ -1839,6 +1780,7 @@ def _walker_argcfg_setarg_(
     # Add argument to group
     def func(value):
         return validator.check(sec.configspec[key], value)
+
     # func = spec.get("func", lambda s: s)
     argtype = wrap_argparse_type(func, spec.get("iterable", None))
     kw = {}
@@ -1848,9 +1790,7 @@ def _walker_argcfg_setarg_(
     else:
         action = "store"
         kw["type"] = argtype
-    group.add_argument(
-        "--" + optkey, action=action, help=_shelp_(sec, key), **kw
-    )
+    group.add_argument("--" + optkey, action=action, help=_shelp_(sec, key), **kw)
 
 
 def _shelp_(
@@ -1878,9 +1818,7 @@ def _shelp_(
         return c.strip().strip("#").strip()
 
     abcoms = list(map(strip, [c for c in sec.comments[key] if c is not None]))
-    incoms = list(
-        map(strip, [c for c in [sec.inline_comments[key]] if c is not None])
-    )
+    incoms = list(map(strip, [c for c in [sec.inline_comments[key]] if c is not None]))
 
     # Merge comments above item and its inline comment
     if mode == "merge":
@@ -1953,9 +1891,7 @@ def _walker_set_boolean_false_by_default_(sec, key, validator=None):
     if validator is None:
         return
     check = sec[key]
-    fun_name, fun_args, fun_kwargs, default = validator._parse_with_caching(
-        check
-    )
+    fun_name, fun_args, fun_kwargs, default = validator._parse_with_caching(check)
     if fun_name == "boolean" and default is None:
         if fun_args or fun_kwargs:
             check = check[:-1] + ", default=False)"
@@ -2202,9 +2138,7 @@ def print_short_help(parser, formatter=None, compressed=False):
             actions.append(fake_action)
         else:
             actions = parser._actions
-        formatter.add_usage(
-            parser.usage, actions, parser._mutually_exclusive_groups
-        )
+        formatter.add_usage(parser.usage, actions, parser._mutually_exclusive_groups)
 
         # description
         formatter.add_text(parser.description)
@@ -2241,6 +2175,7 @@ class _AP_VeryShortHelpAction(_HelpAction):
 
 # %% Sphinx extension
 
+
 def gen_cfgm_rst(app):
 
     logging.info("Generating rst declarations for the ConfigManager")
@@ -2259,12 +2194,18 @@ def gen_cfgm_rst(app):
 
 def setup(app):
 
-    app.add_object_type('cfgmopt', 'cfgmopt',
-                        objname='configuration option',
-                        indextemplate='pair: %s; configuration option')
-    app.add_object_type('cfgmsec', 'cfgmsec',
-                        objname='configuration section',
-                        indextemplate='pair: %s; configuration section')
+    app.add_object_type(
+        'cfgmopt',
+        'cfgmopt',
+        objname='configuration option',
+        indextemplate='pair: %s; configuration option',
+    )
+    app.add_object_type(
+        'cfgmsec',
+        'cfgmsec',
+        objname='configuration section',
+        indextemplate='pair: %s; configuration section',
+    )
 
     app.add_config_value('cfgm_get_cfgm_func', None, 'html')
     app.add_config_value('cfgm_rst_file', 'cfgm.rst', 'html', types=[str])

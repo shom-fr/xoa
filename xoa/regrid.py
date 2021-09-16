@@ -34,8 +34,10 @@ class XoaRegridError(XoaError):
 
 class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     """Supported :func:`regrid1d` methods"""
+
     #: Linear iterpolation (default)
     linear = 1
+    #: Linear iterpolation (default)
     interp = 1  # compat
     #: Nearest iterpolation
     nearest = 0
@@ -43,29 +45,40 @@ class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     cubic = 2
     #: Hermitian iterpolation
     hermit = 3
+    #: Hermitian iterpolation
     hermitian = 3
     #: Cell-averaging or conservative regridding
     cellave = -1
+    #: Cell-averaging or conservative regridding
     cellerr = -2
 
 
 class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     """Supported extrapolation modes"""
+
     #: No extrapolation (default)
     no = 0
+    #: No extrapolation (default)
     none = 0
+    #: No extrapolation (default)
     false = 0
     #: Toward the top (after)
     top = 1
+    #: Toward the top (after)
     above = 1
+    #: Toward the top (after)
     after = 1
     #: Toward the bottom (before)
     bottom = -1
+    #: Toward the bottom (before)
     below = -1
     #: Both below and above
     both = 2
+    #: Both below and above
     all = 2
+    #: Both below and above
     yes = 2
+    #: Both below and above
     true = 2
 
 
@@ -76,7 +89,7 @@ def _wrapper1d_(vari, *args, func_name, **kwargs):
     """
     # To 2D
     eshape = vari.shape[:-1]
-    args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in (vari, ) + args]
+    args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in (vari,) + args]
     args = [np.asarray(arr) for arr in args]
 
     # Call
@@ -84,13 +97,22 @@ def _wrapper1d_(vari, *args, func_name, **kwargs):
     varo = func(*args, **kwargs)
 
     # From 2D
-    return varo.reshape(eshape+varo.shape[-1:])
+    return varo.reshape(eshape + varo.shape[-1:])
 
 
 def regrid1d(
-        da, coord, method=None, dim=None, coord_in_name=None,
-        conserv=False, extrap="no", bias=0., tension=0.,
-        dask='allowed'):
+    da,
+    coord,
+    method=None,
+    dim=None,
+    coord_in_name=None,
+    edges=None,
+    conserv=False,
+    extrap="no",
+    bias=0.0,
+    tension=0.0,
+    dask='allowed',
+):
     """Regrid along a single dimension
 
     The input and output coordinates may vary along other dimensions,
@@ -118,6 +140,12 @@ def regrid1d(
         Name of the input coordinate array, which must be known of ``da``.
         It is inferred from the input dara array and dimension name
         by default.
+    edges: dict, None
+        Grid edge coordinates along the interpolation dimension,
+        for the conservative regridding.
+        When not provided, edges are computed with :func:`xoa.grid.get_edges`.
+        Keys are `"in"` and/or `"out"` and values are arrays with the same shape as
+        coordinates except along the interpolation dimension on which 1 is added.
     conserv: bool
         Use conservative regridding when using ``cellave`` method.
     extrap: str, int
@@ -174,20 +202,34 @@ def regrid1d(
     output_sizes = {dim_out: coord.sizes[dim_out]}
     input_core_dims = [[dim_in]]
     method = regrid1d_methods[method]
+    coord_out = coord
+    exclude_dims = {dim_in, dim_out}
     if int(method) < 0:
-        coord_in = xgrid.get_edges_1d(coord_in, axis=dim_in)
-        coord = xgrid.get_edges_1d(coord, axis=dim_out)
-        input_core_dims.extend([[dim_in+"_edges"], [dim_out+"_edges"]])
+        idimin = coord_in.get_axis_num(dim_in)
+        idimout = coord.get_axis_num(dim_out)
+        if edges and "in" in edges:
+            coord_in = edges["in"]
+        else:
+            coord_in = xgrid.get_edges_1d(coord_in, axis=dim_in)
+        if edges and "out" in edges:
+            coord = edges["out"]
+        else:
+            coord = xgrid.get_edges_1d(coord, axis=dim_out)
+        namein = coord_in.dims[idimin]
+        nameout = coord.dims[idimout]
+        input_core_dims.extend([[namein], [nameout]])
+        exclude_dims = {dim_in, dim_out, namein, nameout}
     else:
+        exclude_dims = {dim_in, dim_out}
         input_core_dims.extend([[dim_in], [dim_out]])
     output_core_dims = [[dim_out]]
 
-    # Fortran function name and arguments
+    # Interpolation function name and arguments
     func_name = str(method) + "1d"
-    if (not (coord_in.sizes[dim_in] == coord.sizes[dim_out] == 1) and
-            method == regrid1d_methods.cellerr):
-        raise XoaRegridError("cellerr regrid method is works only "
-                             "with 1D input and output cordinates")
+    if method == regrid1d_methods.cellerr and not (coord_in.ndim == coord.ndim == 1):
+        raise XoaRegridError(
+            "cellerr regrid method works only with 1D input and output coordinates"
+        )
     # func = getattr(interp, func_name)
     extrap = str(extrap_modes[extrap])
     func_kwargs = {"func_name": func_name, "extrap": extrap}
@@ -204,10 +246,10 @@ def regrid1d(
         kwargs=func_kwargs,
         input_core_dims=input_core_dims,
         output_core_dims=output_core_dims,
-        exclude_dims={dim_in, dim_out},
+        exclude_dims=exclude_dims,
         dask_gufunc_kwargs={"output_sizes": output_sizes},
-        dask=dask
-        )
+        dask=dask,
+    )
 
     # Transpose
     dims = list(da.dims)
@@ -215,8 +257,10 @@ def regrid1d(
     da_out = da_out.transpose(..., *dims, missing_dims="ignore")
 
     # Add output coordinates
-    coord_out_name = coord.name if coord.name else coord_in.name
-    da_out = da_out.assign_coords({coord_out_name: coord})
+    coord_out_name = coord_out.name if coord_out.name else coord_in.name
+    da_out = da_out.assign_coords({coord_out_name: coord_out})
+    da_out.name = da.name
+    da_out.attrs = da.attrs
 
     return da_out
 
@@ -259,8 +303,8 @@ def extrap1d(da, dim, mode, **kwargs):
         output_core_dims=[[dim]],
         exclude_dims={dim},
         dask_gufunc_kwargs={"output_sizes": da.sizes},
-        **kwargs
-        )
+        **kwargs,
+    )
     da_out = da_out.transpose(*da.dims)
     da_out = da_out.assign_coords(da.coords)
     da_out.attrs.update(da.attrs)
@@ -332,7 +376,7 @@ def grid2loc(da, loc, compat="warn"):
 
     # Transpose following the tzyx order
     glon = xcoords.get_lon(da)  # before to_rect
-    glat = xcoords.get_lat(da) # before to_rect
+    glat = xcoords.get_lat(da)  # before to_rect
     dims_in = set(glon.dims).union(glat.dims)
     da_tmp = xgrid.to_rect(da)
     da_tmp = xcoords.reorder(da_tmp, order)
@@ -343,7 +387,7 @@ def grid2loc(da, loc, compat="warn"):
     for axis_type, axis in (("z", -3), ("t", -4)):
         if axis_type not in order:
             vi = np.expand_dims(vi, axis)
-    vi = vi.reshape((-1,)+vi.shape[-4:])
+    vi = vi.reshape((-1,) + vi.shape[-4:])
     # - xy
     glon = xcoords.get_lon(da_tmp)  # after to_rect
     glat = xcoords.get_lat(da_tmp)  # after to_rect
@@ -351,7 +395,7 @@ def grid2loc(da, loc, compat="warn"):
     yi = glat.values
     coords_out = [lons, lats]
     if xi.ndim == 1:
-        xi = xi.reshape(1, - 1)
+        xi = xi.reshape(1, -1)
     if yi.ndim == 1:
         yi = yi.reshape(-1, 1)
     # - z
@@ -367,7 +411,7 @@ def grid2loc(da, loc, compat="warn"):
     else:
         zi = np.zeros((1, 1, 1, 1))
         zo = np.zeros_like(lons.values)
-    zi = zi.reshape((-1,)+zi.shape[-4:])
+    zi = zi.reshape((-1,) + zi.shape[-4:])
     # - t
     if "t" in order:
         # numeric times
@@ -393,7 +437,7 @@ def grid2loc(da, loc, compat="warn"):
         dims=dims_out,
         coords=dict((coord.name, coord) for coord in coords_out),
         attrs=da.attrs,
-        name=da.name
+        name=da.name,
     )
 
     # Transpose

@@ -1,6 +1,25 @@
 What's new
 ##########
 
+Development
+===========
+
+New features
+------------
+- Add the `edges` argument to :func:`xoa.regrid.regrid1d` to manually specify
+  the edges that are used by the "cellave" regridding method.
+- Add the `hlocs` argument to :func:`xoa.sigma.decode_cf_sigma` to allow the decoding
+  at other horizontal staggered grid locations.
+- Add back the `loc` argument to the formatting methods of :mod:`xoa.cf`.
+- Add dimension checking and support for dask arrays in :mod:`xoa.sigma`.
+
+Bug fixes
+---------
+- Fix :func:`xoa.regrid.regrid1d` with "cellave" method.
+- Fix :meth:`xoa.cf.CFSpecs.get_location_mapping` for coordinates that have
+  no axis attribute specifications.
+- Fix :func:`xoa.grid.dz2depth` that was not working properly with 4D+ arrays.
+
 0.4.0 (2021-09-02)
 ==================
 

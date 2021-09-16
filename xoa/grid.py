@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 This module provides 1d to nD grid utilities to get information
-or perform operation on a grid.
+or perform operations on a grid.
 
 For operations between different grids, please see :mod:`xoa.regrid`.
 """
@@ -29,9 +29,8 @@ from . import coords as xcoords
 
 
 def apply_along_dim(
-        ds, dim, func, coord_func=None,
-        data_kwargs=None, coord_kwargs=None, name_kwargs=None,
-        **kwargs):
+    ds, dim, func, coord_func=None, data_kwargs=None, coord_kwargs=None, name_kwargs=None, **kwargs
+):
     """Apply an operator on data array or dataset dimensions
 
     The operator may potentially change size of the array.
@@ -148,7 +147,7 @@ def _pad_(da, dim, pad_width, mode, **kwargs):
 
     to_concat = []
     if isinstance(pad_width, int):
-        pad_width = pad_width,
+        pad_width = (pad_width,)
     pad_width0 = pad_width[0]
     pad_width1 = pad_width[-1]
     if not pad_width0 and not pad_width1:
@@ -159,7 +158,7 @@ def _pad_(da, dim, pad_width, mode, **kwargs):
         to_concat.append(da0.transpose(*da.dims))
     to_concat.append(da)
     if pad_width1:
-        ramp1 = xr.DataArray(np.arange(1, pad_width1+1, dtype=da.dtype), dims=dim)
+        ramp1 = xr.DataArray(np.arange(1, pad_width1 + 1, dtype=da.dtype), dims=dim)
         da1 = da[{dim: -1}] + (da[{dim: -1}] - da[{dim: -2}]) * ramp1
         to_concat.append(da1.transpose(*da.dims))
 
@@ -200,11 +199,14 @@ def pad(da, pad_width, mode="edge", coord_mode="linear_extrap", name_kwargs=None
     """
     pad_width = cf.get_cf_specs(da).parse_dims(pad_width, da)
     return apply_along_dim(
-        da, list(pad_width.keys()), _pad_,
+        da,
+        list(pad_width.keys()),
+        _pad_,
         data_kwargs={"mode": mode, **kwargs},
         coord_kwargs={"mode": coord_mode},
         name_kwargs=name_kwargs,
-        pad_width=pad_width)
+        pad_width=pad_width,
+    )
 
 
 def _get_centers_(da, dim):
@@ -274,21 +276,32 @@ def get_edges(da, dim, mode="edge", **kwargs):
 
 
 class shift_directions(misc.IntEnumChoices, metaclass=misc.XEnumMeta):
-    """Shift directions for :func:`shift``"""
-    #: To the left/bottom/west
+    """Shift directions for :func:`shift`"""
+
+    #: To the left/bottom/west/south/low
     left = -1
+    #: To the left/bottom/west/south/low
     bottom = -1
+    #: To the left/bottom/west/south/low
     south = -1
+    #: To the left/bottom/west/south/low
     low = -1
-    #: To the right/top/north
+    #: To the left/bottom/west/south/low
+    west = -1
+    #: To the right/top/east/north/high
     right = 1
+    #: To the right/top/east/north/high
     top = 1
+    #: To the right/top/east/north/high
     north = 1
+    #: To the right/top/east/north/high
     high = 1
+    #: To the right/top/east/north/high
+    east = 1
 
 
 def shift(da, shift_dirs, mode="edge", **kwargs):
-    f"""Shift the grid by an half grid cell along specified dimensions and directions
+    """Shift the grid by an half grid cell along specified dimensions and directions
 
     This is typically useful with Arakawa grids.
 
@@ -325,6 +338,9 @@ def shift(da, shift_dirs, mode="edge", **kwargs):
     return get_centers(da, list(shift_dirs.keys()))
 
 
+shift.__doc__ = shift.__doc__.format(**locals())
+
+
 def _diff_(da, dim):
     return da.diff(dim)
 
@@ -355,19 +371,20 @@ def diff(da, dim):
 
 class dz2depth_ref_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     """Integration ref types for :func:`dz2depth`"""
+
     #: Infer it (default)
     infer = 0
     #: Up (SSH)
     top = 1
+    #: Up (SSH)
     ssh = 1
     #: Bottom (bathy)
     bottom = -1
+    #: Bottom (bathy)
     bathy = -1
 
 
-def dz2depth(
-        dz, positive=None, zdim=None, ref=None, ref_type='infer',
-        centered=False):
+def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type='infer', centered=False):
     """Integrate layer thicknesses to compute depths
 
     The output depths are the depths at the bottom of the layers and the top
@@ -451,20 +468,20 @@ def dz2depth(
             ref_type = "top" if positive == "down" else "bottom"
     if positive == "up":
         if ref is None:
-            ref = depth[-1]
+            ref = depth.isel({zdim: -1})
         elif ref is not None and ref_type == "top":
-            ref = depth[-1] - ref
+            ref = depth.isel({zdim: -1}) - ref
         depth[:] -= ref
     else:
         if ref is not None:
             if ref_type == "bottom":
-                depth[:] -= depth[-1]
+                depth[:] -= depth.isel({zdim: -1})
             depth[:] += ref
 
     # Fix index
     if zdim in depth.indexes:
         dnz = depth[zdim].diff(zdim).pad({zdim: (0, 1)}, mode="edge")
-        depth = xcoords.change_index(depth, zdim, depth[zdim]+0.5*dnz.data)
+        depth = xcoords.change_index(depth, zdim, depth[zdim] + 0.5 * dnz.data)
 
     # Centered
     if centered:
@@ -474,7 +491,9 @@ def dz2depth(
 
     # Finalize
     depth.attrs["positive"] = positive
-    depth = cfspecs.format_coord(depth, "depth", rename=False, format_coords=False)
+    depth = cfspecs.format_coord(
+        depth, "depth", rename=True, format_coords=False, rename_dims=False
+    )
 
     return depth
 
@@ -536,7 +555,7 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
     if ssh is None and bathy is None:
         ref, ref_type = None, "infer"
     else:
-        for ref, ref_type in [(bathy, "bathy"), (ssh, "ssh")][::int(positive)]:
+        for ref, ref_type in [(bathy, "bathy"), (ssh, "ssh")][:: int(positive)]:
             if ref is not None:
                 break
 
@@ -576,13 +595,17 @@ def to_rect(da, tol=1e-5):
         dims = [odim] if odim else coord.dims
         for odim in dims:
             if np.allclose(coord.min(odim), coord.max(odim), atol=tol):
-                new_coords[name] = xr.DataArray(coord.isel(
-                    {odim: 0}).values, dims=name, attrs=coord.attrs)
+                new_coords[name] = xr.DataArray(
+                    coord.isel({odim: 0}).values, dims=name, attrs=coord.attrs
+                )
                 new_coords[name].encoding.update(coord.encoding)
                 dim = coord.dims[0] if coord.dims[1] == odim else coord.dims[1]
                 rename_args[dim] = name
                 break
     if new_coords:
-        return da.reset_coords(list(new_coords), drop=True).rename(
-            rename_args).assign_coords(new_coords)
+        return (
+            da.reset_coords(list(new_coords), drop=True)
+            .rename(rename_args)
+            .assign_coords(new_coords)
+        )
     return da
