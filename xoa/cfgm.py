@@ -1202,7 +1202,6 @@ class ConfigManager(object):
 
         # Default config
         defaults = self.defaults
-        print("defautsss", defaults)
 
         # Create global group of options from defaults
         # - inits
@@ -1425,11 +1424,14 @@ def filter_section(sec, cfgfilter, default=False):
 def cfgargparse(
     cfgspecfile,
     parser,
-    cfgfileopt="cfgfile",
+    parse=True,
+    cfgfileopt="--cfgfile",
     cfgfile="config.cfg",
     exc=[],
     extraopts=None,
     args=None,
+    getparser=False,
+    getargs=True,
     **kwargs,
 ):
     """Merge configuration and commandline arguments
@@ -1455,6 +1457,7 @@ def cfgargparse(
     Return
     ------
     :class:`ConfigObj`
+    args
 
     Tasks:
 
@@ -1474,9 +1477,11 @@ def cfgargparse(
         cfgfileopt=cfgfileopt,
         exc=exc,
         cfgfile=cfgfile,
-        getargs=True,
         extraopts=extraopts,
         args=args,
+        parse=parse,
+        getparser=getparser,
+        getargs=getargs,
     )
 
 
@@ -2178,6 +2183,9 @@ class _AP_VeryShortHelpAction(_HelpAction):
 
 def gen_cfgm_rst(app):
 
+    if not app.config.cfgm_rst_file:
+        return
+
     logging.info("Generating rst declarations for the ConfigManager")
 
     rst = app.config.cfgm_get_cfgm_func().get_rst(secrole="cfgmsec", optrole="cfgmopt")
@@ -2190,6 +2198,22 @@ def gen_cfgm_rst(app):
         f.write(rst)
 
     logging.info("Created: " + app.config.cfgm_rst_file)
+
+
+def gen_cfgm_cfg(app):
+
+    if not app.config.cfgm_cfg_file:
+        return
+
+    logging.info("Generating the default config from the ConfigManager")
+    cfg = app.config.cfgm_get_cfgm_func().defaults()
+    outfile = os.path.abspath(app.config.cfgm_cfg_file)
+    outdir = os.path.dirname(outfile)
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+    cfg.filename = outfile
+    cfg.write()
+    logging.info("Created: " + app.config.cfgm_cfg_file)
 
 
 def setup(app):
@@ -2209,7 +2233,9 @@ def setup(app):
 
     app.add_config_value('cfgm_get_cfgm_func', None, 'html')
     app.add_config_value('cfgm_rst_file', 'cfgm.rst', 'html', types=[str])
+    app.add_config_value('cfgm_cfg_file', 'cfgm.cfg', 'html', types=[str])
 
     app.connect('builder-inited', gen_cfgm_rst)
+    app.connect('builder-inited', gen_cfgm_cfg)
 
     return {'version': '0.1'}

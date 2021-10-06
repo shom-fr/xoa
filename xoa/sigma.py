@@ -639,11 +639,11 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
         if errors == "warn":
             xoa_warn("Error while decoding sigma coords: {}. Skipping...".format(e))
         return ds
-    # print('termssss', all_terms)
 
     # Loop on locations
     from . import sigma as sigma_module
 
+    sigma_type = None
     hsingle = not isinstance(hlocs, (list, tuple))
     if hsingle:
         hlocs = [hlocs]
@@ -687,4 +687,6 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
             if not as_coord:
                 ds.coords[height.name] = height
 
+    if sigma_type:
+        ds.encoding["cf_sigma_type"] = sigma_type
     return ds
