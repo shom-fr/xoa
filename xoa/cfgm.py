@@ -2078,7 +2078,12 @@ def _walker_cfg2rst_(
             funcname = spec['funcname']
             specs["type"] = f":func:`{funcname} <{funcpath}>`"
             if spec["args"]:
-                skey = "possible choices" if name == "choice" else "args"
+                if spec["funcname"] == "option":
+                    skey = "possible choices"
+                    del specs["type"]
+                else:
+                    skey = "args"
+                skey = "possible choices" if spec["funcname"] == "option" else "args"
                 specs[skey] = spec["args"]
             if spec["kwargs"]:
                 specs.update(spec["kwargs"])
@@ -2180,6 +2185,9 @@ class _AP_VeryShortHelpAction(_HelpAction):
 
 # %% Sphinx extension
 
+re_ws = re.compile(r'\s+')
+re_split_2secs = re.compile(r'\]\s*\[').split
+
 
 def gen_cfgm_rst(app):
 
@@ -2188,7 +2196,7 @@ def gen_cfgm_rst(app):
 
     logging.info("Generating rst declarations for the ConfigManager")
 
-    rst = app.config.cfgm_get_cfgm_func().get_rst(secrole="cfgmsec", optrole="cfgmopt")
+    rst = app.config.cfgm_get_cfgm_func().to_rst(secrole="cfgmsec", optrole="cfgmopt")
 
     outfile = os.path.abspath(app.config.cfgm_rst_file)
     outdir = os.path.dirname(outfile)
@@ -2206,7 +2214,7 @@ def gen_cfgm_cfg(app):
         return
 
     logging.info("Generating the default config from the ConfigManager")
-    cfg = app.config.cfgm_get_cfgm_func().defaults()
+    cfg = app.config.cfgm_get_cfgm_func().defaults
     outfile = os.path.abspath(app.config.cfgm_cfg_file)
     outdir = os.path.dirname(outfile)
     if not os.path.exists(outdir):
@@ -2216,6 +2224,24 @@ def gen_cfgm_cfg(app):
     logging.info("Created: " + app.config.cfgm_cfg_file)
 
 
+def parse_node(env, sig, signode):
+    from sphinx import addnodes
+
+    if "]" not in sig:  # pure scalar
+        sigdec = sig
+    else:
+        secs = [s.strip() for s in re_split_2secs(sig)]
+        if not secs[-1].endswith("]"):  # scalar
+            sigdec = secs[-1].split("]")[1].strip()
+        else:  # section
+            secname = secs[-1].rstrip("]").lstrip("[")
+            nsec = len(secs)
+            sigdec = "[" * nsec + secname + "]" * nsec
+    signode.clear()
+    signode += addnodes.desc_name(sig, sigdec)
+    return re_ws.sub(' ', sig)
+
+
 def setup(app):
 
     app.add_object_type(
@@ -2223,12 +2249,14 @@ def setup(app):
         'cfgmopt',
         objname='configuration option',
         indextemplate='pair: %s; configuration option',
+        parse_node=parse_node,
     )
     app.add_object_type(
         'cfgmsec',
         'cfgmsec',
         objname='configuration section',
         indextemplate='pair: %s; configuration section',
+        parse_node=parse_node,
     )
 
     app.add_config_value('cfgm_get_cfgm_func', None, 'html')
