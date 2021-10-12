@@ -1,17 +1,22 @@
 What's new
 ##########
 
-Development
-===========
+0.5.0 (2021-10-12)
+==================
 
 New features
 ------------
+- Add the `hlocs` argument to :func:`xoa.sigma.get_sigma_terms`
+  and :func:`xoa.sigma.decode_cf_sigma` to decode at several horizontal
+  staggered grid locations.
 - Add the `edges` argument to :func:`xoa.regrid.regrid1d` to manually specify
   the edges that are used by the "cellave" regridding method.
-- Add the `hlocs` argument to :func:`xoa.sigma.decode_cf_sigma` to allow the decoding
-  at other horizontal staggered grid locations.
 - Add back the `loc` argument to the formatting methods of :mod:`xoa.cf`.
 - Add dimension checking and support for dask arrays in :mod:`xoa.sigma`.
+- Expose a few options of :meth:`xoa.cfgm.ConfigManager` to the
+  :func:`xoa.cfgm.cfgargparse` function.
+- Add the :confval:`cfgm_cfg_file` sphinx configuration option
+  to save the default configuration of a :meth:`xoa.cfgm.ConfigManager`.
 
 Bug fixes
 ---------
@@ -19,6 +24,12 @@ Bug fixes
 - Fix :meth:`xoa.cf.CFSpecs.get_location_mapping` for coordinates that have
   no axis attribute specifications.
 - Fix :func:`xoa.grid.dz2depth` that was not working properly with 4D+ arrays.
+
+
+Breaking changes
+----------------
+- The `loc` argument of :func:`xoa.sigma.get_sigma_terms` is renamed `vloc`.
+
 
 0.4.0 (2021-09-02)
 ==================
