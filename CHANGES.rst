@@ -71,16 +71,16 @@ v0.3.1 (2021-05-21)
 New features
 ------------
 
-- Add an ``autolim`` keyword to :func:`xoa.plot.plot_flow` to speedup
+- Add an `autolim` keyword to :func:`xoa.plot.plot_flow` to speedup
   the processing with cartopy maps.
 
 Breaking changes
 ----------------
 
-- Rename the ``cf`` and ``sigma`` keyword of :func:`xoa.register_accessors`
-  respectively to ``xcf`` and ``decode_sigma`` to match the default
+- Rename the `cf` and `sigma` keyword of :func:`xoa.register_accessors`
+  respectively to `xcf` and `decode_sigma` to match the default
   name of accessors.
-- Rename the ``sigma`` accessor to ``decode_sigma``.
+- Rename the `sigma` accessor to `decode_sigma`.
 
 Bug fixes
 ---------
@@ -92,7 +92,7 @@ Documentation
 -------------
 
 - Add a "How to start" section.
-- Accessors are not documented separately with ``sphinx-autosummary-accessors``
+- Accessors are now documented separately with `sphinx-autosummary-accessors`
   [:pull:`20`].
 - The Hycom-GDP example now uses :func:`xoa.plot.plot_flow`.
 
