@@ -1,6 +1,18 @@
 What's new
 ##########
 
+0.5.1 (2021-10-13)
+==================
+
+New features
+------------
+- Switch the CI workflow to github  [:pull:`36`].
+
+Bug fixes
+---------
+- Fix :meth:`xoa.cf.CFSpecs.to_loc` that which failing with dataset  [:pull:`23`].
+
+
 0.5.0 (2021-10-12)
 ==================
 

@@ -4,12 +4,8 @@ xoa - xarray-based ocean analysis library
 .. image:: https://anaconda.org/conda-forge/xoa/badges/installer/conda.svg
     :alt: Install with conda
     :target: https://conda.anaconda.org/conda-forge
-.. image:: https://travis-ci.org/VACUMM/xoa.svg?branch=master
-    :alt: Building and testing status
-    :target: https://travis-ci.org/VACUMM/xoa
-.. image:: https://circleci.com/gh/VACUMM/xoa/tree/master.svg?style=shield
-    :alt: Documentation building on circleci
-    :target: https://circleci.com/gh/VACUMM/xoa/tree/master
+.. image:: https://github.com/VACUMM/xoa/actions/workflows/python-package-conda.yml/badge.svg
+    :alt: Install, linting and tests
 .. image:: https://readthedocs.org/projects/docs/badge/?version=latest
     :alt: Documentation Status
     :target: https://xoa.readthedocs.io/en/latest/
