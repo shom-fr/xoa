@@ -1606,7 +1606,7 @@ class CFSpecs(object):
         names = set(obj.dims).union(obj.coords)
         if hasattr(obj, "data_vars"):
             names = names.union(obj.data_vars)
-        if obj.name is not None:
+        elif obj.name is not None:
             names = names.union({obj.name})
         for name in names:
             if name not in rename_args:
