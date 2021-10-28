@@ -21,6 +21,80 @@ import xarray as xr
 from .__init__ import XoaError, xoa_warn
 from . import coords as xcoords
 
+HOURLY_DEMERLIAC_WEIGHTS = [
+    1,
+    3,
+    8,
+    15,
+    21,
+    32,
+    45,
+    55,
+    72,
+    91,
+    105,
+    128,
+    153,
+    171,
+    200,
+    231,
+    253,
+    288,
+    325,
+    351,
+    392,
+    435,
+    465,
+    512,
+    558,
+    586,
+    624,
+    658,
+    678,
+    704,
+    726,
+    738,
+    752,
+    762,
+    766,
+    768,
+    766,
+    762,
+    752,
+    738,
+    726,
+    704,
+    678,
+    658,
+    624,
+    586,
+    558,
+    512,
+    465,
+    435,
+    392,
+    351,
+    325,
+    288,
+    253,
+    231,
+    200,
+    171,
+    153,
+    128,
+    105,
+    91,
+    72,
+    55,
+    45,
+    32,
+    21,
+    15,
+    8,
+    3,
+    1,
+]
+
 
 def get_window_func(window, *args, **kwargs):
     """Get a window function from its name
@@ -61,10 +135,12 @@ def get_window_func(window, *args, **kwargs):
     """
     # Explicit values so create a wrapper that interpolate them
     if isinstance(window, (list, np.ndarray)):
+
         def window_func(size):
             x = np.linspace(0, 1, size)
             xp = np.linspace(0, 1, len(window))
             return np.interp(x, xp, window)
+
         return window_func
 
     # Base function
@@ -73,6 +149,7 @@ def get_window_func(window, *args, **kwargs):
             func = getattr(np, window)
         else:
             import scipy.signal.windows as sw
+
             func = getattr(sw, window, None)
             if func is None:
                 raise XoaError(f'Invalid window name: {window}')
@@ -81,8 +158,10 @@ def get_window_func(window, *args, **kwargs):
 
     # Wrapper with args
     if args or kwargs:
+
         def window_func(size):
             return func(size, *args, **kwargs)
+
         return window_func
     return func
 
@@ -178,15 +257,15 @@ def generate_isotropic_kernel(shape, window_func, fill_value=0, npt=None):
     # Normalised indices
     indices = np.indices(shape).astype('d')
     for i, width in enumerate(shape):
-        indices[i] /= (width-1)
+        indices[i] /= width - 1
         indices[i] -= 0.5
 
     # Distance from bounds with 0.5 at center and < 0 outside bounds
-    x = 0.5 - np.sqrt((indices**2).sum(axis=0))
+    x = 0.5 - np.sqrt((indices ** 2).sum(axis=0))
 
     # Window values
     if npt is None:
-        npt = 2*max(shape)
+        npt = 2 * max(shape)
     fp = window_func(npt)
     xp = np.linspace(0, 1, npt)
 
@@ -197,7 +276,7 @@ def generate_isotropic_kernel(shape, window_func, fill_value=0, npt=None):
     return kernel
 
 
-def generate_orthogonal_kernel(kernels, window_func="ones", fill_value=0.):
+def generate_orthogonal_kernel(kernels, window_func="ones", fill_value=0.0):
     """Generate an nD kernel from orthogonal 1d kernels
 
     Parameters
@@ -277,7 +356,7 @@ def generate_orthogonal_kernel(kernels, window_func="ones", fill_value=0.):
                 if size != k1d:
                     size += 2
                 k1d = np.full(size, fill_value)
-                k1d[1:-1] = window_func(size-2)
+                k1d[1:-1] = window_func(size - 2)
         else:
             k1d = np.asarray(k1d)
 
@@ -291,8 +370,14 @@ def generate_orthogonal_kernel(kernels, window_func="ones", fill_value=0.):
 
 
 def generate_kernel(
-        kernel, data, isotropic=False, window_func="ones", fill_value=0.,
-        window_args=None, window_kwargs=None):
+    kernel,
+    data,
+    isotropic=False,
+    window_func="ones",
+    fill_value=0.0,
+    window_args=None,
+    window_kwargs=None,
+):
     """Generate a kernel that is compatible with a given data array
 
     Parameters
@@ -309,7 +394,9 @@ def generate_kernel(
         The final data array is transposed and/or expanded with
         :func:`xoa.coords.transpose` to fit into the input data array.
     data: xarray.DataArray
-        Data array that the kernel must be compatible with
+        Data array that the kernel must be compatible with.
+        If the kernel has more than one dimension, it is expanded with a size of 1
+        for missing dimensions.
     isotropic: bool, tuple
         Tuple of the dimensions over which must be computed isotropically.
 
@@ -330,15 +417,15 @@ def generate_kernel(
 
     # Convert to tuple
     if isinstance(kernel, int):
-        kernel = (kernel,)*data.ndim
+        kernel = (kernel,) * data.ndim
 
     # Convert tuple to dict with dims
     if isinstance(kernel, tuple):
         if len(kernel) > data.ndim:
-            raise XoaError("Too many dimensions for your kernel: {} > {}"
-                           .format(len(kernel), data.ndim))
-        kernel = dict(item for item in
-                      zip(data.dims[-len(kernel):], kernel))
+            raise XoaError(
+                "Too many dimensions for your kernel: {} > {}".format(len(kernel), data.ndim)
+            )
+        kernel = dict(item for item in zip(data.dims[-len(kernel) :], kernel))
 
     # Convert list to dict with dims
     elif isinstance(kernel, list):
@@ -363,15 +450,20 @@ def generate_kernel(
                 orthokernels[dim] = kn
             else:
                 if isokernel:
-                    if ((np.isscalar(isokernel) and not np.isscalar(kn)) or
-                            (not np.isscalar(isokernel) and np.isscalar(kn))):
-                        raise XoaError("Inconsistant mix of 1d and scalar "
-                                       "kernel specs for building isotropic "
-                                       "kernel")
-                    if (not np.isscalar(kn) and not np.isscalar(isokernel)
-                            and not np.allclose(kn, isokernel)):
-                        raise XoaError("Inconsistant 1d kernels for building "
-                                       "isotropic kernel")
+                    if (np.isscalar(isokernel) and not np.isscalar(kn)) or (
+                        not np.isscalar(isokernel) and np.isscalar(kn)
+                    ):
+                        raise XoaError(
+                            "Inconsistant mix of 1d and scalar "
+                            "kernel specs for building isotropic "
+                            "kernel"
+                        )
+                    if (
+                        not np.isscalar(kn)
+                        and not np.isscalar(isokernel)
+                        and not np.allclose(kn, isokernel)
+                    ):
+                        raise XoaError("Inconsistant 1d kernels for building " "isotropic kernel")
                 else:
                     isokernel = kn
                 size = kn if np.isscalar(kn) else len(kn)
@@ -384,11 +476,11 @@ def generate_kernel(
             dims += tuple(orthokernels.keys())
             window_args = [] if window_args is None else window_args
             window_kwargs = {} if window_kwargs is None else window_kwargs
-            window_func = get_window_func(
-                window_func, *window_args, **window_kwargs)
+            window_func = get_window_func(window_func, *window_args, **window_kwargs)
             sizes = tuple(orthokernels.values())
             kernel = generate_orthogonal_kernel(
-                sizes, window_func=window_func, fill_value=fill_value)
+                sizes, window_func=window_func, fill_value=fill_value
+            )
 
         # Build isotropic kernel
         if isokernel:
@@ -399,8 +491,8 @@ def generate_kernel(
 
             # nD isotropic kernel
             isokernels = generate_isotropic_kernel(
-                tuple(isokernels_sizes.values()), window_func,
-                fill_value=fill_value)
+                tuple(isokernels_sizes.values()), window_func, fill_value=fill_value
+            )
 
             # Update final kernel
             dims += tuple(isokernels_sizes.keys())
@@ -412,18 +504,21 @@ def generate_kernel(
     # Numpy
     elif isinstance(kernel, np.ndarray):
         if kernel.ndim > data.ndim:
-            raise XoaError("too many dimensions for your numpy kernel: {} > {}"
-                           .format(kernel.dim, data.ndim))
-        dims = data.dims[-kernel.ndim:]
+            raise XoaError(
+                "too many dimensions for your numpy kernel: {} > {}".format(kernel.dim, data.ndim)
+            )
+        dims = data.dims[-kernel.ndim :]
 
     # Data array
     if not isinstance(kernel, xr.DataArray):
         kernel = xr.DataArray(kernel, dims=dims)
     elif not set(kernel.dims).issubset(set(data.dims)):
-        raise XoaError(f"kernel dimensions {kernel.dims} "
-                       f"are not a subset of {data.dims}")
+        raise XoaError(f"kernel dimensions {kernel.dims} " f"are not a subset of {data.dims}")
 
     # Finalize
+    kernel = kernel.astype(data.dtype)
+    if kernel.ndim == 1:
+        return kernel
     return xcoords.transpose(kernel, data, mode="insert").astype(data.dtype)
 
 
@@ -453,9 +548,9 @@ def shapiro_kernel(dims):
 
     """
     if isinstance(dims, str):
-        dims = (dims, )
+        dims = (dims,)
     ndim = len(dims)
-    kernel = np.zeros((3,)*ndim, dtype='d')
+    kernel = np.zeros((3,) * ndim, dtype='d')
     indices = np.indices(kernel.shape)
     for idx in indices:
         idx[idx == 2] = 0
@@ -463,43 +558,45 @@ def shapiro_kernel(dims):
     return xr.DataArray(kernel, dims=dims)
 
 
-def _convolve_(data, kernel, normalize):
+def _convolve_(data, kernel, normalize, na_thres, axis=None):
     """Pure numpy convolution that takes care of nans"""
-    import scipy.signal as ss
+    # Convolution function
+    kwc = {"mode": "constant"}
+    if kernel.ndim != 1:
+        from scipy.ndimage.filters import convolve as convolve_func
+
+        # from scipy.signal import convolve
+        assert data.ndim == kernel.ndim
+    # elif data.ndim == 1:
+    #     convolve_func = np.convolve
+    else:
+        from scipy.ndimage.filters import convolve1d as convolve_func
+
+        kwc["axis"] = axis
 
     # Kernel
-    assert data.ndim == kernel.ndim
     if kernel.dtype is not data.dtype:
-        xoa_warn(
-            "The dtype of your kernel is not the same as that of your data. "
-            "Converting it...")
+        xoa_warn("The dtype of your kernel is not the same as that of your data. Converting it...")
         kernel = kernel.astype(data.dtype)
 
     # Guess mask
     bad = np.isnan(data)
-    with_mask = bad.any()
-    if with_mask:
-        data = np.where(bad, 0, data)
+    data = np.where(bad, 0, data)
 
     # Convolutions
-    cdata = ss.convolve(data, kernel, mode='same')
-    if normalize or with_mask:
-        weights = ss.convolve((~bad).astype('i'), kernel, mode='same')
-        weights = np.clip(weights, 0, kernel.sum())
+    cdata = convolve_func(data, kernel, cval=0.0, **kwc)
+    weights = convolve_func((~bad).astype('i'), kernel, cval=0, **kwc)
+    # weights = np.clip(weights, 0, kernel.sum())
 
     # Weigthing and masking
-    if with_mask:
-        bad = np.isclose(weights, 0, atol=float(1e-6*kernel.sum()))
+    bad = weights <= kernel.sum() * np.clip(1e-6, 1 - na_thres, 1 - 1e-6)
     if normalize:
-        if with_mask:
-            weights[bad] = 1
+        weights = np.where(bad, 1, weights)
         cdata /= weights
-    if with_mask:
-        cdata[bad.data] = np.nan
-    return cdata
+    return np.where(bad, np.nan, cdata)
 
 
-def convolve(data, kernel, normalize=False):
+def convolve(data, kernel, normalize=False, na_thres=0):
     """N-dimensional convolution that takes care of nans
 
     Parameters
@@ -511,6 +608,13 @@ def convolve(data, kernel, normalize=False):
     normalize: bool
         Divide the convolution product by the local sum weights.
         The result is then a weighted average.
+    na_thres: float
+        A float between 0 and 1 that defines the allowed level a NaN contamination.
+        Examples of the behavioir at a single location:
+
+            - `0`: Output is masked if a single NaN is found.
+            - `0.5`: Output is masked only more than 50% of the input data are masked.
+            - `1`: Output is masked if all input data are masked.
 
     Return
     ------
@@ -535,18 +639,20 @@ def convolve(data, kernel, normalize=False):
         data = xr.DataArray(np.random.normal(size=(50, 70)), dims=('y', 'x'))
         data[10:20, 10:20] = np.nan # introduce missing data
         kernel = dict(x=[1, 2, 5, 2, 1], y=[1, 2, 1])
-        datac = convolve(data, kernel, normalize=True)
+        datac = convolve(data, kernel, normalize=True, na_thres=1)
         fig, (ax0, ax1) = plt.subplots(ncols=2, figsize=(7, 3))
         kw = dict(vmin=data.min(), vmax=data.max())
-        data.plot.pcolormesh(ax=ax0, **kw)
-        datac.plot.pcolormesh(ax=ax1, **kw)
+        data.plot.pcolormesh(ax=ax0, **kw);
+        @savefig api.filter.convolve.png
+        datac.plot.pcolormesh(ax=ax1, **kw);
 
     """
     # Adapt the kernel to the data
     kernel = generate_kernel(kernel, data)
 
     # Numpy convolution
-    datac = _convolve_(data.data, kernel.data, normalize)
+    axis = data.get_axis_num(kernel.dims[0]) if kernel.ndim == 1 else None
+    datac = _convolve_(data.data, kernel.data, normalize, na_thres, axis)
 
     # Format
     return xr.DataArray(datac, coords=data.coords, attrs=data.attrs)
@@ -572,7 +678,7 @@ def _reduce_mask_(data, excluded_dims):
 
 
 def _convolve_and_fill_(data, kernel):
-    return data.fillna(convolve(data, kernel, normalize=True))
+    return data.fillna(convolve(data, kernel, normalize=True, na_thres=1))
 
 
 def erode_mask(data, until=1, kernel=None):
@@ -694,3 +800,57 @@ def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
 
     # Filter
     return erode_mask(data, until=until, kernel=kernel)
+
+
+def demerliac(da, na_thres=0, dt_tol=0.01):
+    """Apply a dermerliac filter on a data array
+
+    Note that the data array must have a valid time dimension.
+    When the time step is less than an hour, an interpolation is made on the weights
+    since they are made for hourly time series.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+    dt_tol: float
+        Relative tolerance for the time step variability
+    na_thres: float
+        A float between 0 and 1 that defines the allowed level a NaN contamination.
+        See :func:`convolve`.
+
+    Return
+    ------
+    xarray.DataArray
+    """
+    # Get time dimension
+    tdim = xcoords.get_tdim(da, errors="ignore")
+    if tdim is None:
+        xoa_warn("Cannot apply the Demerliac filter since to time dimension found")
+        return da.copy()
+
+    # Weights
+    weights = np.array(HOURLY_DEMERLIAC_WEIGHTS, "d")
+    if tdim not in da.indexes:
+        xoa_warn("Not time coordinate found so we assume hourly data")
+    else:
+        dt = np.diff(da[tdim].values) / np.timedelta64(3600, "s")
+        ddt = dt.ptp()
+        mdt = dt.mean()
+        if ddt > dt_tol * mdt:
+            raise XoaError(
+                "The variability of your time steps is above the allowed level "
+                " to apply a Dermerliac filter"
+            )
+        if mdt > 1 + dt_tol:
+            xoa_warn(
+                "You should not apply a Demerliac filter to data that are less "
+                f"than hourly sampled. Current time step: {dt:1.2f}"
+            )
+        elif mdt < 1 - dt_tol:
+            nw = len(weights)
+            from scipy.interpolate import interp1d
+
+            weights = interp1d(weights, np.linspace(0, 1, nw), "cubic")(np.linspace(0, 1, nw / dt))
+
+    # Apply
+    return convolve(da, {tdim: weights}, normalize=True, na_thres=na_thres)
