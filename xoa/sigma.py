@@ -165,6 +165,8 @@ def get_cs(sig, thetas, thetab, cs_type=None):
     s, a, b = sig, thetas, thetab
     cs = np.sinh(s * a) * (1 - b) / np.sinh(a)
     cs = cs + b * (np.tanh(a * (s + 0.5)) / (2 * np.tanh(0.5 * a)) - 0.5)
+    if hasattr(cs, "coords"):
+        cs = cf.get_cf_specs(sig).format_data_var(cs, "cs", format_coords=False)
     return cs
 
 
