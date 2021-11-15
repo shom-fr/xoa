@@ -610,9 +610,7 @@ def test_cf_cfspecs_exclude_data_var():
     cfspecs = cf.CFSpecs(
         {"data_vars": {"temp": {"name": "temperature"}, "ptemp": {"exclude": True}}}
     )
-    xoa.register_accessors()
-    xoa.cf.register_cf_specs(cfspecs)
-    ds = ds.xoa.decode()
+    ds = cfspecs.decode(ds)
     assert "temp" in ds.data_vars
 
 
