@@ -20,7 +20,9 @@ Geographic utilities
 import math
 import numpy as np
 import numba
+import xarray as xr
 
+from . import misc
 from . import coords as xcoords
 
 
@@ -116,15 +118,91 @@ def _bearing_(lon0, lat0, lon1, lat1):
     return a * 180 / math.pi
 
 
-def cdist(XA, XB, radius=EARTH_RADIUS):
-    """Compute the haversine distances between positions of two datasets
+class distance_units(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
+    """Supported units of distance"""
+
+    #: Meters (default)
+    m = 0
+    #: Meters (default)
+    meters = 0
+    #: Meters (default)
+    meter = 0
+    #: Kilometers
+    km = 1
+    #: Kilometers
+    kilometers = 1
+    #: Kilometers
+    kilometer = 1
+
+
+def get_distances(da0, da1=None, radius=EARTH_RADIUS, units="m"):
+    """Compute the haversine distance between two datasets/data arrays
+
+    Parameters
+    ----------
+    da0: xarray.Dataset, xarray.DataArray
+    da1: xarray.Dataset, xarray.DataArray
+    radius: float
+        Radius of the sphere which defaults to the earth radius
+    units: int, str, distance_units
+        Distance units as one of: {distance_units.rst_with_links}
+
+    Return
+    ------
+    xarray.DataArray
+        An array with dims `(npts0, npts1)`
+    See also
+    --------
+    haversine
+    cdist
+    pdist
+    """
+    ds0 = xcoords.geo_stack(da0, rename=True, drop=True, reset_index=True)
+    XY0 = np.dstack([ds0.lon.values, ds0.lat.values])[0]
+    units = distance_units[units]
+    du = str(units)
+    import xarray as xr
+
+    if da1 is None:
+        dd = pdist(XY0, radius=radius)
+        if units == distance_units.km:
+            dd *= 1e-3
+        dd = xr.DataArray(
+            dd,
+            dims=("npts", "npts"),
+            attrs={"units": du},
+            name="distance",
+            coords={"lon": ds0.lon, "lat": ds0.lat},
+        )
+    else:
+        ds0 = ds0.rename(npts="npts0")
+        ds1 = xcoords.geo_stack(da1, "npts1", rename=True, drop=True, reset_index=True)
+        XY1 = np.dstack([ds1.lon.values, ds1.lat.values])[0]
+        dd = cdist(XY0, XY1, radius=radius)
+        if units == distance_units.km:
+            dd *= 1e-3
+        dd = xr.DataArray(
+            dd,
+            dims=("npts0", "npts1"),
+            attrs={"units": du},
+            name="distance",
+            coords={"lon_0": ds0.lon, "lat_0": ds0.lat, "lon_1": ds1.lon, "lat_1": ds1.lat},
+        )
+    return dd
+
+
+get_distances.__doc__ = get_distances.__doc__.format(**locals())
+
+
+def cdist(XA, XB, radius=EARTH_RADIUS, **kwargs):
+    """A scipy-distance like cdist function for the haversine method
 
     Parameters
     ----------
     XA: numpy.array
-        An m by 2 array of coordinates in a geographical space.
+        An ma by 2 array of coordinates of the first dataset in a geographical space.
     XB: numpy.array
-        An m by 2 array of coordinates in a geographical space.
+        An mb by 2 array of coordinates of the second dataset in a geographical space.
     radius: float
         Radius of the sphere which defaults to the earth radius
 
@@ -149,8 +227,8 @@ def cdist(XA, XB, radius=EARTH_RADIUS):
     return haversine(xx[0], yy[0], xx[1], yy[1], radius=radius)
 
 
-def pdist(X, compact=False, radius=EARTH_RADIUS):
-    """Compute the pairwise haversine distances between positions of a single dataset
+def pdist(X, compact=False, radius=EARTH_RADIUS, **kwargs):
+    """A scipy-distance like pdist function for the haversine method
 
     Parameters
     ----------
@@ -309,3 +387,96 @@ def get_extent(extent, margin=0, square=False):
         ymax = y0 + 0.5 * dy + ymargin
 
     return [xmin, xmax, ymin, ymax]
+
+
+def clusterize(obj, npmax, split=False):
+    """Split data into clouds of points of max size `npmax`
+
+    Input object must have valid geographic coordinates.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        If a data array, it must have valid longitude and latitude coordinates.
+    npmax: int
+        Maximal number of point per cluster
+    split:
+        Return one dataset per cluster
+
+    Returns
+    -------
+    xarray.Dataset, list of xarray.Dataset
+        A dataset has its longitude and latitude coordinates renamed "lon" and "lat",
+        and its stacked dimension renamed "npts".
+        It contains only arrays that contains the "npts" dimension.
+        If a clustering was needed, the dataset contains the following arrays:
+        iclust:
+            Index of the cluster points belongs to.
+        indices:
+            Indices in the original dataset.
+        centroid:
+            Coordinate of the centroid(s)
+        distorsion:
+            Distances to the centroid that the points belongs to.
+        If the input is a dataset, the global attribute :attrs:`var_names`
+        is set to the list of data var names.
+
+
+    """
+    # Positions
+    obj = xcoords.geo_stack(obj, "npts", rename=True, drop=True)
+    x = obj.lon.values
+    y = obj.lat.values
+
+    from scipy.cluster.vq import kmeans, vq
+
+    # Nothing to do
+    csize = len(x)
+    if not isinstance(obj, xr.Dataset):
+        obj = obj.to_dataset(name=obj.name or "data")
+    obj.encoding["clust_var_names"] = list(obj)
+    if npmax < 2 or csize <= npmax:
+        return [obj] if split else obj
+
+    # Loop on the number of clusters
+    nclust = 2
+    points = np.dstack((x, y))[0]
+    ii = np.arange(csize)
+    while csize > npmax:
+        centroids, global_distorsion = kmeans(points, nclust)
+        indices, distorsions = vq(points, centroids)
+        sindices = [ii[indices == nc] for nc in range(nclust)]
+        csizes = [sii.shape[0] for sii in sindices]
+        order = np.argsort(csizes)[::-1]
+        csize = csizes[order[0]]
+        sdistorsions = [distorsions[sii] for sii in sindices]
+        nclust += 1
+    nclust = len(centroids)
+
+    if split:
+
+        #  Reorder
+        sindices = [sindices[i] for i in order]
+        sdistorsions = [sdistorsions[i] for i in order]
+        centroids = centroids[order]
+
+        # Split
+        out = []
+        for ic in range(nclust):
+            obji = obj.isel(npts=sindices[ic])
+            obji["iclust"] = xr.DataArray(ic)
+            obji["indices"] = xr.DataArray(sindices[ic], dims="npts")
+            obji["centroid"] = xr.DataArray(centroids[ic], dims="xy")
+            obji["distorsion"] = xr.DataArray(sdistorsions[ic], dims="npts")
+            obji.attrs["global_distorsion"] = global_distorsion
+            obji.attrs["npmax"] = npmax
+            out.append(obji)
+        return out
+
+    obj["iclust"] = xr.DataArray(indices, dims="npts")
+    obj["indices"] = xr.DataArray(ii, dims="npts")
+    obj["centroid"] = xr.DataArray(centroids, dims=("nclust", "xy"))
+    obj["distorsion"] = xr.DataArray(distorsions, dims="npts")
+    obj.attrs["global_distorsion"] = global_distorsion
+    obj.attrs["npmax"] = npmax
+    return obj
