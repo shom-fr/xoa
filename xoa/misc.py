@@ -58,6 +58,7 @@ class XEnumMeta(EnumMeta):
         regrid_methods.rst
 
     """
+
     default = None
 
     # def __call__(cls, value=None, *args, **kwargs):
@@ -97,13 +98,12 @@ class XEnumMeta(EnumMeta):
     def get_rst(cls, with_links=False, link_module=None):
         if with_links:
             choices = []
-            prefix = ((link_module+".") if link_module else "")
+            prefix = (link_module + ".") if link_module else ""
             prefix += cls.__name__ + "."
             for number, names in cls._get_groups_().items():
                 number = int(number)
                 attr = names[0]
-                choice = "|".join([f"{number:d}"] +
-                                  [f'"{name}"' for name in names])
+                choice = "|".join([f"{number:d}"] + [f'"{name}"' for name in names])
                 choices.append(f":attr:`{choice}<{prefix}{attr}>`")
             return ", ".join(choices)
         else:
@@ -148,11 +148,14 @@ class DefaultEnumMeta(XEnumMeta):
         regrid_methods['cellave']
 
     """
+
     default = None
 
     def __call__(cls, value=None, *args, **kwargs):
         if value is None:
             return next(iter(cls))
+        if isinstance(value, str):
+            return cls._member_map_[value]
         return super().__call__(value, *args, **kwargs)
 
     def __getitem__(cls, name):
@@ -164,7 +167,6 @@ class DefaultEnumMeta(XEnumMeta):
 
 
 class IntEnumChoices(IntEnum):
-
     def __str__(self):
         return self.name
 
@@ -186,8 +188,7 @@ class Choices(object):
         Short description of the parameter.
     """
 
-    def __init__(self, choices, case_insensitive=True, parameter=None,
-                 description="Choices"):
+    def __init__(self, choices, case_insensitive=True, parameter=None, description="Choices"):
         self._ci = case_insensitive
         self._docs = {}
         if isinstance(choices, dict):
@@ -198,8 +199,7 @@ class Choices(object):
                 self._choices.append(value)
         else:
             self._choices = [self._reformat_value_(value) for value in choices]
-        self._parameter = (self.__class__.__name__.lower()
-                           if parameter is None else parameter)
+        self._parameter = self.__class__.__name__.lower() if parameter is None else parameter
         self._description = description
 
     @property
@@ -215,8 +215,9 @@ class Choices(object):
         choice = self._reformat_value_(choice)
         if choice not in self._choices:
             desc = self._description if self._description else 'choice'
-            raise XoaError(f"Invalid choice for \"{desc}\": {choice}. "
-                           f"Please choose one of: {self}")
+            raise XoaError(
+                f"Invalid choice for \"{desc}\": {choice}. " f"Please choose one of: {self}"
+            )
         return choice
 
     def __str__(self):
@@ -249,22 +250,19 @@ class Choices(object):
         return rst
 
     def format_function_docstring(self, func):
-        func.__doc__ = func.__doc__.format(
-            **{self._parameter: self.to_docstring(4)})
+        func.__doc__ = func.__doc__.format(**{self._parameter: self.to_docstring(4)})
         return func
 
     def format_method_docstring(self, func):
-        func.__doc__ = func.__doc__.format(
-            **{self._parameter: self.to_docstring(8)})
+        func.__doc__ = func.__doc__.format(**{self._parameter: self.to_docstring(8)})
         return func
 
 
-ERRORS = Choices({"ignore": "silently ignore",
-                  "warn": "emit a warning",
-                  "raise": "raise an exception"},
-                 parameter="errors",
-                 description="In case of errors"
-                 )
+ERRORS = Choices(
+    {"ignore": "silently ignore", "warn": "emit a warning", "raise": "raise an exception"},
+    parameter="errors",
+    description="In case of errors",
+)
 
 
 def get_axis_slices(ndim, axis, **kwargs):
@@ -310,7 +308,7 @@ def get_axis_slices(ndim, axis, **kwargs):
     """
     if not isinstance(ndim, int):
         ndim = np.ndim(ndim)
-    sel = [slice(None)]*ndim
+    sel = [slice(None)] * ndim
     selmid = list(sel)
     selmid[axis] = slice(1, -1)
     selmid = tuple(selmid)
@@ -351,11 +349,21 @@ def get_axis_slices(ndim, axis, **kwargs):
             ksel = list(sel)
             ksel[axis] = val
             kwargs[key] = ksel
-    return dict(all=sel, mid=selmid, lasts=sellasts, firsts=selfirsts,
-                lastsp1=sellastsp1, firstsm1=selfirstsm1,
-                last=sellast, first=selfirst, lastm1=sellastm1,
-                firstp1=selfirstp1,
-                lastm2=sellastm2, firstp2=selfirstp2, **kwargs)
+    return dict(
+        all=sel,
+        mid=selmid,
+        lasts=sellasts,
+        firsts=selfirsts,
+        lastsp1=sellastsp1,
+        firstsm1=selfirstsm1,
+        last=sellast,
+        first=selfirst,
+        lastm1=sellastm1,
+        firstp1=selfirstp1,
+        lastm2=sellastm2,
+        firstp2=selfirstp2,
+        **kwargs,
+    )
 
 
 def is_iterable(obj, nostr=True, nogen=True):
@@ -470,7 +478,7 @@ def dict_filter(
                 if keep:
                     kwout[att] = kwread(att)
                 else:
-                    kwout[att[len(filter_):]] = kwread(att)
+                    kwout[att[len(filter_) :]] = kwread(att)
 
     # Add some items
     kwout.update(kwadd)
@@ -482,9 +490,17 @@ def dict_filter(
     return kwout
 
 
-def dict_merge(*dd, mergesubdicts=True, mergelists=False, mergetuples=False,
-               uniquify=False, skipnones=True, overwriteempty=False, cls=None,
-               **kwargs):
+def dict_merge(
+    *dd,
+    mergesubdicts=True,
+    mergelists=False,
+    mergetuples=False,
+    uniquify=False,
+    skipnones=True,
+    overwriteempty=False,
+    cls=None,
+    **kwargs,
+):
     """Merge dictionaries
 
     First dictionaries have priority over next
@@ -552,7 +568,8 @@ def dict_merge(*dd, mergesubdicts=True, mergelists=False, mergetuples=False,
         uniquify=uniquify,
         skipnones=skipnones,
         overwriteempty=overwriteempty,
-        cls=cls)
+        cls=cls,
+    )
 
     # Loop
     for d in dd:
@@ -569,29 +586,17 @@ def dict_merge(*dd, mergesubdicts=True, mergelists=False, mergetuples=False,
                 outd[key] = val
 
             # Merge subdict
-            elif (
-                mergesubdicts
-                and isinstance(outd[key], dict)
-                and isinstance(val, dict)
-            ):
+            elif mergesubdicts and isinstance(outd[key], dict) and isinstance(val, dict):
                 outd[key] = dict_merge(outd[key], val, **kwargs)
 
             # Merge lists
-            elif (
-                mergelists
-                and isinstance(outd[key], list)
-                and isinstance(val, list)
-            ):
+            elif mergelists and isinstance(outd[key], list) and isinstance(val, list):
                 outd[key] += val
                 if uniquify:
                     outd[key] = gunique(list(outd[key]))
 
             # Merge tuples
-            elif (
-                mergetuples
-                and isinstance(outd[key], tuple)
-                and isinstance(val, tuple)
-            ):
+            elif mergetuples and isinstance(outd[key], tuple) and isinstance(val, tuple):
                 outd[key] += val
                 if uniquify:
                     outd[key] = tuple(gunique(outd[key]))
