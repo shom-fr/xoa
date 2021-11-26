@@ -908,7 +908,7 @@ def get_binding_data_vars(ds, coord, as_names=False):
     return out
 
 
-def geo_stack(obj, stack_dim, rename=False, drop=False):
+def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False):
     """Stack the dimensions of longitude and latitude coordinates
 
     .. note:: If already stacked or similar, a simple copy is returned,
@@ -921,10 +921,16 @@ def geo_stack(obj, stack_dim, rename=False, drop=False):
     stack_dim: str
         Name of the new stack dimension
     rename: False
-        Rename longitude to `lon` and `lat` for convenience.
+        Rename longitude to `lon` and latitude to `lat` for convenience.
         If no need to stack, rename the single dimension to `stack_dim`.
     drop: bool
         Drop all variables and coordinates that does not contain final stack dimension
+
+    Return
+    xarray.DataArray, xarray.Dataset
+        Array or dataset with lon and lat stacked.
+        Its "geo_stack" :attr:`~xarray.DataArray.encoding` attribute value is set
+        to `(stack_dim, lon_dim, lat_dim)`.
 
     See also
     --------
@@ -932,20 +938,44 @@ def geo_stack(obj, stack_dim, rename=False, drop=False):
     """
     lon = get_lon(obj)
     lat = get_lat(obj)
+
     if rename:
-        obj = obj.rename({lon.name: "lon", lat.name: "lat"})
+        if (lon.name in obj.coords and lat.name in obj.coords) or reset_index:
+            if lon.name not in obj.coords:
+                obj = obj.reset_index(lon.dims[0])
+            obj = obj.rename({lon.name: "lon", lat.name: "lat"})
+            lon = obj.lon
+            lat = obj.lat
+
+        else:
+            xoa_warn(
+                "Cannot rename lon and lat coordinates since "
+                "they are component of a MultiIndex. "
+                "Pass reset_index=True to allow it."
+            )
+
+    # Stack or not stack?
     if lon.ndim == 1 and lat.ndim == 1 and lon.dims == lat.dims:
         if rename:
-            obj = obj.rename_dims({lon.dims[0]: stack_dim})
+            obj = obj.rename({lon.dims[0]: stack_dim})
         else:
             stack_dim = lon.dims[0]
             obj = obj.copy()
     else:
         obj = obj.stack({stack_dim: set(lon.dims).union(lat.dims)})
+
+    # No multiindex?
+    if reset_index and lon.name not in obj.coords:
+        obj = obj.reset_index(stack_dim)
+
+    # Drop variables with notstacked coordinates
     if drop:
         names = list(obj) if hasattr(obj, "data_vars") else []
         for name in list(names):
             if stack_dim in obj[name].dims:
                 names.remove(name)
         obj = obj.drop(names)
+
+    # Keep trace
+    obj.encoding["geo_stack"] = (stack_dim, lon.name, lat.name)
     return obj
