@@ -974,7 +974,7 @@ def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False
         for name in list(names):
             if stack_dim in obj[name].dims:
                 names.remove(name)
-        obj = obj.drop(names)
+        obj = obj.drop_vars(names)
 
     # Keep trace
     obj.encoding["geo_stack"] = (stack_dim, lon.name, lat.name)
