@@ -480,3 +480,43 @@ def clusterize(obj, npmax, split=False):
     obj.attrs["global_distorsion"] = global_distorsion
     obj.attrs["npmax"] = npmax
     return obj
+
+
+def deg2m(deg, lat=None, radius=EARTH_RADIUS):
+    """Convert to meters a zonal or meridional distance in degrees
+
+    Parameters
+    ----------
+    deg: float
+        Longitude step
+    lat: float
+        Latitude for a zonal distance
+
+    Return
+    ------
+    float
+    """
+    dd = deg * np.pi * radius / 180.0
+    if lat:
+        dd *= np.cos(np.radians(lat))
+    return dd
+
+
+def m2deg(met, lat=None, radius=EARTH_RADIUS):
+    """Convert to degrees a zonal or meridional distance in meters
+
+    Parameters
+    ----------
+    met: float
+        Longitude step
+    lat: float
+        Latitude for a zonal distance
+
+    Return
+    ------
+    float
+    """
+    dd = met * 180 / (np.pi * radius)
+    if lat:
+        dd /= np.cos(np.radians(lat))
+    return dd
