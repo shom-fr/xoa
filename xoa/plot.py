@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 Plotting utilities
+
+Filters are adapted from https://matplotlib.org/stable/gallery/misc/demo_agg_filter.html?highlight=agg%20filter
+and http://vacumm.github.io/vacumm/library/misc.core_plot.html
+
 """
 # Copyright 2020-2022 Shom
 #
@@ -20,8 +24,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.collections as mcollections
+import matplotlib.artist as martist
+import matplotlib.text as mtext
+import matplotlib.patheffects as mpatheffects
 import xarray as xr
 
+from .__init__ import xoa_warn
 from . import misc as xmisc
 from . import geo as xgeo
 from . import cf as xcf
@@ -333,3 +341,286 @@ def plot_ts(
         out["clabel"] = axes.clabel(out["contour"], **clabel_kwargs)
 
     return out
+
+
+def _smooth2d_(A, sigma):
+    from scipy.ndimage import gaussian_filter
+
+    return gaussian_filter(A, sigma, truncate=3)
+
+
+class _BaseFilter_(object):
+    def prepare_image(self, src_image, dpi, pad):
+        ny, nx, depth = src_image.shape
+        padded_src = np.zeros([pad * 2 + ny, pad * 2 + nx, depth], dtype="d")
+        padded_src[pad:-pad, pad:-pad, :] = src_image[:, :, :]
+        return padded_src
+
+    def get_pad(self, dpi):
+        return 0
+
+    def __call__(self, im, dpi):
+        pad = self.get_pad(dpi)
+        padded_src = self.prepare_image(im, dpi, pad)
+        tgt_image = self.process_image(padded_src, dpi)
+        return tgt_image, -pad, -pad
+
+
+class OffsetFilter(_BaseFilter_):
+    def __init__(self, offsets=None):
+        if offsets is None:
+            self.offsets = (0, 0)
+        else:
+            self.offsets = offsets
+
+    def get_pad(self, dpi):
+        return int(max(*self.offsets) / 72.0 * dpi)
+
+    def process_image(self, padded_src, dpi):
+        ox, oy = self.offsets
+        a1 = np.roll(padded_src, int(ox / 72.0 * dpi), axis=1)
+        a2 = np.roll(a1, -int(oy / 72.0 * dpi), axis=0)
+        return a2
+
+
+class GaussianFilter(_BaseFilter_):
+    """Gaussian filter"""
+
+    def __init__(self, sigma, alpha=0.5, color=None):
+        self.sigma = sigma
+        self.alpha = alpha
+        if color is None:
+            self.color = (0, 0, 0)
+        else:
+            self.color = color
+
+    def get_pad(self, dpi):
+        return int(self.sigma * 3 / 72.0 * dpi)
+
+    def process_image(self, padded_src, dpi):
+        # offsetx, offsety = int(self.offsets[0]), int(self.offsets[1])
+        tgt_image = np.zeros_like(padded_src)
+        aa = _smooth2d_(padded_src[:, :, -1] * self.alpha, self.sigma / 72.0 * dpi)
+        tgt_image[:, :, -1] = aa
+        tgt_image[:, :, :-1] = self.color
+        return tgt_image
+
+
+class DropShadowFilter(_BaseFilter_):
+    """Create a drop shadow"""
+
+    def __init__(self, width, alpha=0.3, color=None, offsets=None):
+        self.gauss_filter = GaussianFilter(width / 3, alpha, color)
+        self.offset_filter = OffsetFilter(offsets)
+
+    def get_pad(self, dpi):
+        return max(self.gauss_filter.get_pad(dpi), self.offset_filter.get_pad(dpi))
+
+    def process_image(self, padded_src, dpi):
+        t1 = self.gauss_filter.process_image(padded_src, dpi)
+        t2 = self.offset_filter.process_image(t1, dpi)
+        return t2
+
+
+class GrowFilter(_BaseFilter_):
+    "Enlarge the area"
+
+    def __init__(self, pixels, color=None, alpha=1.0):
+        self.pixels = pixels
+        if color is None:
+            self.color = (1, 1, 1)
+        else:
+            self.color = color
+        self.alpha = alpha
+
+    def __call__(self, im, dpi):
+        pad = self.pixels
+        ny, nx, depth = im.shape
+        new_im = np.empty([pad * 2 + ny, pad * 2 + nx, depth], dtype="d")
+        alpha = new_im[:, :, 3]
+        alpha.fill(0)
+        alpha[pad:-pad, pad:-pad] = im[:, :, -1]
+        alpha2 = np.clip(_smooth2d_(alpha, self.pixels / 72.0 * dpi) * 5, 0, 1) * self.alpha
+        new_im[:, :, -1] = alpha2
+        new_im[:, :, :-1] = self.color
+        offsetx, offsety = -pad, -pad
+
+        return new_im, offsetx, offsety
+
+
+class LightFilter(_BaseFilter_):
+    """Apply a light filter"""
+
+    def __init__(self, sigma, fraction=0.5, **kwargs):
+        self.gauss_filter = GaussianFilter(sigma / 3, alpha=1)
+        self.light_source = mcolors.LightSource(**kwargs)
+        self.fraction = fraction
+
+    def get_pad(self, dpi):
+        return self.gauss_filter.get_pad(dpi)
+
+    def process_image(self, padded_src, dpi):
+        t1 = self.gauss_filter.process_image(padded_src, dpi)
+        elevation = t1[:, :, 3]
+        rgb = padded_src[:, :, :3]
+        rgb2 = self.light_source.shade_rgb(rgb, elevation, fraction=self.fraction)
+        tgt = np.empty_like(padded_src)
+        tgt[:, :, :3] = rgb2
+        tgt[:, :, 3] = padded_src[:, :, 3]
+
+        return tgt
+
+
+class FilteredArtistList(martist.Artist):
+    """
+    A simple container to draw filtered artist.
+    """
+
+    def __init__(self, artist_list, filter):
+        self._artist_list = artist_list
+        self._filter = filter
+        super().__init__()
+
+    def draw(self, renderer):
+        renderer.start_rasterizing()
+        if hasattr(renderer, 'start_filter'):
+            renderer.start_filter()
+        for a in self._artist_list:
+            if hasattr(a, 'draw'):
+                a.draw(renderer)
+        renderer.stop_filter(self._filter)
+        renderer.stop_rasterizing()
+
+
+def add_agg_filter(objs, filter, zorder=None, ax=None, add=True):
+    """Add a filtered version of objects to plot
+
+    Parameters
+    ----------
+
+    objs: :class:`matplotlib.artist.Artist`
+        Plotted objects.
+    filter: :class:`BaseFilter`
+    zorder: optional
+        zorder (else guess from ``objs``).
+    ax: optional, :class:`matplotlib.axes.Axes`
+    """
+    # Input
+    if not isinstance(objs, (list, tuple)):
+        objs = [objs]
+    elif len(objs) == 0:
+        return []
+
+    # Filter
+    if ax is None:
+        ax = plt.gca()
+    shadows = FilteredArtistList(objs, filter)
+    if hasattr(add, 'add_artist'):
+        add.add_artist(shadows)
+    elif add:
+        ax.add_artist(shadows)
+
+    # Text
+    for t in objs:
+        if isinstance(t, mtext.Text):
+            t.set_path_effects([mpatheffects.Normal()])
+
+    # Adjust zorder
+    if zorder is None or zorder is True:
+        same = zorder is True
+        if hasattr(objs, 'get_zorder'):
+            zorder = objs.get_zorder()
+        else:
+            zorder = objs[0].get_zorder()
+        if not same:
+            zorder -= 0.1
+    if zorder is not False:
+        shadows.set_zorder(zorder)
+
+    return shadows
+
+
+def add_shadow(
+    objs, width=3, xoffset=2, yoffset=-2, alpha=0.5, color='k', zorder=None, ax=None, add=True
+):
+    """Add a drop-shadow to objects
+
+    Parameters
+    ----------
+    objs: :class:`matplotlib.artist.Artist`
+        Plotted objects.
+    width: optional
+        Width of the gaussian filter in points.
+    xoffset: optional
+        Shadow offset along X in points.
+    yoffset: optional
+        Shadow offset along Y in points.
+    color: optional
+        Color of the shadow.
+    zorder: optional
+        zorder (else guess from ``objs``).
+    ax: optional, :class:`matplotlib.axes.Axes`
+
+    Inspired from http://matplotlib.sourceforge.net/examples/pylab_examples/demo_agg_filter.html .
+    """
+    if color is not None:
+        color = mcolors.ColorConverter().to_rgb(color)
+    try:
+        gauss = DropShadowFilter(width, offsets=(xoffset, yoffset), alpha=alpha, color=color)
+        return add_agg_filter(objs, gauss, zorder=zorder, ax=ax, add=add)
+    except:
+        xoa_warn('Cannot plot shadows using agg filters')
+
+
+def add_glow(objs, width=3, zorder=None, color='w', ax=None, alpha=1.0, add=True):
+    """Add a glow effect to text
+
+    Parameters
+    ----------
+    objs: :class:`matplotlib.artist.Artist`
+        Plotted objects.
+    width: optional
+        Width of the gaussian filter in points.
+    color: optional
+        Color of the shadow.
+    zorder: optional
+        zorder (else guess from ``objs``).
+    ax: optional, :class:`matplotlib.axes.Axes`
+
+    Inspired from http://matplotlib.sourceforge.net/examples/pylab_examples/demo_agg_filter.html .
+    """
+    if color is not None:
+        color = mcolors.ColorConverter().to_rgb(color)
+    try:
+        white_glows = GrowFilter(width, color=color, alpha=alpha)
+        return add_agg_filter(objs, white_glows, zorder=zorder, ax=ax, add=add)
+    except:
+        xoa_warn('Cannot add glow effect using agg filters')
+
+
+def add_lightshading(objs, width=7, fraction=0.5, zorder=None, ax=None, add=True, **kwargs):
+    """Add a light shading effect to objects
+
+    Parameters
+    ----------
+    objs: :class:`matplotlib.artist.Artist`
+        Plotted objects.
+    width: optional
+        Width of the gaussian filter in points.
+    fraction: optional
+        Unknown.
+    zorder: optional
+        zorder (else guess from ``objs``).
+    ax: optional, :class:`matplotlib.axes.Axes`
+    **kwargs
+        Extra keywords are passed to :class:`matplotlib.colors.LightSource`
+
+    Inspired from http://matplotlib.sourceforge.net/examples/pylab_examples/demo_agg_filter.html .
+    """
+    if zorder is None:
+        zorder = True
+    try:
+        lf = LightFilter(width, fraction=fraction, **kwargs)
+        return add_agg_filter(objs, lf, zorder=zorder, add=add, ax=ax)
+    except:
+        xoa_warn('Cannot add light shading effect using agg filters')

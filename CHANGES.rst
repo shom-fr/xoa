@@ -6,6 +6,8 @@ Current
 
 New features
 ------------
+- Add the :func:`xoa.plot.add_shadow`, :func:`xoa.plot.add_glow` and
+  :func:`xoa.plot.add_lightshading` function to add path effects to plots [:pull:`44`].
 - Add the :func:`xoa.plot.plot_ts` function to make T-S diagrams [:pull:`43`].
 - Add the `exclude` option to data var and coordinate specifications of
   :class:`xoa.cf.CFSpecs` instances [:pull:`38`].
