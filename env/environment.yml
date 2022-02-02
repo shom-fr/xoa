@@ -8,6 +8,7 @@ dependencies:
   - appdirs
   #- cartopy
   - configobj
+  - gsw
   - matplotlib-base
   - numba
   - python>=3

@@ -19,6 +19,7 @@ dependencies:
   - xarray>=0.17
   - pip:
       - configobj
+      - gsw
       - sphinx
       - sphinx-autosummary-accessors
       - sphinx_rtd_theme

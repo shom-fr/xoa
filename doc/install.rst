@@ -19,6 +19,9 @@ xoa requires ``python>3`` and depends on the following packages:
    * - `configobj <https://configobj.readthedocs.io/en/latest/configobj.html>`_
      - ConfigObj is a simple but powerful config file reader and writer:
        an ini file round tripper.
+   * - `gsw <https://teos-10.github.io/GSW-Python/>`_
+     - gsw is the python implementation of the Thermodynamic Equation of
+       Seawater 2010 (TEOS-10).
    * - `matplotlib <https://matplotlib.org/>`_
      - Matplotlib is a comprehensive library for creating static, animated,
        and interactive visualizations in Python.
