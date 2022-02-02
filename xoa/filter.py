@@ -859,7 +859,7 @@ def demerliac(da, na_thres=0, dt_tol=0.01):
     return convolve(da, {tdim: weights}, normalize=True, na_thres=na_thres)
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _get_decimate_arg_(lons, lats, radius):
     """Get which point to keep to make sure they are enough distant of one another
 
@@ -897,7 +897,7 @@ def _get_decimate_arg_(lons, lats, radius):
     return keep
 
 
-@numba.njit
+@numba.njit(cache=True)
 def _decimate_by_average_(lons, lats, radius, keep, data):
     npts = lons.size
     nkept = keep.sum()
@@ -908,14 +908,12 @@ def _decimate_by_average_(lons, lats, radius, keep, data):
         if keep[i]:
             for j in range(npts):
                 dist = xgeo._haversine_(lons[i], lats[i], lons[j], lats[j])
-                # print(dist, radius)
                 if dist <= radius:
-                    # print('BINGO', i, j)
                     cdata[..., k] += data[..., j]
                     ccount[k] += 1.0
             k += 1
     for i in numba.prange(nkept):
-        cdata[..., i] /= ccount[i]
+        cdata[..., i] = cdata[..., i] / ccount[i]
     return cdata
 
 

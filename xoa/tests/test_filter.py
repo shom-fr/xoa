@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 import xarray as xr
 
-from xoa import filter as xfilter
+import xoa.filter as xfilter
 
 np.random.seed(0)
 da1d = xr.DataArray(np.random.normal(size=10), dims=('nt',))
@@ -111,7 +111,7 @@ def test_filter_dermerliac():
     "radius, expected",
     [
         (0.0, [True, True, True, True, True]),
-        (160e3, [True, False, True, True, False]),
+        (0.025, [True, False, True, True, False]),
         (np.inf, [True, False, False, False, False]),
     ],
 )
