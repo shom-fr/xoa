@@ -1,6 +1,27 @@
 What's new
 ##########
 
+Current
+=======
+
+New features
+------------
+- Add the :func:`xoa.plot.plot_ts` function to make T-S diagrams.
+
+Breaking changes
+----------------
+
+Deprecations
+------------
+
+Bug fixes
+---------
+
+Documentation
+-------------
+
+
+
 0.5.1 (2021-10-13)
 ==================
 

@@ -12,8 +12,8 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.join(os.path.abspath(
-    os.path.dirname(__file__)), 'ext'))
+
+sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ext'))
 
 
 # %% Project information
@@ -24,6 +24,7 @@ author = 'Shom'
 
 # The full version, including alpha/beta/rc tags
 import xoa
+
 release = xoa.__version__
 xoa.register_accessors(xoa=True, xcf=True, decode_sigma=True)
 
@@ -50,11 +51,12 @@ extensions = [
     'sphinxcontrib.programoutput',
     'sphinx_autosummary_accessors',
     'sphinx_gallery.gen_gallery',
-    'xoa.cfgm'
+    'xoa.cfgm',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
 import sphinx_autosummary_accessors
+
 templates_path = ['_templates', sphinx_autosummary_accessors.templates_path]
 
 # List of patterns, relative to source directory, that match files and
@@ -93,8 +95,9 @@ intersphinx_mapping = {
     'proplot': ('https://proplot.readthedocs.io/en/latest/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
     'xarray': ('http://xarray.pydata.org/en/stable/', None),
+    'gsw': ('https://teos-10.github.io/GSW-Python', None)
     # 'xesmf': ("https://xesmf.readthedocs.io/en/latest/", None)
-    }
+}
 
 # %% Napoleon
 napoleon_use_admonition_for_examples = False
@@ -108,6 +111,7 @@ genoptions_declarations = 'genoptions/declarations.txt'
 
 # %% Cfgm
 import xoa.cf
+
 cfgm_get_cfgm_func = xoa.cf._get_cfgm_
 cfgm_rst_file = "cf.txt"
 
@@ -118,7 +122,7 @@ extlinks = {
 }
 
 # %% Nbsphinx
-#nbsphinx_timeout = 120  # in seconds
+# nbsphinx_timeout = 120  # in seconds
 
 # %% Sphinx gallery
 sphinx_gallery_conf = {
@@ -129,28 +133,34 @@ sphinx_gallery_conf = {
         'repo': 'xoa',
         'branch': 'master',
         'binderhub_url': 'https://mybinder.org',
-        'dependencies': [
-            './binder/environment.yml',
-            './binder/apt.txt',
-            './binder/setup.py'
-            ],
+        'dependencies': ['./binder/environment.yml', './binder/apt.txt', './binder/setup.py'],
         'notebooks_dir': 'notebooks',
         'use_jupyter_lab': True,
-        },
-    }
+    },
+}
 
 # %% User directives
+
 
 def setup(app):
 
     app.add_css_file('custom.css')
 
-    app.add_object_type('confopt', 'confopt',
-                        objname='configuration option',
-                        indextemplate='pair: %s; configuration option')
-    app.add_object_type('confsec', 'confsec',
-                        objname='configuration section',
-                        indextemplate='pair: %s; configuration section')
-    app.add_object_type('confval', 'confval',
-                        objname='sphinx configuration value',
-                        indextemplate='pair: %s; sphinx configuration value')
+    app.add_object_type(
+        'confopt',
+        'confopt',
+        objname='configuration option',
+        indextemplate='pair: %s; configuration option',
+    )
+    app.add_object_type(
+        'confsec',
+        'confsec',
+        objname='configuration section',
+        indextemplate='pair: %s; configuration section',
+    )
+    app.add_object_type(
+        'confval',
+        'confval',
+        objname='sphinx configuration value',
+        indextemplate='pair: %s; sphinx configuration value',
+    )
