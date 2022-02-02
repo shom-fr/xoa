@@ -6,7 +6,9 @@ Current
 
 New features
 ------------
-- Add the :func:`xoa.plot.plot_ts` function to make T-S diagrams.
+- Add the :func:`xoa.plot.plot_ts` function to make T-S diagrams [:pull:`43`].
+- Add the `exclude` option to data var and coordinate specifications of
+  :class:`xoa.cf.CFSpecs` instances [:pull:`38`].
 
 Breaking changes
 ----------------
@@ -31,7 +33,7 @@ New features
 
 Bug fixes
 ---------
-- Fix :meth:`xoa.cf.CFSpecs.to_loc` that which failing with dataset  [:pull:`23`].
+- Fix :meth:`xoa.cf.CFSpecs.to_loc` that which failing with dataset [:pull:`23`].
 
 
 0.5.0 (2021-10-12)
@@ -41,11 +43,13 @@ New features
 ------------
 - Add the `hlocs` argument to :func:`xoa.sigma.get_sigma_terms`
   and :func:`xoa.sigma.decode_cf_sigma` to decode at several horizontal
-  staggered grid locations.
+  staggered grid locations  [:pull:`34`].
 - Add the `edges` argument to :func:`xoa.regrid.regrid1d` to manually specify
-  the edges that are used by the "cellave" regridding method.
-- Add back the `loc` argument to the formatting methods of :mod:`xoa.cf`.
-- Add dimension checking and support for dask arrays in :mod:`xoa.sigma`.
+  the edges that are used by the "cellave" regridding method  [:pull:`34`].
+- Add back the `loc` argument to the formatting methods of :mod:`xoa.cf`
+   [:pull:`34`].
+- Add dimension checking and support for dask arrays in :mod:`xoa.sigma`
+   [:pull:`34`].
 - Expose a few options of :meth:`xoa.cfgm.ConfigManager` to the
   :func:`xoa.cfgm.cfgargparse` function.
 - Add the :confval:`cfgm_cfg_file` sphinx configuration option
@@ -53,15 +57,17 @@ New features
 
 Bug fixes
 ---------
-- Fix :func:`xoa.regrid.regrid1d` with "cellave" method.
+- Fix :func:`xoa.regrid.regrid1d` with "cellave" method  [:pull:`34`].
 - Fix :meth:`xoa.cf.CFSpecs.get_location_mapping` for coordinates that have
-  no axis attribute specifications.
-- Fix :func:`xoa.grid.dz2depth` that was not working properly with 4D+ arrays.
+  no axis attribute specifications  [:pull:`34`].
+- Fix :func:`xoa.grid.dz2depth` that was not working properly with 4D+ arrays
+  [:pull:`34`].
 
 
 Breaking changes
 ----------------
-- The `loc` argument of :func:`xoa.sigma.get_sigma_terms` is renamed `vloc`.
+- The `loc` argument of :func:`xoa.sigma.get_sigma_terms` is renamed `vloc`
+   [:pull:`34`].
 
 
 0.4.0 (2021-09-02)

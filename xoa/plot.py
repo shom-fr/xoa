@@ -77,7 +77,7 @@ def plot_flow(
     Return
     ------
     dict
-        With the following key, depending on what is plotted:
+        With the following keys:
         `axes`, `lc`, `step`, `duration`.
         `lc` is the :class:`matplotlib.collections.LineCollection` instance.
         The duration and step are also stored in the output.
@@ -197,7 +197,7 @@ def plot_ts(
 
     A TS diagram is a scatter plot with absolute salinity as X axis
     and potential temperature as Y axis.
-    The density is generally plotted as background contours.
+    The density is generally added as background contours.
 
     Parameters
     ----------
@@ -209,19 +209,22 @@ def plot_ts(
         Add contours of density.
         The density is computed with function :func:`gsw.density.sigma0`.
     potential: bool, None
-        Is the temperature potential? If set to None, infer it from attributes.
+        Is the temperature potential? If None, infer from attributes.
     clabel: bool
         Add labels to density contours
     clabel_kwargs: dict, None
         Parameters that are passed to :func:`~matplotlib.pyplot.clabel`.
     colorbar: bool, None
-        Should we add the colorbar? If set to None, check if scatter plot color is data array.
+        Should we add the colorbar? If None, check if scatter plot color is a data array.
     colorbar_kwargs: dict, None
         Parameters that are passed to :func:`~matplotlib.pyplot.colorbar`.
     contour_kwargs: dict, None
         Parameters that are passed to :func:`~matplotlib.pyplot.contour`.
     axes: None
         Matplotlib axes instance
+    kwargs: dict
+        Extra parameters are filtered by :func:`xoa.misc.dict_filter`
+        and passed to the plot functions.
 
     See also
     --------
@@ -231,7 +234,7 @@ def plot_ts(
     Return
     ------
     dict
-        With the following key, depending on what is plotted:
+        With the following keys, depending on what is plotted:
         `axes`, `scatter`, `colorbar`, `contour`, `clabel`.
 
 
@@ -245,7 +248,8 @@ def plot_ts(
         from xoa.plot import plot_ts
 
         # Load the CROCO meridional section
-        ds = xoa.open_data_sample("croco.south-africa.meridional.nc").isel(xi_rho=slice(30))
+        ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
+        ds = ds.isel(xi_rho=slice(30))
         temp = ds.xoa.get('temp')
         sal = ds.xoa.get('sal')
         depth = xoa.coords.get_depth(ds)
