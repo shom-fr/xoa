@@ -972,6 +972,13 @@ class CFSpecs(object):
                         pcat, pname, pspecs = item
                         items[pcat].append((pname, pspecs))
 
+        # Exclude
+        for category in self.categories:
+            items[category] = dict(items[category])
+            for name in self[category].names:
+                if items[category][name]['exclude']:
+                    del items[category][name]
+
         # Refill
         for category in items:
             self._dict[category].clear()
@@ -1038,10 +1045,7 @@ class CFSpecs(object):
 
             # Inherit with merging
             entries[name] = specs = dict_merge(
-                specs,
-                self._dict[from_cat][from_name],
-                cls=dict,
-                **_CF_DICT_MERGE_KWARGS,
+                specs, self._dict[from_cat][from_name], cls=dict, **_CF_DICT_MERGE_KWARGS,
             )
 
             # Check compatibility of keys when not from same category
