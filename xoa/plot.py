@@ -247,12 +247,15 @@ def plot_ts(
         @suppress
         from xoa.plot import plot_ts
 
+        # Register the main xoa accessor
+        xoa.register_accessors()
+
         # Load the CROCO meridional section
         ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
-        ds = ds.isel(xi_rho=slice(30))
-        temp = ds.xoa.get('temp')
-        sal = ds.xoa.get('sal')
-        depth = xoa.coords.get_depth(ds)
+        ds = ds.isel(eta_rho=slice(40))
+        temp = ds.xoa.get('temp')     # requests are based...
+        sal = ds.xoa.get('sal')       # ...on the generic name
+        depth = ds.xoa.get_depth(ds)  # or xoa.coords.get_depth(ds)
 
         # Plot
         @savefig api.plot.plot_ts.png
