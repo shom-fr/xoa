@@ -2,6 +2,7 @@ appdirs
 cartopy
 cmocean
 configobj
+gsw
 ipython
 jupyter_client
 matplotlib-base
