@@ -1,7 +1,7 @@
 """
 Routines related to the ocean dynamics.
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2022 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,9 +40,9 @@ def _get_uv2d_(t, txy, gx, gy, gz, gt, guv):
     tuv = grid2locs(gx, gy, gz, gt, guv, tx, ty, tz, tt)
 
     # Scale the speed for degrees
-    tuv[0] *= 180. / (np.pi * EARTH_RADIUS)
-    tuv[1] *= 180. / (np.pi * EARTH_RADIUS)
-    tuv[1] *= np.cos(ty*np.pi/180)
+    tuv[0] *= 180.0 / (np.pi * EARTH_RADIUS)
+    tuv[1] *= 180.0 / (np.pi * EARTH_RADIUS)
+    tuv[1] *= np.cos(ty * np.pi / 180)
 
     # Pack velocity
     return tuv.ravel()
@@ -51,23 +51,23 @@ def _get_uv2d_(t, txy, gx, gy, gz, gt, guv):
 def _rk4_(xy, f, t, dt, **kwargs):
     """Integrate one time step with RK4"""
     k1 = dt * f(t, xy, **kwargs)
-    k2 = dt * f(t + 0.5*dt, xy + 0.5*k1, **kwargs)
-    k3 = dt * f(t + 0.5*dt, xy + 0.5*k2, **kwargs)
-    k4 = dt * f(t + 0.5*dt, xy + 0.5*k3, **kwargs)
-    return xy + (k1 + k2 + k3 + k4)/6.
+    k2 = dt * f(t + 0.5 * dt, xy + 0.5 * k1, **kwargs)
+    k3 = dt * f(t + 0.5 * dt, xy + 0.5 * k2, **kwargs)
+    k4 = dt * f(t + 0.5 * dt, xy + 0.5 * k3, **kwargs)
+    return xy + (k1 + k2 + k3 + k4) / 6.0
 
 
 def _integrate_(xy, f, t0, t1, dt, **kwargs):
     """Low level integration with packed, pure-numeric data"""
 
     # Fit the time steps to the time range
-    dt *= 1.
+    dt *= 1.0
     if t1 < 0:
         dts = [dt] * int(-t1)
     else:
-        nt = int((t1-t0)//dt)
+        nt = int((t1 - t0) // dt)
         dts = [dt] * nt
-        dtf = (t1-t0) % dt
+        dtf = (t1 - t0) % dt
         if dtf:
             dts.append(dtf)
 
@@ -123,9 +123,9 @@ def flow2d(u, v, xy0, duration, step, date=None):
         gx = gx.reshape(1, -1)
     if gy.ndim == 1:
         gy = gy.reshape(-1, 1)
-    gz = np.zeros((1,)*5)
+    gz = np.zeros((1,) * 5)
     gt = np.zeros(1)
-    gu = u.values.reshape((1,)*2+u.shape[-2:])
+    gu = u.values.reshape((1,) * 2 + u.shape[-2:])
     gv = v.values.reshape(gu.shape)
     guv = np.array([gu, gv])
 
@@ -151,12 +151,7 @@ def flow2d(u, v, xy0, duration, step, date=None):
     if isinstance(step, np.timedelta64):
         step /= np.timedelta64(1, "s")
     t1 = duration
-    tt, txy = _integrate_(
-        txy0,
-        _get_uv2d_,
-        t0, t1, step,
-        gx=gx, gy=gy, gz=gz, gt=gt,
-        guv=guv)
+    tt, txy = _integrate_(txy0, _get_uv2d_, t0, t1, step, gx=gx, gy=gy, gz=gz, gt=gt, guv=guv)
     tx, ty = np.split(txy, 2, axis=1)
 
     # As a dataset
@@ -168,9 +163,12 @@ def flow2d(u, v, xy0, duration, step, date=None):
         date = time0.values
     else:
         date = pd.Timestamp.now().to_datetime64()
-    time = xr.DataArray(tt*np.timedelta64(1, 's')+date, dims='time')
+    time = xr.DataArray(tt * np.timedelta64(1, 's') + date, dims='time')
 
     return xr.Dataset(
-        coords={'lon': (('time', 'particles'), tx),
-                'lat': (('time', 'particles'), ty),
-                'time': time})
+        coords={
+            'lon': (('time', 'particles'), tx),
+            'lat': (('time', 'particles'), ty),
+            'time': time,
+        }
+    )

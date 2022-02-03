@@ -2,7 +2,7 @@
 """
 Plotting utilities
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2022 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,8 +78,8 @@ def plot_flow(
     ------
     dict
         With the following keys:
-        `axes`, `lc`, `step`, `duration`.
-        `lc` is the :class:`matplotlib.collections.LineCollection` instance.
+        `axes`, `linecollection`, `step`, `duration`.
+        `linecollection` refere to the :class:`matplotlib.collections.LineCollection` instance.
         The duration and step are also stored in the output.
 
     Example
@@ -167,16 +167,14 @@ def plot_flow(
     kwargs.setdefault("colors", colors)
     kwargs.setdefault("linewidths", linewidths)
     lc = mcollections.LineCollection(segments, **kwargs)
-    out = {"step": step, "duration": duration}
     newaxes = axes is None
     if newaxes:
         axes = plt.gca()
     if autolim is None:
         autolim = newaxes
     axes.add_collection(lc, autolim=autolim)
-    out["axes"] = axes
 
-    return out
+    return {"axes": axes, "step": step, "duration": duration, "linecollection": lc}
 
 
 def plot_ts(

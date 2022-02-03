@@ -28,7 +28,7 @@ from . import coords as xcoords
 EARTH_RADIUS = 6371e3
 
 
-@numba.vectorize
+@numba.vectorize(cache=True)
 def _haversine_(lon0, lat0, lon1, lat1):
     """Haversine distance between two points on a **unit sphere**
 
@@ -48,11 +48,14 @@ def _haversine_(lon0, lat0, lon1, lat1):
     float, array_like
         Distance(s)
     """
-    deg2rad = math.pi / 180.
-    dist = math.sin(deg2rad*(lat0-lat1)*0.5)**2
-    dist += (math.cos(deg2rad*lat0) * math.cos(deg2rad*lat1) *
-             math.sin(deg2rad*(lon0-lon1)*0.5)**2)
-    dist = 2. * math.asin(math.sqrt(dist))
+    deg2rad = math.pi / 180.0
+    dist = math.sin(deg2rad * (lat0 - lat1) * 0.5) ** 2
+    dist += (
+        math.cos(deg2rad * lat0)
+        * math.cos(deg2rad * lat1)
+        * math.sin(deg2rad * (lon0 - lon1) * 0.5) ** 2
+    )
+    dist = 2.0 * math.asin(math.sqrt(dist))
     return dist
 
 
@@ -77,9 +80,7 @@ def haversine(lon0, lat0, lon1, lat1, radius=EARTH_RADIUS):
     float, array_like
         Distance(s)
     """
-    return _haversine_(
-        np.double(lon0), np.double(lat0),
-        np.double(lon1), np.double(lat1)) * radius
+    return _haversine_(np.double(lon0), np.double(lat0), np.double(lon1), np.double(lat1)) * radius
 
 
 def bearing(lon0, lat0, lon1, lat1):
@@ -101,17 +102,17 @@ def bearing(lon0, lat0, lon1, lat1):
     float, array_like
         Angle(s)
     """
-    return _bearing_(
-        np.double(lon0), np.double(lat0), np.double(lon1), np.double(lat1))
+    return _bearing_(np.double(lon0), np.double(lat0), np.double(lon1), np.double(lat1))
 
 
 @numba.vectorize
 def _bearing_(lon0, lat0, lon1, lat1):
-    deg2rad = math.pi / 180.
+    deg2rad = math.pi / 180.0
     a = math.arctan2(
-        math.cos(deg2rad*lat0)*math.sin(deg2rad*lat1) -
-        math.sin(deg2rad*lat0)*math.cos(deg2rad*lat1)*math.cos(deg2rad*(lon1-lon0)),
-        math.sin(deg2rad*(lon1-lon0))*math.cos(deg2rad*lat1))
+        math.cos(deg2rad * lat0) * math.sin(deg2rad * lat1)
+        - math.sin(deg2rad * lat0) * math.cos(deg2rad * lat1) * math.cos(deg2rad * (lon1 - lon0)),
+        math.sin(deg2rad * (lon1 - lon0)) * math.cos(deg2rad * lat1),
+    )
     return a * 180 / math.pi
 
 
@@ -172,10 +173,10 @@ def get_extent(extent, margin=0, square=False):
     if square or margin:
         dx = xmax - xmin
         dy = ymax - ymin
-        x0 = 0.5 * (xmin+xmax)
-        y0 = 0.5 * (ymin+ymax)
+        x0 = 0.5 * (xmin + xmax)
+        y0 = 0.5 * (ymin + ymax)
         if square:
-            aspect = dx * math.cos(y0*math.pi/180) / dy
+            aspect = dx * math.cos(y0 * math.pi / 180) / dy
             if aspect > 1:
                 dy *= aspect
             else:
