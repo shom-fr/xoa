@@ -115,11 +115,11 @@ def nearest1d(vari, yi, yo, extrap="no"):
                 dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
 
                 # Above
-                if dy1 < 0:  # above
+                if dy1 < 0.0:  # above
                     break
 
                 # Below
-                if dy0 < 0:
+                if dy0 < 0.0:
                     iyomin = iyo + 1
 
                 # Interpolations
@@ -191,15 +191,15 @@ def linear1d(vari, yi, yo, extrap="no"):
                 dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
 
                 # Above
-                if dy1 < 0:  # above
+                if dy1 < 0.0:  # above
                     break
 
                 # Below
-                if dy0 < 0:
+                if dy0 < 0.0:
                     iyomin = iyo + 1
 
                 # Interpolation
-                elif dy0 > 0 or dy1 > 0:
+                elif dy0 > 0.0 or dy1 > 0.0:
 
                     varo[ix, iyo] = (vari[ixi, iyi] * dy1 + vari[ixi, iyi + 1] * dy0) / (dy0 + dy1)
 
@@ -266,11 +266,11 @@ def cubic1d(vari, yi, yo, extrap="no"):
                 dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
 
                 # Above
-                if dy1 < 0:  # above
+                if dy1 < 0.0:  # above
                     break
 
                 # Inside
-                if dy0 >= 0 and dy1 >= 0:
+                if dy0 >= 0.0 and dy1 >= 0.0:
 
                     iyomin = iyo
                     mu = dy0 / (dy0 + dy1)
@@ -358,11 +358,11 @@ def hermit1d(vari, yi, yo, extrap="no", bias=0.0, tension=0.0):
                 dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
 
                 # Above
-                if dy1 < 0:  # above
+                if dy1 < 0.0:  # above
                     break
 
                 # Inside
-                if dy0 >= 0 and dy1 >= 0:
+                if dy0 >= 0.0 and dy1 >= 0.0:
 
                     iyomin = iyo
                     mu = dy0 / (dy0 + dy1)
