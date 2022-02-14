@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ext
 # %% Project information
 
 project = 'xoa'
-copyright = '2020-2021, Shom'
+copyright = '2020-2022, Shom'
 author = 'Shom'
 
 # The full version, including alpha/beta/rc tags

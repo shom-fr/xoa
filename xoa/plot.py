@@ -175,6 +175,7 @@ def plot_flow(
     kwargs.setdefault("colors", colors)
     kwargs.setdefault("linewidths", linewidths)
     lc = mcollections.LineCollection(segments, **kwargs)
+    axes = kwargs.get("ax", axes)
     newaxes = axes is None
     if newaxes:
         axes = plt.gca()
@@ -189,6 +190,7 @@ def plot_ts(
     temp,
     sal,
     dens=True,
+    pres=None,
     potential=None,
     axes=None,
     scatter_kwargs=None,
@@ -214,6 +216,8 @@ def plot_ts(
     dens: bool
         Add contours of density.
         The density is computed with function :func:`gsw.density.sigma0`.
+    pres: xarray.DataArray, None
+        Pressure to compute potential temperature.
     potential: bool, None
         Is the temperature potential? If None, infer from attributes.
     clabel: bool
@@ -277,13 +281,18 @@ def plot_ts(
     if not potential:
         import gsw
 
-        lat = xcoords.get_lat(temp)
-        depth = xcoords.get_depth(temp)
-        lat, depth = xr.broadcast(lat, depth)
-        pres = gsw.p_from_z(depth, lat)
-        temp = gsw.pt_from_t(sal, temp, pres)
+        if pres is None:
+            lat = xcoords.get_lat(temp)
+            depth = xcoords.get_depth(temp)
+            lat, depth = xr.broadcast(lat, depth)
+            pres = gsw.p_from_z(depth, lat)
+        attrs = temp.attrs
+        temp = gsw.pt0_from_t(sal, temp, pres)
+        temp.attrs.update(attrs)
+        cfspecs.format_data_var(temp, cf_name="ptemp", copy=False, replace_attrs=True)
 
     # Init plot
+    axes = kwargs.get("ax", axes)
     if axes is None:
         axes = plt.gca()
     out = {"axes": axes}
