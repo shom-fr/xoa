@@ -9,11 +9,17 @@ New features
 - Add the :func:`xoa.plot.add_shadow`, :func:`xoa.plot.add_glow` and
   :func:`xoa.plot.add_lightshading` function to add path effects to plots [:pull:`44`].
 - Add the :func:`xoa.plot.plot_ts` function to make T-S diagrams [:pull:`43`].
+- Add the :func:`xoa.filter.demerliac` function to apply a Dermerliac filter
+  to time serie [:pull:`41`].
+- Add support for fine tuning masking in :func:`xoa.filter.convolve` through the `na_thres`
+  parameter [:pull:`41`].
 - Add the `exclude` option to data var and coordinate specifications of
   :class:`xoa.cf.CFSpecs` instances [:pull:`38`].
 
 Breaking changes
 ----------------
+- A single Nan now contaminates the data over the kernel emprise in :func:`xoa.filter.convolve`
+  since `na_thres` is set to zero by default.
 
 Deprecations
 ------------
@@ -23,7 +29,6 @@ Bug fixes
 
 Documentation
 -------------
-
 
 
 0.5.1 (2021-10-13)
