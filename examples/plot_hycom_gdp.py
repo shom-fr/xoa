@@ -31,7 +31,7 @@ from xoa.plot import plot_flow
 xr.set_options(display_style="text")
 
 # %%
-# Register the :ref:`xoa <accessors>` accessors :
+# Register the :ref:`xoa <accessors>` accessors:
 
 xoa.register_accessors()
 
@@ -108,7 +108,9 @@ print(hycom)
 #
 # The drifter comes as a `csv` file and we read it as :class:`pandas.DataFrame` instance.
 
-drifter = xoa.open_data_sample("gdp-6203641.csv", header=0, skiprows=[1], parse_dates=[2], index_col=2)
+drifter = xoa.open_data_sample(
+    "gdp-6203641.csv", header=0, skiprows=[1], parse_dates=[2], index_col=2
+)
 
 # %%
 # Since the sampling is not that nice, we resample it to 3-hour intervals.
@@ -128,7 +130,7 @@ drifter = drifter.where(~drifter.lon.isnull() & ~drifter.lat.isnull(), drop=True
 # %%
 # We add a constant depth of 15 m.
 
-drifter.coords["depth"] = drifter.lon*0 + 15
+drifter.coords["depth"] = drifter.lon * 0 + 15
 
 # %%
 # Here is what we obtain.
@@ -141,9 +143,13 @@ print(drifter)
 #
 # We compute the drifter velocity components
 
-drifter["u"] = drifter.lon.differentiate("time", datetime_unit="s") * xgeo.EARTH_RADIUS*np.pi/180
+drifter["u"] = (
+    drifter.lon.differentiate("time", datetime_unit="s") * xgeo.EARTH_RADIUS * np.pi / 180
+)
 drifter["u"] *= np.cos(np.radians(drifter.lat.values))
-drifter["v"] = drifter.lat.differentiate("time", datetime_unit="s") * xgeo.EARTH_RADIUS*np.pi/180
+drifter["v"] = (
+    drifter.lat.differentiate("time", datetime_unit="s") * xgeo.EARTH_RADIUS * np.pi / 180
+)
 
 # %%
 # We make a 4D linear interpolation the Hycom velocity to the drifter positions with :func:`xoa.regrid.grid2loc`.
@@ -156,7 +162,7 @@ vloc = grid2loc(hycom["v"], drifter)
 # we can plot the mean model velocities over the same period as a background.
 # So we interpolate them at 15 m with :func:`xoa.regrid.regrid1d` and compute a time average.
 
-d15 = xr.DataArray([15.], dims="depth", name="depth")
+d15 = xr.DataArray([15.0], dims="depth", name="depth")
 uh15 = regrid1d(hycom["u"], d15).squeeze(drop=True).mean(dim="time")
 vh15 = regrid1d(hycom["v"], d15).squeeze(drop=True).mean(dim="time")
 
@@ -172,15 +178,31 @@ pcarr = ccrs.PlateCarree()
 fig, ax = plt.subplots(figsize=(7, 7), subplot_kw={"facecolor": "teal", "projection": pmerc})
 ax.gridlines(draw_labels=True, dms=True)
 ax.set_extent(xgeo.get_extent(uh15))
-kwqv = dict(scale_units="dots", scale=0.1/20, units="dots", transform=pcarr)
-plot_flow(uh15, vh15, axes=ax, transform=pcarr, color="w", alpha=(.3, 1), linewidth=.6)
-qv = ax.quiver(uloc.lon.values, uloc.lat.values, uloc.values, vloc.values,
-    color="w", width=2, label="Model", **kwqv)
-ax.plot(drifter.lon.values, drifter.lat.values, '-', color="C1", transform=pcarr, lw=.5)
-ax.quiver(drifter.lon.values, drifter.lat.values, drifter.u.values, drifter.v.values,
-    color="C1", label="Drifter", width=2, **kwqv)
+kwqv = dict(scale_units="dots", scale=0.1 / 20, units="dots", transform=pcarr)
+plot_flow(uh15, vh15, axes=ax, transform=pcarr, color="w", alpha=(0.3, 1), linewidth=0.6)
+qv = ax.quiver(
+    uloc.lon.values,
+    uloc.lat.values,
+    uloc.values,
+    vloc.values,
+    color="w",
+    width=2,
+    label="Model",
+    **kwqv,
+)
+ax.plot(drifter.lon.values, drifter.lat.values, '-', color="C1", transform=pcarr, lw=0.5)
+ax.quiver(
+    drifter.lon.values,
+    drifter.lat.values,
+    drifter.u.values,
+    drifter.v.values,
+    color="C1",
+    label="Drifter",
+    width=2,
+    **kwqv,
+)
 plt.quiverkey(qv, 0.1, 1.06, 0.1, r"0.1 $m\,s^{-1}$", color="k", alpha=1, labelpos="E")
-plt.legend();
+plt.legend()
 
 # %%
 # The discrepancies between the lagrangian and mean eulerian currents highlight

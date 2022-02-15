@@ -927,6 +927,7 @@ def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False
         Drop all variables and coordinates that does not contain final stack dimension
 
     Return
+    ------
     xarray.DataArray, xarray.Dataset
         Array or dataset with lon and lat stacked.
         Its "geo_stack" :attr:`~xarray.DataArray.encoding` attribute value is set
@@ -939,10 +940,15 @@ def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False
     lon = get_lon(obj)
     lat = get_lat(obj)
 
+    # Singleton
+    singleton = lon.ndim == 0 and lat.ndim == 0
+    dims = list(set(lon.dims).union(lat.dims))
+
+    # Rename to lon and lat?
     if rename:
         if (lon.name in obj.coords and lat.name in obj.coords) or reset_index:
-            if lon.name not in obj.coords:
-                obj = obj.reset_index(lon.dims[0])
+            if not singleton and lon.name not in obj.coords:
+                obj = obj.reset_index(dims[0])
             obj = obj.rename({lon.name: "lon", lat.name: "lat"})
             lon = obj.lon
             lat = obj.lat
@@ -955,24 +961,28 @@ def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False
             )
 
     # Stack or not stack?
-    if lon.ndim == 1 and lat.ndim == 1 and lon.dims == lat.dims:
+    if singleton:
+        stack_dim = None
+    elif lon.ndim == 1 and lat.ndim == 1 and lon.dims == lat.dims:
         if rename:
-            obj = obj.rename({lon.dims[0]: stack_dim})
+            obj = obj.rename({dims[0]: stack_dim})
         else:
-            stack_dim = lon.dims[0]
+            stack_dim = dims[0]
             obj = obj.copy()
     else:
-        obj = obj.stack({stack_dim: set(lon.dims).union(lat.dims)})
+        obj = obj.stack({stack_dim: dims})
 
     # No multiindex?
-    if reset_index and lon.name not in obj.coords:
+    if not singleton and reset_index and lon.name not in obj.coords:
         obj = obj.reset_index(stack_dim)
 
-    # Drop variables with notstacked coordinates
-    if drop:
-        names = list(obj) if hasattr(obj, "data_vars") else []
-        for name in list(names):
-            if stack_dim in obj[name].dims:
+    # Drop variables with no stacked coordinates
+    if drop and hasattr(obj, "data_vars"):
+        names = list(obj)
+        for name in list(obj):
+            if (stack_dim in obj[name].dims) or (
+                singleton and lon.name in obj[name].coords and lat.name in obj[name].coords
+            ):
                 names.remove(name)
         obj = obj.drop_vars(names)
 

@@ -392,7 +392,7 @@ class VariogramModel(object):
         pp = list(self.estimated_params.values())
         if None in pp:
             raise VariogramModelError(
-                "No all parameters are estimated: {}".format(self.estimated_params)
+                "Not all parameters are estimated: {}".format(self.estimated_params)
             )
         return np.array(pp)
 
@@ -433,7 +433,7 @@ class VariogramModel(object):
             params = self.get_params()
             if None in list(params.values()):
                 raise VariogramModelError(
-                    "No all parameters are estimated: {}".format(self.estimated_params)
+                    "Not all parameters are estimated: {}".format(self.estimated_params)
                 )
         return get_variogram_model_func(self.mtype, **params)
 
@@ -445,8 +445,8 @@ class VariogramModel(object):
                 da = da[list(da)[0]]
             elif len(da) > 1:
                 xoa_warn(
-                    "Multiple candidate variable found in the dataset for estimating "
-                    "the variogram parameters. Keeping only the forst one."
+                    "Multiple candidate variables found in the dataset for estimating "
+                    "the variogram parameters. Keeping only the first one."
                 )
             elif len(da) == 0:
                 raise KrigingError(
@@ -504,7 +504,7 @@ class VariogramModel(object):
         nr: int
             Number of points to plot the curve
         show_params: bool, dict
-            Show a text box that contains the variogram paramters in the lower right corner.
+            Show a text box that contains the variogram parameters in the lower right corner.
         kwargs: dict
             Extra keyword are passed to the `xarray.DataArray.plot` callable accessor
         """
@@ -573,14 +573,14 @@ class Kriger(object):
 
         #. Input points are split in clusters if necessary.
         #. The input variogram matrix is inverted
-            for each cluster, possibly using
-            :mod:`multiprocessing` if ``nproc>1``.
-        #. Value are computed at output positions
-            using each the inverted matrix of cluster.
+           for each cluster, possibly using
+           :mod:`multiprocessing` if ``nproc>1``.
+        #. Values are computed at output positions
+           each using the inverted matrix of cluster.
         #. Final value is a weighted average of
-            the values estimated using each cluster.
-            Weights are inversely proportional to the inverse
-            of the squared error.
+           the values estimated using each cluster.
+           Weights are inversely proportional to the inverse
+           of the squared error.
 
     Parameters
     ----------
