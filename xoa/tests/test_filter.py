@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 import xarray as xr
 
-from xoa import filter as xfilter
+import xoa.filter as xfilter
 
 np.random.seed(0)
 da1d = xr.DataArray(np.random.normal(size=10), dims=('nt',))
@@ -105,3 +105,45 @@ def test_filter_dermerliac():
 
     da_out = xfilter.demerliac(da_in, na_thres=1)
     assert abs(da_out.mean()) < 0.1
+
+
+@pytest.mark.parametrize(
+    "radius, expected",
+    [
+        (0.0, [True, True, True, True, True]),
+        (0.025, [True, False, True, True, False]),
+        (np.inf, [True, False, False, False, False]),
+    ],
+)
+def test_filter_get_decimate_arg(radius, expected):
+
+    x = np.array([0.0, 1.0, 2.0, 5.0, 6.0])
+    y = x.copy()
+    keep = xfilter._get_decimate_arg_(x, y, radius)
+    np.testing.assert_allclose(keep, expected)
+
+
+def test_filter_decimate():
+
+    ds = xr.Dataset(
+        {"temp": ("npts", 20 + np.arange(5))},
+        coords={
+            "lon": ("npts", [0.0, 1.0, 2.0, 5.0, 6.0]),
+            "lat": ("npts", [0.0, 1.0, 2.0, 5.0, 6.0]),
+        },
+    )
+
+    dsc0 = xfilter.decimate(ds, 160e3, method="pick")
+    assert dsc0.lon.dims == ("npts",)
+    np.testing.assert_allclose(dsc0.lon.values, [0.0, 2.0, 5.0])
+
+    dac = xfilter.decimate(ds.temp, 160e3, method="pick")
+    np.testing.assert_allclose(dac.lon.values, [0.0, 2.0, 5.0])
+
+    dsc1 = xfilter.decimate(ds.drop_vars("temp"), 160e3, method="pick")
+    np.testing.assert_allclose(dsc1.lon.values, [0.0, 2.0, 5.0])
+
+    dsc0a = xfilter.decimate(ds, 160e3, method="average", smooth_factor=0)
+    xr.testing.assert_equal(dsc0.temp, dsc0a.temp)
+    dsc0b = xfilter.decimate(ds, 160e3, method="average", smooth_factor=np.inf)
+    assert np.isclose(ds.temp.values.mean(), dsc0b.temp.values.mean())

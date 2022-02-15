@@ -17,9 +17,12 @@ Filtering utilities
 
 import numpy as np
 import xarray as xr
+import numba
 
 from .__init__ import XoaError, xoa_warn
+from . import misc as xmisc
 from . import coords as xcoords
+from . import geo as xgeo
 
 HOURLY_DEMERLIAC_WEIGHTS = [
     1,
@@ -854,3 +857,176 @@ def demerliac(da, na_thres=0, dt_tol=0.01):
 
     # Apply
     return convolve(da, {tdim: weights}, normalize=True, na_thres=na_thres)
+
+
+@numba.njit(cache=True)
+def _get_decimate_arg_(lons, lats, radius):
+    """Get which point to keep to make sure they are enough distant of one another
+
+    A loop is made on all points: a point that is at a distance less that `radius`
+    from a point that was previously marked as True is marked as False.
+
+    Parameters
+    ----------
+    x: numpy.array
+        1D array of longitudes
+    y: numpy.array
+        1D array of latitudes
+    radius: float
+        Radius relative to the sphere radius
+
+    Returns
+    -------
+    numpy.array
+        1D array of boolean with True set for the points to keep
+
+    See also
+    --------
+    xoa.geo.haversine
+    decimate
+    """
+    npts = lons.size
+    keep = np.ones(npts, dtype="?")
+    for i in range(1, npts):
+        for j in range(i):
+            if keep[j]:
+                dist = xgeo._haversine_(lons[i], lats[i], lons[j], lats[j])
+                if dist < radius:
+                    keep[i] = False
+                    break
+    return keep
+
+
+@numba.njit(cache=True)
+def _decimate_by_average_(lons, lats, radius, keep, data):
+    npts = lons.size
+    nkept = keep.sum()
+    cdata = np.zeros(data.shape[:-1] + (nkept,), data.dtype)
+    ccount = np.zeros(nkept, data.dtype)
+    k = 0
+    for i in numba.prange(npts):
+        if keep[i]:
+            for j in range(npts):
+                dist = xgeo._haversine_(lons[i], lats[i], lons[j], lats[j])
+                if dist <= radius:
+                    cdata[..., k] += data[..., j]
+                    ccount[k] += 1.0
+            k += 1
+    for i in numba.prange(nkept):
+        cdata[..., i] = cdata[..., i] / ccount[i]
+    return cdata
+
+
+class decimation_methods(xmisc.IntEnumChoices, metaclass=xmisc.DefaultEnumMeta):
+    """Supported :func:`regrid1d` methods"""
+
+    #: Average (default)
+    average = 1
+    #: Pick
+    pick = 0
+    kill = 0
+
+
+def decimate(
+    obj,
+    radius,
+    method="average",
+    stack_dim="npts",
+    sphere_radius=xgeo.EARTH_RADIUS,
+    smooth_factor=1.0,
+):
+    """Decimate a data array or dataset by removing too close points
+
+    It typical use is for undersampling a huge dataset before a geostatistical interpolation.
+
+    A loop is made on all points: a point that is at a distance less that `radius`
+    from a previously selected point is not selected.
+    In the case of the "average" method, an average is made at selected points within a radius
+    of `radius*smooth_factor`.
+
+    .. warning:: X and Y dimensions are stacked during this process if not already stacked.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Array or dataset to decimate with lon and lat coordinates
+    radius: float
+        Radius in meters
+    method:str, int
+        Decimation method:
+        {decimation_methods.rst_with_links}.
+        `pick` operates with crude undersampling, while `average` performs
+        an average with a radius of size `radius*smooth_factor`.
+    smooth_factor: float
+        Factor applied to `radius` for the average process, not for the selection
+        process.
+        A `smooth_factor` of zero is equivalent to `method` set to "pick".
+        A `smooth_factor` which is equal to the infinite returns a spatial average over the domain
+        at all selected points.
+    stack_dim: str
+        When lon and lat coordinates have several or uncommon dimensions,
+        they are stacked onto a single dimension whose name is `stack_dim`,
+        with function :func:`~xoa.coords.geo_stack`.
+    sphere_radius: float
+        Radius of the sphere in meters
+
+    Example
+    -------
+
+    .. ipython:: python
+
+        @suppress
+        import xarray as xr, numpy as np, cmocean, matplotlib.pyplot as plt
+        @suppress
+        from xoa.filter import decimate
+        # Create the sample
+        npts = 1000
+        x = np.random.uniform(-20, -10, npts)
+        y = np.random.uniform(40, 50, npts)
+        ds = xr.Dataset(
+            {{"temp": ("npts", 20+5*np.exp(-(x+15)**2/3**2-(y-45)**2/3**2))}},
+            coords={{"lon": ("npts", x), "lat": ("npts", y)}})
+
+        # Decimate it with a radius of 150 km
+        dsc = decimate(ds, radius=150e3)
+
+        # Plot
+        fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True)
+        axs[0].scatter(ds.lon, ds.lat, c=ds.temp, cmap='cmo.thermal')
+        axs[0].set_title("Complete")
+        axs[1].scatter(dsc.lon, dsc.lat, c=dsc.temp, cmap='cmo.thermal')
+        @savefig api.filter.decimate.png
+        axs[1].set_title("Decimated")
+
+    See also
+    --------
+    xoa.geo.haversine
+    xarray.DataArray.stack
+    """
+    # Stacked coordinates
+    obj = xcoords.geo_stack(obj, stack_dim)
+    lon = xcoords.get_lon(obj)
+    x = lon.values
+    y = xcoords.get_lat(obj).values
+
+    # Decimation arg
+    keep = xr.DataArray(_get_decimate_arg_(x, y, radius / sphere_radius), dims=lon.dims)
+
+    # Compress
+    objc = obj.where(keep, drop=True)
+
+    # By average
+    method = decimation_methods[method]
+    if method.name == "average":
+        targets = list(objc) if isinstance(objc, xr.Dataset) else [0]
+        for target in targets:
+            if lon.dims[0] in obj[target].dims:
+                values = obj[target].values.reshape(-1, obj[target].shape[-1])
+                objc[target][:] = _decimate_by_average_(
+                    x, y, smooth_factor * radius / sphere_radius, keep.values, values
+                ).reshape((objc[target].shape[:-1] + (-1,)))
+
+    return objc
+
+
+decimate.__doc__ = decimate.__doc__.format(**locals())

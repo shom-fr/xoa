@@ -20,7 +20,9 @@ Geographic utilities
 import math
 import numpy as np
 import numba
+import xarray as xr
 
+from . import misc
 from . import coords as xcoords
 
 
@@ -116,6 +118,202 @@ def _bearing_(lon0, lat0, lon1, lat1):
     return a * 180 / math.pi
 
 
+class distance_units(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
+    """Supported units of distance"""
+
+    #: Meters (default)
+    m = 0
+    #: Meters (default)
+    meters = 0
+    #: Meters (default)
+    meter = 0
+    #: Kilometers
+    km = 1
+    #: Kilometers
+    kilometers = 1
+    #: Kilometers
+    kilometer = 1
+
+
+def get_distances(da0, da1=None, radius=EARTH_RADIUS, units="m"):
+    """Compute the haversine distance between two datasets/data arrays
+
+    Parameters
+    ----------
+    da0: xarray.Dataset, xarray.DataArray
+    da1: xarray.Dataset, xarray.DataArray
+    radius: float
+        Radius of the sphere which defaults to the earth radius
+    units: int, str, distance_units
+        Distance units as one of: {distance_units.rst_with_links}
+
+    Return
+    ------
+    xarray.DataArray
+        An array with dims `(npts0, npts1)`
+    See also
+    --------
+    haversine
+    cdist
+    pdist
+    """
+    ds0 = xcoords.geo_stack(da0, rename=True, drop=True, reset_index=True)
+    XY0 = np.dstack([ds0.lon.values, ds0.lat.values])[0]
+    units = distance_units[units]
+    du = str(units)
+    import xarray as xr
+
+    if da1 is None:
+        dd = pdist(XY0, radius=radius)
+        if units == distance_units.km:
+            dd *= 1e-3
+        dd = xr.DataArray(
+            dd,
+            dims=("npts", "npts"),
+            attrs={"units": du},
+            name="distance",
+            coords={"lon": ds0.lon, "lat": ds0.lat},
+        )
+    else:
+        ds0 = ds0.rename(npts="npts0")
+        ds1 = xcoords.geo_stack(da1, "npts1", rename=True, drop=True, reset_index=True)
+        XY1 = np.dstack([ds1.lon.values, ds1.lat.values])[0]
+        dd = cdist(XY0, XY1, radius=radius)
+        if units == distance_units.km:
+            dd *= 1e-3
+        dd = xr.DataArray(
+            dd,
+            dims=("npts0", "npts1"),
+            attrs={"units": du},
+            name="distance",
+            coords={"lon_0": ds0.lon, "lat_0": ds0.lat, "lon_1": ds1.lon, "lat_1": ds1.lat},
+        )
+    return dd
+
+
+get_distances.__doc__ = get_distances.__doc__.format(**locals())
+
+
+def cdist(XA, XB, radius=EARTH_RADIUS, **kwargs):
+    """A scipy-distance like cdist function for the haversine method
+
+    Parameters
+    ----------
+    XA: numpy.array
+        An ma by 2 array of coordinates of the first dataset in a geographical space.
+    XB: numpy.array
+        An mb by 2 array of coordinates of the second dataset in a geographical space.
+    radius: float
+        Radius of the sphere which defaults to the earth radius
+
+    Returns
+    -------
+    numpy.array
+        2D array of distances
+
+    See also
+    --------
+    haversine
+    pdist
+    scipy.sparial.distances.cdist
+    scipy.sparial.distances.pdist
+    """
+    lons0 = XA[:, 0]
+    lats0 = XA[:, 1]
+    lons1 = XB[:, 0]
+    lats1 = XB[:, 1]
+    xx = np.meshgrid(lons1, lons0)
+    yy = np.meshgrid(lats1, lats0)
+    return haversine(xx[0], yy[0], xx[1], yy[1], radius=radius)
+
+
+def pdist(X, compact=False, radius=EARTH_RADIUS, **kwargs):
+    """A scipy-distance like pdist function for the haversine method
+
+    Parameters
+    ----------
+    X: numpy.array
+        An m by 2 array of coordinates in a geographical space.
+    compact: bool
+        Compact the distance matrix to remove duplicate and zeros.
+        It is the strict upper triangle of the distance matrix.
+    radius: float
+        Radius of the sphere which defaults to the earth radius
+
+    Returns
+    -------
+    numpy.array
+        Either 2D (square form) or 1D (compact form) the distance matrix
+
+    See also
+    --------
+    haversine
+    cdist
+    numpy.triu
+    scipy.sparial.distances.pdist
+    scipy.sparial.distances.cdist
+    scipy.sparial.distances.squareform
+    """
+    dd = cdist(X, X, radius=radius)
+    if compact:
+        return dd[np.triu_indices(dd.shape[0], 1)]
+    return dd
+
+
+def _adapative_cdist_(XA, XB, method="haversine", **kwargs):
+    if method == "haversine":
+        return cdist(XA, XB, **kwargs)
+    import scipy.spatial.distance
+
+    return scipy.spatial.distance.cdist(XA, XB, method=method, **kwargs)
+
+
+def _adapative_pdist_(X, method="haversine", **kwargs):
+    if method == "haversine":
+        return pdist(X, **kwargs)
+    import scipy.spatial.distance
+
+    return scipy.spatial.distance.pdist(X, method=method, **kwargs)
+
+
+class ScipyDistContext(object):
+    """Context to switch the :func:`scipy.spatial.distance.cdist` fonction to :func:`cdist`
+
+    Parameters
+    ----------
+    force: bool
+        If true, this function will be used whatever the distance method asked for is.
+    """
+
+    def __init__(self, cdist=True, pdist=True, force=False):
+        self.switch_cdist = cdist
+        self.switch_pdist = pdist
+        import scipy.spatial.distance
+
+        self.distmod = scipy.spatial.distance
+        if force:
+            self.cdist = cdist
+            self.pdist = pdist
+        else:
+            self.cdist = _adapative_cdist_
+            self.pdist = _adapative_pdist_
+
+    def __enter__(self):
+        if self.switch_cdist:
+            self._old_cdist = getattr(self.distmod, "cdist")
+            setattr(self.distmod, "cdist", self.cdist)
+        if self.switch_pdist:
+            self._old_pdist = getattr(self.distmod, "pdist")
+            setattr(self.distmod, "pdist", self.pdist)
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self.switch_cdist:
+            setattr(self.distmod, "cdist", self._old_cdist)
+        if self.switch_pdist:
+            setattr(self.distmod, "pdist", self._old_pdist)
+
+
 def get_extent(extent, margin=0, square=False):
     """Compute the geographic extent in degrees
 
@@ -189,3 +387,136 @@ def get_extent(extent, margin=0, square=False):
         ymax = y0 + 0.5 * dy + ymargin
 
     return [xmin, xmax, ymin, ymax]
+
+
+def clusterize(obj, npmax, split=False):
+    """Split data into clouds of points of max size `npmax`
+
+    Input object must have valid geographic coordinates.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        If a data array, it must have valid longitude and latitude coordinates.
+    npmax: int
+        Maximal number of point per cluster
+    split:
+        Return one dataset per cluster
+
+    Returns
+    -------
+    xarray.Dataset, list of xarray.Dataset
+        A dataset has its longitude and latitude coordinates renamed "lon" and "lat",
+        and its stacked dimension renamed "npts".
+        It contains only arrays that contains the "npts" dimension.
+        If a clustering was needed, the dataset contains the following arrays:
+        iclust:
+            Index of the cluster points belongs to.
+        indices:
+            Indices in the original dataset.
+        centroid:
+            Coordinate of the centroid(s)
+        distorsion:
+            Distances to the centroid that the points belongs to.
+        If the input is a dataset, the global attribute :attrs:`var_names`
+        is set to the list of data var names.
+
+
+    """
+    # Positions
+    obj = xcoords.geo_stack(obj, "npts", rename=True, drop=True)
+    x = obj.lon.values
+    y = obj.lat.values
+
+    from scipy.cluster.vq import kmeans, vq
+
+    # Nothing to do
+    csize = len(x)
+    if not isinstance(obj, xr.Dataset):
+        obj = obj.to_dataset(name=obj.name or "data")
+    obj.encoding["clust_var_names"] = list(obj)
+    if npmax < 2 or csize <= npmax:
+        return [obj] if split else obj
+
+    # Loop on the number of clusters
+    nclust = 2
+    points = np.dstack((x, y))[0]
+    ii = np.arange(csize)
+    while csize > npmax:
+        centroids, global_distorsion = kmeans(points, nclust)
+        indices, distorsions = vq(points, centroids)
+        sindices = [ii[indices == nc] for nc in range(nclust)]
+        csizes = [sii.shape[0] for sii in sindices]
+        order = np.argsort(csizes)[::-1]
+        csize = csizes[order[0]]
+        sdistorsions = [distorsions[sii] for sii in sindices]
+        nclust += 1
+    nclust = len(centroids)
+
+    if split:
+
+        #  Reorder
+        sindices = [sindices[i] for i in order]
+        sdistorsions = [sdistorsions[i] for i in order]
+        centroids = centroids[order]
+
+        # Split
+        out = []
+        for ic in range(nclust):
+            obji = obj.isel(npts=sindices[ic])
+            obji["iclust"] = xr.DataArray(ic)
+            obji["indices"] = xr.DataArray(sindices[ic], dims="npts")
+            obji["centroid"] = xr.DataArray(centroids[ic], dims="xy")
+            obji["distorsion"] = xr.DataArray(sdistorsions[ic], dims="npts")
+            obji.attrs["global_distorsion"] = global_distorsion
+            obji.attrs["npmax"] = npmax
+            out.append(obji)
+        return out
+
+    obj["iclust"] = xr.DataArray(indices, dims="npts")
+    obj["indices"] = xr.DataArray(ii, dims="npts")
+    obj["centroid"] = xr.DataArray(centroids, dims=("nclust", "xy"))
+    obj["distorsion"] = xr.DataArray(distorsions, dims="npts")
+    obj.attrs["global_distorsion"] = global_distorsion
+    obj.attrs["npmax"] = npmax
+    return obj
+
+
+def deg2m(deg, lat=None, radius=EARTH_RADIUS):
+    """Convert to meters a zonal or meridional distance in degrees
+
+    Parameters
+    ----------
+    deg: float
+        Longitude step
+    lat: float
+        Latitude for a zonal distance
+
+    Return
+    ------
+    float
+    """
+    dd = deg * np.pi * radius / 180.0
+    if lat:
+        dd *= np.cos(np.radians(lat))
+    return dd
+
+
+def m2deg(met, lat=None, radius=EARTH_RADIUS):
+    """Convert to degrees a zonal or meridional distance in meters
+
+    Parameters
+    ----------
+    met: float
+        Longitude step
+    lat: float
+        Latitude for a zonal distance
+
+    Return
+    ------
+    float
+    """
+    dd = met * 180 / (np.pi * radius)
+    if lat:
+        dd /= np.cos(np.radians(lat))
+    return dd

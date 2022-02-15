@@ -25,14 +25,13 @@ See the :ref:`uses.cf` section.
 import os
 import pickle
 import re
-import operator
 import pprint
 import fnmatch
 import copy
 
 import appdirs
 
-from .__init__ import XoaError, xoa_warn, get_option, __version__
+from .__init__ import XoaError, xoa_warn, get_option
 from .misc import dict_merge, match_string, ERRORS, Choices
 
 _THISDIR = os.path.dirname(__file__)
@@ -74,6 +73,22 @@ ATTRS_PATCH_MODE = Choices(
 
 class XoaCFError(XoaError):
     pass
+
+
+def _list_xr_names_(obj, data_vars=True, coords=True, dims=True):
+    """List the data vars, coords and dims names of a xarray dataset or data array"""
+    out = set()
+    if data_vars and hasattr(obj, "data_vars"):
+        out = out.union(list(obj))
+    if coords:
+        cnames = set(obj.coords)
+        for cname in cnames:  # multiindexes
+            if cname in obj.indexes and hasattr(obj.indexes[cname], "names"):
+                cnames = cnames.union(obj.indexes[cname].names)
+        out = out.union(cnames)
+    if dims:
+        out = out.union(obj.dims)
+    return out
 
 
 def _get_cache_():
@@ -1196,7 +1211,7 @@ class CFSpecs(object):
         for da in das:
             if locations.get(da.name) is True:
                 loc = None
-                for dim in list(da.dims) + list(da.coords):
+                for dim in _list_xr_names_(da):
                     dim_loc = locations.get(dim)
                     if dim_loc is not None:
                         if loc is None:
@@ -1287,7 +1302,9 @@ class CFSpecs(object):
 
         # Coordinates
         if format_coords:
-            for cname, cda in list(obj.coords.items()):
+            # for cname, cda in list(obj.coords.items()):
+            for cname in _list_xr_names_(obj, data_vars=False, dims=False):
+                cda = obj.coords[cname]
                 new_coord_name = self.coords.format_dataarray(
                     cda,
                     cf_name=cf_names.get(cname) if isinstance(cf_names, dict) else None,
@@ -1607,10 +1624,8 @@ class CFSpecs(object):
         SGLocator.format_attr
         """
         rename_args = {}
-        names = set(obj.dims).union(obj.coords)
-        if hasattr(obj, "data_vars"):
-            names = names.union(obj.data_vars)
-        elif obj.name is not None:
+        names = _list_xr_names_(obj)
+        if hasattr(obj, "name"):
             names = names.union({obj.name})
         for name in names:
             if name not in rename_args:
@@ -1644,9 +1659,10 @@ class CFSpecs(object):
         SGLocator.format_attr
         """
         rename_args = {}
-        names = set(obj.dims).union(obj.coords)
-        if hasattr(obj, "data_vars"):
-            names = names.union(obj.data_vars)
+        names = _list_xr_names_(obj)
+        # names = set(obj.dims).union(obj.coords)
+        # if hasattr(obj, "data_vars"):
+        #     names = names.union(obj.data_vars)
         for name in names:
             if name not in rename_args:
                 root_name, old_loc = self.sglocator.parse_attr("name", name)
@@ -1765,7 +1781,8 @@ class CFSpecs(object):
         -------
         str
         """
-        if da.name is not None and (da.name in da.dims or da.name in da.coords):
+        # if da.name is not None and (da.name in da.dims or da.name in da.coords):
+        if da.name is not None and _list_xr_names_(da, data_vars=False):
             return "coords"
         return "data_vars"
 
@@ -2426,9 +2443,16 @@ class _CFCatSpecs_(object):
 
         # Get target objects
         if self.category and hasattr(obj, self.category):
-            objs = getattr(obj, self.category)
+            names = getattr(obj, self.category)
+            kw = dict(data_vars=False, coords=False, dims=False)
+            kw[self.category] = True
+            names = _list_xr_names_(obj, **kw)
         else:
-            objs = obj.keys() if hasattr(obj, "keys") else obj.coords
+            names = (
+                list(obj)
+                if hasattr(obj, "keys")
+                else _list_xr_names_(obj, data_vars=False, dims=False)
+            )
 
         # Get match specs
         if cf_name:  # Explicit name so we loop on search specs
@@ -2450,17 +2474,20 @@ class _CFCatSpecs_(object):
         found = []
         found_objs = []
         for match_arg in match_specs:
-            for obj in objs.values():
-                m = self.match(obj, match_arg, loc=loc)
+            # for obj in objs.values():
+            for this_name in names:
+                this_obj = obj[this_name]
+                m = self.match(this_obj, match_arg, loc=loc)
                 if m:
-                    if obj.name in found_objs:
+                    # if obj.name in found_objs:
+                    if this_name in found_objs:
                         continue
-                    found_objs.append(obj.name)
+                    found_objs.append(this_name)
                     cf_name = cf_name if cf_name else m
                     if get == "both":
-                        found.append((obj, cf_name))
+                        found.append((this_obj, cf_name))
                     else:
-                        found.append(obj if get == "obj" else cf_name)
+                        found.append(this_obj if get == "obj" else cf_name)
 
         # Return
         if not single:
@@ -2474,7 +2501,7 @@ class _CFCatSpecs_(object):
         if found:
             return found[0]
         if errors != "ignore":
-            msg = "No match item found"
+            msg = "No matching item found"
             if errors == "raise":
                 raise XoaCFError(msg)
             xoa_warn(msg)
@@ -3136,7 +3163,7 @@ class CFCoordSpecs(_CFCatSpecs_):
         dims = list(obj.dims)
         ndim = len(dims)
         if len(cf_args) > len(dims):
-            msg = f"this data array has less dimensions ({ndim})" " than requested ({})".format(
+            msg = f"This data array has less dimensions ({ndim})" " than requested ({})".format(
                 len(cf_args)
             )
             if errors == "raise":
@@ -3363,9 +3390,7 @@ def search_similar(obj, da):
     is_similar
     get_matching_item_specs
     """
-    targets = list(da.coords.values())
-    if hasattr(obj, "data_vars"):
-        targets = list(da.data_vars.values()) + targets
+    targets = _list_xr_names_(da, data_vars=False)
     for ds_da in targets:
         if are_similar(ds_da, da):
             return ds_da
@@ -3850,9 +3875,7 @@ def assign_cf_specs(ds, name=None, register=False):
         name = name.name
 
     # Set as encoding
-    targets = [ds] + list(ds.coords.values())
-    if hasattr(ds, "data_vars"):
-        targets.extend(list(ds.data_vars.values()))
+    targets = [ds] + _list_xr_names_(dims=False)
     for target in targets:
         target.encoding.update(cf_specs=name)
     return ds

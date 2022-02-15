@@ -385,7 +385,8 @@ def test_cf_cfspecs_get_loc_mapping():
     )
 
     locations = cf_specs0.get_loc_mapping(ds0)
-    assert locations == {'u': False, 'lon': 'u', 'x': 'u', 'bathy': 'u', 'lat': None}
+    expected = {'u': False, 'lon': 'u', 'x': 'u', 'bathy': 'u', 'lat': None}
+    assert set(locations.items()) == set(expected.items())
 
 
 @pytest.mark.parametrize("cf_name", [None, "lon"])
@@ -424,6 +425,21 @@ def test_cf_cfspecs_search_coord(cf_name, in_name, in_attrs):
     temp = xr.DataArray(range(20, 25), dims=in_name, coords={in_name: lon}, name='temp')
     res = cf.get_cf_specs().search_coord(temp, cf_name, get="cf_name")
     assert res == 'lon'
+
+
+def test_cf_cfspecs_search_coord_with_stacking():
+
+    ds = xr.Dataset(
+        coords={
+            "lon": ("lon", np.linspace(-10, -2, 5)),
+            "lat": ("lat", np.linspace(43, 49, 4)),
+        }
+    ).stack(npts=("lat", "lon"))
+
+    res = cf.get_cf_specs().search_coord(ds, "lon", get="obj")
+    assert res is not None
+    assert res.shape == (20,)
+    assert res.name == "lon"
 
 
 @pytest.mark.parametrize("cf_name", ["temp", None])
@@ -1073,6 +1089,7 @@ def test_cf_infer_cf_specs():
 # test_cf_cfspecs_format_obj_with_loc()
 # test_cf_cfspecs_get_loc_mapping()
 # test_cf_cfspecs_coords_search_dim()
+test_cf_cfspecs_search_coord_with_stacking()
 
 # lon = xr.DataArray(range(5), dims="lon")
 # banana = xr.DataArray(

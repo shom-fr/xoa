@@ -13,19 +13,31 @@ New features
   to time serie [:pull:`41`].
 - Add support for fine tuning masking in :func:`xoa.filter.convolve` through the `na_thres`
   parameter [:pull:`41`].
+- Add the :func:`xoa.geo.cdist` and :func:`xoa.geo.pdist` functions to compute
+  haversine distances respectively between two dataset and with a dataset  [:pull:`40`].
+- Add the :func:`xoa.coords.geo_stack` function to stack longitudes and latitudes
+  into another dimension, in a dataset or data array  [:pull:`40`].
+- Add the func:`xoa.filter.decimate` function to crudely undersample a geographic
+  dataset or data array with a radius of proximity [:pull:`40`].
+- Add the :func:`xoa.geo.get_distances` to compute the Haversine distances between
+  locations inside a single dataset or between txo datasets [:pull:`40`].
+- Add the :func:`xoa.krig.empirical_variogram` function to estimate variogram parameters.
+- Add the :class:`xoa.krig.VariogramModel` to manage a variogram model [:pull:`40`].
+- Add the :class:`xoa.krig.Kriger` and :func:`xoa.krig.krig` to perform kriging [:pull:`40`].
 - Add the `exclude` option to data var and coordinate specifications of
   :class:`xoa.cf.CFSpecs` instances [:pull:`38`].
 
 Breaking changes
 ----------------
 - A single Nan now contaminates the data over the kernel emprise in :func:`xoa.filter.convolve`
-  since `na_thres` is set to zero by default.
+  since `na_thres` is set to zero by default  [:pull:`40`].
 
 Deprecations
 ------------
 
 Bug fixes
 ---------
+- Fix search for coordinates that are hidden due to :meth:`xarray.DataArray.stack`.
 
 Documentation
 -------------

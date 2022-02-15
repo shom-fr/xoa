@@ -35,15 +35,15 @@ class XoaRegridError(XoaError):
 class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     """Supported :func:`regrid1d` methods"""
 
-    #: Linear iterpolation (default)
+    #: Linear interpolation (default)
     linear = 1
     #: Linear iterpolation (default)
     interp = 1  # compat
-    #: Nearest iterpolation
+    #: Nearest interpolation
     nearest = 0
-    #: Cubic iterpolation
+    #: Cubic interpolation
     cubic = 2
-    #: Hermitian iterpolation
+    #: Hermitian interpolation
     hermit = 3
     #: Hermitian iterpolation
     hermitian = 3
