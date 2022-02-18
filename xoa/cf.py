@@ -3892,7 +3892,7 @@ def assign_cf_specs(ds, name=None, register=False):
         name = name.name
 
     # Set as encoding
-    targets = [ds] + _list_xr_names_(dims=False)
+    targets = [ds] + [ds[name] for name in _list_xr_names_(ds, dims=False)]
     for target in targets:
         target.encoding.update(cf_specs=name)
     return ds
