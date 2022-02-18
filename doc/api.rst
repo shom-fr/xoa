@@ -20,6 +20,7 @@ Package API
     xoa.geo
     xoa.grid
     xoa.interp
+    xoa.krig
     xoa.misc
     xoa.plot
     xoa.regrid
