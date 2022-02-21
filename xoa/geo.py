@@ -403,13 +403,14 @@ def clusterize(obj, npmax, split=False):
     split:
         Return one dataset per cluster
 
-    Returns
-    -------
+    Return
+    ------
     xarray.Dataset, list of xarray.Dataset
-        A dataset has its longitude and latitude coordinates renamed "lon" and "lat",
-        and its stacked dimension renamed "npts".
-        It contains only arrays that contains the "npts" dimension.
+        A dataset has its longitude and latitude coordinates renamed `lon` and `lat`,
+        and its stacked dimension renamed `npts`.
+        It contains only arrays that contains the `npts` dimension.
         If a clustering was needed, the dataset contains the following arrays:
+
         iclust:
             Index of the cluster points belongs to.
         indices:
@@ -418,7 +419,8 @@ def clusterize(obj, npmax, split=False):
             Coordinate of the centroid(s)
         distorsion:
             Distances to the centroid that the points belongs to.
-        If the input is a dataset, the global attribute :attrs:`var_names`
+
+        If the input is a dataset, the global attribute :attr:`var_names`
         is set to the list of data var names.
 
 

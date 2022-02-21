@@ -210,11 +210,11 @@ def regrid1d(
         if edges and "in" in edges:
             coord_in = edges["in"]
         else:
-            coord_in = xgrid.get_edges_1d(coord_in, axis=dim_in)
+            coord_in = xgrid.get_edges(coord_in, dim_in)
         if edges and "out" in edges:
             coord = edges["out"]
         else:
-            coord = xgrid.get_edges_1d(coord, axis=dim_out)
+            coord = xgrid.get_edges(coord, dim_out)
         namein = coord_in.dims[idimin]
         nameout = coord.dims[idimout]
         input_core_dims.extend([[namein], [nameout]])
@@ -223,6 +223,9 @@ def regrid1d(
         exclude_dims = {dim_in, dim_out}
         input_core_dims.extend([[dim_in], [dim_out]])
     output_core_dims = [[dim_out]]
+    for cname in coord.coords:
+        if cname != coord.name:
+            coord = coord.drop(cname)
 
     # Interpolation function name and arguments
     func_name = str(method) + "1d"
@@ -258,6 +261,9 @@ def regrid1d(
 
     # Add output coordinates
     coord_out_name = coord_out.name if coord_out.name else coord_in.name
+    for cname in coord_out.coords:
+        if cname != coord_out.name:
+            coord_out = coord_out.drop(cname)
     da_out = da_out.assign_coords({coord_out_name: coord_out})
     da_out.name = da.name
     da_out.attrs = da.attrs
@@ -359,8 +365,8 @@ def grid2loc(da, loc, compat="warn"):
     order = "yx"
     lons = xcoords.get_lon(loc)
     lats = xcoords.get_lat(loc)
-    xo = lons.values
-    yo = lats.values
+    xo = np.atleast_1d(lons.values)
+    yo = np.atleast_1d(lats.values)
     # - vertical
     deps = xcoords.get_vertical(loc, errors="ignore")
     if deps is not None:
@@ -410,18 +416,19 @@ def grid2loc(da, loc, compat="warn"):
         coords_out.append(deps)
     else:
         zi = np.zeros((1, 1, 1, 1))
-        zo = np.zeros_like(lons.values)
+        zo = np.zeros_like(xo)
     zi = zi.reshape((-1,) + zi.shape[-4:])
     # - t
     if "t" in order:
         # numeric times
         ti = (gtime.values - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
         to = (times.values - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
+        to = np.atleast_1d(to)
         dims_in.update(gtime.dims)
         coords_out.append(times)
     else:
         ti = np.zeros(1)
-        to = np.zeros(lons.shape)
+        to = np.zeros(xo.shape)
 
     # Interpolate
     vo = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
@@ -430,7 +437,7 @@ def grid2loc(da, loc, compat="warn"):
     dims_out = [dim for dim in da.dims if dim not in dims_in]
     sizes_out = [size for dim, size in da.sizes.items() if dim in dims_out]
     dims_out.extend(loc.dims)
-    sizes_out.append(lons.shape[-1])
+    sizes_out.extend(lons.shape)
     coords_out = coords_out + xcoords.get_coords_compat_with_dims(da, exclude_dims=dims_in)
     da_out = xr.DataArray(
         vo.reshape(sizes_out),

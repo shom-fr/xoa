@@ -362,13 +362,13 @@ class VariogramModel(object):
     def get_param(self, name):
         """Get a single parameter
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         name: str
             A valid parameter name
 
-        Returns
-        -------
+        Return
+        ------
         float, None
             Returns None if the parameter is not frozen and has not been estimated yet.
         """
@@ -385,8 +385,8 @@ class VariogramModel(object):
     def get_params_array(self):
         """Get the :attr:`estimated_params` as an array
 
-        Returns
-        -------
+        Return
+        ------
         numpy.array
         """
         pp = list(self.estimated_params.values())

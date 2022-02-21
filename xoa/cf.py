@@ -106,13 +106,14 @@ def _get_cache_():
 
 def _compile_sg_match_(re_match, attrs, formats, root_patterns, location_pattern):
     for attr in attrs:
-        root_pattern = root_patterns[attr]
-        re_match[attr] = re.compile(
-            formats[attr].format(
-                root=rf"(?P<root>{root_pattern})", loc=rf"(?P<loc>{location_pattern})"
-            ),
-            re.I,
-        ).match
+        if formats[attr]:
+            root_pattern = root_patterns[attr]
+            re_match[attr] = re.compile(
+                formats[attr].format(
+                    root=rf"(?P<root>{root_pattern})", loc=rf"(?P<loc>{location_pattern})"
+                ),
+                re.I,
+            ).match
 
 
 class SGLocator(object):
@@ -164,11 +165,9 @@ class SGLocator(object):
         # Formats and regexps
         to_recompile = set()
         if name_format:
-            for pat in ("{root}", "{loc}"):
+            for pat in ("{root}",):  # "{loc}"):
                 if pat not in name_format:
-                    raise XoaCFError(
-                        "name_format must contain strings " "{root} and {loc}: " + name_format
-                    )
+                    raise XoaCFError("name_format must contain strings {root}: " + name_format)
             if len(name_format) == 10:
                 xoa_warn(
                     'No separator found in "name_format" and '
@@ -177,6 +176,9 @@ class SGLocator(object):
                     'regular expression parsing.'
                 )
             self.formats["name"] = name_format
+            to_recompile.add("name")
+        elif name_format is not None:
+            self.formats["name"] = "{root}"
             to_recompile.add("name")
         all_locations = []
         if self.valid_locations:
@@ -222,8 +224,10 @@ class SGLocator(object):
             sg.parse_attr("name", "super_banana_t")
             sg.parse_attr("name", "super_banana_rho")
         """
+        if not self.formats[attr]:
+            return value, None
         m = self.re_match[attr](value)
-        if m is None:
+        if m is None or "loc" not in m.groupdict():
             return value, None
         return m.group("root"), m.group("loc").lower()
 
@@ -460,6 +464,8 @@ class SGLocator(object):
                 loc = loc.upper()
             elif attr == "standard_name":
                 loc = loc.lower()
+        if not self.formats[attr]:
+            return root
         return self.formats[attr].format(root=root, loc=loc)
 
     def format_attrs(self, attrs, loc=None, standardize=True):
@@ -1060,7 +1066,10 @@ class CFSpecs(object):
 
             # Inherit with merging
             entries[name] = specs = dict_merge(
-                specs, self._dict[from_cat][from_name], cls=dict, **_CF_DICT_MERGE_KWARGS,
+                specs,
+                self._dict[from_cat][from_name],
+                cls=dict,
+                **_CF_DICT_MERGE_KWARGS,
             )
 
             # Check compatibility of keys when not from same category
@@ -3691,7 +3700,11 @@ def get_registered_cf_specs(current=True, reverse=True, named=False):
         cfl = cfl[::-1]
     if current and cf_cache["current"] is not None:
         cfl.append(cf_cache["current"])
-    if named:
+    if named is False:
+        cfdef = get_default_cf_specs()
+        if cfdef not in cfl:
+            cfl.append(cfdef)
+    else:
         cfl = [c for c in cfl if c.name]
     return cfl
 
@@ -3796,8 +3809,12 @@ def infer_cf_specs(ds, named=False):
     if attrs:
         for cfspecs in candidates:
             for attr, pattern in cfspecs["register"]["attrs"].items():
-                if attr in attrs and fnmatch.fnmatch(str(attrs[attr]).lower(), pattern.lower()):
-                    return cfspecs
+                if attr in attrs:
+                    if isinstance(pattern, str):
+                        pattern = [pattern]
+                    for pat in pattern:
+                        if fnmatch.fnmatch(str(attrs[attr]).lower(), pat.lower()):
+                            return cfspecs
 
     # By matching score
     best_score = -1
@@ -3875,7 +3892,7 @@ def assign_cf_specs(ds, name=None, register=False):
         name = name.name
 
     # Set as encoding
-    targets = [ds] + _list_xr_names_(dims=False)
+    targets = [ds] + [ds[name] for name in _list_xr_names_(ds, dims=False)]
     for target in targets:
         target.encoding.update(cf_specs=name)
     return ds

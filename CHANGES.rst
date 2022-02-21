@@ -17,7 +17,7 @@ New features
   haversine distances respectively between two dataset and with a dataset  [:pull:`40`].
 - Add the :func:`xoa.coords.geo_stack` function to stack longitudes and latitudes
   into another dimension, in a dataset or data array  [:pull:`40`].
-- Add the func:`xoa.filter.decimate` function to crudely undersample a geographic
+- Add the :func:`xoa.filter.decimate` function to crudely undersample a geographic
   dataset or data array with a radius of proximity [:pull:`40`].
 - Add the :func:`xoa.geo.get_distances` to compute the Haversine distances between
   locations inside a single dataset or between txo datasets [:pull:`40`].
@@ -37,10 +37,13 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix :func:`xoa.regrid.grid2loc` so that it works with scalar output coordinates.
+- Fix :func:`xoa.regrid.regrid1d` to prevent conflict in the presence of MultiIndexes.
 - Fix search for coordinates that are hidden due to :meth:`xarray.DataArray.stack`.
 
 Documentation
 -------------
+- Add the :ref:`Compare Mercator to ARGO <sphx_glr_examples_plot_mercator_argo.py>` example.
 
 
 0.5.1 (2021-10-13)
