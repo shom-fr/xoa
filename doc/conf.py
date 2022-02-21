@@ -12,6 +12,8 @@
 #
 import os
 import sys
+from matplotlib import MatplotlibDeprecationWarning
+import warnings
 
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ext'))
 
@@ -66,7 +68,6 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 # A list of ignored prefixes for module index sorting.
 modindex_common_prefix = ['xoa.']
-
 
 # %% Options for HTML output
 
@@ -125,6 +126,7 @@ extlinks = {
 # nbsphinx_timeout = 120  # in seconds
 
 # %% Sphinx gallery
+warnings.simplefilter("ignore", MatplotlibDeprecationWarning)
 sphinx_gallery_conf = {
     "examples_dirs": "../examples",
     "gallery_dirs": "examples",
