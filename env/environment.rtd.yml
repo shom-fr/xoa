@@ -15,6 +15,7 @@ dependencies:
   - matplotlib-base
   - netCDF4
   - numba
+  - owslib
   - pip
   - python>=3.7
   - xarray>=0.17

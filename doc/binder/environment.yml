@@ -4,14 +4,15 @@ channels:
 
 dependencies:
   - appdirs
-  #- cartopy
+  - cartopy
   - cmocean
   - configobj
+  - gsw
   - matplotlib-base
   - numba
   - pip
   - python>=3
-  #- scipy
+  - scipy
   - xarray
   - xesmf
   - pip:
