@@ -33,12 +33,14 @@ Breaking changes
 ----------------
 - A single Nan now contaminates the data over the kernel emprise in :func:`xoa.filter.convolve`
   since `na_thres` is set to zero by default  [:pull:`40`].
+- xoa now requires the :mod:`gsw` package.
 
 Deprecations
 ------------
 
 Bug fixes
 ---------
+- Fix :func:`xoa.regrid.regrid1d` so that it works now with time coordinates [:pull:`48`].
 - Fix :func:`xoa.regrid.grid2loc` so that it works with scalar output coordinates.
 - Fix :func:`xoa.regrid.regrid1d` to prevent conflict in the presence of MultiIndexes.
 - Fix search for coordinates that are hidden due to :meth:`xarray.DataArray.stack`.

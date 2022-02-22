@@ -31,7 +31,8 @@ def test_regrid_regrid1d():
         name="banana",
         dims=('time', 'lon', 'nz'),
         coords=(time, lon, dep0),
-        attrs={'long_name': 'Big banana'})
+        attrs={'long_name': 'Big banana'},
+    )
     da_out = regrid.regrid1d(da_in, dep1, method="linear")
     assert da_out.dims == ("time", "lon", "nk")
     assert da_out.shape == (nt, nx, nz1)
@@ -40,13 +41,13 @@ def test_regrid_regrid1d():
     assert da_out.max() <= da_in.max()
 
     # data: 3d, coord_in: 2d, coord_out: 2d
-    depth_in = xr.DataArray(yyi, dims=("lon", "nz"),)
-    depth_out = xr.DataArray(
-        yyo, dims=("lon", "nk"),
-        attrs={'standard_name': 'ocean_layer_depth'})
+    depth_in = xr.DataArray(
+        yyi,
+        dims=("lon", "nz"),
+    )
+    depth_out = xr.DataArray(yyo, dims=("lon", "nk"), attrs={'standard_name': 'ocean_layer_depth'})
     del da_in["nz"]
-    da_in = da_in.assign_coords(
-        {"time": time, "lon": lon, "depth": depth_in})
+    da_in = da_in.assign_coords({"time": time, "lon": lon, "depth": depth_in})
     da_out = regrid.regrid1d(da_in, depth_out, method="linear")
     assert da_out.dims == ('time', "lon", "nk")
     assert "depth" in da_out.coords
@@ -59,16 +60,28 @@ def test_regrid_regrid1d():
     assert not np.isnan(da_out).all()
 
 
+def test_regrid_regrid1d_time():
+    time_in = xr.DataArray(np.arange("2000-01-01", "2000-01-03", dtype="M8[D]"), dims="time")
+    data_in = xr.DataArray(np.arange(time_in.size), coords={"time": time_in})
+    time_out = xr.DataArray(np.arange("2000-01-01", "2000-01-03", dtype="M8[h]"), dims="time")
+    data_out = regrid.regrid1d(data_in, time_out)
+    assert data_out.dtype.char == "d"
+    assert data_out.time.dtype.str == '<M8[ns]'
+    assert data_out.shape == (48,)
+    assert float(data_out.max()) == 1.0
+
+
 @pytest.mark.parametrize(
-    "mode,expected", [
+    "mode,expected",
+    [
         ["no", [np.nan, 1, np.nan]],
         ["bottom", [1, 1, np.nan]],
         ["below", [1, 1, np.nan]],
         [-1, [1, 1, np.nan]],
         ['top', [np.nan, 1, 1]],
         ['both', [1, 1, 1]],
-        ]
-    )
+    ],
+)
 def test_regrid_extrap1d(mode, expected):
     nz, ny, nx = 4, 3, 5
     zi = np.linspace(3, 10, nz)
@@ -98,15 +111,15 @@ def test_regrid_grid2loc():
     nti = 4
     no = 10
     xxi, yyi, zzi, tti, xo, yo, to, zo = get_grid2locs_coords(
-        nex=nex, nexz=nexz, nxi=nxi, nyi=nyi, nzi=nzi, nti=nti, no=no)
+        nex=nex, nexz=nexz, nxi=nxi, nyi=nyi, nzi=nzi, nti=nti, no=no
+    )
     ttidt = tti.astype("m8[us]") + np.datetime64("1950-01-01")
     todt = to.astype("m8[us]") + np.datetime64("1950-01-01")
     todt = xr.DataArray(todt, dims='time')
     xo = xr.DataArray(xo, dims="time")
     yo = xr.DataArray(yo, dims="time")
     zo = xr.DataArray(zo, dims="time")
-    loc = xr.Dataset(
-        coords={"time": todt, "depth": zo, "lat": yo, "lon": xo})
+    loc = xr.Dataset(coords={"time": todt, "depth": zo, "lat": yo, "lon": xo})
 
     # Pure 1D axes
     xi = xr.DataArray(xxi[0, 0, 0, :], dims='lon')
@@ -116,10 +129,11 @@ def test_regrid_grid2loc():
     mi = xr.DataArray(np.arange(nex), dims='member')
     vi = vfunc(tti, zzi, yyi, xxi)
     vi = xr.DataArray(
-        np.resize(vi, (nex, )+vi.shape[1:]),
+        np.resize(vi, (nex,) + vi.shape[1:]),
         dims=('member', 'time', 'depth', 'lat', 'lon'),
         coords={"member": mi, "time": ti, "depth": zi, "lat": yi, "lon": xi},
-        attrs={'long_name': "Long name"})
+        attrs={'long_name': "Long name"},
+    )
     vo_truth = np.array(vfunc(to, zo.values, yo.values, xo.values))
     vo_interp = regrid.grid2loc(vi, loc)
     assert vo_interp.shape == (nex, no)
