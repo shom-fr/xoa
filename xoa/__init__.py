@@ -55,9 +55,7 @@ cmapcyc = string(default="cmo.phase")   # default cyclic colormap
 """
 
 #: Default xoa user configuration file
-DEFAULT_USER_CONFIG_FILE = os.path.join(
-    appdirs.user_config_dir("xoa"), "xoa.cfg"
-)
+DEFAULT_USER_CONFIG_FILE = os.path.join(appdirs.user_config_dir("xoa"), "xoa.cfg")
 
 # Directory of sample files
 _SAMPLE_DIR = os.path.join(os.path.dirname(__file__), '_samples')
@@ -72,8 +70,8 @@ _PACKAGES = [
     "pandas",
     "scipy",
     "xarray",
-    "xesmf"
-    ]
+    "xesmf",
+]
 
 
 class XoaError(Exception):
@@ -105,9 +103,10 @@ def xoa_warn(message, stacklevel=2):
 
 def _get_cache_():
     from . import __init__
+
     if not hasattr(__init__, "_XOA_CACHE"):
         __init__._XOA_CACHE = {}
-    return  __init__._XOA_CACHE
+    return __init__._XOA_CACHE
 
 
 def load_options(cfgfile=None):
@@ -143,11 +142,7 @@ def load_options(cfgfile=None):
         )
     if "options" not in xoa_cache:
         xoa_cache["options"] = configobj.ConfigObj(
-            (
-                DEFAULT_USER_CONFIG_FILE
-                if os.path.exists(DEFAULT_USER_CONFIG_FILE)
-                else None
-            ),
+            (DEFAULT_USER_CONFIG_FILE if os.path.exists(DEFAULT_USER_CONFIG_FILE) else None),
             configspec=xoa_cache["cfgspecs"],
             file_error=False,
             raise_errors=True,
@@ -155,9 +150,7 @@ def load_options(cfgfile=None):
         )
     if cfgfile:
         xoa_cache["options"].merge(
-            configobj.ConfigObj(
-                cfgfile, file_error=True, raise_errors=True, list_values=True
-            )
+            configobj.ConfigObj(cfgfile, file_error=True, raise_errors=True, list_values=True)
         )
     xoa_cache["options"].validate(validate.Validator(), copy=True)
 
@@ -187,9 +180,7 @@ def get_option(section, option=None):
         if m:
             section, option = m.groups()
         else:
-            raise XoaConfigError(
-                "You must provide an option name to get_option"
-            )
+            raise XoaConfigError("You must provide an option name to get_option")
     try:
         value = options[section][option]
     except Exception:
@@ -243,7 +234,8 @@ class set_options(object):
             else:
                 if section is None:
                     raise XoaConfigError(
-                        "You must specify the section explicitly or through the option name")
+                        "You must specify the section explicitly or through the option name"
+                    )
                 sec = section
             opts.setdefault(sec, {})[option] = value
 
@@ -320,8 +312,7 @@ def show_options(specs=False):
     if specs:
         print(CONFIG_SPECS.strip("\n"))
     else:
-        print("\n".join(_get_options_().write())
-              .strip("\n").replace('#', ' #'))
+        print("\n".join(_get_options_().write()).strip("\n").replace('#', ' #'))
 
 
 def _parse_requirements_(reqfile):
@@ -373,14 +364,17 @@ def show_paths():
     """
     print("- xoa library dir:", os.path.dirname(__file__))
     from . import cf
+
     asterix = False
-    for label, path in [("user config file", DEFAULT_USER_CONFIG_FILE),
-                        ("user CF specs file", cf.USER_CF_FILE),
-                        ("user CF cache file", cf.USER_CF_CACHE_FILE)]:
+    for label, path in [
+        ("user config file", DEFAULT_USER_CONFIG_FILE),
+        ("user CF specs file", cf.USER_CF_FILE),
+        ("user CF cache file", cf.USER_CF_CACHE_FILE),
+    ]:
         if not os.path.exists(path):
             asterix = True
             path = path + " [*]"
-        print("-", label+":", path)
+        print("-", label + ":", path)
     print("- data samples:", " ".join(get_data_sample()))
     if asterix:
         print("*: file not present")
@@ -440,21 +434,19 @@ def get_data_sample(filename=None):
     if filename is None:
         return filenames
     if filename not in filenames:
-        raise XoaError("Invalid data sample: "+filename)
+        raise XoaError('Invalid data sample: "{}"'.format(filename))
     return os.path.join(_SAMPLE_DIR, filename)
 
 
 def open_data_sample(filename, **kwargs):
     """Open a data sample with :func:`xarray.open_dataset` or :func:`pandas.read_csv`
 
-    A shortcut to::
-
-        xr.open_dataset(get_data_sample(filename))
-
     Parameters
     ----------
     filename: str
-        File name of the sample
+        File name of the sample.
+        If not an existing sample, a warning is raised and if the path exists and has
+        a csv or nc extension, it is opened.
 
     Returns
     -------
@@ -474,16 +466,34 @@ def open_data_sample(filename, **kwargs):
     get_data_sample
     show_data_samples
     """
-    fname = get_data_sample(filename)
-    if fname.endswith("nc"):
+    try:
+        path = get_data_sample(filename)
+    except XoaError as e:
+        msg = str(e) + ".\nThis function is for opening xoa internal sample file."
+        path = filename
+        if not os.path.exists(path):
+            raise XoaError("Invalid path: " + path)
+        else:
+            msg += "\nTrying to open it..."
+        xoa_warn(msg)
+    if path.endswith("nc"):
         import xarray as xr
-        return xr.open_dataset(fname, **kwargs)
-    import pandas as pd
-    return pd.read_csv(fname, **kwargs)
+
+        return xr.open_dataset(path, **kwargs)
+    if path.endswith("csv"):
+        import pandas as pd
+
+        return pd.read_csv(path, **kwargs)
+    raise XoaError("Don't know haw to open this file")
 
 
-def show_data_samples():
+def show_data_samples(full_paths=False):
     """Print the list of data samples
+
+    Parameters
+    ----------
+    full_paths: bool
+        Show full absolute paths.
 
     Example
     -------
@@ -498,7 +508,10 @@ def show_data_samples():
     get_data_samples
     open_data_sample
     """
-    print(' '.join(get_data_sample()))
+    paths = get_data_sample()
+    if full_paths:
+        paths = [os.path.join(_SAMPLE_DIR, path) for path in paths]
+    print(' '.join(paths))
 
 
 def register_accessors(xoa=True, xcf=False, decode_sigma=False):
@@ -522,13 +535,16 @@ def register_accessors(xoa=True, xcf=False, decode_sigma=False):
     """
     if xoa:
         from .accessors import register_xoa_accessors
+
         kw = {"name": xoa} if isinstance(xoa, str) else {}
         register_xoa_accessors(**kw)
     if xcf:
         from .accessors import register_cf_accessors
+
         kw = {"name": xcf} if isinstance(xcf, str) else {}
         register_cf_accessors(**kw)
     if decode_sigma:
         from .accessors import register_sigma_accessor
+
         kw = {"name": decode_sigma} if isinstance(decode_sigma, str) else {}
         register_sigma_accessor(**kw)
