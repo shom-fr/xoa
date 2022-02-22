@@ -82,15 +82,25 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     true = 2
 
 
+def _asfloat_(arr):
+    arr = np.asarray(arr)
+    if arr.dtype.type is np.datetime64:
+        arr = (arr - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
+    elif arr.dtype.char in 'il?':
+        arr = arr.astype("d")
+    return arr
+
+
 def _wrapper1d_(vari, *args, func_name, **kwargs):
     """To make sure arrays have a 2D shape
 
     Output array is reshaped back accordindly
     """
     # To 2D
+    vari = _asfloat_(vari)
     eshape = vari.shape[:-1]
-    args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in (vari,) + args]
-    args = [np.asarray(arr) for arr in args]
+    args = [_asfloat_(arr) for arr in args]
+    args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in [vari] + args]
 
     # Call
     func = getattr(interp, func_name)
@@ -421,8 +431,8 @@ def grid2loc(da, loc, compat="warn"):
     # - t
     if "t" in order:
         # numeric times
-        ti = (gtime.values - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
-        to = (times.values - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
+        ti = _asfloat_(gtime.values)
+        to = _asfloat_(times.values)
         to = np.atleast_1d(to)
         dims_in.update(gtime.dims)
         coords_out.append(times)
