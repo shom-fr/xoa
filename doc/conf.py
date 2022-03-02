@@ -118,8 +118,8 @@ cfgm_rst_file = "cf.txt"
 
 # %% Extlinks
 extlinks = {
-    "issue": ("https://github.com/pydata/xarray/issues/%s", "GH"),
-    "pull": ("https://github.com/pydata/xarray/pull/%s", "PR"),
+    "issue": ("https://github.com/VACUMM/xoa/issues/%s", "GH"),
+    "pull": ("https://github.com/VACUMM/xoa/pulls/%s", "PR"),
 }
 
 # %% Nbsphinx
