@@ -1,6 +1,15 @@
 What's new
 ##########
 
+Ongoing developments
+====================
+
+Bug fixes
+---------
+- Fix :func:`xoa.sigma.get_sigma_terms` so that it works in case of multiple levels coordinates [:pull:`60`]
+
+
+
 0.6.0 (2022-02-24)
 ==================
 
