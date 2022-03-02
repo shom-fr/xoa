@@ -538,14 +538,9 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
                 "No standard_name attribute found in sigma/s " "variable name: " + sig.name
             )
         standard_name, loc = cfspecs.sglocator.parse_attr("standard_name", sig.standard_name)
+        #skip this one
         if standard_name not in SIGMA_COORDINATE_TYPES:
-            raise XoaSigmaError(
-                "Sigma/s coordinate not supported: "
-                + standard_name
-                + ". Supported coordinates: "
-                + " ".join(SIGMA_COORDINATE_TYPES)
-            )
-
+           continue
         # Get formula terms
         if "formula_terms" not in sig.attrs:
             raise XoaSigmaError(
