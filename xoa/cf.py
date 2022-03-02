@@ -2006,7 +2006,7 @@ class CFSpecs(object):
                 obj, cf_name=cf_name, loc=loc, get=get, single=single, errors="ignore"
             )
             if not single:
-                res = [r for r in res if r not in found]
+                res = [r for r in res if r.name not in [f.name for f in found]]
                 found.extend(res)
             elif res is not None:
                 return res
