@@ -54,8 +54,8 @@ def get_lon(da, errors="raise"):
 def is_lon(da, loc="any"):
     """Tell if a data array is identified as longitudes
 
-    Parameters    is_vertical
-
+    Parameters
+    ----------
     da: xarray.DataArray
 
     Return

@@ -7,6 +7,7 @@ Ongoing developments
 Bug fixes
 ---------
 - Fix :func:`xoa.sigma.get_sigma_terms` so that it works in case of multiple levels coordinates [:pull:`60`]
+- Fix :func:`xoa.grid.to_rect` that now infers coordinates and can emit a warning or raise an error.
 
 
 

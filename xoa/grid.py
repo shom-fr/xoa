@@ -566,15 +566,20 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
     return ds.assign_coords(depth=depth)
 
 
-def to_rect(da, tol=1e-5):
-    """Convert a curvilinear coordinate array to a rectangular 1d coordinate array
+@misc.ERRORS.format_function_docstring
+def to_rect(da, tol=1e-5, errors="warn"):
+    """Convert the curvilinear coordinates of array/dataset to rectangular axis coordinates
 
-    It checks if the coordinates may be converted to 1D without loss of information.
+    It checks if the coordinates may be converted to 1D  axis without loss of information.
 
     Parameters
     ----------
     da: xarray.DataArray, xarray.Dataset
         In case of a dataset, it must contain longitudes and latitudes.
+    to: float
+        Absolute tolerance of the variability of a coordinate along its constant dimension
+        to consider it as a 1D axis coordinate.
+    {errors}
 
     Return
     ------
@@ -583,6 +588,8 @@ def to_rect(da, tol=1e-5):
     da = da.copy()
     new_coords = {}
     rename_args = {}
+    da = cf.infer_coords(da)
+    errors = misc.ERRORS[errors]
     for name, coord in da.coords.items():
         if coord.ndim != 2:
             continue
@@ -602,6 +609,12 @@ def to_rect(da, tol=1e-5):
                 dim = coord.dims[0] if coord.dims[1] == odim else coord.dims[1]
                 rename_args[dim] = name
                 break
+        else:
+            msg = ("Cannot convert to curvilinear to rectangular grid since since coordinate "
+                   f"'{name}' is not constant along one of its dimensions")
+            if errors == "errors":
+                raise XoaError(msg)
+            xoa_warn(msg)
     if new_coords:
         return (
             da.reset_coords(list(new_coords), drop=True)
