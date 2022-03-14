@@ -362,7 +362,7 @@ def isoslice(da, values, isoval, dim=None, **kwargs):
     """
 
     if dim is None:
-      dim=xcoords.get_zdim(da)
+        dim = xcoords.get_zdim(da,errors="ignore")
 
     assert dim in da.dims
     assert dim in values.dims

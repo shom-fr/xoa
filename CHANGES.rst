@@ -4,10 +4,17 @@ What's new
 Ongoing developments
 ====================
 
+New features
+------------
+- Add :func:`xoa.regrid.isoslice`  based on :func:`xoa.interp.isoslice` core function
+
 Bug fixes
 ---------
 - Fix :func:`xoa.sigma.get_sigma_terms` so that it works in case of multiple levels coordinates [:pull:`60`]
 
+Documentation
+-------------
+- Add an example of `xoa.regrid.isoslice` to :ref:`sphx_glr_examples_plot_croco_section.py` example
 
 
 0.6.0 (2022-02-24)
