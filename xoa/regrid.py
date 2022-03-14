@@ -331,6 +331,59 @@ def extrap1d(da, dim, mode, **kwargs):
 extrap1d.__doc__ = extrap1d.__doc__.format(**locals())
 
 
+def isoslice(da, values, isoval, dim=None, **kwargs):
+    """Extract data from var where values==isoval
+
+    Parameters
+    -----------
+    da: xarray.DataArray
+          array from which the data are extracted
+    values: array_like
+          array on which a research of isoval is made
+    isoval: Float
+          value of interest on which we perform research in values array
+    dim   : str
+          dimension shared by da and values on which the slice is made
+    Return
+    ------
+    isovar : array_like
+            Sliced array based on data where values==isoval
+
+    Example
+    -------
+
+    Let's define depth and temperature variables both in 3 dimensions (i,j,k)
+    where i and j are horizontal dimension and k the vertical one.
+
+    dep_at_t20 = isoslice(dep,temp,20)   # depth at temperature=20°C
+    temp_at_z15 = isoslice(temp,dep,-15) # temperature at depth=-15m
+
+
+    """
+
+    if dim is None:
+      dim=xcoords.get_zdim(da)
+
+    assert dim in da.dims
+    assert dim in values.dims
+
+    da_out = xr.apply_ufunc(
+        interp.isoslice,
+        da,
+        values,
+        isoval,
+        join="override",
+        input_core_dims=[[dim], [dim], []],
+        exclude_dims={dim},
+        dask='parallelized',
+        dask_gufunc_kwargs={"output_sizes": da.sizes},
+        **kwargs,
+    )
+    da_out.attrs.update(da.attrs)
+    da_out.encoding.update(da.encoding)
+    return da_out
+
+
 def grid2loc(da, loc, compat="warn"):
     """Interpolate a gridded data array to random locations
 
