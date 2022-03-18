@@ -111,7 +111,7 @@ from xoa.regrid import isoslice
 # %%
 # Let's say we want to slice the temperature at depth=-1200 m
 # 
-# The first argument of `isoslice` is the array we want to slice , here the temperature.
+# The first argument of :func:`xoa.regrid.isoslice` is the array we want to slice , here the temperature.
 # 
 # The second one, is the array on which we search the isovalue. Since we look at given depth it must be the depth array
 # 
