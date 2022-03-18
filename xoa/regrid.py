@@ -331,7 +331,7 @@ def extrap1d(da, dim, mode, **kwargs):
 extrap1d.__doc__ = extrap1d.__doc__.format(**locals())
 
 
-def isoslice(da, values, isoval, dim=None, **kwargs):
+def isoslice(da, values, isoval, dim=None, dask='parallelized', **kwargs):
     """Extract data from var where values==isoval
 
     Parameters
@@ -375,7 +375,7 @@ def isoslice(da, values, isoval, dim=None, **kwargs):
         join="override",
         input_core_dims=[[dim], [dim], []],
         exclude_dims={dim},
-        dask='parallelized',
+        dask=dask,
         dask_gufunc_kwargs={"output_sizes": da.sizes},
         **kwargs,
     )
