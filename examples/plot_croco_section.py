@@ -132,7 +132,7 @@ plt.axvline(isotemp.isel(eta_rho=10), ls='--', c='r')
 
 
 # %%
-# Now we try to find the depth at which the temperature is 12°C for example
+# Now we try to find the depth at which the temperature is 12°C for example.
 # 
 # The order of the arguments are not the same as before !
 
