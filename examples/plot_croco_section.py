@@ -127,8 +127,8 @@ isotemp = isoslice(temp, temp.depth, isodepth)
 
 plt.figure()
 temp.isel(eta_rho=10).plot.line(y="depth")
-plt.axhline(isodepth,ls='--')
-plt.axvline(isotemp.isel(eta_rho=10),ls='--',c='r')
+plt.axhline(isodepth, ls='--')
+plt.axvline(isotemp.isel(eta_rho=10), ls='--', c='r')
 
 
 # %%
