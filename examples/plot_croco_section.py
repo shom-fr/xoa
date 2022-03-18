@@ -102,7 +102,7 @@ tempz.plot.contour(lat_name, "depth", colors='w', linewidths=.3, ax=axs[1], **kw
 
 
 # %%
-# Test isoslice function
+# Make iso slices
 # ----------------------
 
 from xoa.regrid import isoslice
