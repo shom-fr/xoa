@@ -353,10 +353,10 @@ def isoslice(da, values, isoval, dim=None, **kwargs):
     -------
 
     Let's define depth and temperature variables both in 3 dimensions (i,j,k)
-    where i and j are horizontal dimension and k the vertical one.
+    where i and j are horizontal dimension and k the vertical one::
 
-    dep_at_t20 = isoslice(dep,temp,20)   # depth at temperature=20°C
-    temp_at_z15 = isoslice(temp,dep,-15) # temperature at depth=-15m
+        dep_at_t20 = isoslice(dep, temp, 20)   # depth at temperature=20°C
+        temp_at_z15 = isoslice(temp, dep, -15) # temperature at depth=-15m
 
 
     """
