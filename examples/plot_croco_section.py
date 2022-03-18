@@ -118,8 +118,8 @@ from xoa.regrid import isoslice
 # The last one is the isovalue
 # 
 
-isodepth=-1200.
-isotemp=isoslice(temp,temp.depth,isodepth)
+isodepth = -1200.
+isotemp = isoslice(temp, temp.depth, isodepth)
 
 
 # %%
