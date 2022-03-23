@@ -102,4 +102,50 @@ tempz.plot.contour(lat_name, "depth", colors='w', linewidths=.3, ax=axs[1], **kw
 
 
 # %%
+# Make iso slices
+# ----------------------
+
+from xoa.regrid import isoslice
+
+
+# %%
+# Let's say we want to slice the temperature at depth=-1200 m
+# 
+# The first argument of :func:`xoa.regrid.isoslice` is the array we want to slice , here the temperature.
+# 
+# The second one, is the array on which we search the isovalue. Since we look at given depth it must be the depth array
+# 
+# The last one is the isovalue
+# 
+
+isodepth = -1200.
+isotemp = isoslice(temp, temp.depth, isodepth)
+
+
+# %%
+# Make a simple profil plot at a given latitude (index eta_rho=10)
+
+plt.figure()
+temp.isel(eta_rho=10).plot.line(y="depth")
+plt.axhline(isodepth, ls='--')
+plt.axvline(isotemp.isel(eta_rho=10), ls='--', c='r')
+
+
+# %%
+# Now we try to find the depth at which the temperature is 12°C for example.
+# 
+# The order of the arguments are not the same as before !
+
+isotemp=12.
+isodep=isoslice(temp.depth,temp,isotemp)
+
+# %%
+# And the plot ...
+
+plt.figure()
+temp.isel(eta_rho=10).plot.line(y="depth")
+plt.axvline(isotemp,ls='--')
+plt.axhline(isodep.isel(eta_rho=10),ls='--',c='r')
+
+# %%
 # Et voilà!

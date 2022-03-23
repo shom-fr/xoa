@@ -84,6 +84,7 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
 
 def _asfloat_(arr):
     arr = np.asarray(arr)
+    arr = np.atleast_1d(arr)
     if arr.dtype.type is np.datetime64:
         arr = (arr - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
     elif arr.dtype.char in 'il?':
@@ -101,11 +102,9 @@ def _wrapper1d_(vari, *args, func_name, **kwargs):
     eshape = vari.shape[:-1]
     args = [_asfloat_(arr) for arr in args]
     args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in [vari] + args]
-
     # Call
     func = getattr(interp, func_name)
     varo = func(*args, **kwargs)
-
     # From 2D
     return varo.reshape(eshape + varo.shape[-1:])
 
@@ -329,6 +328,58 @@ def extrap1d(da, dim, mode, **kwargs):
 
 
 extrap1d.__doc__ = extrap1d.__doc__.format(**locals())
+
+
+def isoslice(da, values, isoval, dim=None, dask='parallelized', **kwargs):
+    """Extract data from var where values==isoval
+
+    Parameters
+    -----------
+    da: xarray.DataArray
+          array from which the data are extracted
+    values: array_like
+          array on which a research of isoval is made
+    isoval: Float
+          value of interest on which we perform research in values array
+    dim   : str
+          dimension shared by da and values on which the slice is made
+    Return
+    ------
+    isovar : array_like
+            Sliced array based on data where values==isoval
+
+    Example
+    -------
+
+    Let's define depth and temperature variables both in 3 dimensions (i,j,k)
+    where i and j are horizontal dimension and k the vertical one::
+
+        dep_at_t20 = isoslice(dep, temp, 20)   # depth at temperature=20°C
+        temp_at_z15 = isoslice(temp, dep, -15) # temperature at depth=-15m
+
+
+    """
+
+    if dim is None:
+        dim = xcoords.get_zdim(da, errors="ignore")
+
+    assert dim in da.dims
+    assert dim in values.dims
+
+    da_out = xr.apply_ufunc(
+        interp.isoslice,
+        da,
+        values,
+        isoval,
+        join="override",
+        input_core_dims=[[dim], [dim], []],
+        exclude_dims={dim},
+        dask=dask,
+        **kwargs,
+    )
+    da_out.attrs.update(da.attrs)
+    da_out.encoding.update(da.encoding)
+    return da_out
 
 
 def grid2loc(da, loc, compat="warn"):
