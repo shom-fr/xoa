@@ -84,6 +84,7 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
 
 def _asfloat_(arr):
     arr = np.asarray(arr)
+    arr = np.atleast_1d(arr)
     if arr.dtype.type is np.datetime64:
         arr = (arr - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
     elif arr.dtype.char in 'il?':
@@ -101,11 +102,9 @@ def _wrapper1d_(vari, *args, func_name, **kwargs):
     eshape = vari.shape[:-1]
     args = [_asfloat_(arr) for arr in args]
     args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in [vari] + args]
-
     # Call
     func = getattr(interp, func_name)
     varo = func(*args, **kwargs)
-
     # From 2D
     return varo.reshape(eshape + varo.shape[-1:])
 
@@ -362,7 +361,7 @@ def isoslice(da, values, isoval, dim=None, dask='parallelized', **kwargs):
     """
 
     if dim is None:
-        dim = xcoords.get_zdim(da,errors="ignore")
+        dim = xcoords.get_zdim(da, errors="ignore")
 
     assert dim in da.dims
     assert dim in values.dims
@@ -376,7 +375,6 @@ def isoslice(da, values, isoval, dim=None, dask='parallelized', **kwargs):
         input_core_dims=[[dim], [dim], []],
         exclude_dims={dim},
         dask=dask,
-        dask_gufunc_kwargs={"output_sizes": da.sizes},
         **kwargs,
     )
     da_out.attrs.update(da.attrs)
