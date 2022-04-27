@@ -634,7 +634,6 @@ def convolve(data, kernel, normalize=False, na_thres=0):
     -------
     .. ipython:: python
 
-        @savefig api.filter.convolve.png
         @suppress
         import xarray as xr, numpy as np, matplotlib.pyplot as plt
         @suppress

@@ -331,21 +331,22 @@ extrap1d.__doc__ = extrap1d.__doc__.format(**locals())
 
 
 def isoslice(da, values, isoval, dim=None, dask='parallelized', **kwargs):
-    """Extract data from var where values==isoval
+    """Extract data from an array where another array equals `isoval`
 
     Parameters
     -----------
     da: xarray.DataArray
-          array from which the data are extracted
-    values: array_like
-          array on which a research of isoval is made
-    isoval: Float
-          value of interest on which we perform research in values array
-    dim   : str
+          Array from which the data are extracted
+    values: xarray.DataArray
+          Array on which a research of isoval is made
+    isoval: Float, xarray.DataArray
+          Value of interest on which we perform research in values array
+    dim: str
           dimension shared by da and values on which the slice is made
+
     Return
     ------
-    isovar : array_like
+    isovar: xarray.DataArray
             Sliced array based on data where values==isoval
 
     Example
@@ -356,7 +357,6 @@ def isoslice(da, values, isoval, dim=None, dask='parallelized', **kwargs):
 
         dep_at_t20 = isoslice(dep, temp, 20)   # depth at temperature=20°C
         temp_at_z15 = isoslice(temp, dep, -15) # temperature at depth=-15m
-
 
     """
 
@@ -411,7 +411,7 @@ def grid2loc(da, loc, compat="warn"):
     xarray.dataArray
         The interpolated data array.
 
-    See also
+    See Also
     --------
     xoa.interp.grid2locs
     xoa.interp.grid2relloc
