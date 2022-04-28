@@ -287,7 +287,7 @@ def cubic1d(vari, yi, yo, extrap="no"):
 
                     # Interpolation
                     varo[ix, iyo] = vc1 - vari[ix, iyi + 1] - vc0 + vari[ix, iyi]
-                    varo[ix, iyo] = mu**3 * varo[ix, iyo] + mu**2 * (
+                    varo[ix, iyo] = mu ** 3 * varo[ix, iyo] + mu ** 2 * (
                         vc0 - vari[ix, iyi] - varo[ix, iyo]
                     )
                     varo[ix, iyo] += mu * (vari[ix, iyi + 1] - vc0)
@@ -379,10 +379,10 @@ def hermit1d(vari, yi, yo, extrap="no", bias=0.0, tension=0.0):
 
                     # Interpolation
                     mu = dy0 / (dy0 + dy1)
-                    a0 = 2 * mu**3 - 3 * mu**2 + 1
-                    a1 = mu**3 - 2 * mu**2 + mu
-                    a2 = mu**3 - mu**2
-                    a3 = -2 * mu**3 + 3 * mu**2
+                    a0 = 2 * mu ** 3 - 3 * mu ** 2 + 1
+                    a1 = mu ** 3 - 2 * mu ** 2 + mu
+                    a2 = mu ** 3 - mu ** 2
+                    a3 = -2 * mu ** 3 + 3 * mu ** 2
                     varo[ix, iyo] = a0 * vari[ix, iyi]
                     varo[ix, iyo] += a1 * (
                         (vari[ix, iyi] - vc0) * (1 + bias) * (1 - tension) / 2
@@ -604,7 +604,7 @@ def cell2relloc(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
         p1 = -CC / BB
         p2 = p1
     else:
-        DD = BB**2 - 4 * AA * CC
+        DD = BB ** 2 - 4 * AA * CC
         sDD = math.sqrt(DD)
         p1 = (-BB - sDD) / (2 * AA)
         p2 = (-BB + sDD) / (2 * AA)
@@ -977,27 +977,25 @@ def isoslice(var, values, isoval, isovar):
     Parameters
     -----------
     var: array_like
-          array from which the data are extracted
+          Array from which the data are extracted
     values: array_like
-          array on which a research of isoval is made
-    isoval: Float
-          value of interest on which we perform research in values array
+          Array on which a research of isoval is made
+    isoval: Float, array_like
+          Value of interest on which we perform research in values array
 
     Return
     ------
-    isovar : array_like
+    isovar: array_like
            Sliced array based on var where values==isoval
 
     Example
     -------
 
     Let's define depth and temperature variables both in 3 dimensions (i,j,k)
-    where i and j are horizontal dimension and k the vertical one.
+    where i and j are horizontal dimension and k the vertical one::
 
-    dep_at_t20 = isoslice(dep,temp,20)   # depth at temperature=20°C
-    temp_at_z15 = isoslice(temp,dep,-15) # temperature at depth=-15m
-
-
+        dep_at_t20 = isoslice(dep, temp, 20)   # depth at temperature=20°C
+        temp_at_z15 = isoslice(temp, dep, -15) # temperature at depth=-15m
     """
     nz = var.shape[-1]
     isovar[0] = var[-1]

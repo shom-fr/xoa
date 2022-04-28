@@ -144,3 +144,24 @@ def test_regrid_grid2loc():
     vo_truth[np.isnan(vo_interp[0].values)] = np.nan
     np.testing.assert_almost_equal(vo_interp[0], vo_truth)
     assert "long_name" in vo_interp.attrs
+
+
+def test_regrid_isoslice():
+
+    depth = xr.DataArray(np.linspace(-50, 0.0, 6), dims="z", attrs={"long_name": "Depth"})
+    values = xr.DataArray(np.linspace(10, 20.0, 6), dims="z")
+    isoval = 15.0
+
+    isodepth = regrid.isoslice(depth, values, isoval)
+    assert isodepth == -25.0
+    assert isodepth.long_name == "Depth"
+
+    depth = np.resize(depth, (2,) + depth.shape).T
+    values = np.resize(values, (2,) + values.shape).T
+    depth = xr.DataArray(depth, dims=("z", "x"))
+    values = xr.DataArray(values, dims=("z", "x"))
+    isoval = xr.DataArray([15.0, 15.0], dims="x")
+    isodepth = regrid.isoslice(depth, values, isoval)
+    np.testing.assert_allclose(isodepth, [-25.0, -25.0])
+    assert isodepth.dims == ("x",)
+    assert isodepth.shape == (2,)

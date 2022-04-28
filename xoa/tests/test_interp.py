@@ -11,9 +11,8 @@ from xoa import interp
 
 
 def vfunc(t=0, z=0, y=0, x=0):
-    """A function that returns a linear combination of coordinates
-    """
-    return 1.13*x + 2.35*y + 3.24*z - 0.65*t
+    """A function that returns a linear combination of coordinates"""
+    return 1.13 * x + 2.35 * y + 3.24 * z - 0.65 * t
 
 
 def round_as_time(arr, units="us", origin="1950-01-01"):
@@ -24,8 +23,7 @@ def round_as_time(arr, units="us", origin="1950-01-01"):
 
 
 @functools.lru_cache()
-def get_interp1d_data(
-        yimin=-100., yimax=0., yomin=-90., yomax=10., irregular=True):
+def get_interp1d_data(yimin=-100.0, yimax=0.0, yomin=-90.0, yomax=10.0, irregular=True):
 
     np.random.seed(0)
 
@@ -39,9 +37,9 @@ def get_interp1d_data(
     yyi = np.resize(yi, (nx, nyi))
     yyo = np.resize(yo, (nx, nyo))
     if irregular:
-        dyi = (yi[1]-yi[0])*0.49
+        dyi = (yi[1] - yi[0]) * 0.49
         yyi += np.random.uniform(-dyi, dyi, (nx, nyi))
-        dyo = (yo[1]-yo[0])*0.49
+        dyo = (yo[1] - yo[0]) * 0.49
         yyo += +np.random.uniform(-dyo, dyo, (nx, nyo))
     xxi = np.resize(x, (nyi, nx)).T
     xxo = np.resize(x, (nyo, nx)).T
@@ -49,7 +47,7 @@ def get_interp1d_data(
     # input
     xxi = np.resize(x, (nyi, nx)).T
     vari = vfunc(y=yyi, x=xxi)
-    vari[int(nx/3):int(2*nx/3), int(nyi/3):int(2*nyi/3)] = np.nan
+    vari[int(nx / 3) : int(2 * nx / 3), int(nyi / 3) : int(2 * nyi / 3)] = np.nan
 
     return xxi, yyi, vari, xxo, yyo
 
@@ -120,11 +118,10 @@ def test_interp1d_nans_in_coords(method):
     yyon[:, -3:] = np.nan
 
     # Interpolations
-    func = getattr(interp, method+"1d")
+    func = getattr(interp, method + "1d")
     varol = func(vari[:, 3:-3], yyi[:, 3:-3], yyo[:, 3:-3])
     varoln = func(vari, yyin, yyon)
     np.testing.assert_allclose(varol, varoln[:, 3:-3])
-
 
 
 # def test_interp_cellave1d():
@@ -202,24 +199,24 @@ def test_interp_cellave1d():
     nx = 17
     nyi = 20
     nyo = 12
-    yib = np.linspace(-1000., 0., nyi+1)
-    yob = np.linspace(-1200, 200, nyo+1)
-    yyib = np.resize(yib, (nx, nyi+1))
-    dyi = (yib[1]-yib[0])*0.49
+    yib = np.linspace(-1000.0, 0.0, nyi + 1)
+    yob = np.linspace(-1200, 200, nyo + 1)
+    yyib = np.resize(yib, (nx, nyi + 1))
+    dyi = (yib[1] - yib[0]) * 0.49
     yyib += np.random.uniform(-dyi, dyi, yyib.shape)
-    yyob = np.resize(yob, (nx, nyo+1))
-    dyo = (yob[1]-yob[0])*0.49
+    yyob = np.resize(yob, (nx, nyo + 1))
+    dyo = (yob[1] - yob[0]) * 0.49
     yyob += np.random.uniform(-dyo, dyo, yyob.shape)
 
     # input
-    u, v = np.mgrid[-3:3:nx*1j, -3:3:nyi*1j]-2
-    vari = np.asarray(u**2+v**2)
-    vari[int(nx/3):int(2*nx/3), int(nyi/3):int(2*nyi/3)] = np.nan
+    u, v = np.mgrid[-3 : 3 : nx * 1j, -3 : 3 : nyi * 1j] - 2
+    vari = np.asarray(u ** 2 + v ** 2)
+    vari[int(nx / 3) : int(2 * nx / 3), int(nyi / 3) : int(2 * nyi / 3)] = np.nan
 
     # conserv, no extrap
     varoc = interp.cellave1d(vari, yyib, yyob, conserv=True, extrap="no")
-    sumi = np.nansum(vari*np.diff(yyib, axis=1), axis=1)
-    sumo = np.nansum(varoc*np.diff(yyob, axis=1), axis=1)
+    sumi = np.nansum(vari * np.diff(yyib, axis=1), axis=1)
+    sumo = np.nansum(varoc * np.diff(yyob, axis=1), axis=1)
     np.testing.assert_allclose(sumi, sumo)
 
     # average, no extrap
@@ -232,19 +229,21 @@ def test_interp_cellave1d():
 
 @pytest.mark.parametrize(
     "x,y,pt,qt",
-    [(0., 0, 0, 0),
-     (3, 1, 0, 1),
-     (2, 3, 1, 1),
-     (-1, 2, 1, 0),
-     (1., 1.5, .5, .5),
-     (-1, -1, -1, -1),
-     ])
+    [
+        (0.0, 0, 0, 0),
+        (3, 1, 0, 1),
+        (2, 3, 1, 1),
+        (-1, 2, 1, 0),
+        (1.0, 1.5, 0.5, 0.5),
+        (-1, -1, -1, -1),
+    ],
+)
 def test_interp_cell2relloc(x, y, pt, qt):
 
-    x1, y1 = 0., 0.
-    x2, y2 = 3., 1.
-    x3, y3 = 2., 3.
-    x4, y4 = -1., 2.
+    x1, y1 = 0.0, 0.0
+    x2, y2 = 3.0, 1.0
+    x3, y3 = 2.0, 3.0
+    x4, y4 = -1.0, 2.0
     p, q = interp.cell2relloc(x1, x2, x3, x4, y1, y2, y3, y4, x, y)
     assert p == pt
     assert q == qt
@@ -255,17 +254,21 @@ def get_grid2locs_coords(nex=4, nexz=2, nxi=7, nyi=6, nzi=5, nti=4, no=10):
 
     np.random.seed(0)
 
-    tti, zzi, yyi, xxi = np.mgrid[0:nti-1:nti*1j, 0:nzi-1:nzi*1j,
-                                  0:nyi-1:nyi*1j, 0:nxi-1:nxi*1j]
+    tti, zzi, yyi, xxi = np.mgrid[
+        0 : nti - 1 : nti * 1j,
+        0 : nzi - 1 : nzi * 1j,
+        0 : nyi - 1 : nyi * 1j,
+        0 : nxi - 1 : nxi * 1j,
+    ]
 
     zzi = zzi[None]
     zzi = np.repeat(zzi, nexz, axis=0)
 
     xyztomin = -0.5
-    xo = np.random.uniform(xyztomin, nxi-1.5, no)
-    yo = np.random.uniform(xyztomin, nyi-1.5, no)
-    zo = np.random.uniform(xyztomin, nzi-1.5, no)
-    to = np.random.uniform(xyztomin, nti-1.5, no)
+    xo = np.random.uniform(xyztomin, nxi - 1.5, no)
+    yo = np.random.uniform(xyztomin, nyi - 1.5, no)
+    zo = np.random.uniform(xyztomin, nzi - 1.5, no)
+    to = np.random.uniform(xyztomin, nti - 1.5, no)
 
     tti = round_as_time(tti)
     to = round_as_time(to)
@@ -284,7 +287,8 @@ def test_interp_grid2locs():
     nti = 4
     no = 10
     xxi, yyi, zzi, tti, xo, yo, to, zo = get_grid2locs_coords(
-        nex=nex, nexz=nexz, nxi=nxi, nyi=nyi, nzi=nzi, nti=nti, no=no)
+        nex=nex, nexz=nexz, nxi=nxi, nyi=nyi, nzi=nzi, nti=nti, no=no
+    )
 
     # Pure 1D axes
     xi = xxi[0, 0, 0:1, :]  # (nyix=1,nxi)
@@ -292,7 +296,7 @@ def test_interp_grid2locs():
     zi = zzi[0:1, 0:1, :, 0:1, 0:1]  # (nexz=1,ntiz=1,nzi,nyiz=1,nxiz=1)
     ti = tti[:, 0, 0, 0]  # (nti)
     vi = vfunc(tti, zzi, yyi, xxi)
-    vi = np.resize(vi, (nex, )+vi.shape[1:])  # (nex,nti,nzi,nyi,nxi)
+    vi = np.resize(vi, (nex,) + vi.shape[1:])  # (nex,nti,nzi,nyi,nxi)
     vo_truth = np.array(vfunc(to, zo, yo, xo))
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     assert vo_interp[0].shape == vo_truth.shape
@@ -305,7 +309,7 @@ def test_interp_grid2locs():
     zi = zzi[0:1, 0:1, :, 0:1, 0:1]  # (nexz=1,ntiz=1,nzi,nyiz=1,nxiz=1)
     ti = tti[:, 0, 0, 0]  # (nti)
     vi = vfunc(tti, zzi, yyi, xxi)[:, :, :, :1, :1]
-    vi = np.resize(vi, (nex, )+vi.shape[1:])  # (nex,nti,nzi,1,1)
+    vi = np.resize(vi, (nex,) + vi.shape[1:])  # (nex,nti,nzi,1,1)
     vo_truth = np.array(vfunc(to, zo, yi[0], xi[0]))
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
@@ -317,7 +321,7 @@ def test_interp_grid2locs():
     zi = zzi[0:1, 0:1, :, 0:1, 0:1]  # (ntiz=1,nzi,nyiz=1,nxiz=1)
     ti = tti[:1, 0, 0, 0]  # (1)
     vi = vfunc(tti, zzi, yyi, xxi)[:, :1, :, :, :]
-    vi = np.resize(vi, (nex, )+vi.shape[1:])  # (nex,1,nzi,nyi,nxi)
+    vi = np.resize(vi, (nex,) + vi.shape[1:])  # (nex,1,nzi,nyi,nxi)
     vo_truth = vfunc(ti, zo, yo, xo)
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
@@ -329,7 +333,7 @@ def test_interp_grid2locs():
     zi = zzi[:, :, :, :, :]  # (nexz,ntiz=nti,nzi,nyiz=nyi,nxiz=nxi)
     ti = tti[:, 0, 0, 0]  # (nti)
     vi = vfunc(tti, zzi, yyi, xxi)
-    vi = np.resize(vi, (nex, )+vi.shape[1:])  # (nex,nti,nzi,nyi,nxi)
+    vi = np.resize(vi, (nex,) + vi.shape[1:])  # (nex,nti,nzi,nyi,nxi)
     vo_truth = vfunc(to, zo, yo, xo)
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
@@ -341,10 +345,9 @@ def test_interp_grid2locs():
     zi = zzi[0:1, 0:1, 0:1, 0:1, 0:1]  # (nexz=1,ntiz=1,1,nyiz=1,nxiz=1)
     ti = tti[:1, 0, 0, 0]  # (1)
     vi = vfunc(tti, zzi, yyi, xxi)[:, :1, :1, :, :]
-    vi = np.resize(vi, (nex, )+vi.shape[1:])  # (nex,1,1,nyi,nxi)
+    vi = np.resize(vi, (nex,) + vi.shape[1:])  # (nex,1,1,nyi,nxi)
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
-    vo_interp_rect = interp.grid2locs(
-        xi[:1], yi[:, :1], zi, ti, vi, xo, yo, zo, to)
+    vo_interp_rect = interp.grid2locs(xi[:1], yi[:, :1], zi, ti, vi, xo, yo, zo, to)
     vo_truth = vfunc(ti, zi.ravel()[0], yo, xo)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
     np.testing.assert_allclose(vo_interp[0], vo_truth)
@@ -358,7 +361,7 @@ def test_interp_grid2locs():
     zi = zzi[0:1, 0:1, :, 0:1, 0:1]  # (nexz=1,ntiz=1,nzi,nyiz=1,nxiz=1)
     ti = tti[:, 0, 0, 0]  # (nti)
     vi = vfunc(tti, zzi, yyi, xxi)
-    vi = np.resize(vi, (nex, )+vi.shape[1:])  # (nex,nti,nzi,nyi,nxi)
+    vi = np.resize(vi, (nex,) + vi.shape[1:])  # (nex,nti,nzi,nyi,nxi)
     tzyxo = np.meshgrid(ti, zi, yi, xi, indexing='ij')
     xo = tzyxo[3].ravel()
     yo = tzyxo[2].ravel()
@@ -368,3 +371,17 @@ def test_interp_grid2locs():
     vo_interp = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
     vo_truth[np.isnan(vo_interp[0])] = np.nan
     np.testing.assert_allclose(vo_interp[0], vo_truth)
+
+
+def test_interp_isoslice():
+
+    depth = np.linspace(-50, 0.0, 6)
+    values = np.linspace(10, 20.0, 6)
+    isoval = 15.0
+
+    isodepth = interp.isoslice(depth, values, isoval)
+    assert isodepth == -25.0
+
+    depth = np.resize(depth, (2,) + depth.shape)
+    isodepth = interp.isoslice(depth, values, isoval)
+    np.testing.assert_allclose(isodepth, [-25.0, -25.0])
