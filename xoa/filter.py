@@ -15,6 +15,7 @@ Filtering utilities
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import numpy as np
 import xarray as xr
 import numba
@@ -99,7 +100,7 @@ HOURLY_DEMERLIAC_WEIGHTS = [
 ]
 
 
-def get_window_func(window, *args, **kwargs):
+def get_window_func(window, **kwargs):
     """Get a window function from its name
 
     Parameters
@@ -113,7 +114,7 @@ def get_window_func(window, *args, **kwargs):
         - `list`, `array_like`: transformed to an array and interpolated
           onto ``size`` points.
 
-    args, kwargs:
+    kwargs:
         Argument passed to the low level window function at calling time.
 
     Return
@@ -135,6 +136,15 @@ def get_window_func(window, *args, **kwargs):
         plt.plot(func1(100), label='List/array');
         @savefig api.filter.get_window_func.png
         plt.legend();
+
+    See also
+    --------
+    scipy.signal.windows
+    numpy.bartlett
+    numpy.blackman
+    numpy.hamming
+    numpy.hanning
+    numpy.kaiser
     """
     # Explicit values so create a wrapper that interpolate them
     if isinstance(window, (list, np.ndarray)):
@@ -156,55 +166,28 @@ def get_window_func(window, *args, **kwargs):
             func = getattr(sw, window, None)
             if func is None:
                 raise XoaError(f'Invalid window name: {window}')
+
     else:
         func = window
 
     # Wrapper with args
-    if args or kwargs:
+    params = inspect.signature(func).parameters
+    if kwargs or "sym" in params or "std" in params or "p" in params or "sig" in params:
+        kwargs = kwargs.copy()
 
         def window_func(size):
-            return func(size, *args, **kwargs)
+            if "sym" in params and "sym" not in kwargs:
+                kwargs["sym"] = True
+            if "std" in params and "std" not in kwargs:
+                kwargs["std"] = 1.5 * size
+            if "sig" in params and "sig" not in kwargs:
+                kwargs["sig"] = 1.5 * size
+            if "p" in params and "p" not in kwargs:
+                kwargs["p"] = 1
+            return func(size, **kwargs)
 
         return window_func
     return func
-
-
-# def get_window_kernel(size, window, *args, **kwargs):
-#     """Generate an 1d kernel from a window name or function
-
-#     It first get the window function, then returns::
-
-#         window_func(size)
-
-#     Parameters
-#     ----------
-#     size: int
-#         Size of the output kernel
-#     window: str, callable, list, array_like
-#         Specification to get the window function:
-
-#         - `callable`: used as is.
-#         - `str`: supposed to be function name of the :mod:`numpy` or
-#           :mod:`scipy.signal.windows` modules.
-#         - `list`, `array_like`: transformed to an array and interpolated
-#           onto ``size`` points.
-
-#     Return
-#     ------
-#     np.ndarray
-#         1D kernel
-
-#     See also
-#     --------
-#     get_window_func
-#     """
-#     if isinstance(window, str):
-#         window = get_window_func(window, *args, **kwargs)
-#     elif isinstance(window, (list, np.ndarray)):
-#         x = np.linspace(0, 1, size)
-#         xp = np.linspace(0, 1, len(window))
-#         return np.interp(x, xp, window)
-#     return window(size)
 
 
 def generate_isotropic_kernel(shape, window_func, fill_value=0, npt=None):
@@ -246,6 +229,7 @@ def generate_isotropic_kernel(shape, window_func, fill_value=0, npt=None):
     --------
     generate_orthogonal_kernel
     generate_kernel
+    scipy.signal.windows
     numpy.bartlett
     numpy.blackman
     numpy.hamming
@@ -338,6 +322,7 @@ def generate_orthogonal_kernel(kernels, window_func="ones", fill_value=0.0):
     --------
     generate_isotropic_kernel
     generate_kernel
+    scipy.signal.windows
     numpy.bartlett
     numpy.blackman
     numpy.hamming
@@ -373,13 +358,7 @@ def generate_orthogonal_kernel(kernels, window_func="ones", fill_value=0.0):
 
 
 def generate_kernel(
-    kernel,
-    data,
-    isotropic=False,
-    window_func="ones",
-    fill_value=0.0,
-    window_args=None,
-    window_kwargs=None,
+    kernel, data, window_func="ones", isotropic=False, fill_value=0.0, window_kwargs=None, **kwargs
 ):
     """Generate a kernel that is compatible with a given data array
 
@@ -402,6 +381,15 @@ def generate_kernel(
         for missing dimensions.
     isotropic: bool, tuple
         Tuple of the dimensions over which must be computed isotropically.
+    fill_value: float
+        Value used by :func:`generate_isotropic_kernel` to fill the isotropic kernel
+        in its corners.
+    window_func: str
+        Function to generate the kernel from its size by calling :func:`get_window_func`
+    window_kwargs: dict
+        Optional arguments passed to :func:`get_window_func`
+    kwargs: dict
+        Extra parameters are merged with `window_kwargs`
 
     Return
     ------
@@ -412,6 +400,13 @@ def generate_kernel(
     --------
     generate_isotropic_kernel
     generate_orthogonal_kernel
+    get_window_func
+    scipy.signal.windows
+    numpy.bartlett
+    numpy.blackman
+    numpy.hamming
+    numpy.hanning
+    numpy.kaiser
     xoa.coords.transpose
     """
     # Isotropic
@@ -475,11 +470,12 @@ def generate_kernel(
         # Merge orthogonal kernels
         dims = ()
         kernel = None
+        window_kwargs = {} if window_kwargs is None else window_kwargs
+        if kwargs:
+            window_kwargs.update(kwargs)
         if orthokernels:
             dims += tuple(orthokernels.keys())
-            window_args = [] if window_args is None else window_args
-            window_kwargs = {} if window_kwargs is None else window_kwargs
-            window_func = get_window_func(window_func, *window_args, **window_kwargs)
+            window_func = get_window_func(window_func, **window_kwargs)
             sizes = tuple(orthokernels.values())
             kernel = generate_orthogonal_kernel(
                 sizes, window_func=window_func, fill_value=fill_value
@@ -490,7 +486,7 @@ def generate_kernel(
 
             # List/array
             if not np.isscalar(isokernel):
-                window_func = get_window_func(isokernel)
+                window_func = get_window_func(isokernel, **window_kwargs)
 
             # nD isotropic kernel
             isokernels = generate_isotropic_kernel(
@@ -599,7 +595,7 @@ def _convolve_(data, kernel, normalize, na_thres, axis=None):
     return np.where(bad, np.nan, cdata)
 
 
-def convolve(data, kernel, normalize=False, na_thres=0):
+def convolve(data, kernel, normalize=False, na_thres=0, kernel_kwargs=None, **kwargs):
     """N-dimensional convolution that takes care of nans
 
     Parameters
@@ -618,6 +614,10 @@ def convolve(data, kernel, normalize=False, na_thres=0):
             - `0`: Output is masked if a single NaN is found.
             - `0.5`: Output is masked only more than 50% of the input data are masked.
             - `1`: Output is masked if all input data are masked.
+    kernel_kwargs: dict, None
+        Extra parameters passed to :func:`generate_kernel`.
+    kwargs: dict
+        Extra parameters are merged with `kernel_kwargs`
 
     Return
     ------
@@ -650,14 +650,17 @@ def convolve(data, kernel, normalize=False, na_thres=0):
 
     """
     # Adapt the kernel to the data
-    kernel = generate_kernel(kernel, data)
+    kernel_kwargs = kernel_kwargs if kernel_kwargs is not None else {}
+    if kwargs:
+        kernel_kwargs.update(kwargs)
+    kernel = generate_kernel(kernel, data, **kernel_kwargs)
 
     # Numpy convolution
     axis = data.get_axis_num(kernel.dims[0]) if kernel.ndim == 1 else None
     datac = _convolve_(data.data, kernel.data, normalize, na_thres, axis)
 
     # Format
-    return xr.DataArray(datac, coords=data.coords, attrs=data.attrs)
+    return xr.DataArray(datac, coords=data.coords, attrs=data.attrs, dims=data.dims)
 
 
 def _get_xydims_(data, xdim, ydim):

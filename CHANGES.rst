@@ -6,7 +6,17 @@ Ongoing developments
 
 New features
 ------------
-- Add :func:`xoa.regrid.isoslice`  based on :func:`xoa.interp.isoslice` core function
+- Add `kernel_kwargs` keyword to :func:`~xoa.filter.convolve` to better control
+  the kernel generation by :func:`~xoa.filter.generate_kernel` [:pull:`64`].
+- Add inference of parameters for some window functions, like the gaussian
+  shape, in :func:`~xoa.filter.get_window_func` [:pull:`64`].
+- Add :func:`xoa.regrid.isoslice` based on :func:`xoa.interp.isoslice` core function
+  [:pull:`63`].
+
+Breaking changes
+----------------
+- func:`~xoa.filter.get_window_func` accepts now only one positional argument
+  and all other arguments must be named.
 
 Bug fixes
 ---------
@@ -16,7 +26,6 @@ Bug fixes
 Documentation
 -------------
 - Add an example of `xoa.regrid.isoslice` to :ref:`sphx_glr_examples_plot_croco_section.py` example
-
 
 0.6.0 (2022-02-24)
 ==================
@@ -51,9 +60,6 @@ Breaking changes
 - A single Nan now contaminates the data over the kernel emprise in :func:`xoa.filter.convolve`
   since `na_thres` is set to zero by default  [:pull:`40`].
 - xoa now requires the :mod:`gsw` package.
-
-Deprecations
-------------
 
 Bug fixes
 ---------
