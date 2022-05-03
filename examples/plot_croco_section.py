@@ -8,7 +8,8 @@ This notebook, we show:
 
 * how to compute the depths from s-coordinates,
 * how to easily find the name of variables and coordinates,
-* how to interpolate a 3D field with varying depths to regular depths.
+* how to interpolate a 3D field with varying depths to regular depths,
+* how to compute the mixed layer depth from temperature.
 """
 
 # %%
@@ -23,6 +24,7 @@ import matplotlib.pyplot as plt
 import cmocean
 import xoa
 from xoa.regrid import regrid1d
+from xoa.thermdyn import mixed_layer_depth
 
 xr.set_options(display_style="text")
 
@@ -69,6 +71,7 @@ print(ds.depth)
 # as shown in :cfsec:`accessors`.
 
 temp = ds.xoa.temp.squeeze()
+temp = temp.where(temp != 0)  # convert zeros to nans
 lat_name = temp.xoa.lat.name
 
 # %%
@@ -79,73 +82,50 @@ lat_name = temp.xoa.lat.name
 #
 # Let's create the output depths.
 
-depth = xr.DataArray(np.linspace(ds.depth.min(), ds.depth.max(), 100),
-                     name="depth", dims="depth")
+depth = xr.DataArray(np.linspace(ds.depth.min(), ds.depth.max(), 1000), name="depth", dims="depth")
 
 # %%
 # Let's interpolate the temperature.
 
-tempz = regrid1d(temp, depth)
+tempz = regrid1d(temp, depth, extrap="top")
+
+# Compute the mixed layer depths
+# -------------------------------
+#
+# The mixed layer depths are computed here as the depth at wich the temperature
+# is `deltatemp` below the surface temperature,
+# thanks to the :func:`xoa.thermdyn.mixed_layer_depth` function.
+
+deltatemp = 0.2
+mld = -mixed_layer_depth(temp, deltatemp=deltatemp)
+mldz = -mixed_layer_depth(temp, deltatemp=deltatemp)
 
 # %%
 # Plots
 # -----
-#
-# Make a basic comparison plots.
+
+# %%
+# Plot the full section.
 
 fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10, 4))
 kw = dict(levels=np.arange(0, 23))
 temp.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[0], **kw)
-temp.plot.contour(lat_name, "depth", colors='w', linewidths=.3, ax=axs[0], **kw)
+temp.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[0], **kw)
 tempz.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[1], **kw)
-tempz.plot.contour(lat_name, "depth", colors='w', linewidths=.3, ax=axs[1], **kw);
-
-
-# %%
-# Make iso slices
-# ----------------------
-
-from xoa.regrid import isoslice
-
+tempz.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[1], **kw)
 
 # %%
-# Let's say we want to slice the temperature at depth=-1200 m
-# 
-# The first argument of :func:`xoa.regrid.isoslice` is the array we want to slice , here the temperature.
-# 
-# The second one, is the array on which we search the isovalue. Since we look at given depth it must be the depth array
-# 
-# The last one is the isovalue
-# 
+# Plot a zoom near the surface and add the mixed layer depth isoline.
 
-isodepth = -1200.
-isotemp = isoslice(temp, temp.depth, isodepth)
+fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10, 3))
+kw = dict(levels=np.arange(0, 23))
+temp.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[0], **kw)
+temp.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[0], **kw)
+mld.plot.line(x=lat_name, color="k", linewidth=2, linestyle="--", ax=axs[0])
+tempz.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[1], **kw)
+tempz.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[1], **kw)
+mldz.plot.line(x=lat_name, color="k", linewidth=2, linestyle="--", ax=axs[1])
+axs[0].set_ylim(-300, 0)
 
-
-# %%
-# Make a simple profil plot at a given latitude (index eta_rho=10)
-
-plt.figure()
-temp.isel(eta_rho=10).plot.line(y="depth")
-plt.axhline(isodepth, ls='--')
-plt.axvline(isotemp.isel(eta_rho=10), ls='--', c='r')
-
-
-# %%
-# Now we try to find the depth at which the temperature is 12°C for example.
-# 
-# The order of the arguments are not the same as before !
-
-isotemp=12.
-isodep=isoslice(temp.depth,temp,isotemp)
-
-# %%
-# And the plot ...
-
-plt.figure()
-temp.isel(eta_rho=10).plot.line(y="depth")
-plt.axvline(isotemp,ls='--')
-plt.axhline(isodep.isel(eta_rho=10),ls='--',c='r')
-
-# %%
-# Et voilà!
+# # %%
+# # Et voilà!
