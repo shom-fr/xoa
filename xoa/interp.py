@@ -969,23 +969,26 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
 
 
 @numba.guvectorize(
-    [(numba.float64[:], numba.float64[:], numba.float64[:], numba.float64[:])], "(nz),(nz),()->()"
+    [(numba.float64[:], numba.float64[:], numba.float64[:], numba.boolean, numba.float64[:])],
+    "(nz),(nz),(),()->()",
 )
-def isoslice(var, values, isoval, isovar):
+def isoslice(var, values, isoval, reverse, isovar):
     """Extract data from var where values==isoval
 
     Parameters
-    -----------
+    ----------
     var: array_like
-          Array from which the data are extracted
+        array from which the data are extracted
     values: array_like
-          Array on which a research of isoval is made
-    isoval: Float, array_like
-          Value of interest on which we perform research in values array
+        array on which a research of isoval is made
+    isoval: float
+        value of interest on which we perform research in values array
+    reverse: bool
+        search from the last index instead of the first one
 
     Return
     ------
-    isovar: array_like
+    isovar : array_like
            Sliced array based on var where values==isoval
 
     Example
@@ -996,18 +999,24 @@ def isoslice(var, values, isoval, isovar):
 
         dep_at_t20 = isoslice(dep, temp, 20)   # depth at temperature=20°C
         temp_at_z15 = isoslice(temp, dep, -15) # temperature at depth=-15m
+
+
     """
     nz = var.shape[-1]
-    isovar[0] = var[-1]
+    isovar[0] = np.nan
+    if reverse:
+        istart, istop, istep = nz - 1, 1, -1
+    else:
+        istart, istop, istep = 0, nz - 2, 1
 
     # From the top
-    for i in numba.prange(nz - 1, 0, -1):
-        if (values[i] >= isoval[0] and values[i - 1] <= isoval[0]) or (
-            values[i] <= isoval[0] and values[i - 1] >= isoval[0]
+    for i in numba.prange(istart, istop + istep, istep):
+        if (values[i] >= isoval[0] and values[i + istep] <= isoval[0]) or (
+            values[i] <= isoval[0] and values[i + istep] >= isoval[0]
         ):
-            if values[i - 1] == values[i]:
+            if values[i + istep] == values[i]:
                 isovar[0] = values[i]
             else:
-                isovar[0] = var[i - 1] + (isoval[0] - values[i - 1]) * (var[i] - var[i - 1]) / (
-                    values[i] - values[i - 1]
-                )
+                isovar[0] = var[i + istep] + (isoval[0] - values[i + istep]) * (
+                    var[i] - var[i + istep]
+                ) / (values[i] - values[i + istep])

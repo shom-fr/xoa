@@ -379,9 +379,11 @@ def test_interp_isoslice():
     values = np.linspace(10, 20.0, 6)
     isoval = 15.0
 
-    isodepth = interp.isoslice(depth, values, isoval)
+    isodepth = interp.isoslice(depth, values, isoval, False)
+    assert isodepth == -25.0
+    isodepth = interp.isoslice(depth, values, isoval, True)
     assert isodepth == -25.0
 
     depth = np.resize(depth, (2,) + depth.shape)
-    isodepth = interp.isoslice(depth, values, isoval)
+    isodepth = interp.isoslice(depth, values, isoval, False)
     np.testing.assert_allclose(isodepth, [-25.0, -25.0])
