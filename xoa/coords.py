@@ -879,7 +879,7 @@ def get_positive_attr(da, zdim=None):
     # Loop on targets
     for target in targets:
         if "positive" in target.attrs:
-            positive = da.coords[zdim].attrs["positive"]
+            positive = target.attrs["positive"]
             return positive_attr[positive].name
 
     # Fall back to current CFSpecs
