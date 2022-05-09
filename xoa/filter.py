@@ -130,7 +130,7 @@ def get_window_func(window, **kwargs):
         import matplotlib.pyplot as plt
         @suppress
         from xoa.filter import get_window_func
-        func0 = get_window_func("gaussian", 22, sym=True)
+        func0 = get_window_func("gaussian", std=22, sym=True)
         func1 = get_window_func([1, 2, 5, 2, 1])
         plt.plot(func0(100), label='Gaussian');
         plt.plot(func1(100), label='List/array');
