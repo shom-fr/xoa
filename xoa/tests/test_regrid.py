@@ -152,7 +152,7 @@ def test_regrid_isoslice():
     values = xr.DataArray(np.linspace(10, 20.0, 6), dims="z")
     isoval = 15.0
 
-    isodepth = regrid.isoslice(depth, values, isoval)
+    isodepth = regrid.isoslice(depth, values, isoval, "z")
     assert isodepth == -25.0
     assert isodepth.long_name == "Depth"
 
@@ -161,7 +161,7 @@ def test_regrid_isoslice():
     depth = xr.DataArray(depth, dims=("z", "x"))
     values = xr.DataArray(values, dims=("z", "x"))
     isoval = xr.DataArray([15.0, 15.0], dims="x")
-    isodepth = regrid.isoslice(depth, values, isoval)
+    isodepth = regrid.isoslice(depth, values, isoval, "z")
     np.testing.assert_allclose(isodepth, [-25.0, -25.0])
     assert isodepth.dims == ("x",)
     assert isodepth.shape == (2,)

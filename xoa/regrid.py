@@ -32,6 +32,9 @@ class XoaRegridError(XoaError):
     pass
 
 
+# %% 1D
+
+
 class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     """Supported :func:`regrid1d` methods"""
 
@@ -102,9 +105,11 @@ def _wrapper1d_(vari, *args, func_name, **kwargs):
     eshape = vari.shape[:-1]
     args = [_asfloat_(arr) for arr in args]
     args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in [vari] + args]
+
     # Call
     func = getattr(interp, func_name)
     varo = func(*args, **kwargs)
+
     # From 2D
     return varo.reshape(eshape + varo.shape[-1:])
 
@@ -120,7 +125,7 @@ def regrid1d(
     extrap="no",
     bias=0.0,
     tension=0.0,
-    dask='allowed',
+    dask='parallelized',
 ):
     """Regrid along a single dimension
 
@@ -161,13 +166,14 @@ def regrid1d(
         Extrapolation mode as one of the following:
         {extrap_modes.rst_with_links}
     dask: str
+        See :func:`xarray.apply_ufunc`.
 
     Returns
     -------
     xarray.DataArray
         Regridded array with ``coord`` as new coordinate array.
 
-    See also
+    See Also
     --------
     xoa.interp.nearest1d
     xoa.interp.linear2d
@@ -283,7 +289,7 @@ def regrid1d(
 regrid1d.__doc__ = regrid1d.__doc__.format(**locals())
 
 
-def extrap1d(da, dim, mode, **kwargs):
+def extrap1d(da, dim, mode, dask='parallelized'):
     """Extrapolate along a single dimension
 
 
@@ -296,8 +302,8 @@ def extrap1d(da, dim, mode, **kwargs):
     mode: str, int
         Extrapolation mode as one of the following:
         {extrap_modes.rst_with_links}
-    kwargs: dict
-        Extra arguments are passed to :func:`xarray.apply_ufunc`
+    dask: str
+        See :func:`xarray.apply_ufunc`.
 
     Returns
     -------
@@ -317,8 +323,8 @@ def extrap1d(da, dim, mode, **kwargs):
         input_core_dims=[[dim]],
         output_core_dims=[[dim]],
         exclude_dims={dim},
+        dask=dask,
         dask_gufunc_kwargs={"output_sizes": da.sizes},
-        **kwargs,
     )
     da_out = da_out.transpose(*da.dims)
     da_out = da_out.assign_coords(da.coords)
@@ -330,23 +336,25 @@ def extrap1d(da, dim, mode, **kwargs):
 extrap1d.__doc__ = extrap1d.__doc__.format(**locals())
 
 
-def isoslice(da, values, isoval, dim=None, dask='parallelized', **kwargs):
-    """Extract data from an array where another array equals `isoval`
+def isoslice(da, values, isoval, dim, reverse=False, dask='parallelized', **kwargs):
+    """Extract data from var where values==isoval
 
     Parameters
     -----------
     da: xarray.DataArray
-          Array from which the data are extracted
-    values: xarray.DataArray
-          Array on which a research of isoval is made
-    isoval: Float, xarray.DataArray
-          Value of interest on which we perform research in values array
+          array from which the data are extracted
+    values: array_like
+          array on which a research of isoval is made
+    isoval: float
+          value of interest on which we perform research in values array
     dim: str
           dimension shared by da and values on which the slice is made
+    dask: str
+        See :func:`xarray.apply_ufunc`.
 
     Return
     ------
-    isovar: xarray.DataArray
+    isovar : array_like
             Sliced array based on data where values==isoval
 
     Example
@@ -355,13 +363,14 @@ def isoslice(da, values, isoval, dim=None, dask='parallelized', **kwargs):
     Let's define depth and temperature variables both in 3 dimensions (i,j,k)
     where i and j are horizontal dimension and k the vertical one::
 
-        dep_at_t20 = isoslice(dep, temp, 20)   # depth at temperature=20°C
-        temp_at_z15 = isoslice(temp, dep, -15) # temperature at depth=-15m
+        dep_at_t20 = isoslice(dep, temp, 20, "z")   # depth at temperature=20°C
+        temp_at_z15 = isoslice(temp, dep, -15, "z") # temperature at depth=-15m
 
+    See Also
+    --------
+    xoa.interp.isoslice
+    xarray.apply_ufunc
     """
-
-    if dim is None:
-        dim = xcoords.get_zdim(da, errors="ignore")
 
     assert dim in da.dims
     assert dim in values.dims
@@ -371,8 +380,9 @@ def isoslice(da, values, isoval, dim=None, dask='parallelized', **kwargs):
         da,
         values,
         isoval,
+        reverse,
         join="override",
-        input_core_dims=[[dim], [dim], []],
+        input_core_dims=[[dim], [dim], [], []],
         exclude_dims={dim},
         dask=dask,
         **kwargs,
@@ -380,6 +390,9 @@ def isoslice(da, values, isoval, dim=None, dask='parallelized', **kwargs):
     da_out.attrs.update(da.attrs)
     da_out.encoding.update(da.encoding)
     return da_out
+
+
+# %% 2D
 
 
 def grid2loc(da, loc, compat="warn"):

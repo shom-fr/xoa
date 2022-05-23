@@ -6,10 +6,14 @@ Ongoing developments
 
 New features
 ------------
-- Add `kernel_kwargs` keyword to :func:`~xoa.filter.convolve` to better control
-  the kernel generation by :func:`~xoa.filter.generate_kernel` [:pull:`64`].
+- Add the :func:`xoa.thermdyn.mixed_layer_depth` fonction to compute
+  the mixed layer depth with three different methods [:pull:`67`].
+- Add the :func:`xoa.thermdyn.is_temp` and :func:`xoa.thermdyn.is_dens` functions
+  to if an array of temperature or density type [:pull:`67`].
+- Add `kernel_kwargs` keyword to :func:`xoa.filter.convolve` to better control
+  the kernel generation by :func:`xoa.filter.generate_kernel` [:pull:`64`].
 - Add inference of parameters for some window functions, like the gaussian
-  shape, in :func:`~xoa.filter.get_window_func` [:pull:`64`].
+  shape, in :func:`xoa.filter.get_window_func` [:pull:`64`].
 - Add :func:`xoa.regrid.isoslice` based on :func:`xoa.interp.isoslice` core function
   [:pull:`63`].
 
@@ -25,9 +29,11 @@ Bug fixes
 
 Documentation
 -------------
-- Add an example of `xoa.regrid.isoslice` to :ref:`sphx_glr_examples_plot_croco_section.py` example
+- Add an example of `xoa.thermdyn.mixed_layer_depth` to
+  :ref:`sphx_glr_examples_plot_croco_section.py` example [:pull:`67`].
 
-0.6.0 (2022-02-24)
+
+0.6.1 (2022-02-24)
 ==================
 
 New features
@@ -71,6 +77,12 @@ Bug fixes
 Documentation
 -------------
 - Add the :ref:`Compare Mercator to ARGO <sphx_glr_examples_plot_mercator_argo.py>` example.
+
+
+0.6.0 (2022-02-24)
+==================
+
+Empty with non existing tag.
 
 
 0.5.1 (2021-10-13)
