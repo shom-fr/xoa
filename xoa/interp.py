@@ -4,7 +4,7 @@ Low level interpolation routines accelerated with numba
 The numerical inputs and outputs of all these routines are of scalar
 or numpy.ndarray type.
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2022 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import math
 import numpy as np
 import numba
 
+from .num import ravel_index, unravel_index, get_iminmax
 from .geo import _haversine_
 
 NOT_CI = os.environ.get("CI", "false") == "false"
@@ -31,36 +32,8 @@ NOT_CI = os.environ.get("CI", "false") == "false"
 # %% 1D routines
 
 
-@numba.njit(cache=NOT_CI)
-def get_iminmax(data1d):
-    """The first and last non nan values for a 1d array
-
-    Parameters
-    ----------
-    data1d: array_like(n)
-
-    Return
-    ------
-    int
-        Index of the first valid value
-    int
-        Index of the last valid value
-    """
-    imin = -1
-    imax = -1
-    n = len(data1d)
-    for i in range(n):
-        if imin < 0 and not np.isnan(data1d[i]):
-            imin = i
-        if imax < 0 and not np.isnan(data1d[n - 1 - i]):
-            imax = n - 1 - i
-        if imax > 0 and imin > 0:
-            break
-    return imin, imax
-
-
 @numba.njit(parallel=False, cache=NOT_CI)
-def nearest1d(vari, yi, yo, extrap="no"):
+def nearest1d(vari, yi, yo, eshapes, extrap="no"):
     """Nearest interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -73,6 +46,7 @@ def nearest1d(vari, yi, yo, extrap="no"):
     vari: array_like(nxi, nyi)
     yi: array_like(nxiy, nyi)
     yo: array_like(nxo, nyo)
+    eshapes: array_like(3, ndim-1)
 
     Return
     ------
@@ -80,11 +54,11 @@ def nearest1d(vari, yi, yo, extrap="no"):
         With `nx=max(nxi, nxo)`
     """
     # Shapes
-    nxi, nyi = vari.shape
-    nxiy = yi.shape[0]
-    nxi, nyi = vari.shape
-    nxo, nyo = yo.shape
-    nx = max(nxi, nxo)
+    nyo = yo.shape[1]
+    eshape = np.empty(eshapes.shape[1], eshapes.dtype)
+    for i in range(eshape.size):
+        eshape[i] = eshapes[:, i].max()
+    nx = np.prod(eshape)
 
     # Init output
     varo = np.full((nx, nyo), np.nan, dtype=vari.dtype)
@@ -92,10 +66,11 @@ def nearest1d(vari, yi, yo, extrap="no"):
     # Loop on the varying dimension
     for ix in numba.prange(nx):
 
-        # Index along x for coordinate arrays
-        ixi = min(nxi - 1, ix % nxi)
-        ixiy = min(nxiy - 1, ix % nxiy)
-        ixoy = min(nxo - 1, ix % nxo)
+        # Index along x for all arrays
+        ii = unravel_index(ix, eshape)
+        ixi = ravel_index(np.minimum(ii, eshapes[0] - 1), eshapes[0])
+        ixiy = ravel_index(np.minimum(ii, eshapes[1] - 1), eshapes[1])
+        ixoy = ravel_index(np.minimum(ii, eshapes[2] - 1), eshapes[2])
 
         # Loop on input grid
         iyimin, iyimax = get_iminmax(yi[ixiy])
@@ -135,8 +110,8 @@ def nearest1d(vari, yi, yo, extrap="no"):
     return varo
 
 
-@numba.njit(parallel=False, cache=NOT_CI)
-def linear1d(vari, yi, yo, extrap="no"):
+# @numba.njit(parallel=False, cache=NOT_CI)
+def linear1d(vari, yi, yo, eshapes, extrap="no"):
     """Linear interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -149,6 +124,7 @@ def linear1d(vari, yi, yo, extrap="no"):
     vari: array_like(nxi, nyi)
     yi: array_like(nxiy, nyi)
     yo: array_like(nxo, nyo)
+    eshapes: array_like(3, ndim-1)
 
     Return
     ------
@@ -156,11 +132,11 @@ def linear1d(vari, yi, yo, extrap="no"):
         With `nx=max(nxi, nxo)`
     """
     # Shapes
-    nxi, nyi = vari.shape
-    nxiy = yi.shape[0]
-    nxi, nyi = vari.shape
-    nxo, nyo = yo.shape
-    nx = max(nxi, nxo)
+    nyo = yo.shape[1]
+    eshape = np.empty(eshapes.shape[1], eshapes.dtype)
+    for i in range(eshape.size):
+        eshape[i] = eshapes[:, i].max()
+    nx = np.prod(eshape)
 
     # Init output
     varo = np.full((nx, nyo), np.nan, dtype=vari.dtype)
@@ -168,10 +144,11 @@ def linear1d(vari, yi, yo, extrap="no"):
     # Loop on the varying dimension
     for ix in numba.prange(nx):
 
-        # Index along x for coordinate arrays
-        ixi = min(nxi - 1, ix % nxi)
-        ixiy = min(nxiy - 1, ix % nxiy)
-        ixoy = min(nxo - 1, ix % nxo)
+        # Index along x for all arrays
+        ii = unravel_index(ix, eshape)
+        ixi = ravel_index(np.minimum(ii, eshapes[0] - 1), eshapes[0])
+        ixiy = ravel_index(np.minimum(ii, eshapes[1] - 1), eshapes[1])
+        ixoy = ravel_index(np.minimum(ii, eshapes[2] - 1), eshapes[2])
 
         # Loop on input grid
         iyimin, iyimax = get_iminmax(yi[ixiy])
@@ -211,7 +188,7 @@ def linear1d(vari, yi, yo, extrap="no"):
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def cubic1d(vari, yi, yo, extrap="no"):
+def cubic1d(vari, yi, yo, eshapes, extrap="no"):
     """Cubic interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -224,6 +201,7 @@ def cubic1d(vari, yi, yo, extrap="no"):
     vari: array_like(nxi, nyi)
     yi: array_like(nxiy, nyi)
     yo: array_like(nxo, nyo)
+    eshapes: array_like(3, ndim-1)
 
     Return
     ------
@@ -231,11 +209,11 @@ def cubic1d(vari, yi, yo, extrap="no"):
         With `nx=max(nxi, nxo)`
     """
     # Shapes
-    nxi, nyi = vari.shape
-    nxiy = yi.shape[0]
-    nxi, nyi = vari.shape
-    nxo, nyo = yo.shape
-    nx = max(nxi, nxo)
+    nyo = yo.shape[1]
+    eshape = np.empty(eshapes.shape[1], eshapes.dtype)
+    for i in range(eshape.size):
+        eshape[i] = eshapes[:, i].max()
+    nx = np.prod(eshape)
 
     # Init output
     varo = np.full((nx, nyo), np.nan, dtype=vari.dtype)
@@ -243,10 +221,11 @@ def cubic1d(vari, yi, yo, extrap="no"):
     # Loop on the varying dimension
     for ix in numba.prange(nx):
 
-        # Index along x for coordinate arrays
-        ixi = min(nxi - 1, ix % nxi)
-        ixiy = min(nxiy - 1, ix % nxiy)
-        ixoy = min(nxo - 1, ix % nxo)
+        # Index along x for all arrays
+        ii = unravel_index(ix, eshape)
+        ixi = ravel_index(np.minimum(ii, eshapes[0] - 1), eshapes[0])
+        ixiy = ravel_index(np.minimum(ii, eshapes[1] - 1), eshapes[1])
+        ixoy = ravel_index(np.minimum(ii, eshapes[2] - 1), eshapes[2])
 
         # Loop on input grid
         iyimin, iyimax = get_iminmax(yi[ixiy])
@@ -260,7 +239,7 @@ def cubic1d(vari, yi, yo, extrap="no"):
                 break
 
             # Loop on output grid
-            for iyo in range(iyomin, nyo):
+            for iyo in range(iyomin, iyomax + 1):
 
                 dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
                 dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
@@ -268,6 +247,10 @@ def cubic1d(vari, yi, yo, extrap="no"):
                 # Above
                 if dy1 < 0.0:  # above
                     break
+
+                # Below
+                if dy0 < 0.0:
+                    iyomin = iyo + 1
 
                 # Inside
                 if dy0 >= 0.0 and dy1 >= 0.0:
@@ -277,7 +260,7 @@ def cubic1d(vari, yi, yo, extrap="no"):
 
                     # Extrapolations
                     if iyi == iyimin:  # y0
-                        vc0 = 2 * vari[ix, iyi] - vari[ix, iyi + 1]
+                        vc0 = 2 * vari[ixi, iyi] - vari[ixi, iyi + 1]
                     else:
                         vc0 = vari[ixi, iyi - 1]
                     if iyi == iyimax - 1:  # y3
@@ -286,12 +269,12 @@ def cubic1d(vari, yi, yo, extrap="no"):
                         vc1 = vari[ixi, iyi + 2]
 
                     # Interpolation
-                    varo[ix, iyo] = vc1 - vari[ix, iyi + 1] - vc0 + vari[ix, iyi]
-                    varo[ix, iyo] = mu ** 3 * varo[ix, iyo] + mu ** 2 * (
-                        vc0 - vari[ix, iyi] - varo[ix, iyo]
+                    varo[ix, iyo] = vc1 - vari[ixi, iyi + 1] - vc0 + vari[ixi, iyi]
+                    varo[ix, iyo] = mu**3 * varo[ix, iyo] + mu**2 * (
+                        vc0 - vari[ixi, iyi] - varo[ix, iyo]
                     )
-                    varo[ix, iyo] += mu * (vari[ix, iyi + 1] - vc0)
-                    varo[ix, iyo] += vari[ix, iyi]
+                    varo[ix, iyo] += mu * (vari[ixi, iyi + 1] - vc0)
+                    varo[ix, iyo] += vari[ixi, iyi]
 
     # Extrapolation
     if extrap != "no":
@@ -301,7 +284,7 @@ def cubic1d(vari, yi, yo, extrap="no"):
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def hermit1d(vari, yi, yo, extrap="no", bias=0.0, tension=0.0):
+def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0):
     """Hermitian interp. of nD data along an axis with varying coordinates
 
     Warning
@@ -314,6 +297,7 @@ def hermit1d(vari, yi, yo, extrap="no", bias=0.0, tension=0.0):
     vari: array_like(nxi, nyi)
     yi: array_like(nxiy, nyi)
     yo: array_like(nxo, nyo)
+    eshapes: array_like(3, ndim-1)
     bias: float
     tension: float
 
@@ -323,11 +307,11 @@ def hermit1d(vari, yi, yo, extrap="no", bias=0.0, tension=0.0):
         With `nx=max(nxi, nxo)`
     """
     # Shapes
-    nxi, nyi = vari.shape
-    nxiy = yi.shape[0]
-    nxi, nyi = vari.shape
-    nxo, nyo = yo.shape
-    nx = max(nxi, nxo)
+    nyo = yo.shape[1]
+    eshape = np.empty(eshapes.shape[1], eshapes.dtype)
+    for i in range(eshape.size):
+        eshape[i] = eshapes[:, i].max()
+    nx = np.prod(eshape)
 
     # Init output
     varo = np.full((nx, nyo), np.nan, dtype=vari.dtype)
@@ -335,10 +319,11 @@ def hermit1d(vari, yi, yo, extrap="no", bias=0.0, tension=0.0):
     # Loop on the varying dimension
     for ix in numba.prange(nx):
 
-        # Index along x for coordinate arrays
-        ixi = min(nxi - 1, ix % nxi)
-        ixiy = min(nxiy - 1, ix % nxiy)
-        ixoy = min(nxo - 1, ix % nxo)
+        # Index along x for all arrays
+        ii = unravel_index(ix, eshape)
+        ixi = ravel_index(np.minimum(ii, eshapes[0] - 1), eshapes[0])
+        ixiy = ravel_index(np.minimum(ii, eshapes[1] - 1), eshapes[1])
+        ixoy = ravel_index(np.minimum(ii, eshapes[2] - 1), eshapes[2])
 
         # Loop on input grid
         iyimin, iyimax = get_iminmax(yi[ixiy])
@@ -352,7 +337,7 @@ def hermit1d(vari, yi, yo, extrap="no", bias=0.0, tension=0.0):
                 break
 
             # Loop on output grid
-            for iyo in range(iyomin, nyo):
+            for iyo in range(iyomin, iyomax + 1):
 
                 dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
                 dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
@@ -360,6 +345,10 @@ def hermit1d(vari, yi, yo, extrap="no", bias=0.0, tension=0.0):
                 # Above
                 if dy1 < 0.0:  # above
                     break
+
+                # Below
+                if dy0 < 0.0:
+                    iyomin = iyo + 1
 
                 # Inside
                 if dy0 >= 0.0 and dy1 >= 0.0:
@@ -369,7 +358,7 @@ def hermit1d(vari, yi, yo, extrap="no", bias=0.0, tension=0.0):
 
                     # Extrapolations
                     if iyi == iyimin:  # y0
-                        vc0 = 2 * vari[ix, iyi] - vari[ix, iyi + 1]
+                        vc0 = 2 * vari[ixi, iyi] - vari[ixi, iyi + 1]
                     else:
                         vc0 = vari[ixi, iyi - 1]
                     if iyi == iyimax - 1:  # y3
@@ -379,20 +368,20 @@ def hermit1d(vari, yi, yo, extrap="no", bias=0.0, tension=0.0):
 
                     # Interpolation
                     mu = dy0 / (dy0 + dy1)
-                    a0 = 2 * mu ** 3 - 3 * mu ** 2 + 1
-                    a1 = mu ** 3 - 2 * mu ** 2 + mu
-                    a2 = mu ** 3 - mu ** 2
-                    a3 = -2 * mu ** 3 + 3 * mu ** 2
-                    varo[ix, iyo] = a0 * vari[ix, iyi]
+                    a0 = 2 * mu**3 - 3 * mu**2 + 1
+                    a1 = mu**3 - 2 * mu**2 + mu
+                    a2 = mu**3 - mu**2
+                    a3 = -2 * mu**3 + 3 * mu**2
+                    varo[ix, iyo] = a0 * vari[ixi, iyi]
                     varo[ix, iyo] += a1 * (
-                        (vari[ix, iyi] - vc0) * (1 + bias) * (1 - tension) / 2
-                        + (vari[ix, iyi + 1] - vari[ix, iyi]) * (1 - bias) * (1 - tension) / 2
+                        (vari[ixi, iyi] - vc0) * (1 + bias) * (1 - tension) / 2
+                        + (vari[ixi, iyi + 1] - vari[ixi, iyi]) * (1 - bias) * (1 - tension) / 2
                     )
                     varo[ix, iyo] += a2 * (
-                        (vari[ix, iyi + 1] - vari[ix, iyi]) * (1 + bias) * (1 - tension) / 2
-                        + (vc1 - vari[ix, iyi + 1]) * (1 - bias) * (1 - tension) / 2
+                        (vari[ixi, iyi + 1] - vari[ixi, iyi]) * (1 + bias) * (1 - tension) / 2
+                        + (vc1 - vari[ixi, iyi + 1]) * (1 - bias) * (1 - tension) / 2
                     )
-                    varo[ix, iyo] += a3 * vari[ix, iyi + 1]
+                    varo[ix, iyo] += a3 * vari[ixi, iyi + 1]
 
     if extrap != "no":
         varo = extrap1d(varo, extrap)
@@ -433,7 +422,7 @@ def extrap1d(vari, mode):
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def cellave1d(vari, yib, yob, extrap="no", conserv=False):
+def cellave1d(vari, yib, yob, eshapes, extrap="no", conserv=False):
     """Cell average regrid. of nD data along an axis with varying coordinates
 
     Warning
@@ -453,12 +442,19 @@ def cellave1d(vari, yib, yob, extrap="no", conserv=False):
         With `nx=max(nxi, nxo)`
     """
     # Shapes
-    nxi, nyib = vari.shape
-    nxiy, nyi = yib.shape
-    nxi, nyi = vari.shape
-    nxo, nyob = yob.shape
-    nx = max(nxi, nxo)
-    nyo = nyob - 1
+    # nxi, nyib = vari.shape
+    # nxiy, nyi = yib.shape
+    # nxi, nyi = vari.shape
+    # nxo, nyob = yob.shape
+    # nx = max(nxi, nxo)
+    # nyo = nyob - 1
+
+    nyi = vari.shape[1]
+    nyo = yob.shape[1] - 1
+    eshape = np.empty(eshapes.shape[1], eshapes.dtype)
+    for i in range(eshape.size):
+        eshape[i] = eshapes[:, i].max()
+    nx = np.prod(eshape)
 
     # Init output
     varo = np.zeros((nx, nyo), dtype=vari.dtype)
@@ -467,9 +463,10 @@ def cellave1d(vari, yib, yob, extrap="no", conserv=False):
     for ix in numba.prange(nx):
 
         # Index along x for coordinate arrays
-        ixi = min(nxi - 1, ix % nxi)
-        ixiy = min(nxiy - 1, ix % nxiy)
-        ixoy = min(nxo - 1, ix % nxo)
+        ii = unravel_index(ix, eshape)
+        ixi = ravel_index(np.minimum(ii, eshapes[0] - 1), eshapes[0])
+        ixiy = ravel_index(np.minimum(ii, eshapes[1] - 1), eshapes[1])
+        ixoy = ravel_index(np.minimum(ii, eshapes[2] - 1), eshapes[2])
 
         # Loop on output cells to be filled
         iyi0 = 0
@@ -509,7 +506,7 @@ def cellave1d(vari, yib, yob, extrap="no", conserv=False):
                     dyio = dyio / (yob[ixoy, iyo + 1] - yob[ixoy, iyo])
                 if not np.isnan(vari[ixi, iyi]):
                     wo = wo + dyio
-                    varo[ixi, iyo] += vari[ix, iyi] * dyio
+                    varo[ixi, iyo] += vari[ixi, iyi] * dyio
 
                 # Next input cell?
                 if yib1 >= yob[ixoy, iyo + 1]:
@@ -604,7 +601,7 @@ def cell2relloc(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
         p1 = -CC / BB
         p2 = p1
     else:
-        DD = BB ** 2 - 4 * AA * CC
+        DD = BB**2 - 4 * AA * CC
         sDD = math.sqrt(DD)
         p1 = (-BB - sDD) / (2 * AA)
         p2 = (-BB + sDD) / (2 * AA)

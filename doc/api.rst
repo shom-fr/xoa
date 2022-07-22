@@ -22,6 +22,7 @@ Package API
     xoa.interp
     xoa.krig
     xoa.misc
+    xoa.num
     xoa.plot
     xoa.regrid
     xoa.thermdyn
