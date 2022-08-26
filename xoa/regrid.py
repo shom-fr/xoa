@@ -86,6 +86,7 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
 
 
 def _asfloat_(arr):
+    """We need arrays that are at least 1D and that are not dates, booleans or integers"""
     arr = np.asarray(arr)
     arr = np.atleast_1d(arr)
     if arr.dtype.type is np.datetime64:
@@ -100,18 +101,29 @@ def _wrapper1d_(vari, *args, func_name, **kwargs):
 
     Output array is reshaped back accordindly
     """
+
+    # The function to call
+    func = getattr(interp, func_name)
+
     # To 2D
-    vari = _asfloat_(vari)
-    eshape = vari.shape[:-1]
-    args = [_asfloat_(arr) for arr in args]
-    args = [np.reshape(arr, (-1, arr.shape[-1])) for arr in [vari] + args]
+    args = [vari] + list(args)
+    eshapes = []
+    for arr in args:
+        eshape = list(arr.shape[:-1])
+        if len(eshapes) and len(eshape) < len(eshapes[-1]):
+            eshape = [1] * (len(eshapes[-1]) - len(eshape)) + eshape
+        eshapes.append(eshape)
+    eshapes = np.array(eshapes, dtype='l')
+    args = [_asfloat_(arr).reshape(-1, arr.shape[-1]) for arr in args]
+    func_code = getattr(func, "func_code", getattr(func, "__code__"))
+    if "eshapes" in func_code.co_varnames[: func_code.co_argcount]:
+        args = args + [eshapes]
 
     # Call
-    func = getattr(interp, func_name)
     varo = func(*args, **kwargs)
 
     # From 2D
-    return varo.reshape(eshape + varo.shape[-1:])
+    return varo.reshape(tuple(eshapes.max(axis=0)) + varo.shape[-1:])
 
 
 def regrid1d(
@@ -208,7 +220,7 @@ def regrid1d(
     # Input coordinate
     if coord_in_name:
         assert coord_in_name in da.coords, 'Invalid coordinate'
-        coord_in = da.coords['coord_in_name']
+        coord_in = da.coords[coord_in_name]
     else:
         coord_in = cfspecs_in.search_coord_from_dim(da, dim_in, errors="raise")
         coord_in_name = coord_in.name

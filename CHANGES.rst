@@ -6,6 +6,7 @@ Ongoing developments
 
 New features
 ------------
+- Add the :mod:`xoa.num` module that contains low level numeric utilities.
 - Add the :func:`xoa.thermdyn.mixed_layer_depth` fonction to compute
   the mixed layer depth with three different methods [:pull:`67`].
 - Add the :func:`xoa.thermdyn.is_temp` and :func:`xoa.thermdyn.is_dens` functions
@@ -24,7 +25,8 @@ Breaking changes
 
 Bug fixes
 ---------
-- Fix :func:`xoa.sigma.get_sigma_terms` so that it works in case of multiple levels coordinates [:pull:`60`]
+- Fix broadcasting :mod:`xoa.interp` 1d interpolation routines [:issue:`69`].
+- Fix :func:`xoa.sigma.get_sigma_terms` so that it works in case of multiple levels coordinates [:pull:`60`].
 - Fix :func:`xoa.grid.to_rect` that now infers coordinates and can emit a warning or raise an error.
 
 Documentation

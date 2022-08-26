@@ -14,7 +14,7 @@ from test_interp import get_grid2locs_coords, vfunc, get_interp1d_data
 def test_regrid_regrid1d():
 
     # Get some data
-    xxi, yyi, vari, xxo, yyo = get_interp1d_data()
+    xxi, yyi, vari, xxo, yyo, eshapes = get_interp1d_data()
 
     # Some inits
     nz1 = xxo.shape[1]
@@ -54,10 +54,17 @@ def test_regrid_regrid1d():
     assert not np.isnan(da_out).all()
 
     # same but transposed
-    da_in = da_in.transpose("time", "nz", "lon")
-    da_out = regrid.regrid1d(da_in, depth_out, method="linear")
-    assert da_out.dims == ('time', "nk", "lon")
-    assert not np.isnan(da_out).all()
+    da_in_t = da_in.transpose("time", "nz", "lon")
+    da_out_t = regrid.regrid1d(da_in_t, depth_out, method="linear")
+    assert da_out_t.dims == ('time', "nk", "lon")
+    assert not np.isnan(da_out_t).all()
+
+    # now we remove/add some dims
+    depth_in_ed = da_in_t.depth.broadcast_like(da_in_t).isel(lon=0).drop("lon")
+    da_in_ed = da_in_t.assign_coords({"depth": depth_in_ed})
+    da_out_ed = regrid.regrid1d(da_in_ed, depth_out, method="linear")
+    assert da_out_ed.dims == ('time', "nk", "lon")
+    np.testing.assert_allclose(da_out_ed.isel(lon=0), da_out_t.isel(lon=0))
 
 
 def test_regrid_regrid1d_time():
@@ -84,7 +91,6 @@ def test_regrid_regrid1d_time():
 )
 def test_regrid_extrap1d(mode, expected):
     nz, ny, nx = 4, 3, 5
-    zi = np.linspace(3, 10, nz)
     zi = xr.DataArray(np.arange(nz), dims="z")
     vi = xr.DataArray(np.ones((nz, ny, nx)), dims=('z', 'y', 'x'), coords={"z": zi})
     vi[:, 0] = np.nan
