@@ -192,6 +192,7 @@ def plot_ts(
     dens=True,
     pres=None,
     potential=None,
+    absolute=True,
     axes=None,
     scatter_kwargs=None,
     contour_kwargs=None,
@@ -220,6 +221,8 @@ def plot_ts(
         Pressure to compute potential temperature.
     potential: bool, None
         Is the temperature potential? If None, infer from attributes.
+    absolute : bool
+        Is the salinity absolute? If None, convert from practical (psu) to absolute (g.kg-1)
     clabel: bool
         Add labels to density contours
     clabel_kwargs: dict, None
@@ -290,6 +293,18 @@ def plot_ts(
         temp = gsw.pt0_from_t(sal, temp, pres)
         temp.attrs.update(attrs)
         cfspecs.format_data_var(temp, cf_name="ptemp", copy=False, replace_attrs=True)
+
+    if not absolute:
+        import gsw
+        
+        if pres is None:
+            lat = xcoords.get_lat(sal)
+            lon = xcoords.get_lon(sal)           
+            depth = xcoords.get_depth(sal)
+            lat, depth = xr.broadcast(lat, depth)
+            pres = gsw.p_from_z(depth, lat)
+
+        sal = gsw.SA_from_SP(sal,pres,lon,lat)
 
     # Init plot
     axes = kwargs.get("ax", axes)
