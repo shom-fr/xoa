@@ -23,11 +23,15 @@ This follows the CF conventions for
 import re
 
 import numpy as np
+import numba
+import xarray as xr
 
 from .__init__ import xoa_warn
 from . import misc
 from . import cf
 from . import coords as xcoords
+
+# %% Constants
 
 #: To convert from formula terms to CF names
 FORMULA_TERMS_TO_CF_NAMES = {
@@ -58,11 +62,103 @@ class XoaSigmaError(cf.XoaCFError):
     pass
 
 
-def atmosphere_sigma_coordinate(sig, ps, ptop, cache=None):
-    """Convert from sigma [0, 1] to altitude in an atmopsheric model
+# %% Low level routines
+
+
+@numba.njit(cache=True)
+def _atmosphere_sigma_(sigma, ps, ptop):
+    p = np.zeros(ps.shape + sigma.shape)
+    for k in numba.prange(sigma.shape[0]):
+        p[..., k] = ptop
+        p[..., k] = p[..., k] + sigma[k] * (ps - ptop)
+    return p
+
+
+@numba.njit(cache=True)
+def _ocean_sigma_(sigma, eta, depth):
+    z = np.zeros(eta.shape + sigma.shape)
+    for k in numba.prange(sigma.shape[0]):
+        z[..., k] = eta
+        z[..., k] = z[..., k] + sigma[k] * (eta + depth)
+    return z
+
+
+@numba.njit(cache=True)
+def _ocean_s_(s, eta, depth, depth_c, C):
+    z = np.zeros(eta.shape + s.shape)
+    for k in numba.prange(s.shape[0]):
+        z[..., k] = eta * (1 + s[k])
+        z[..., k] = z[..., k] + depth_c * s[k]
+        z[..., k] = z[..., k] + (depth - depth_c) * C[k]
+    return z
+
+
+@numba.njit(cache=True)
+def _ocean_s_g1_(s, eta, depth, depth_c, C):
+    z = np.zeros(eta.shape + s.shape)
+    for k in numba.prange(s.shape[0]):
+        S = depth_c * s[k]
+        S = S + (depth - depth_c) * C[k]
+        z[..., k] = S
+        z[..., k] = z[..., k] + eta * (1.0 + S / depth)
+    return z
+
+
+@numba.njit(cache=True)
+def _ocean_s_g2_(s, eta, depth, depth_c, C):
+    z = np.zeros(eta.shape + s.shape)
+    for k in numba.prange(s.shape[0]):
+        S = depth_c * s[k] + depth * C[k]
+        S = S / (depth + depth_c)
+        z[..., k] = S * (depth + eta)
+        z[..., k] = z[..., k] + eta
+    return z
+
+
+def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask):
+    # Stetching curve
+    if cs is None:
+        if None in (thetas, thetab):
+            raise XoaSigmaError("thetas and thetab must be provided when cs is not")
+        cs = get_cs(sig, thetas, thetab, cs_type)
+
+    # Checks dims
+    if np.ndim(hc) and set(hc.dims) != set(bathy.dims):
+        raise XoaSigmaError("Incompatible dimensions between bathy and hc")
+
+    # Call core routine
+    zdim = sig.dims[0]
+    depth = xr.apply_ufunc(
+        func,
+        sig,
+        ssh,
+        bathy,
+        hc,
+        cs,
+        input_core_dims=[[zdim], [], [], [], [zdim]],
+        output_core_dims=[[zdim]],
+        exclude_dims={zdim},
+        dask=dask,
+        dask_gufunc_kwargs={"output_sizes": {zdim: sig.shape[0]}},
+    )
+
+    # Format
+    return cf.get_cf_specs(sig).format_data_var(
+        depth, "depth", format_coords=False, rename_dims=False
+    )
+
+
+# %% High level routines
+
+
+def atmosphere_sigma_coordinate(sig, ps, ptop, dask="parallelized", cache=None):
+    """Convert from sigma [0, 1] to pressure in an atmopsheric model
+
+    .. note:: This function is dask-aware since it delegates the core computation to
+        :func:`xarray.apply_ufunc`.
 
     Source:
-        `Ocean sigma coordinate  <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#_atmosphere_sigma_coordinate>`_
+        `Atmosphere sigma coordinate  <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#_atmosphere_sigma_coordinate>`_
 
     Formula:
         .. math::
@@ -89,16 +185,33 @@ def atmosphere_sigma_coordinate(sig, ps, ptop, cache=None):
     xarray.DataArray
         Air pressure in Pa (:math:`p`)
     """
-    # Compute
-    p = sig * (ps - ptop)
-    p = p + ptop
+
+    if cache is not None:
+        xoa_warn("The `cache` parameter is currently not used.")
+
+    # Call core routine
+    zdim = sig.dims[0]
+    p = xr.apply_ufunc(
+        _atmosphere_sigma_,
+        sig,
+        ps,
+        ptop,
+        input_core_dims=[[zdim], [], []],
+        output_core_dims=[[zdim]],
+        exclude_dims={zdim},
+        dask=dask,
+        dask_gufunc_kwargs={"output_sizes": {zdim: sig.shape[0]}},
+    )
 
     # Format
-    return cf.get_cf_specs(sig).format_data_var(p, "plev", format_coords=False)
+    return cf.get_cf_specs(sig).format_data_var(p, "plev", format_coords=False, rename_dims=False)
 
 
-def ocean_sigma_coordinate(sig, ssh, bathy, cache=None):
+def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
     """Convert from sigma [-1, 0] to negative depths in an ocean model
+
+    .. note:: This function is dask-aware since it delegates the core computation to
+        :func:`xarray.apply_ufunc`.
 
     Source:
         `Ocean sigma coordinate <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#_ocean_sigma_coordinate>`_
@@ -128,14 +241,31 @@ def ocean_sigma_coordinate(sig, ssh, bathy, cache=None):
     xarray.DataArray
         Negative depth below surface in m (:math:`z`)
     """
+    if cache is not None:
+        xoa_warn("The `cache` parameter is currently not used.")
+
     # Compute
     if not set(bathy.dims) <= set(ssh.dims):
         raise XoaSigmaError("Incompatible dimensions between bathy and ssh")
-    z = sig * (bathy + ssh)
-    z = z + ssh
+
+    # Call core routine
+    zdim = sig.dims[0]
+    depth = xr.apply_ufunc(
+        _ocean_sigma_,
+        sig,
+        ssh,
+        bathy,
+        input_core_dims=[[zdim], [], []],
+        output_core_dims=[[zdim]],
+        exclude_dims={zdim},
+        dask=dask,
+        dask_gufunc_kwargs={"output_sizes": {zdim: sig.shape[0]}},
+    )
 
     # Format
-    return cf.get_cf_specs(sig).format_data_var(z, "depth", format_coords=False)
+    return cf.get_cf_specs(sig).format_data_var(
+        depth, "depth", format_coords=False, rename_dims=False
+    )
 
 
 def get_cs(sig, thetas, thetab, cs_type=None):
@@ -165,13 +295,28 @@ def get_cs(sig, thetas, thetab, cs_type=None):
     s, a, b = sig, thetas, thetab
     cs = np.sinh(s * a) * (1 - b) / np.sinh(a)
     cs = cs + b * (np.tanh(a * (s + 0.5)) / (2 * np.tanh(0.5 * a)) - 0.5)
+    cs.name = None
     if hasattr(cs, "coords"):
-        cs = cf.get_cf_specs(sig).format_data_var(cs, "cs", format_coords=False)
+        cs = cf.get_cf_specs(sig).format_data_var(cs, "cs", format_coords=False, rename_dims=False)
     return cs
 
 
-def ocean_s_coordinate(sig, ssh, bathy, hc, thetas, thetab, cs=None, cs_type=None, cache=None):
+def ocean_s_coordinate(
+    sig,
+    ssh,
+    bathy,
+    hc,
+    thetas=None,
+    thetab=None,
+    cs=None,
+    cs_type=None,
+    cache=None,
+    dask="parallelized",
+):
     """Convert from s [-1, 0] to depths in an ocean model
+
+    .. note:: This function is dask-aware since it delegates the core computation to
+        :func:`xarray.apply_ufunc`.
 
     Source:
         `Ocean s-coordinate <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#_ocean_s_coordinate>`_
@@ -217,37 +362,28 @@ def ocean_s_coordinate(sig, ssh, bathy, hc, thetas, thetab, cs=None, cs_type=Non
     xarray.DataArray
         Negative depth below surface in m (:math:`z`)
     """
-    # Check cache first
-    if cache:
-        zconst = cache['zconst']
+    if cache is not None:
+        xoa_warn("The `cache` parameter is currently not used.")
 
-    else:  # Compute
-
-        # Stetching curve
-        if cs is None:
-            cs = get_cs(sig, thetas, thetab, cs_type)
-
-        # Constant part of the formula
-        if np.ndim(hc) and set(hc.dims) != set(bathy.dims):
-            raise XoaSigmaError("Incompatible dimensions between bathy and hc")
-        zconst = sig * hc
-        zconst = zconst + cs * (bathy - hc)
-
-        # Store in cache
-        if isinstance(cache, dict):
-            cache.update(zconst=zconst)
-
-    # Final computation
-    z = (sig + 1) * ssh + zconst
-
-    # Format
-    return cf.get_cf_specs(sig).format_data_var(z, "depth", format_coords=False)
+    return _apply_ocean_s_(_ocean_s_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask)
 
 
 def ocean_s_coordinate_g1(
-    sig, ssh, bathy, hc, thetas=None, thetab=None, cs=None, cs_type=None, cache=None
+    sig,
+    ssh,
+    bathy,
+    hc,
+    thetas=None,
+    thetab=None,
+    cs=None,
+    cs_type=None,
+    cache=None,
+    dask="parallelized",
 ):
     """Convert from s [-1, 0] generic form 1 to depths in an ocean model
+
+    .. note:: This function is dask-aware since it delegates the core computation to
+        :func:`xarray.apply_ufunc`.
 
     Source:
         `Ocean s-coordinate, generic form 1 <http://cfconventions.org/cf-conventions/cf-conventions.html#_ocean_s_coordinate_generic_form_1>`_
@@ -255,9 +391,9 @@ def ocean_s_coordinate_g1(
     Formula:
         .. math::
 
-            z & = \\eta*(1+s) + (\\eta + h * S)
+            z & = S + \\eta*(1+s) + (1 + S / h)
 
-            S & = \\frac{h_c s + h C}{h_c + h}
+            S & = h_c s + (h - h_c) C
 
             C & = (1-b)*\\frac{\\sinh(a*s)}{\\sinh(a)} +  b*\\left[\\frac{\\tanh(a*(s+0.5))}{2*\\tanh(0.5*a)} - 0.5\\right]
 
@@ -299,43 +435,28 @@ def ocean_s_coordinate_g1(
     xarray.DataArray
         Negative depth below surface in m (:math:`z`)
     """
-    s, h = sig, bathy
+    if cache is not None:
+        xoa_warn("The `cache` parameter is currently not used.")
 
-    # Check cache first
-    if cache:
-        S = cache['S']
-        Sh1 = cache['Sh1']
-
-    else:  # Compute
-
-        # Stetching curve
-        if cs is None:
-            if None in (thetas, thetab):
-                raise XoaSigmaError("thetas and thetas must be provided when " "cs is not")
-            cs = get_cs(sig, thetas, thetab, cs_type)
-
-        # Constant part of the formula
-        if np.ndim(hc) and set(hc.dims) != set(h.dims):
-            raise XoaSigmaError("Incompatible dimensions between bathy and hc")
-        S = s * hc + cs * (h - hc)
-        Sh1 = S / h
-        Sh1 = Sh1 + 1
-
-        # Store in cache
-        if isinstance(cache, dict):
-            cache.update(S=S, Sh1=Sh1)
-
-    # Final computation
-    z = S + Sh1 * ssh
-
-    # Format
-    return cf.get_cf_specs(sig).format_data_var(z, "depth", format_coords=False)
+    return _apply_ocean_s_(_ocean_s_g1_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask)
 
 
 def ocean_s_coordinate_g2(
-    sig, ssh, bathy, hc, thetas=None, thetab=None, cs=None, cs_type=None, cache=None
+    sig,
+    ssh,
+    bathy,
+    hc,
+    thetas=None,
+    thetab=None,
+    cs=None,
+    cs_type=None,
+    cache=None,
+    dask="parallelized",
 ):
     """Convert from s [-1, 0] generic form 2 to depths in an ocean model
+
+    .. note:: This function is dask-aware since it delegates the core computation to
+        :func:`xarray.apply_ufunc`.
 
     Source:
         `Ocean s-coordinate, generic form 2 <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#_ocean_s_coordinate_generic_form_2>`_
@@ -343,7 +464,7 @@ def ocean_s_coordinate_g2(
     Formula:
         .. math::
 
-            z & = \\eta*(1+s) + (\\eta + h * S)
+            z & = \\eta + (\\eta + h) * S
 
             S & = \\frac{h_c s + h C}{h_c + h}
 
@@ -385,41 +506,17 @@ def ocean_s_coordinate_g2(
     xarray.DataArray
         Negative depth below surface in m (:math:`z`)
     """
-    s, h = sig, bathy
+    if cache is not None:
+        xoa_warn("The `cache` parameter is currently not used.")
 
-    # Check cache first
-    if cache:
-        S = cache['S']
-        hS = cache['hS']
+    return _apply_ocean_s_(_ocean_s_g2_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask)
 
-    else:  # Compute
 
-        # Stetching curve
-        if cs is None:
-            if None in (thetas, thetab):
-                raise XoaSigmaError("thetas and thetas must be provided when cs is not")
-            cs = get_cs(sig, thetas, thetab, cs_type)
-
-        # Constant part of the formula
-        if np.ndim(hc) and set(hc.dims) != set(h.dims):
-            raise XoaSigmaError("Incompatible dimensions between bathy and hc")
-        S = s * hc + cs * h
-        S = S / (hc + h)
-        hS = S * h
-
-        # Store in cache
-        if isinstance(cache, dict):
-            cache.update(S=S, hS=hS)
-
-    # Final computation
-    z = hS + (S + 1) * ssh
-
-    # Format
-    return cf.get_cf_specs(sig).format_data_var(z, "depth", format_coords=False)
+# %% File decoding
 
 
 def _ds_search_ci_(ds, name):
-    """Case insensitive search in data_vars and coords of a dataset
+    """Case insensitive search in data_vars, coords and attrs of a dataset
 
     Parameters
     ----------
@@ -433,7 +530,7 @@ def _ds_search_ci_(ds, name):
         Real name
     """
     lname = name.lower()
-    for cat in "data_vars", "coords":
+    for cat in "data_vars", "coords", "attrs":
         pool = getattr(ds, cat)
         names = [nm for nm in pool.keys()]
         lnames = [nm.lower() for nm in names]
@@ -538,9 +635,9 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
                 "No standard_name attribute found in sigma/s " "variable name: " + sig.name
             )
         standard_name, loc = cfspecs.sglocator.parse_attr("standard_name", sig.standard_name)
-        #skip this one
+        # skip this one
         if standard_name not in SIGMA_COORDINATE_TYPES:
-           continue
+            continue
         # Get formula terms
         if "formula_terms" not in sig.attrs:
             raise XoaSigmaError(
@@ -652,7 +749,7 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
             hloc = cfspecs.sglocator.parse_loc_arg(hloc)
             sigma_type = terms.pop("type")
 
-            # Args: keys are cf names, values ara dataarrays
+            # Args: keys are cf names, values are dataarrays
             kwargs = {}
             for vname, cf_name in terms.items():
                 if cf_name in HORIZONTAL_TERMS:
@@ -661,8 +758,8 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
 
             # Compute depth/altitude/pressure
             func = getattr(sigma_module, sigma_type)
-            cache = {}
-            kwargs['cache'] = cache
+            # cache = {}
+            # kwargs['cache'] = cache
             height = func(**kwargs)
 
             # Format
