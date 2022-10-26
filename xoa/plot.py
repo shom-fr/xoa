@@ -477,6 +477,7 @@ def plot_minimap(
         )
         ax = fig.add_axes(ax, projection=proj, facecolor=ocean_color)
         ax.spines["geo"].set_linewidth(0.2)
+    if gridlines:
         ax.gridlines()
     if land_scale is None:
         land_scale = "50m" if extent == "global" else "110m"
