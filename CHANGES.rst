@@ -6,6 +6,7 @@ Ongoing developments
 
 New features
 ------------
+- Add practical/absolute salinity conversion in :func:`xoa.plot.plot_ts` function to make T-S diagrams
 - Add the :mod:`xoa.num` module that contains low level numeric utilities.
 - Add the :func:`xoa.thermdyn.mixed_layer_depth` fonction to compute
   the mixed layer depth with three different methods [:pull:`67`].
