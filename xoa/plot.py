@@ -206,7 +206,7 @@ def plot_ts(
 
     A TS diagram is a scatter plot with absolute salinity [g.kg-1] as X axis
     and potential temperature as Y axis.
-    The density is generally added as background contours. The density calculated in 
+    The density is generally added as background contours. The density calculated in
     this function is sigma0 and is computed from absolute salinity and potential temperature.
 
     Parameters
@@ -275,7 +275,7 @@ def plot_ts(
 
         # Plot
         @savefig api.plot.plot_ts.png
-        plot_ts(temp, psal, potential=True, scatter_c=depth, contour_linewidths=0.2, clabel_fontsize=8)
+        plot_ts(temp, sal, potential=True, scatter_c=depth, contour_linewidths=0.2, clabel_fontsize=8)
 
     """
     # Absolute salinity
@@ -291,7 +291,6 @@ def plot_ts(
     if not absolute:
         sal = gsw.SA_from_SP(sal, pres, lon, lat)
 
-        
     # Potential temperature
     cfspecs = xcf.get_cf_specs(temp)
     # potential = POTENTIAL[potential]
@@ -303,7 +302,6 @@ def plot_ts(
         temp = gsw.pt0_from_t(sal, temp, pres)
         temp.attrs.update(attrs)
         cfspecs.format_data_var(temp, cf_name="ptemp", copy=False, replace_attrs=True)
-
 
     # Init plot
     axes = kwargs.get("ax", axes)
@@ -359,7 +357,7 @@ def plot_ts(
             kwargs, "contour_", defaults={"colors": ".3"}, **(contour_kwargs or {})
         )
         out["contour"] = axes.contour(ss, tt, dd, **contour_kwargs)
-        
+
         # Contour labels
         clabel_kwargs = xmisc.dict_filter(kwargs, "clabel_", defaults={}, **(clabel_kwargs or {}))
         out["clabel"] = axes.clabel(out["contour"], **clabel_kwargs)
