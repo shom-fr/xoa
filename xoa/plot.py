@@ -192,7 +192,7 @@ def plot_ts(
     dens=True,
     pres=None,
     potential=None,
-    absolute=True,
+    absolute=None,
     axes=None,
     scatter_kwargs=None,
     contour_kwargs=None,
@@ -204,19 +204,22 @@ def plot_ts(
 ):
     """Plot a TS diagram
 
-    A TS diagram is a scatter plot with absolute salinity as X axis
+    A TS diagram is a scatter plot with absolute salinity [g.kg-1] as X axis
     and potential temperature as Y axis.
-    The density is generally added as background contours.
+    The density is generally added as background contours. The density calculated in 
+    this function is sigma0 and is computed from absolute salinity and potential temperature.
 
     Parameters
     ----------
     temp: xarray.DataArray
         Temperature. If not potential temperature, please set `potential=True`.
     sal: xarray.DataArray
-        Salinity
+       Salinity. If not absolute, please set `absolute=True`.
+       can be practical (psu) or absolute (g.kg-1)
     dens: bool
         Add contours of density.
         The density is computed with function :func:`gsw.density.sigma0`.
+        (computation from absolute salinity and potential temperature)
     pres: xarray.DataArray, None
         Pressure to compute potential temperature.
     potential: bool, None
@@ -272,39 +275,35 @@ def plot_ts(
 
         # Plot
         @savefig api.plot.plot_ts.png
-        plot_ts(temp, sal, potential=True, scatter_c=depth, contour_linewidths=0.2, clabel_fontsize=8)
+        plot_ts(temp, psal, potential=True, scatter_c=depth, contour_linewidths=0.2, clabel_fontsize=8)
 
     """
+    # Absolute salinity
+    import gsw
 
+    if pres is None:
+        lat = xcoords.get_lat(sal)
+        lon = xcoords.get_lon(sal)
+        depth = xcoords.get_depth(sal)
+        lat, depth = xr.broadcast(lat, depth)
+        pres = gsw.p_from_z(depth, lat)
+
+    if not absolute:
+        sal = gsw.SA_from_SP(sal, pres, lon, lat)
+
+        
     # Potential temperature
     cfspecs = xcf.get_cf_specs(temp)
     # potential = POTENTIAL[potential]
     if potential is None:
         potential = cfspecs.match_data_var(temp, "ptemp")
     if not potential:
-        import gsw
 
-        if pres is None:
-            lat = xcoords.get_lat(temp)
-            depth = xcoords.get_depth(temp)
-            lat, depth = xr.broadcast(lat, depth)
-            pres = gsw.p_from_z(depth, lat)
         attrs = temp.attrs
         temp = gsw.pt0_from_t(sal, temp, pres)
         temp.attrs.update(attrs)
         cfspecs.format_data_var(temp, cf_name="ptemp", copy=False, replace_attrs=True)
 
-    if not absolute:
-        import gsw
-        
-        if pres is None:
-            lat = xcoords.get_lat(sal)
-            lon = xcoords.get_lon(sal)           
-            depth = xcoords.get_depth(sal)
-            lat, depth = xr.broadcast(lat, depth)
-            pres = gsw.p_from_z(depth, lat)
-
-        sal = gsw.SA_from_SP(sal,pres,lon,lat)
 
     # Init plot
     axes = kwargs.get("ax", axes)
@@ -316,6 +315,7 @@ def plot_ts(
     scatter_kwargs = xmisc.dict_filter(
         kwargs, "scatter_", defaults={"s": 10}, **(scatter_kwargs or {})
     )
+
     out["scatter"] = axes.scatter(sal.values, temp.values, **scatter_kwargs)
 
     # Colorbar
@@ -337,7 +337,8 @@ def plot_ts(
         out["colorbar"] = plt.colorbar(out["scatter"], ax=axes, **colorbar_kwargs)
 
     # Labels
-    axes.set_xlabel(sal.attrs.get("long_name", "Salinity").title())
+    slabel = sal.attrs.get("long_name", "Salinity").title()
+    axes.set_xlabel(f"{slabel} [g.kg-1]")
     tlabel = temp.attrs.get("long_name", "Temperature").title()
     tunits = temp.attrs.get("units", "°C")
     axes.set_ylabel(f"{tlabel} [{tunits}]")
@@ -353,13 +354,12 @@ def plot_ts(
         ss = np.linspace(smin, smax, 100)
         ss, tt = np.meshgrid(ss, tt)
         dd = gsw.sigma0(ss, tt)
-
         # Contours
         contour_kwargs = xmisc.dict_filter(
             kwargs, "contour_", defaults={"colors": ".3"}, **(contour_kwargs or {})
         )
         out["contour"] = axes.contour(ss, tt, dd, **contour_kwargs)
-
+        
         # Contour labels
         clabel_kwargs = xmisc.dict_filter(kwargs, "clabel_", defaults={}, **(clabel_kwargs or {}))
         out["clabel"] = axes.clabel(out["contour"], **clabel_kwargs)
