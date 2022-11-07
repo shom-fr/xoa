@@ -6,6 +6,7 @@ Ongoing developments
 
 New features
 ------------
+- Add dask support to :mod:`xoa.sigma` sigma to depth converters.
 - Add the :mod:`xoa.num` module that contains low level numeric utilities.
 - Add the :func:`xoa.thermdyn.mixed_layer_depth` fonction to compute
   the mixed layer depth with three different methods [:pull:`67`].

@@ -1251,7 +1251,7 @@ class CFSpecs(object):
         loc=None,
         # add_loc_to_name=None, add_loc_to_coord_names=None,
         specialize=False,
-        rename_dims=True,
+        rename_dims=None,
         categories=["coords", "data_vars"],
     ):
         """Auto-format a whole xarray.Dataset
@@ -1267,6 +1267,8 @@ class CFSpecs(object):
 
         # Init rename dict
         rename_args = {}
+        if rename_dims is None:
+            rename_dims = format_coords
 
         # Common formatting kwargs
         kwargs = dict(
@@ -2669,7 +2671,6 @@ class _CFCatSpecs_(object):
         replace_attrs=False,
         copy=True,
         # add_loc_to_name=None,
-        bound_to=None,
     ):
         """Format a DataArray's name and attributes
 
