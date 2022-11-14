@@ -7,7 +7,8 @@ Ongoing developments
 New features
 ------------
 - Add the :func:`plot_minimap` and :func:`plot_double_minimap` functions to display the
-  geographic situation of a set of coordinates.
+  geographic situation of a set of coordinates [:pull:`73`].
+- Add support for the `min_extent` keyword to :func:`xoa.geo.get_extent` [:pull:`73`]
 - Add dask support to :mod:`xoa.sigma` sigma to depth converters [:pull:`72`].
 - Add the :mod:`xoa.num` module that contains low level numeric utilities.
 - Add the :func:`xoa.thermdyn.mixed_layer_depth` fonction to compute
@@ -29,11 +30,15 @@ Breaking changes
 Bug fixes
 ---------
 - Fix broadcasting :mod:`xoa.interp` 1d interpolation routines [:issue:`69`].
-- Fix :func:`xoa.sigma.get_sigma_terms` so that it works in case of multiple levels coordinates [:pull:`60`].
+- Fix :func:`xoa.sigma.get_sigma_terms` so that it works in case of multiple
+  levels coordinates [:pull:`60`].
 - Fix :func:`xoa.grid.to_rect` that now infers coordinates and can emit a warning or raise an error.
 
 Documentation
 -------------
+- Add an example of `xoa.plot.plot_double_minimap` to
+  :ref:`sphx_glr_examples_plot_mercator_argo.py`
+  and :ref:`sphx_glr_examples_plot_hycom_gdp.py` examples [:pull:`73`].
 - Add an example of `xoa.thermdyn.mixed_layer_depth` to
   :ref:`sphx_glr_examples_plot_croco_section.py` example [:pull:`67`].
 
