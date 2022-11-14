@@ -376,9 +376,10 @@ minimap_plot_coords = xmisc.Choices(
 @minimap_plot_coords.format_function_docstring
 def plot_minimap(
     obj,
-    ax=[0.9, 0.9, 0.09, 0.09],
+    ax=[0.9, 0.9, 0.09],
     fig=None,
     extent=1.0,
+    min_extent=2.0,
     gridlines=True,
     ocean_color=None,
     land_color=None,
@@ -400,14 +401,16 @@ def plot_minimap(
         that can be retrieved xith :func:`xoa.coords.get_lon` and func:`xoa.coords.get_lat`.
         In case of a tuple, it should a couple of `(lon, lat)` :class:`xarray.DataArray`.
     ax: list, cartopy.mpl.geoaxes.GeoAxes
-        A matplotlib axes instance or a list that defines the bounding box `
-        `[xmin, ymin, width, height]``in figure coordinates of the axes to be created.
+        A matplotlib axes instance or a list that defines the bounding box of the axes to be
+        created ``[xmin, ymin, width, height]`` or ``[xmin, ymin, size]`` in figure coordinates.
     fig: figure
         Figure instance
     extent: str, float
         Either ``"global"`` for a global minimap, or the margin added to the coordinates
         bounding box expressed relative to the coordinates extent: a velue of 1.0 means
         a margin equal to the extent.
+    min_extent: None, float, (float, float)
+        Minimal extent in degrees. See :func:`xoa.geo.get_extent`
     gridlines: bool
         Add gridlines.
     ocean_color: None, color
@@ -432,6 +435,8 @@ def plot_minimap(
         lands.
         Parameters matching ``coords_<param>`` are passed to the function that plots
         coordinates.
+        Parameters matching ``gridlines_<param>`` are passed to
+        :meth:`cartopy.mpl.geoaxes.GeoAxes.gridlines`.
 
     Return
     ------
@@ -458,6 +463,9 @@ def plot_minimap(
     See also
     --------
     plot_double_minimap
+    xoa.coords.get_lon
+    xoa.coords.get_lat
+    xoa.geo.get_extent
     """
     # Create map
     pcar = ccrs.PlateCarree()
@@ -475,16 +483,19 @@ def plot_minimap(
             central_longitude=float(lon.mean()),
             central_latitude=float(lat.mean()),  # satellite_height=50000
         )
+        if len(ax) == 3:
+            ax = ax + ax[-1:]
         ax = fig.add_axes(ax, projection=proj, facecolor=ocean_color)
         ax.spines["geo"].set_linewidth(0.2)
     if gridlines:
-        ax.gridlines()
+        kwgl = xmisc.dict_filter(kwargs, "gridlines_")
+        ax.gridlines(**kwgl)
     if land_scale is None:
         land_scale = "50m" if extent == "global" else "110m"
     if extent == "global":
         ax.set_global()
     else:
-        extent = np.array(xgeo.get_extent(obj, square=True, margin=extent))
+        extent = np.array(xgeo.get_extent(obj, square=True, margin=extent, min_extent=min_extent))
         ax.set_extent(extent, pcar)
 
     # Add land

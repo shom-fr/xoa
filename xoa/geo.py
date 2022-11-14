@@ -314,7 +314,7 @@ class ScipyDistContext(object):
             setattr(self.distmod, "pdist", self._old_pdist)
 
 
-def get_extent(extent, margin=0, square=False):
+def get_extent(extent, margin=0, square=False, min_extent=None):
     """Compute the geographic extent in degrees
 
     Parameters
@@ -331,6 +331,9 @@ def get_extent(extent, margin=0, square=False):
         For instance, a value of ``-0.1`` shrinks the box of 10% on each side.
     square: bool
         Force the box to be square in degrees.
+    min_extent: None, float, (float, float)
+        Minimal extent along x and y: ``(dx, dy)``.
+        If a single floating value is provided, it is valid for both x and y.
 
     Return
     ------
@@ -368,12 +371,18 @@ def get_extent(extent, margin=0, square=False):
         ymax = float(np.max(lat))
 
     # Scale
-    if square or margin:
+    if square or margin or min_extent is not None:
         dx = xmax - xmin
         dy = ymax - ymin
         x0 = 0.5 * (xmin + xmax)
         y0 = 0.5 * (ymin + ymax)
-        if square:
+        if min_extent is not None:
+            if isinstance(min_extent, (float, int)):
+                min_extent = (min_extent, min_extent)
+            dx_min, dy_min = min_extent
+            dx = max(dx, dx_min)
+            dy = max(dy, dy_min)
+        if square and dy != 0:
             aspect = dx * math.cos(y0 * math.pi / 180) / dy
             if aspect > 1:
                 dy *= aspect
