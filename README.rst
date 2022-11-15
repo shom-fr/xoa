@@ -1,11 +1,11 @@
 xoa - xarray-based ocean analysis library
 =========================================
 
-.. image:: https://anaconda.org/conda-forge/xoa/badges/installer/conda.svg
-    :alt: Install with conda
-    :target: https://conda.anaconda.org/conda-forge
 .. image:: https://github.com/VACUMM/xoa/actions/workflows/python-package-conda.yml/badge.svg
     :alt: Install, linting and tests
+.. image:: https://anaconda.org/conda-forge/xoa/badges/version.svg
+    :alt: Available on conda-forge
+    :target: https://conda.anaconda.org/conda-forge/xoa
 .. image:: https://readthedocs.org/projects/docs/badge/?version=latest
     :alt: Documentation Status
     :target: https://xoa.readthedocs.io/en/latest/
@@ -15,12 +15,29 @@ xoa - xarray-based ocean analysis library
 .. image:: https://pepy.tech/badge/xoa
     :alt: Number of downloads on pypi
     :target: https://pypi.org/project/xoa
+.. image:: https://anaconda.org/conda-forge/xoa/badges/platforms.svg
+    :alt: noarch
+    :target: https://anaconda.org/conda-forge/xoa
+.. image:: https://anaconda.org/conda-forge/xoa/badges/license.svg
+    :alt: Apache 2.0
+    :target: https://anaconda.org/conda-forge/xoa
 
 xoa is intended to help reading and manipulating observed
 and simulated ocean data.
 It is heavily based on `xarray <http://xarray.pydata.org/en/stable/>`_.
 For those who know it, it is the successor of
 `vacumm <https://github.com/VACUMM/vacumm>`_.
+
+Installation
+------------
+
+From conda::
+
+   conda install -c conda-forge xoa
+
+From pypi::
+
+   pip install xoa
 
 Documentation
 -------------
