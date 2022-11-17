@@ -93,8 +93,8 @@ def mixed_layer_depth(
 ):
     """Compute the mixed layer depth with different methods.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     da: xarray.DataArray
         A data array that contains either the potential temperature, the potential density or
         the vertical tracer diffisivity.

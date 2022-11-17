@@ -28,6 +28,8 @@ import matplotlib.artist as martist
 import matplotlib.text as mtext
 import matplotlib.patheffects as mpatheffects
 import xarray as xr
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 from .__init__ import xoa_warn
 from . import misc as xmisc
@@ -35,6 +37,8 @@ from . import geo as xgeo
 from . import cf as xcf
 from . import coords as xcoords
 from . import dyn
+
+# %% Special functions
 
 
 def plot_flow(
@@ -350,6 +354,271 @@ def plot_ts(
         out["clabel"] = axes.clabel(out["contour"], **clabel_kwargs)
 
     return out
+
+
+minimap_plot_coords = xmisc.Choices(
+    {
+        "auto": "infer from coords",
+        "box": "rectangle of coords extent",
+        "filledbox": "filled rectangle of coords extent",
+        "points": "scatter plot",
+        "lines": "as lines",
+        "center": "a single point at the center",
+        "Filled": "filled polygon",
+        False: "do not plot",
+    },
+    parameter="plot_coords",
+    description="Type of plot for coordinates",
+    aliases={"auto": [True, None]},
+)
+
+
+@minimap_plot_coords.format_function_docstring
+def plot_minimap(
+    obj,
+    ax=[0.9, 0.9, 0.09],
+    fig=None,
+    extent=1.0,
+    min_extent=2.0,
+    gridlines=True,
+    ocean_color=None,
+    land_color=None,
+    land_scale="110m",
+    plot_coords="auto",
+    coords_markersize=10,
+    coords_linewidth=2,
+    coords_color="tab:red",
+    coords_facecolor=0.2,
+    **kwargs,
+):
+    """Plot a small map to show the geographic situation of coordinates
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset, tuple
+        Object that contains lon and lat coordinates.
+        The object must contains unique and identifiable geographic coordinates
+        that can be retrieved xith :func:`xoa.coords.get_lon` and func:`xoa.coords.get_lat`.
+        In case of a tuple, it should a couple of `(lon, lat)` :class:`xarray.DataArray`.
+    ax: list, cartopy.mpl.geoaxes.GeoAxes
+        A matplotlib axes instance or a list that defines the bounding box of the axes to be
+        created ``[xmin, ymin, width, height]`` or ``[xmin, ymin, size]`` in figure coordinates.
+    fig: figure
+        Figure instance
+    extent: str, float
+        Either ``"global"`` for a global minimap, or the margin added to the coordinates
+        bounding box expressed relative to the coordinates extent: a velue of 1.0 means
+        a margin equal to the extent.
+    min_extent: None, float, (float, float)
+        Minimal extent in degrees. See :func:`xoa.geo.get_extent`
+    gridlines: bool
+        Add gridlines.
+    ocean_color: None, color
+        A matplotlib color for oceans.
+        If `None`, it defaults to ``cartopy.feature.COLORS["ocean"]``.
+    land_color: None, color
+        A matplotlib color for lands.
+        If `None`, it defaults to ``cartopy.feature.COLORS["land"]``.
+    {plot_coords}
+    coords_markersize: float
+        Size of markers in ``"points"`` mode.
+    coords_linewidth: float
+        Line width in ``"lines"``, `"box"`` and ``"filledbox"`` modes.
+    coord_color: color
+        Matplotlib color.
+    coords_facecolor: color
+        Matplotlib face color in ``"filled"`` and ``"filledbox"`` modes.
+        If a float, it is interpreted as an alpha transparency that is applied to `coord_color`
+        to get the face color.
+    **kwargs:
+        Parameters matching ``land_<param>`` are passed to the function that plots
+        lands.
+        Parameters matching ``coords_<param>`` are passed to the function that plots
+        coordinates.
+        Parameters matching ``gridlines_<param>`` are passed to
+        :meth:`cartopy.mpl.geoaxes.GeoAxes.gridlines`.
+
+    Return
+    ------
+    cartopy.mpl.geoaxes.GeoAxes
+        An instance of cartopy geographic axes
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import xarray as xr, numpy as np, matplotlib.pyplot as plt
+        @suppress
+        from xoa.plot import plot_minimap
+        ds = xr.Dataset(coords={{"lon": ("station", [-7, -5, -5]), "lat": ("station", [44, 44, 46])}})
+        plt.plot([0, 2], [0, 2])
+        @savefig api.plot.plot_minimap.global.png
+        plot_minimap(ds, extent="global")
+        plt.figure()
+        plt.plot([0, 2], [0, 2])
+        @savefig api.plot.plot_minimap.regional.png
+        plot_minimap(ds, extent=1.2, color="tab:green", gridlines=False, land_color="k")
+
+    See also
+    --------
+    plot_double_minimap
+    xoa.coords.get_lon
+    xoa.coords.get_lat
+    xoa.geo.get_extent
+    """
+    # Create map
+    pcar = ccrs.PlateCarree()
+    if isinstance(obj, tuple):
+        lon, lat = obj
+    else:
+        lon = xcoords.get_lon(obj)
+        lat = xcoords.get_lat(obj)
+    if fig is None:
+        fig = plt.gcf()
+    if isinstance(ax, (list, tuple)):
+        if ocean_color is None:
+            ocean_color = cfeature.COLORS["water"]
+        proj = ccrs.NearsidePerspective(
+            central_longitude=float(lon.mean()),
+            central_latitude=float(lat.mean()),  # satellite_height=50000
+        )
+        if len(ax) == 3:
+            ax = ax + ax[-1:]
+        ax = fig.add_axes(ax, projection=proj, facecolor=ocean_color)
+        ax.spines["geo"].set_linewidth(0.2)
+    if gridlines:
+        kwgl = xmisc.dict_filter(kwargs, "gridlines_")
+        ax.gridlines(**kwgl)
+    if land_scale is None:
+        land_scale = "50m" if extent == "global" else "110m"
+    if extent == "global":
+        ax.set_global()
+    else:
+        extent = np.array(xgeo.get_extent(obj, square=True, margin=extent, min_extent=min_extent))
+        ax.set_extent(extent, pcar)
+
+    # Add land
+    kwland = xmisc.dict_filter(kwargs, "land_")
+    if land_color is None:
+        land_color = cfeature.COLORS["land"]
+    kwland["facecolor"] = land_color
+    ax.add_feature(cfeature.LAND.with_scale(land_scale), **kwland)
+
+    # Add coordinates
+    plot_coords = minimap_plot_coords[plot_coords]
+    if plot_coords is not False:
+        kwcoords = xmisc.dict_filter(kwargs, "coords_")
+        kwcoords.update(transform=pcar)
+        if plot_coords in ("box", "filledbox"):
+            bbox = xgeo.get_extent((lon, lat))
+            lon = [bbox[0], bbox[1], bbox[1], bbox[0], bbox[0]]
+            lat = [bbox[2], bbox[2], bbox[3], bbox[3], bbox[2]]
+            plot_coords = "lines" if plot_coords == "box" else "filled"
+        elif plot_coords == "center":
+            lon = [lon.mean()]
+            lat = [lat.mean()]
+            plot_coords = "points"
+        if plot_coords is None:
+            plot_coords = "auto"
+        if plot_coords == "auto":
+            if lon.dims == lat.dims and lon.ndim == 1 and lon.size > 0:
+                plot_coords = "lines"
+            else:
+                lon, lat = xr.broadcast(lon, lat)
+                plot_coords = "points"
+        if plot_coords == "lines":
+            kwcoords.update(linewidth=coords_linewidth, color=coords_color)
+            ax.plot(lon, lat, **kwcoords)
+        elif plot_coords == "filled":
+            if isinstance(coords_facecolor, float) and coords_facecolor <= 1:
+                fc_alpha = coords_facecolor
+                coords_facecolor = mcolors.to_rgba(coords_color)
+                fc_alpha *= coords_facecolor[-1]
+                coords_facecolor = coords_facecolor[:3] + (fc_alpha,)
+            kwcoords.update(
+                linewidth=coords_linewidth, color=coords_color, facecolor=coords_facecolor
+            )
+            ax.fill(lon, lat, **kwcoords)
+        else:
+            kwcoords.update(s=coords_markersize, c=coords_color)
+            ax.scatter(lon, lat, **kwcoords)
+
+    return ax
+
+
+def plot_double_minimap(obj, regional_ax="below", **kwargs):
+    """Plot a global minimap and a regional minimap
+
+    It consists in two calls to :func:`plot_minimap` with the first one whith a "global" extent.
+    By default, the coordinates are plotted as single point on the global minimap, and the
+    regional minimap is placed below the global one.
+
+    Parameters
+    ----------
+    regional_ax: axes, list, str
+        If a string, it should be one of ``"below"``, ``"above"``, ``"left"`` or ``"right"``
+        and it is interpreted as a relative position of the regional minimap with respect
+        to the global one.
+    **kwargs:
+        Parameters matching ``global_<param>`` are passed to the global minimap while
+        parameters matching ``regional_<param>`` are passed to the regional minimap.
+        All other parameters are passed to both minimaps.
+
+    Returns
+    -------
+    cartopy.mpl.geoaxes.GeoAxes, cartopy.mpl.geoaxes.GeoAxes
+        A tuple of `(global_ax, regiona_ax)`
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import xarray as xr, numpy as np, matplotlib.pyplot as plt
+        @suppress
+        from xoa.plot import plot_double_minimap
+        ds = xr.Dataset(coords={"lon": ("station", [-7, -5, -5]), "lat": ("station", [44, 44, 46])})
+        plt.plot([0, 2], [0, 2])
+        @savefig api.plot.plot_double_minimap.png
+        plot_double_minimap(ds)
+
+    See also
+    --------
+    plot_minimap
+    """
+
+    # Filter keywords
+    kwglobal = xmisc.dict_filter(kwargs, "global_")
+    kwregional = xmisc.dict_filter(kwargs, "regional_")
+
+    # Global minimap
+    kw = kwargs.copy()
+    kwglobal.update(extent="global")
+    kwglobal.setdefault("plot_coords", "center")
+    kw.update(kwglobal)
+    global_ax = plot_minimap(obj, **kw)
+
+    # Regional minimap
+    if isinstance(regional_ax, str):
+        bb = global_ax.bbox.transformed(global_ax.figure.transFigure.inverted())
+        if regional_ax == "right":
+            regional_ax = [bb.xmin + bb.width * 1.1, bb.ymin, bb.width, bb.height]
+        elif regional_ax == "above":
+            regional_ax = [bb.xmin, bb.ymax + bb.height * 0.1, bb.width, bb.height]
+        elif regional_ax == "left":
+            regional_ax = [bb.xmin - bb.width * 1.1, bb.ymin, bb.width, bb.height]
+        else:
+            regional_ax = [bb.xmin, bb.ymin - bb.height * 1.1, bb.width, bb.height]
+    kw = kwargs.copy()
+    kwregional.update(ax=regional_ax)
+    kw.update(kwregional)
+    regional_ax = plot_minimap(obj, **kw)
+
+    return global_ax, regional_ax
+
+
+# %% Filters
 
 
 def _smooth2d_(A, sigma):
