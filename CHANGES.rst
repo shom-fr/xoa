@@ -6,6 +6,7 @@ Ongoing developments
 
 New features
 ------------
+- Add the statistics accumulator :class:`xoa.stats.StatAccum` to deal with large datasets.
 - Add the :func:`plot_minimap` and :func:`plot_double_minimap` functions to display the
   geographic situation of a set of coordinates [:pull:`73`].
 - Add support for the `min_extent` keyword to :func:`xoa.geo.get_extent` [:pull:`73`]

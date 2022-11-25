@@ -25,5 +25,6 @@ Package API
     xoa.num
     xoa.plot
     xoa.regrid
+    xoa.stats
     xoa.thermdyn
     xoa.sigma
