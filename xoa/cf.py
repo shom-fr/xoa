@@ -311,6 +311,30 @@ class SGLocator(object):
         return loc
 
     @ERRORS.format_method_docstring
+    def get_loc_from_dict(self, dd, errors="warn"):
+        """Parse name and attributes items of a dict to find a unique location
+
+        Parameters
+        ----------
+        dd: dict
+            Dictionary optionaly with `name` and `attrs` keys
+            and values that default to `None`.
+        {errors}
+
+        Return
+        ------
+        None, str
+            ``None`` if no location is found, else the corresponding string
+
+        Raises
+        ------
+        XoaCFError
+            When locations parsed from name and attributes are conflicting.
+            Thus, this method method is a way to check location consistency.
+        """
+        return self.get_loc(name=dd.get("name"), attrs=dd.get("attrs"), errors=errors)
+
+    @ERRORS.format_method_docstring
     def get_loc_from_da(self, da, errors="warn"):
         """Parse a data array name and attributes to find a unique location
 
@@ -613,14 +637,106 @@ class SGLocator(object):
                         value = value[0]
 
                 # Location
-                value = self.merge_attr(
-                    attr, attrs.get(attr, None), value, loc, standardize=standardize
-                )
+                value = self.merge_attr(attr, attrs.get(attr), value, loc, standardize=standardize)
 
             if value is not None:
                 attrs[attr] = value
 
         return attrs
+
+    def format_dict(
+        self,
+        dd,
+        loc=None,
+        standardize=True,
+        name=None,
+        attrs=None,
+        rename=True,
+        copy=True,
+        replace_attrs=False,
+        add_loc_to_name=True,
+        add_loc_to_attrs=True,
+    ):
+        """Format name and attributes of a copy of DataArray
+
+        Parameters
+        ----------
+        dd: dict
+            Dictionary optionaly with `name` and `attrs` keys
+            and values that default to `None`.
+        loc: {True, None}, str, {False, ""}
+            If None, location is left unchanged;
+            if a string, it is set;
+            else, it is removed.
+        standardize: bool
+            If True, standardize ``root`` and ``loc`` values.
+        name: str, None
+            Substitute for data array name
+        attrs: str, None
+            Substitute for dataarray attributes.
+            If ``standard_name`` and ``long_name`` values are a list,
+            and if the dataarray has its attribute included in the list,
+            it is left unchanged since it is considered compatible.
+        rename:
+            Allow renaming the array if its name is already set
+        add_loc_to_name: bool
+            Add the location to the name
+        replace_attrs: bool
+            Replace existing attributes?
+        copy: bool
+            Make sure to work on a copy
+
+        Return
+        ------
+        xarray.DataArray
+
+        See also
+        --------
+        format_dataarray
+        format_attrs
+        patch_attrs
+        """
+        if copy:
+            dd = dd.copy()
+        dd.setdefault("attrs", {})
+        dd.setdefault("name", None)
+
+        # Location argument
+        loc = self.parse_loc_arg(loc)  # specified
+        if loc is None:
+            loc0 = self.get_loc_from_dict(dd)  # parsed from
+            loc1 = self.get_loc(name=name, attrs=attrs)  # parsed from specs
+            loc = loc0 if loc1 is None else loc1
+
+        # Attributes
+        kwloc = {"loc": loc if add_loc_to_attrs else False}
+        if attrs:
+            dd["attrs"].update(
+                self.patch_attrs(
+                    dd["attrs"], attrs, standardize=standardize, replace=replace_attrs, **kwloc
+                )
+            )
+        else:
+            dd["attrs"].update(self.format_attrs(dd["attrs"], standardize=standardize, **kwloc))
+
+        # Name
+        if rename:
+            kwloc = {"loc": loc if add_loc_to_name else False}
+            if dd["name"]:  # change the name
+                dd["name"] = self.merge_attr("name", dd["name"], name, **kwloc)
+            else:  # set it
+                dd["name"] = self.format_attr("name", name, **kwloc)
+
+        # # Check location consistency
+        # loc = self.parse_loc_arg(loc)
+        # if loc is None:
+        #     loc = self.get_loc(da)
+        #     if loc:
+        #         da = self.format_dataarray(
+        #             da, loc=loc, rename=True, replace_attrs=True,
+        #             add_loc_to_name=add_loc_to_name)
+
+        return dd
 
     def format_dataarray(
         self,
@@ -668,59 +784,86 @@ class SGLocator(object):
 
         See also
         --------
+        format_dict
         format_attrs
         patch_attrs
         """
         if copy:
             da = da.copy()
 
-        # Location argument
-        loc = self.parse_loc_arg(loc)  # specified
-        if loc is None:
-            loc0 = self.get_loc_from_da(da)  # parsed from
-            loc1 = self.get_loc(name=name, attrs=attrs)  # parsed from specs
-            loc = loc0 if loc1 is None else loc1
+        # Apply to dict
+        dd = self.format_dict(
+            {"name": da.name, "attrs": da.attrs},
+            loc=loc,
+            standardize=standardize,
+            name=name,
+            attrs=attrs,
+            rename=rename,
+            copy=copy,
+            replace_attrs=replace_attrs,
+            add_loc_to_name=add_loc_to_name,
+            add_loc_to_attrs=add_loc_to_attrs,
+        )
 
-        # Attributes
-        kwloc = {"loc": loc if add_loc_to_attrs else False}
-        if attrs:
-            da.attrs.update(
-                self.patch_attrs(
-                    da.attrs, attrs, standardize=standardize, replace=replace_attrs, **kwloc
-                )
-            )
-        else:
-            da.attrs.update(self.format_attrs(da.attrs, standardize=standardize, **kwloc))
-
-        # Name
-        if rename:
-            kwloc = {"loc": loc if add_loc_to_name else False}
-            if da.name:  # change the name
-                da.name = self.merge_attr("name", da.name, name, **kwloc)
-            else:  # set it
-                da.name = self.format_attr("name", name, **kwloc)
-
-        # # Check location consistency
-        # loc = self.parse_loc_arg(loc)
-        # if loc is None:
-        #     loc = self.get_loc(da)
-        #     if loc:
-        #         da = self.format_dataarray(
-        #             da, loc=loc, rename=True, replace_attrs=True,
-        #             add_loc_to_name=add_loc_to_name)
-
+        # Export to da
+        da.name = dd["name"]
+        da.attrs = dd["attrs"]
         return da
 
-    def add_loc(self, da, loc, to_name=True, to_attrs=True):
-        """A shortcut to :meth:`format_dataarray` to update `da` with loc without copy"""
-        return self.format_dataarray(
-            da,
-            loc,
-            copy=False,
-            replace_attrs=True,
-            add_loc_to_name=to_name,
-            add_loc_to_attrs=to_attrs,
+        # # Location argument
+        # loc = self.parse_loc_arg(loc)  # specified
+        # if loc is None:
+        #     loc0 = self.get_loc_from_da(da)  # parsed from
+        #     loc1 = self.get_loc(name=name, attrs=attrs)  # parsed from specs
+        #     loc = loc0 if loc1 is None else loc1
+
+        # # Attributes
+        # kwloc = {"loc": loc if add_loc_to_attrs else False}
+        # if attrs:
+        #     da.attrs.update(
+        #         self.patch_attrs(
+        #             da.attrs, attrs, standardize=standardize, replace=replace_attrs, **kwloc
+        #         )
+        #     )
+        # else:
+        #     da.attrs.update(self.format_attrs(da.attrs, standardize=standardize, **kwloc))
+
+        # # Name
+        # if rename:
+        #     kwloc = {"loc": loc if add_loc_to_name else False}
+        #     if da.name:  # change the name
+        #         da.name = self.merge_attr("name", da.name, name, **kwloc)
+        #     else:  # set it
+        #         da.name = self.format_attr("name", name, **kwloc)
+
+        # # # Check location consistency
+        # # loc = self.parse_loc_arg(loc)
+        # # if loc is None:
+        # #     loc = self.get_loc(da)
+        # #     if loc:
+        # #         da = self.format_dataarray(
+        # #             da, loc=loc, rename=True, replace_attrs=True,
+        # #             add_loc_to_name=add_loc_to_name)
+
+        # return da
+
+    format_da = format_dataarray
+
+    def add_loc(self, obj, loc, to_name=True, to_attrs=True):
+        """Quickly update `da` with loc without copy
+
+        This is a shortcut to:
+
+        * :meth:`format_dataarray` is `obj` is a data array,
+        * :meth:`format_dict` is `obj` is a dict.
+
+        """
+        kwargs = dict(
+            copy=False, replace_attrs=True, add_loc_to_name=to_name, add_loc_to_attrs=to_attrs
         )
+        if isinstance(obj, dict):
+            return self.format_dict(obj, loc, **kwargs)
+        return self.format_dataarray(obj, loc, **kwargs)
 
 
 def _solve_rename_conflicts_(rename_args):
