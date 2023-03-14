@@ -29,6 +29,7 @@ Breaking changes
 
 Bug fixes
 ---------
+- Fix :func:`xoa.cfgm.is_boolstr` which now supports the new :mod:`configobj`.
 - Fix broadcasting :mod:`xoa.interp` 1d interpolation routines [:issue:`69`].
 - Fix :func:`xoa.sigma.get_sigma_terms` so that it works in case of multiple
   levels coordinates [:pull:`60`].
