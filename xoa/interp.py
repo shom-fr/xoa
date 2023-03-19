@@ -110,7 +110,7 @@ def nearest1d(vari, yi, yo, eshapes, extrap="no"):
     return varo
 
 
-# @numba.njit(parallel=False, cache=NOT_CI)
+@numba.njit(parallel=False, cache=NOT_CI)
 def linear1d(vari, yi, yo, eshapes, extrap="no"):
     """Linear interpolation of nD data along an axis with varying coordinates
 
