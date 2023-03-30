@@ -5,6 +5,7 @@ Thermodynamics utilities
 """
 import numpy as np
 
+import xarray as xr
 from .__init__ import XoaError
 from . import cf as xcf
 from . import misc as xmisc
@@ -84,6 +85,7 @@ MLD_METHODS = xmisc.Choices(
 def mixed_layer_depth(
     da,
     method=None,
+    zref=0.,
     deltatemp=0.2,
     deltadens=0.3,
     kzmax=0.0005,
@@ -150,7 +152,11 @@ def mixed_layer_depth(
     if method == "kzmax":
         isoval = kzmax
     else:
-        surf = da.isel({zdim: 0 if positive == "down" else -1})
+        if zref==0:
+            surf = da.isel({zdim: 0 if positive == "down" else -1})
+        else:
+            dep0 = xr.DataArray([zref], dims="depth")
+            surf = xregrid.regrid1d(da, dep0, method="linear").squeeze(dim="depth")
         if method == "deltatemp":
             isoval = surf - deltatemp
         elif method == "deltadens":
