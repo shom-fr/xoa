@@ -152,7 +152,7 @@ def mixed_layer_depth(
     if method == "kzmax":
         isoval = kzmax
     else:
-        if zref==0:
+        if zref == 0.:
             surf = da.isel({zdim: 0 if positive == "down" else -1})
         else:
             dep0 = xr.DataArray([zref], dims="depth")
