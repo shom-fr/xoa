@@ -178,10 +178,10 @@ def get_window_func(window, **kwargs):
         def window_func(size):
             if "sym" in params and "sym" not in kwargs:
                 kwargs["sym"] = True
-            if "std" in params and "std" not in kwargs:
-                kwargs["std"] = 1.5 * size
-            if "sig" in params and "sig" not in kwargs:
-                kwargs["sig"] = 1.5 * size
+            if "std" in params:
+                kwargs["std"] = size * kwargs.get("std", 1 / 6)
+            if "sig" in params:
+                kwargs["sig"] = size * kwargs.get("sig", 1 / 6)
             if "p" in params and "p" not in kwargs:
                 kwargs["p"] = 1
             return func(size, **kwargs)
@@ -248,7 +248,7 @@ def generate_isotropic_kernel(shape, window_func, fill_value=0, npt=None):
         indices[i] -= 0.5
 
     # Distance from bounds with 0.5 at center and < 0 outside bounds
-    x = 0.5 - np.sqrt((indices ** 2).sum(axis=0))
+    x = 0.5 - np.sqrt((indices**2).sum(axis=0))
 
     # Window values
     if npt is None:
@@ -333,7 +333,6 @@ def generate_orthogonal_kernel(kernels, window_func="ones", fill_value=0.0):
     """
     kernel = None
     for k1d in kernels:
-
         # From scalar to 1d
         if np.isscalar(k1d):
             window_func = get_window_func(window_func)
@@ -431,7 +430,6 @@ def generate_kernel(
 
     # From an size or 1d kernel for given dimensions
     if isinstance(kernel, dict):
-
         # Isotropic parameter
         if isotropic:
             if isotropic is True:
@@ -483,7 +481,6 @@ def generate_kernel(
 
         # Build isotropic kernel
         if isokernel:
-
             # List/array
             if not np.isscalar(isokernel):
                 window_func = get_window_func(isokernel, **window_kwargs)
@@ -684,6 +681,26 @@ def _reduce_mask_(data, excluded_dims):
 
 def _convolve_and_fill_(data, kernel):
     return data.fillna(convolve(data, kernel, normalize=True, na_thres=1))
+
+
+def smooth(data, kernel, **kwargs):
+    """A short to ``convolve(data, kernel, normalize=True)``
+
+    See :func:`convolve` for the complete list of options.
+
+    Parameters
+    ----------
+    data: xarray.DataArray
+        Array to filter
+    kernel: int, tuple, numpy.ndarray, xarray.DataArray
+        Convolution kernel. See :func:`generate_kernel`.
+
+    See also
+    --------
+    convolve
+    """
+    kwargs["normalize"] = True
+    return convolve(data, kernel, **kwargs)
 
 
 def erode_mask(data, until=1, kernel=None):
