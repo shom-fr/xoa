@@ -6,7 +6,11 @@ Ongoing developments
 
 New features
 ------------
-- Add the :func:`plot_minimap` and :func:`plot_double_minimap` functions to display the
+- Add the :func:`xoa.filter.smooth` function [:pull:`76`].
+- Improved the default `sig` and `std` parameter values for filter windows 
+  that accept them [:pull:`76`].
+- Add the :func:`xoa.plot.plot_minimap` and :func:`xoa.plot.plot_double_minimap` 
+  functions to display the
   geographic situation of a set of coordinates [:pull:`73`].
 - Add support for the `min_extent` keyword to :func:`xoa.geo.get_extent` [:pull:`73`]
 - Add dask support to :mod:`xoa.sigma` sigma to depth converters [:pull:`72`].
