@@ -1,24 +1,25 @@
 What's new
 ##########
 
-Ongoing developments
-====================
+0.7.0 (XXXX-XX-XX)
+==================
 
 New features
 ------------
+- Add issue and pull request templates.
 - Add the :func:`xoa.filter.smooth` function [:pull:`76`].
-- Improved the default `sig` and `std` parameter values for filter windows 
+- Improved the default `sig` and `std` parameter values for filter windows
   that accept them [:pull:`76`].
-- Add the :func:`xoa.plot.plot_minimap` and :func:`xoa.plot.plot_double_minimap` 
+- Add the :func:`xoa.plot.plot_minimap` and :func:`xoa.plot.plot_double_minimap`
   functions to display the
   geographic situation of a set of coordinates [:pull:`73`].
 - Add support for the `min_extent` keyword to :func:`xoa.geo.get_extent` [:pull:`73`]
 - Add dask support to :mod:`xoa.sigma` sigma to depth converters [:pull:`72`].
 - Add the :mod:`xoa.num` module that contains low level numeric utilities.
-- Add the :func:`xoa.thermdyn.mixed_layer_depth` fonction to compute
-  the mixed layer depth with three different methods [:pull:`67`].
+- Add the :func:`xoa.thermdyn.mixed_layer_depth` function to compute
+  the mixed layer depth with three different methods [:pull:`67`, :pull:`75`].
 - Add the :func:`xoa.thermdyn.is_temp` and :func:`xoa.thermdyn.is_dens` functions
-  to if an array of temperature or density type [:pull:`67`].
+  to infer if an array of temperature or density type [:pull:`67`].
 - Add `kernel_kwargs` keyword to :func:`xoa.filter.convolve` to better control
   the kernel generation by :func:`xoa.filter.generate_kernel` [:pull:`64`].
 - Add inference of parameters for some window functions, like the gaussian

@@ -17,7 +17,7 @@ build:
   os: "ubuntu-20.04"
   image: stable
   tools:
-      python: 3.9
+      python: "3.10"
 
 # Conda
 conda:
