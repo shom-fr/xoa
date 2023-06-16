@@ -85,7 +85,7 @@ MLD_METHODS = xmisc.Choices(
 def mixed_layer_depth(
     da,
     method=None,
-    zref=0.,
+    zref=0.0,
     deltatemp=0.2,
     deltadens=0.3,
     kzmax=0.0005,
@@ -103,6 +103,8 @@ def mixed_layer_depth(
         Note that this array **must contain a depth coordinate**, which optimally contains
         the `positive` attribute.
     {method}
+    zref: float
+        Reference depth (in meters) from which the MLD_METHODS are applied
     kwargs: dict
         Extra keywords are passed to :func:`xoa.regrid.isoslice`.
 
@@ -152,7 +154,7 @@ def mixed_layer_depth(
     if method == "kzmax":
         isoval = kzmax
     else:
-        if zref == 0.:
+        if zref == 0.0:
             surf = da.isel({zdim: 0 if positive == "down" else -1})
         else:
             dep0 = xr.DataArray([zref], dims="depth")
