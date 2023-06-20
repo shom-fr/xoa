@@ -475,7 +475,7 @@ def grid2loc(da, loc, compat="warn"):
 
     # To numpy with singletons
     # - data
-    vi = da_tmp.data
+    vi = da_tmp.values
     for axis_type, axis in (("z", -3), ("t", -4)):
         if axis_type not in order:
             vi = np.expand_dims(vi, axis)
