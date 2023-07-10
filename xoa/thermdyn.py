@@ -34,7 +34,7 @@ def _get_array_(ds, func, variants, variant, errors, name):
             xoa_warn(msg)
         return
     if len(das) > 1:
-        msg = "fFound more than one {name} array"
+        msg = f"Found more than one {name} array"
         if errors == "raise":
             raise XoaError(msg)
         if errors == "warning":
@@ -44,7 +44,7 @@ def _get_array_(ds, func, variants, variant, errors, name):
 
 TEMP_VARIANTS = xmisc.Choices(
     {
-        None: "No restiction",
+        None: "No restriction",
         "insitu": "In situ",
         "conservative": "Conservative temperature",
         "absolute": "Absolute temperature",
@@ -106,7 +106,7 @@ def get_temp(ds, variant=None, errors="warn"):
 
 SAL_VARIANTS = xmisc.Choices(
     {
-        None: "No restiction",
+        None: "No restriction",
         "insitu": "In situ salinity",
         "absolute": "Absolute salinity",
         "preformed": "Preformed salinity",
@@ -119,7 +119,7 @@ SAL_VARIANTS = xmisc.Choices(
 
 @SAL_VARIANTS.format_method_docstring
 def is_sal(da, variant=None):
-    """Check if `da` is a temperature-like array.
+    """Check if `da` is a salinity-like array.
 
     Parameters
     ----------
@@ -167,10 +167,10 @@ def get_sal(ds, variant=None, errors="warn"):
 
 DENS_VARIANTS = xmisc.Choices(
     {
-        None: "No restiction",
+        None: "No restriction",
         "insitu": "In situ density",
         "potential": "Potential density",
-        "neutral": "neutral salinity",
+        "neutral": "Neutral salinity",
     },
     parameter="variant",
     description="Restrict checking to a given variant",

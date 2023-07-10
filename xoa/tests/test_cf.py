@@ -40,9 +40,10 @@ def test_cf_sglocator_parse_attr(attr, value, expected):
 )
 def test_cf_sglocator_parse_attr_with_valid_locations(attr, value, expected):
     assert (
-        cf.SGLocator(valid_locations=['u', 'rho'], name_format="{root}{loc}",).parse_attr(
-            attr, value
-        )
+        cf.SGLocator(
+            valid_locations=['u', 'rho'],
+            name_format="{root}{loc}",
+        ).parse_attr(attr, value)
         == expected
     )
 
@@ -113,7 +114,9 @@ def test_cf_sglocator_get_loc_from_da_error(name, standard_name, long_name):
 )
 def test_cf_sglocator_match_attr(attr, root, loc, expected):
     value = dict(
-        standard_name="my_var_at_t_location", long_name="My var at T location", name="myvar_t",
+        standard_name="my_var_at_t_location",
+        long_name="My var at T location",
+        name="myvar_t",
     )[attr]
     assert cf.SGLocator().match_attr(attr, value, root, loc) is expected
 
@@ -360,16 +363,22 @@ def test_cf_cfspecs_get_name(specialize, expected):
 def test_cf_cfspecs_get_attrs():
     cfspecs = cf.get_cf_specs()
     attrs = cfspecs.data_vars.get_attrs("temp", other="ok")
-    assert attrs["long_name"] == "Temperature"
+    assert attrs["long_name"] == "Sea water in situ temperature"
     assert attrs["other"] == "ok"
 
 
 def test_cf_cfspecs_get_loc_mapping():
 
     cf_dict0 = {
-        "sglocator": {"valid_locations": ["u", "v"],},
+        "sglocator": {
+            "valid_locations": ["u", "v"],
+        },
         "data_vars": {
-            "u": {"loc": "u", "add_loc": False, "add_coords_loc": {"lon": True, "x": True},},
+            "u": {
+                "loc": "u",
+                "add_loc": False,
+                "add_coords_loc": {"lon": True, "x": True},
+            },
             "bathy": {"add_loc": True},
         },
     }
@@ -444,7 +453,11 @@ def test_cf_cfspecs_search_coord_with_stacking():
 
 @pytest.mark.parametrize("cf_name", ["temp", None])
 @pytest.mark.parametrize(
-    "in_name,in_attrs", [("temp", None), ("xxx", {"standard_name": "sea_water_temperature"}),],
+    "in_name,in_attrs",
+    [
+        ("temp", None),
+        ("xxx", {"standard_name": "sea_water_temperature"}),
+    ],
 )
 def test_cf_cfspecs_match_data_var(cf_name, in_name, in_attrs):
 
@@ -461,7 +474,11 @@ def test_cf_cfspecs_match_data_var(cf_name, in_name, in_attrs):
 
 @pytest.mark.parametrize("cf_name", ["temp", None])
 @pytest.mark.parametrize(
-    "in_name,in_attrs", [("temp", None), ("xxx", {"standard_name": "sea_water_temperature"}),],
+    "in_name,in_attrs",
+    [
+        ("temp", None),
+        ("xxx", {"standard_name": "sea_water_temperature"}),
+    ],
 )
 def test_cf_cfspecs_search_data_var(cf_name, in_name, in_attrs):
 
@@ -476,8 +493,16 @@ def test_cf_cfspecs_search_data_var(cf_name, in_name, in_attrs):
 def test_cf_cfspecs_cats_get_loc_arg():
 
     cf_dict0 = {
-        "sglocator": {"valid_locations": ["u", "v"],},
-        "data_vars": {"u": {"loc": "u", "add_loc": False, "add_coords_loc": {"lon": True},},},
+        "sglocator": {
+            "valid_locations": ["u", "v"],
+        },
+        "data_vars": {
+            "u": {
+                "loc": "u",
+                "add_loc": False,
+                "add_coords_loc": {"lon": True},
+            },
+        },
     }
     cf_specs0 = cf.CFSpecs(cf_dict0)
 
@@ -507,7 +532,11 @@ def test_cf_cfspecs_cats_get_loc_arg():
 @pytest.mark.parametrize("cf_name", [None, "lon"])
 @pytest.mark.parametrize(
     "in_name,in_attrs",
-    [("lon", None), ("xxx", {"standard_name": "longitude"}), ("xxx", {"units": "degrees_east"}),],
+    [
+        ("lon", None),
+        ("xxx", {"standard_name": "longitude"}),
+        ("xxx", {"units": "degrees_east"}),
+    ],
 )
 def test_cf_cfspecs_cats_format_dataarray(cf_name, in_name, in_attrs):
 
@@ -539,9 +568,15 @@ def test_cf_cfspecs_cats_get_allowed_names():
 def test_cf_cfspecs_format_obj_with_loc():
 
     cf_dict0 = {
-        "sglocator": {"valid_locations": ["u", "v"],},
+        "sglocator": {
+            "valid_locations": ["u", "v"],
+        },
         "data_vars": {
-            "u": {"loc": "u", "add_loc": False, "add_coords_loc": {"lon": True, "x": True},},
+            "u": {
+                "loc": "u",
+                "add_loc": False,
+                "add_coords_loc": {"lon": True, "x": True},
+            },
             "bathy": {"add_loc": True},
         },
     }
@@ -564,7 +599,11 @@ def test_cf_cfspecs_format_obj_with_loc():
 
 @pytest.mark.parametrize("cf_name", [None, "temp"])
 @pytest.mark.parametrize(
-    "in_name,in_attrs", [("temp", None), ("yyy", {"standard_name": "sea_water_temperature"}),],
+    "in_name,in_attrs",
+    [
+        ("temp", None),
+        ("yyy", {"standard_name": "sea_water_temperature"}),
+    ],
 )
 def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
 
@@ -575,7 +614,7 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
     temp = cf.get_cf_specs().format_data_var(temp, cf_name)
     assert temp.name == "temp"
     assert temp.standard_name == "sea_water_temperature"
-    assert temp.long_name == "Temperature"
+    assert temp.long_name == "Sea water in situ temperature"
     assert temp.units == "degrees_celsius"
     assert temp.lon.standard_name == "longitude"
 
@@ -583,9 +622,6 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
 def test_cf_cfspecs_format_data_var_coord():
     da = xr.DataArray(0, attrs={'standard_name': 'longitude_at_u_location'})
     da = cf.get_cf_specs().format_data_var(da)
-
-
-#     assert da.name == "lon_u"
 
 
 def test_cf_cfspecs_format_data_var_specialize():
