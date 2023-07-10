@@ -18,8 +18,12 @@ New features
 - Add the :mod:`xoa.num` module that contains low level numeric utilities.
 - Add the :func:`xoa.thermdyn.mixed_layer_depth` function to compute
   the mixed layer depth with three different methods [:pull:`67`, :pull:`75`].
-- Add the :func:`xoa.thermdyn.is_temp` and :func:`xoa.thermdyn.is_dens` functions
-  to infer if an array of temperature or density type [:pull:`67`].
+- Add the :func:`xoa.thermdyn.is_temp`, :func:`xoa.thermdyn.is_sal`
+  and :func:`xoa.thermdyn.is_dens` functions
+  to infer if an array of temperature, salinity or density type,
+  and added the related :func:`xoa.thermdyn.get_temp`,
+  :func:`xoa.thermdyn.get_sal` and :func:`xoa.thermdyn.get_dens`
+  function to search in datasets[:pull:`67`, :pull:`79`].
 - Add `kernel_kwargs` keyword to :func:`xoa.filter.convolve` to better control
   the kernel generation by :func:`xoa.filter.generate_kernel` [:pull:`64`].
 - Add inference of parameters for some window functions, like the gaussian
