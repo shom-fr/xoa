@@ -825,10 +825,10 @@ def test_cf_cfspecs_coords_get_dims():
     )
 
     cfspecs = cf.get_cf_specs().coords
-    dims = cfspecs.get_dims(da, 'xyzt', allow_positional=True)
+    dims = cfspecs.get_dims(da, ['x', 'y', 'z', 't'], allow_positional=True)
     assert dims == ('xi', 'yy', 'level', 'r')
     dims = cfspecs.get_dims(da, 'f', errors="ignore")
-    assert dims == (None,)
+    assert dims is None
 
 
 def test_cf_cfspecs_infer_coords():

@@ -3172,6 +3172,9 @@ class CFCoordSpecs(_CFCatSpecs_):
         errors = ERRORS[errors]
         dims = list(obj.dims)
         ndim = len(dims)
+        single_arg = isinstance(cf_args, str)
+        if single_arg:
+            cf_args = [cf_args]
         if len(cf_args) > len(dims):
             msg = f"This data array has less dimensions ({ndim})" " than requested ({})".format(
                 len(cf_args)
@@ -3211,7 +3214,10 @@ class CFCoordSpecs(_CFCatSpecs_):
                         xoa_warn(msg)
                     scanned[cf_arg] = dim[0]
 
-        return tuple(scanned.values())
+        values = tuple(scanned.values())
+        if single_arg and scanned:
+            return values[0]
+        return values
 
     def get_rename_dims_args(self, obj, locations=None, specialize=False):
         """Get args for renaming dimensions that are not coordinates

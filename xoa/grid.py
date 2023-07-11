@@ -535,10 +535,9 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
     dz = cfspecs.search(ds, 'dz', errors=errors)
     if dz is None:
         return ds
-    zdims = xcoords.get_cf_dims(dz, "z", errors=errors)
-    if zdims is None:
+    zdim = xcoords.get_cf_dims(dz, "z", errors=errors)
+    if zdim is None:
         return ds
-    zdim = zdims[0]
     positive = cfspecs["vertical"]["positive"]
     if positive is None:
         positive = xcoords.get_positive_attr(ds, zdim)
@@ -610,8 +609,10 @@ def to_rect(da, tol=1e-5, errors="warn"):
                 rename_args[dim] = name
                 break
         else:
-            msg = ("Cannot convert to curvilinear to rectangular grid since since coordinate "
-                   f"'{name}' is not constant along one of its dimensions")
+            msg = (
+                "Cannot convert to curvilinear to rectangular grid since since coordinate "
+                f"'{name}' is not constant along one of its dimensions"
+            )
             if errors == "errors":
                 raise XoaError(msg)
             xoa_warn(msg)
