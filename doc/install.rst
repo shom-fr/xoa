@@ -59,7 +59,7 @@ From sources
 
 Clone the repository::
 
-    $ git clone https://github.com/VACUMM/xoa.git
+    $ git clone https://github.com/shom-fr/xoa.git
 
 Run the installation command::
 

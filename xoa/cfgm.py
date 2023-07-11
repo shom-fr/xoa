@@ -554,7 +554,7 @@ def is_dict(value, default={}, vtype=None):
 # If value is not a dict, it is supposed to be the validator function
 
 
-#: Available VACUMM :mod:`configobj` validator specifications
+#: Available :mod:`configobj` validator specifications
 VALIDATOR_SPECS = {
     # copy of some validate.Validator.functions to later build plural forms
     "integer": validate.is_integer,
@@ -591,7 +591,7 @@ VALIDATOR_SPECS = {
 #: Available :mod:`validate.Validator` validator functions
 VALIDATOR_FUNCTIONS = {}
 
-#: Available VACUMM :mod:`configobj` validator type names
+#: Available :mod:`configobj` validator type names
 VALIDATOR_TYPES = []
 
 

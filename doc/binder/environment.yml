@@ -16,4 +16,4 @@ dependencies:
   - xarray
   - xesmf
   - pip:
-    - https://github.com/VACUMM/xoa/archive/master.zip
+    - https://github.com/shom-fr/xoa/archive/master.zip
