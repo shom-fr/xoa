@@ -2,6 +2,28 @@ What's new
 ##########
 
 
+In development (XXX-XX-XX)
+==========================
+
+New features
+------------
+- Add support for not creating multi-indexes in :func:`xoa.coords.geo_stack`.
+
+Breaking changes
+----------------
+
+Deprecations
+------------
+
+Bug fixes
+---------
+- Fix :func:`xoa.coords.geo_distance` that was not able to handle multi-indexes
+  from :func:`xoa.coords.geo_stack`.
+
+Documentation
+-------------
+
+
 0.7.0 (2023-07-17)
 ==================
 

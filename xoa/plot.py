@@ -97,6 +97,7 @@ def plot_flow(
     Example
     ------
     .. ipython:: python
+        :okwarning:
 
         @suppress
         import numpy as np, xarray as xr
