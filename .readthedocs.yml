@@ -15,7 +15,6 @@ python:
 # Build
 build:
   os: "ubuntu-20.04"
-  image: stable
   tools:
       python: "3.10"
 
