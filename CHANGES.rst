@@ -34,7 +34,7 @@ New features
 
 Breaking changes
 ----------------
-- func:`~xoa.filter.get_window_func` accepts now only one positional argument
+- :func:`~xoa.filter.get_window_func` now accepts only one positional argument
   and all other arguments must be named.
 
 Bug fixes
