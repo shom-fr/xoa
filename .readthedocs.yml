@@ -5,6 +5,12 @@ version: 2
 sphinx:
   fail_on_warning: false
 
+# Install current library
+python:
+  install:
+    - method: pip
+      path: .
+
 # Build
 build:
   os: "ubuntu-22.04"
