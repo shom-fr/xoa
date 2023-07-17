@@ -140,6 +140,9 @@ sphinx_gallery_conf = {
         'use_jupyter_lab': True,
     },
 }
+    
+# %% IPython
+ipython_warning_is_error = False
 
 # %% User directives
 
