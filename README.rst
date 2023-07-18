@@ -30,8 +30,6 @@ xoa - xarray-based ocean analysis library
 xoa is intended to help reading and manipulating observed
 and simulated ocean data.
 It is heavily based on `xarray <http://xarray.pydata.org/en/stable/>`_.
-For those who know it, it is the successor of
-`vacumm <https://github.com/VACUMM/vacumm>`_.
 
 Installation
 ------------
