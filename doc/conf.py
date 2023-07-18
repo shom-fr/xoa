@@ -118,8 +118,8 @@ cfgm_rst_file = "cf.txt"
 
 # %% Extlinks
 extlinks = {
-    "issue": ("https://github.com/shom-fr/xoa/issues/%s", "GH"),
-    "pull": ("https://github.com/shom-fr/xoa/pulls/%s", "PR"),
+    "issue": ("https://github.com/shom-fr/xoa/issues/%s", "GH%s"),
+    "pull": ("https://github.com/shom-fr/xoa/pulls/%s", "PR%s"),
 }
 
 # %% Nbsphinx
@@ -141,11 +141,13 @@ sphinx_gallery_conf = {
     },
 }
 
+# %% IPython
+ipython_warning_is_error = False
+
 # %% User directives
 
 
 def setup(app):
-
     app.add_css_file('custom.css')
 
     app.add_object_type(

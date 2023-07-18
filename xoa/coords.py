@@ -901,7 +901,9 @@ def get_binding_data_vars(ds, coord, as_names=False):
     return out
 
 
-def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False):
+def geo_stack(
+    obj, stack_dim="npts", rename=False, drop=False, reset_index=False, create_index=False
+):
     """Stack the dimensions of longitude and latitude coordinates
 
     .. note:: If already stacked or similar, a simple copy is returned,
@@ -918,6 +920,10 @@ def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False
         If no need to stack, rename the single dimension to `stack_dim`.
     drop: bool
         Drop all variables and coordinates that does not contain final stack dimension
+    reset_index: bool
+        Remove MultiIndexes that contains lon and lat dimensions before any operations
+    create_index: bool
+        Create a MultiIndex when calling :meth:`~xarray.DataArray.stack`
 
     Return
     ------
@@ -963,7 +969,7 @@ def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False
             stack_dim = dims[0]
             obj = obj.copy()
     else:
-        obj = obj.stack({stack_dim: dims})
+        obj = obj.stack({stack_dim: dims}, create_index=create_index)
 
     # No multiindex?
     if not singleton and reset_index and lon.name not in obj.coords:

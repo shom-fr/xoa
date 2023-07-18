@@ -97,6 +97,7 @@ def plot_flow(
     Example
     ------
     .. ipython:: python
+        :okwarning:
 
         @suppress
         import numpy as np, xarray as xr
@@ -446,6 +447,7 @@ def plot_minimap(
     Example
     -------
     .. ipython:: python
+        :okwarning:
 
         @suppress
         import xarray as xr, numpy as np, matplotlib.pyplot as plt

@@ -29,6 +29,7 @@
    changes
    roadmap
    appendix
+   Github repository <https://github.com/shom-fr/xoa>
 
 Indices and tables
 ------------------
