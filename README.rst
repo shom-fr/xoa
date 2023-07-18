@@ -3,9 +3,12 @@ xoa - xarray-based ocean analysis library
 
 .. image:: https://github.com/shom-fr/xoa/actions/workflows/python-package-conda.yml/badge.svg
     :alt: Install, linting and tests
-.. image:: https://anaconda.org/conda-forge/xoa/badges/version.svg
+.. image:: https://img.shields.io/conda/vn/conda-forge/xoa.svg
     :alt: Available on conda-forge
     :target: https://conda.anaconda.org/conda-forge/xoa
+.. image:: https://img.shields.io/pypi/v/xoa.svg
+    :alt: Available on pypi
+    :target: ttps://pypi.python.org/pypi/xoa/
 .. image:: https://readthedocs.org/projects/docs/badge/?version=latest
     :alt: Documentation Status
     :target: https://xoa.readthedocs.io/en/latest/
@@ -15,6 +18,8 @@ xoa - xarray-based ocean analysis library
 .. image:: https://pepy.tech/badge/xoa
     :alt: Number of downloads on pypi
     :target: https://pypi.org/project/xoa
+.. image:: https://img.shields.io/badge/code%20style-black-black
+    :alt: Black code style
 .. image:: https://anaconda.org/conda-forge/xoa/badges/platforms.svg
     :alt: noarch
     :target: https://anaconda.org/conda-forge/xoa
