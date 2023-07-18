@@ -18,7 +18,7 @@ Deprecations
 Bug fixes
 ---------
 - Fix :func:`xoa.geo.get_distances` that was not able to handle multi-indexes from :func:`xoa.coords.geo_stack`.
-- Fix doc generation.
+- Fix doc generation [:pull:`83`].
 
 Documentation
 -------------
