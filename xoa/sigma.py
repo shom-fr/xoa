@@ -295,8 +295,8 @@ def get_cs(sig, thetas, thetab, cs_type=None):
     s, a, b = sig, thetas, thetab
     cs = np.sinh(s * a) * (1 - b) / np.sinh(a)
     cs = cs + b * (np.tanh(a * (s + 0.5)) / (2 * np.tanh(0.5 * a)) - 0.5)
-    cs.name = None
     if hasattr(cs, "coords"):
+        cs.name = None
         cs = cf.get_cf_specs(sig).format_data_var(cs, "cs", format_coords=False, rename_dims=False)
     return cs
 
@@ -628,7 +628,6 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
     sigs = cfspecs.search(ds, 'sig', loc=vloc, single=False)
     terms = {}
     for sig in sigs:
-
         # Check standard_name and get loc
         if "standard_name" not in sig.attrs:
             raise XoaSigmaError(
@@ -648,11 +647,9 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
         # Loop in horizontal locations
         subterms = terms[loc] = {}
         for hloc in hlocs:
-
             # Check terms
             subsubterms = subterms[hloc] = {sig.name: "sig", "type": standard_name}
             for fname, fvname in formula_terms.items():
-
                 # xoa.cf name
                 # TODO: handle mising cs and fallback with thetas and thetab
                 if fname.lower() not in FORMULA_TERMS_TO_CF_NAMES:
@@ -742,9 +739,7 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
     if hsingle:
         hlocs = [hlocs]
     for vloc, vterms in all_terms.items():
-
         for hloc in hlocs:
-
             terms = vterms if hsingle else vterms[hloc]
             hloc = cfspecs.sglocator.parse_loc_arg(hloc)
             sigma_type = terms.pop("type")

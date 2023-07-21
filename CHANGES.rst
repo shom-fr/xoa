@@ -2,26 +2,23 @@ What's new
 ##########
 
 
-In development (XXX-XX-XX)
-==========================
+0.7.1 (2023-07-21)
+==================
 
 New features
 ------------
 - Add support for not creating multi-indexes in :func:`xoa.coords.geo_stack`.
 
-Breaking changes
-----------------
-
-Deprecations
-------------
-
 Bug fixes
 ---------
 - Fix :func:`xoa.geo.get_distances` that was not able to handle multi-indexes from :func:`xoa.coords.geo_stack`.
 - Fix doc generation [:pull:`83`].
+- Fix :func:`xoa.sigma.get_cs` to keep it compatible with pure numpy arrays
+
 
 Documentation
 -------------
+- Add a link to the github repository.
 
 
 0.7.0 (2023-07-17)
