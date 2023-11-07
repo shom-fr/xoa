@@ -144,7 +144,6 @@ class SGLocator(object):
     _compile_sg_match_(re_match, valid_attrs, formats, root_patterns, location_pattern)
 
     def __init__(self, name_format=None, valid_locations=None, encoding=None):
-
         # Init
         self.formats = self.formats.copy()
         self.re_match = self.re_match.copy()
@@ -592,14 +591,12 @@ class SGLocator(object):
 
         # Loop patching on attributes
         for attr, value in patch.items():
-
             # Skip
             if value is None or (attr in attrs and not replace):
                 continue
 
             # Attr with loc
             if attr in self.valid_attrs:
-
                 # List
                 if isinstance(value, list):
                     if attr in attrs:
@@ -672,7 +669,7 @@ class SGLocator(object):
         patch_attrs
         """
         if copy:
-            da = da.copy()
+            da = da.copy(deep=False)
 
         # Location argument
         loc = self.parse_loc_arg(loc)  # specified
@@ -781,7 +778,6 @@ class CFSpecs(object):
     """
 
     def __init__(self, cfg=None, default=True, user=True, name=None, cache=None):
-
         # Initialiase categories
         self._cfs = {}
         catcls = {"data_vars": CFVarSpecs, "coords": CFCoordSpecs}
@@ -823,7 +819,6 @@ class CFSpecs(object):
             or (isinstance(cfg, dict) and "register" in cfg and cfg["register"]["name"])
         )
         if cache:
-
             # Init cache
             if isinstance(cfg, str):
                 cache_key = cfg
@@ -979,7 +974,6 @@ class CFSpecs(object):
         self.load_cfg(data)
 
     def _post_process_(self):
-
         # Inits
         items = {}
         for category in self.categories:
@@ -1051,7 +1045,6 @@ class CFSpecs(object):
 
         # Inherits from other specs (merge specs with dict_merge)
         if "inherit" in specs and specs["inherit"]:
-
             # From what?
             from_name = specs["inherit"]
             if ":" in from_name:
@@ -1251,7 +1244,7 @@ class CFSpecs(object):
         loc=None,
         # add_loc_to_name=None, add_loc_to_coord_names=None,
         specialize=False,
-        rename_dims=True,
+        rename_dims=None,
         categories=["coords", "data_vars"],
     ):
         """Auto-format a whole xarray.Dataset
@@ -1263,10 +1256,12 @@ class CFSpecs(object):
         """
         # Copy
         if copy:
-            obj = obj.copy()
+            obj = obj.copy(deep=False)
 
         # Init rename dict
         rename_args = {}
+        if rename_dims is None:
+            rename_dims = format_coords
 
         # Common formatting kwargs
         kwargs = dict(
@@ -2178,7 +2173,7 @@ class CFSpecs(object):
             for da in ds.data_vars.values():
                 if self.coords.match(da):
                     ds = ds.set_coords(da.name)
-        return ds.copy()
+        return ds.copy(deep=False)
 
 
 class _CFCatSpecs_(object):
@@ -2371,7 +2366,6 @@ class _CFCatSpecs_(object):
         else:
             names = self.names
         for name_ in names:
-
             # Get match specs
             if isinstance(name_, dict):
                 match_specs = name_
@@ -2574,7 +2568,6 @@ class _CFCatSpecs_(object):
         # Loop
         attrs = {}
         for key in specs["attrs"].keys():
-
             # No lists or tuples
             value = specs["attrs"][key]
             if isinstance(value, list):
@@ -2669,7 +2662,6 @@ class _CFCatSpecs_(object):
         replace_attrs=False,
         copy=True,
         # add_loc_to_name=None,
-        bound_to=None,
     ):
         """Format a DataArray's name and attributes
 
@@ -2714,7 +2706,7 @@ class _CFCatSpecs_(object):
         if rename:
             copy = True
         if copy:
-            da = da.copy()
+            da = da.copy(deep=False)
 
         # Names
         if cf_name is None:
@@ -2722,7 +2714,7 @@ class _CFCatSpecs_(object):
         if cf_name is None:
             if not rename:
                 return
-            return da.copy() if copy else None
+            return da.copy(deep=False) if copy else None
         assert cf_name in self.names
         old_name = da.name
         new_name = self.get_name(cf_name, specialize=specialize)  # if specialize else cf_name
@@ -2733,7 +2725,6 @@ class _CFCatSpecs_(object):
 
         # Attributes
         if attrs is True:
-
             # Get attributes from Cf specs
             attrs = self.get_attrs(cf_name, loc=None, standardize=False, multi=True)
 
@@ -2913,7 +2904,6 @@ class CFCoordSpecs(_CFCatSpecs_):
 
         # Check if a coordinate have the same name and an axis type
         if obj is not None:
-
             # Check dim validity
             if dim_loc not in obj.dims:
                 raise XoaCFError(f"dimension '{dim}' does not belong to obj")
@@ -3017,7 +3007,6 @@ class CFCoordSpecs(_CFCatSpecs_):
         # Loop on dims
         found = []
         for dim in obj.dims:
-
             # Filter-out by loc
             pname, ploc = self.sglocator.parse_attr('name', dim)
             ploc = self.sglocator.parse_loc_arg(ploc)
@@ -3116,7 +3105,6 @@ class CFCoordSpecs(_CFCatSpecs_):
             return len(o.dims)
 
         if dim_type is not None:
-
             # Look for a coordinate with this dim_type
             #  starting from coordinates with a higher number of dimensions
             #  like depth that have more dims than level
@@ -3171,6 +3159,9 @@ class CFCoordSpecs(_CFCatSpecs_):
         errors = ERRORS[errors]
         dims = list(obj.dims)
         ndim = len(dims)
+        single_arg = isinstance(cf_args, str)
+        if single_arg:
+            cf_args = [cf_args]
         if len(cf_args) > len(dims):
             msg = f"This data array has less dimensions ({ndim})" " than requested ({})".format(
                 len(cf_args)
@@ -3210,7 +3201,10 @@ class CFCoordSpecs(_CFCatSpecs_):
                         xoa_warn(msg)
                     scanned[cf_arg] = dim[0]
 
-        return tuple(scanned.values())
+        values = tuple(scanned.values())
+        if single_arg and scanned:
+            return values[0]
+        return values
 
     def get_rename_dims_args(self, obj, locations=None, specialize=False):
         """Get args for renaming dimensions that are not coordinates
@@ -3239,7 +3233,6 @@ class CFCoordSpecs(_CFCatSpecs_):
         # Loop on dims
         rename_args = {}
         for dim in obj.dims:
-
             # Skip effective coordinate dims
             if dim in obj.coords:
                 continue
@@ -3578,7 +3571,6 @@ def get_default_cf_specs(cache="rw"):
 
     # Compute it from scratch
     if cfspecs is None:
-
         # Setup
         cfspecs = CFSpecs()
 
@@ -3634,7 +3626,6 @@ def get_cf_specs(name=None, cache="rw"):
     if name is None:
         name = "current"
     if not isinstance(name, str) or name not in ("current", "default"):
-
         # Registered name
         if isinstance(name, str):
             return get_cf_specs_from_name(name, errors="raise")

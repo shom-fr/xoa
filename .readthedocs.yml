@@ -5,17 +5,17 @@ version: 2
 sphinx:
   fail_on_warning: false
 
-# Optionally set the version of Python and requirements required to build your docs
+# Install current library
 python:
-  version: 3.7
-  system_packages: true
   install:
     - method: pip
       path: .
 
 # Build
 build:
-  image: stable
+  os: "ubuntu-22.04"
+  tools:
+      python: "mambaforge-4.10"
 
 # Conda
 conda:

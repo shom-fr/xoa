@@ -1,11 +1,14 @@
 xoa - xarray-based ocean analysis library
 =========================================
 
-.. image:: https://anaconda.org/conda-forge/xoa/badges/installer/conda.svg
-    :alt: Install with conda
-    :target: https://conda.anaconda.org/conda-forge
-.. image:: https://github.com/VACUMM/xoa/actions/workflows/python-package-conda.yml/badge.svg
+.. image:: https://github.com/shom-fr/xoa/actions/workflows/python-package-conda.yml/badge.svg
     :alt: Install, linting and tests
+.. image:: https://img.shields.io/conda/vn/conda-forge/xoa.svg
+    :alt: Available on conda-forge
+    :target: https://conda.anaconda.org/conda-forge/xoa
+.. image:: https://img.shields.io/pypi/v/xoa.svg
+    :alt: Available on pypi
+    :target: ttps://pypi.python.org/pypi/xoa/
 .. image:: https://readthedocs.org/projects/docs/badge/?version=latest
     :alt: Documentation Status
     :target: https://xoa.readthedocs.io/en/latest/
@@ -15,12 +18,29 @@ xoa - xarray-based ocean analysis library
 .. image:: https://pepy.tech/badge/xoa
     :alt: Number of downloads on pypi
     :target: https://pypi.org/project/xoa
+.. image:: https://img.shields.io/badge/code%20style-black-black
+    :alt: Black code style
+.. image:: https://anaconda.org/conda-forge/xoa/badges/platforms.svg
+    :alt: noarch
+    :target: https://anaconda.org/conda-forge/xoa
+.. image:: https://anaconda.org/conda-forge/xoa/badges/license.svg
+    :alt: Apache 2.0
+    :target: https://anaconda.org/conda-forge/xoa
 
 xoa is intended to help reading and manipulating observed
 and simulated ocean data.
 It is heavily based on `xarray <http://xarray.pydata.org/en/stable/>`_.
-For those who know it, it is the successor of
-`vacumm <https://github.com/VACUMM/vacumm>`_.
+
+Installation
+------------
+
+From conda::
+
+   conda install -c conda-forge xoa
+
+From pypi::
+
+   pip install xoa
 
 Documentation
 -------------
@@ -32,12 +52,12 @@ Sources and help
 -----------------
 
 Sources are available on the xoa github page:
-https://github.com/VACUMM/xoa.
+https://github.com/shom-fr/xoa.
 Here you can also
-participate to `discussions <https://github.com/VACUMM/xoa/discussions>`_
+participate to `discussions <https://github.com/shom-fr/xoa/discussions>`_
 and post tickets for
-`requests <https://github.com/VACUMM/xoa/pulls>`_ and
-`issues <https://github.com/VACUMM/xoa/issues>`_.
+`requests <https://github.com/shom-fr/xoa/pulls>`_ and
+`issues <https://github.com/shom-fr/xoa/issues>`_.
 
 License
 -------

@@ -186,19 +186,44 @@ class Choices(object):
         Parameter name, which defaults to the lower case class name
     description: str
         Short description of the parameter.
+    aliases: dict, None
+        Allowed alternate values for selected choices
     """
 
-    def __init__(self, choices, case_insensitive=True, parameter=None, description="Choices"):
+    def __init__(
+        self, choices, case_insensitive=True, parameter=None, description="Choices", aliases=None
+    ):
         self._ci = case_insensitive
         self._docs = {}
+        if aliases:
+            aa = {}
+            for key, values in aliases.items():
+                key = self._reformat_value_(key)
+                if not isinstance(values, (list, tuple)):
+                    values = [values]
+                else:
+                    values = list(values)
+                values = [self._reformat_value_(value) for value in values]
+                aa[key] = values
+            aliases = aa
         if isinstance(choices, dict):
             self._choices = []
             for value, doc in choices.items():
-                value = self._reformat_value_(value)
-                self._docs[value] = doc
+                value = doc_value = self._reformat_value_(value)
                 self._choices.append(value)
+                if aliases and value in aliases:
+                    doc_value = "|".join([repr(val) for val in ([value] + aliases[value])])
+                    self._choices.extend(aliases[value])
+                else:
+                    doc_value = repr(doc_value)
+                self._docs[doc_value] = doc
         else:
-            self._choices = [self._reformat_value_(value) for value in choices]
+            self._choices = []
+            for value in choices:
+                value = self._reformat_value_(value)
+                self._choices.append(value)
+                if aliases and value in aliases:
+                    self._choices.extend(aliases[value])
         self._parameter = self.__class__.__name__.lower() if parameter is None else parameter
         self._description = description
 
@@ -221,7 +246,7 @@ class Choices(object):
         return choice
 
     def __str__(self):
-        return ", ".join(self._choices)
+        return ", ".join([repr(choice) for choice in self._choices])
 
     def to_docstring(self, indent=4):
         """Convert to numpy-like docstring

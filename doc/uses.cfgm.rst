@@ -7,13 +7,13 @@ Config management with  :mod:`xoa.cfgm`
 Introduction
 ============
 
-The :mod:`xoa.cfgm` module facilitates and extends the functionality
-offered by the excellent
+The :mod:`xoa.cfgm` module simplifies and extends the functionality
+provided by the excellent
 `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_
-configuration file reading and validation package.
-It makes the global usage slightly easier and adds support for
+configuration file reader and validator package.
+It makes global usage a little easier and adds support for
 plurals forms and for exporting the specifications
-to a commandline options and rst declarations.
+to commandline options and rst declarations.
 
 
 Loading and validating
@@ -45,8 +45,8 @@ Now, initialize the config manager:
     CFGM = cfgm.ConfigManager(cfgspecs_lines)
 
 .. note:: To configure a library, the `cfgspecs_lines` argument is typically the name
-    of a static file placed in the same directory as the module that will
-    initializes an instance of the `~xoa.cfg.ConfigManager` class.
+    of a static file placed in the same directory as the module, which will
+    initialize an instance of the :class:`~xoa.cfg.ConfigManager` class.
 
 And finally, load and validate the user configuration:
 

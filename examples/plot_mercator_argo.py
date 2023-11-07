@@ -189,7 +189,9 @@ plt.fill_betweenx(
 ds_merc_prof.sal.plot(y="depth", color="C1", label="Mercator")
 plt.plot(ds_merc_prof.sal.values, ds_merc_prof.depth, "o-", color="C1")
 ds_argo_prof.sal.plot(y="depth", label="ARGO", color="C0")
-plt.legend();
+plt.title("Uncertain profile")
+plt.legend()
+xplot.plot_double_minimap(ds_argo_prof, regional_ax="left", global_ax=(0.88, 0.88, 0.11),);
 
 # %%
 # Therefore, if we accept an uncertainty in the positioning of the ocean

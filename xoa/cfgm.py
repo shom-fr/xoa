@@ -34,15 +34,11 @@ from collections import OrderedDict
 from warnings import warn
 import logging
 
-import validate
+try:
+    import configobj.validate as validate
+except ImportError:
+    import validate
 from configobj import ConfigObj, flatten_errors
-from validate import (
-    ValidateError,
-    Validator,
-    VdtTypeError,
-    VdtValueTooBigError,
-    VdtValueTooSmallError,
-)
 
 from .__init__ import XoaError, XoaWarning, xoa_warn
 
@@ -56,7 +52,7 @@ class VdtWarning(XoaWarning):
     pass
 
 
-class XoaValidateError(ValidateError, XoaError):
+class XoaValidateError(validate.ValidateError, XoaError):
     pass
 
 
@@ -134,25 +130,27 @@ def _valwraplist_(validator):
         # Do list checks
         n = kwargs.pop("n", None)
         if n is not None and len(value) != int(n):
-            raise VdtSizeError("Incorrect size: {}, {} values expected".format(len(value), n))
+            raise validate.VdtSizeError(
+                "Incorrect size: {}, {} values expected".format(len(value), n)
+            )
         nmin = kwargs.pop("nmin", None)
         if nmin is not None and len(value) < int(nmin):
-            raise VdtSizeError(
+            raise validate.VdtSizeError(
                 "Incorrect size: {}, at least {} values expected".format(len(value), nmin)
             )
         nmax = kwargs.pop("nmax", None)
         if nmax is not None and len(value) > int(nmax):
-            raise VdtSizeError(
+            raise validate.VdtSizeError(
                 "Incorrect size: {}, at most {} values expected".format(len(value), nmax)
             )
         odd = validate.is_boolean(kwargs.pop("odd", False))
         if odd and not len(value) % 2:
-            raise VdtSizeError(
+            raise validate.VdtSizeError(
                 "Incorrect size: {}, odd number of values expected".format(len(value))
             )
         even = validate.is_boolean(kwargs.pop("even", False))
         if even and len(value) % 2:
-            raise VdtSizeError(
+            raise validate.VdtSizeError(
                 "Incorrect size: {}, even number of values expected".format(len(value))
             )
 
@@ -164,11 +162,11 @@ def _valwraplist_(validator):
                 try:
                     shape, vshape = list(map(int, shape)), numpy.shape(value)
                     if vshape != shape:
-                        raise VdtSizeError(
+                        raise validate.VdtSizeError(
                             "Incorrect shape: {}, {} shape expected".format(vshape, shape)
                         )
                 except Exception:
-                    raise ValidateError(
+                    raise validate.ValidateError(
                         "Cannot test value shape, this may be caused by "
                         "an irregular array-like shape. Error was:\n{}".format(
                             traceback.format_exc()
@@ -198,7 +196,7 @@ def is_bbox(value, default=None):
     for v in value.split():
         c.extend(v.split(","))
     if len(c) != 4:
-        raise VdtTypeError(value)
+        raise validate.VdtTypeError(value)
     return list(map(float, c))
 
 
@@ -214,7 +212,7 @@ def is_numerics(value, default=None, min=None, max=None, type="float", n=None):
         try:
             value = eval(value)
         except Exception:
-            raise VdtTypeError(value)
+            raise validate.VdtTypeError(value)
     if not isinstance(value, tuple):
         try:
             value = tuple(value)
@@ -224,7 +222,7 @@ def is_numerics(value, default=None, min=None, max=None, type="float", n=None):
         if isinstance(n, str):
             n = int(n)
         if len(value) != n:
-            raise VdtTypeError(value)
+            raise validate.VdtTypeError(value)
     out = ()
     type = eval(type)
     if min is not None and isinstance(min, str):
@@ -236,7 +234,7 @@ def is_numerics(value, default=None, min=None, max=None, type="float", n=None):
             try:
                 val = type(val)
             except Exception:
-                raise VdtTypeError(value)
+                raise validate.VdtTypeError(value)
         if min is not None and val < min:
             val = type(min)
         if max is not None and val > max:
@@ -268,7 +266,7 @@ def is_interval(value, default=None):
         return None
     if not isinstance(value, str):
         if not isinstance(value, list):
-            raise VdtTypeError(value)
+            raise validate.VdtTypeError(value)
         value = ",".join(value)
     if value.startswith("("):
         value = value[1:]
@@ -276,7 +274,7 @@ def is_interval(value, default=None):
         value = value[:-1]
     values = value.split(",")
     if len(values) < 2 or len(values) > 3:
-        raise VdtTypeError(value)
+        raise validate.VdtTypeError(value)
     out = ()
     for val in values[:2]:
         try:
@@ -287,7 +285,7 @@ def is_interval(value, default=None):
     if len(values) == 3 and values[2]:
         m = re.search("([co]{1,2}[ne]{0,2})", values[2])
         if m is None:
-            raise VdtTypeError(value)
+            raise validate.VdtTypeError(value)
         out += (m.group(1),)
     return out
 
@@ -307,7 +305,7 @@ def is_cmap(value, default=None):
     return CmapAdapter(value)
 
 
-class VdtDateTimeError(ValidateError):
+class VdtDateTimeError(validate.ValidateError):
     pass
 
 
@@ -352,7 +350,7 @@ def is_pydatetime(value, default=None, fmt="%Y-%m-%dT%H:%M:%S"):
 #     if value == "None" or not value:
 #         value = default
 #     if not are_valid_units(value):
-#         raise VdtTypeError(value)
+#         raise validate.VdtTypeError(value)
 #     return value
 
 
@@ -366,11 +364,11 @@ def is_cdtime(value, min=None, max=None, default=None):
     try:
         value = cdtime.s2c(value)
     except Exception:
-        raise VdtTypeError(value)
+        raise validate.VdtTypeError(value)
     if min is not None and val < cdtime.s2c(min):
-        raise VdtValueTooSmallError(value)
+        raise validate.VdtValueTooSmallError(value)
     if max is not None and val > cdtime.s2c(max):
-        raise VdtValueTooBigError(value)
+        raise validate.VdtValueTooBigError(value)
     return value
 
 
@@ -452,12 +450,12 @@ def is_boolstr(value, default=None):
             return validate.bool_dict[value.lower()]
         except KeyError:
             return value
-    if value == False:
+    if value is False:
         return False
-    elif value == True:
+    elif value is True:
         return True
     else:
-        raise VdtTypeError(value)
+        raise validate.VdtTypeError(value)
 
 
 def is_eval(value, default=None, unchanged_if_failed=True):
@@ -468,7 +466,7 @@ def is_eval(value, default=None, unchanged_if_failed=True):
         if unchanged_if_failed:
             return value
         else:
-            raise VdtTypeError(value)
+            raise validate.VdtTypeError(value)
     return value
 
 
@@ -490,9 +488,9 @@ def is_color(value, default="k", alpha=False, as256=None):
             try:
                 return cc(_check256_(eval(value), as256=as256))
             except Exception:
-                raise VdtTypeError(value)
+                raise validate.VdtTypeError(value)
 
-    raise VdtTypeError(value)
+    raise validate.VdtTypeError(value)
 
 
 def _check256_(val, as256=None):
@@ -537,18 +535,18 @@ def is_dict(value, default={}, vtype=None):
     if not m:
         m = _re_set(value)
         if not m:
-            raise VdtTypeError(value)
+            raise validate.VdtTypeError(value)
         value = "dict(" + value + ")"
     if m:
         try:
             value = eval(value)
         except Exception:
-            raise VdtTypeError(value)
+            raise validate.VdtTypeError(value)
         if not isinstance(value, dict):
-            raise VdtTypeError(value)
+            raise validate.VdtTypeError(value)
         else:
             return value
-    raise VdtTypeError(value)
+    raise validate.VdtTypeError(value)
 
 
 # Define additionnal specifications
@@ -556,7 +554,7 @@ def is_dict(value, default={}, vtype=None):
 # If value is not a dict, it is supposed to be the validator function
 
 
-#: Available VACUMM :mod:`configobj` validator specifications
+#: Available :mod:`configobj` validator specifications
 VALIDATOR_SPECS = {
     # copy of some validate.Validator.functions to later build plural forms
     "integer": validate.is_integer,
@@ -593,16 +591,14 @@ VALIDATOR_SPECS = {
 #: Available :mod:`validate.Validator` validator functions
 VALIDATOR_FUNCTIONS = {}
 
-#: Available VACUMM :mod:`configobj` validator type names
+#: Available :mod:`configobj` validator type names
 VALIDATOR_TYPES = []
 
 
 def _update_registry_():
-
     # 1. Fix specs dicts
     # 2. Generate list validators
     for k, v in list(VALIDATOR_SPECS.items()):
-
         # Check type of spec
         if not isinstance(v, dict):
             v = dict(func=v)
@@ -790,7 +786,7 @@ class ConfigManager(object):
         self._configspecfile = self._configspec.filename
 
         # Validator
-        if isinstance(validator, Validator):
+        if isinstance(validator, validate.Validator):
             self._validator = validator
         else:
             self._validator = get_validator(functions=validator)
@@ -981,15 +977,12 @@ class ConfigManager(object):
 
         # Validation
         if validate and self._configspec:
-
             # Validation itself
             err = cfg.validate(self._validator, preserve_errors=True)
 
             # Loop on errors
             if isinstance(err, dict):
-
                 for sections, key, error in flatten_errors(cfg, err):
-
                     # Format explicit message
                     if len(sections):
                         section = "[" + "][".join(sections) + "] "
@@ -1256,7 +1249,6 @@ class ConfigManager(object):
 
         # Now create a configuration instance from passed options
         if parse:
-
             # Which args ?
             if args is None:
                 args = sys.argv[1:]
@@ -1517,11 +1509,9 @@ def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
     re_sec = re.compile(r"^(?:  )?([\w\s]+):(?: (.+))?$").match
     secname = None
     for line in shelp.splitlines():
-
         # Sections
         m = re_sec(line)
         if m and not line.lower().endswith("ex:"):
-
             secname = m.group(1).title().strip()
 
             # Usage
@@ -1547,14 +1537,12 @@ def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
         # Options and other lines
         m = re_opt(line)
         if m:
-
             rhelp.extend(["", "\t.. cmdoption:: " + m.group(1), ""])
             multiline = True
             if m.group(2) is not None:
                 rhelp.append("\t\t" + m.group(2).strip())
 
         elif secname and secname.lower() == "positional arguments" and line.startswith(" " * 2):
-
             sline = line.split()
             rhelp.extend(["", "\t.. cmdoption:: " + sline[0], ""])
             multiline = True
@@ -1562,7 +1550,6 @@ def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
                 rhelp.append("\t\t" + " ".join(sline[1:]))
 
         elif multiline and len(line.strip()) and line.startswith(" " * 3):
-
             indent = "\t\t"
             if secname == "Usage":
                 indent += "\t"
@@ -1571,7 +1558,6 @@ def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
         #    rhelp.append('\t'+line)
 
         else:
-
             indent = ""
             if secname and secname == descname:
                 indent += "\t"
@@ -1671,7 +1657,7 @@ def get_spec(spec, validator=None):
     return _attdict_(spec)
 
 
-def get_validator(functions=None, cls=Validator, **kwargs):
+def get_validator(functions=None, cls=validate.Validator, **kwargs):
     """Get a default validator"""
 
     # Init
@@ -1730,7 +1716,6 @@ def _walker_argcfg_setcfg_(sec, key, cfg=None, options=None, nested=None):
     parents = _parent_list_(sec, names=False)
     cfgkey = "_".join([p.name.strip("_") for p in parents] + [key])
     for option, value in options._get_kwargs():
-
         # Option not set
         if value is None:
             continue
@@ -1818,6 +1803,7 @@ def _shelp_(
         - auto: if one is empty use the other one, else use inline
 
     """
+
     # filter
     def strip(c):
         return c.strip().strip("#").strip()
@@ -2045,20 +2031,17 @@ def _walker_cfg2rst_(
     dir_fmt=".. {conftype}:: {name}\n\n{desc}\n",
     desc_fmt_desc_item="| {key}: {val}\n",
 ):
-
     assert mode in ("basic", "values", "specs")
 
     # Name, values and type
     secnames = get_sec_names(cfg)
     specs = OrderedDict()
     if key in cfg.sections:  # section
-
         secnames.append(key)
         name = "[{}]".format("][".join(secnames))
         conftype = secrole
 
     else:  # option
-
         if secnames:
             name = "[{}] {}".format("][".join(secnames), key)
         else:
@@ -2066,11 +2049,9 @@ def _walker_cfg2rst_(
         conftype = optrole
 
         if mode == "values":
-
             specs["default"] = cfg[key]
 
         elif mode == "specs":
-
             spec = get_spec(cfg[key], validator=validator)
             specs["default"] = spec["default"]
             func = spec["base_func"]
@@ -2119,7 +2100,6 @@ def _walker_cfg2rst_(
 def print_short_help(parser, formatter=None, compressed=False):
     """Print all help of a parser instance but those of groups"""
     if isinstance(parser, ArgumentParser):
-
         if formatter is None:
             formatter = parser._get_formatter()
 
@@ -2190,7 +2170,6 @@ re_split_2secs = re.compile(r'\]\s*\[').split
 
 
 def gen_cfgm_rst(app):
-
     if not app.config.cfgm_rst_file:
         return
 
@@ -2209,7 +2188,6 @@ def gen_cfgm_rst(app):
 
 
 def gen_cfgm_cfg(app):
-
     if not app.config.cfgm_cfg_file:
         return
 
@@ -2243,7 +2221,6 @@ def parse_node(env, sig, signode):
 
 
 def setup(app):
-
     app.add_object_type(
         'cfgmopt',
         'cfgmopt',

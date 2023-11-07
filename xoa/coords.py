@@ -409,7 +409,7 @@ def get_cf_coords(da, coord_names, errors="raise"):
 
 
 @misc.ERRORS.format_function_docstring
-def get_cf_dims(da, cf_args, allow_positional=False, positions='tzyx', errors="warn"):
+def get_cf_dims(da, cf_args, allow_positional=False, positions='tzyx', errors="warn", **kwargs):
     """Get the data array dimensions names from their type
 
     Parameters
@@ -424,10 +424,13 @@ def get_cf_dims(da, cf_args, allow_positional=False, positions='tzyx', errors="w
     positions: str
         Default position per type starting from the end.
     {errors}
+    kwargs: dict
+        Extra parameters are passed to :meth:`xoa.cf.CFSpecs.get_dims` in addition to
+        the above parameters.
 
     Return
     ------
-    tuple
+    tuple(list) or list
         Tuple of dimension name or None when the dimension if not found
 
     See also
@@ -435,7 +438,7 @@ def get_cf_dims(da, cf_args, allow_positional=False, positions='tzyx', errors="w
     xoa.cf.CFSpecs.get_dims
     """
     return xcf.get_cf_specs(da).get_dims(
-        da, cf_args, allow_positional=allow_positional, positions=positions, errors=errors
+        da, cf_args, allow_positional=allow_positional, positions=positions, errors=errors, **kwargs
     )
 
 
@@ -453,7 +456,7 @@ def get_xdim(da, errors="warn", **kwargs):
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :func:`get_dims`
+        Extra parameters are passed to :func:`get_cf_dims`
 
     Return
     ------
@@ -464,9 +467,7 @@ def get_xdim(da, errors="warn", **kwargs):
     --------
     get_dims
     """
-    dims = get_cf_dims(da, "x", errors=errors)
-    if dims:
-        return dims[0]
+    return get_cf_dims(da, "x", errors=errors, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring
@@ -483,7 +484,7 @@ def get_ydim(da, errors="warn", **kwargs):
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :func:`get_dims`
+        Extra parameters are passed to :func:`get_cf_dims`
 
     Return
     ------
@@ -494,9 +495,7 @@ def get_ydim(da, errors="warn", **kwargs):
     --------
     get_dims
     """
-    dims = get_cf_dims(da, "y", errors=errors)
-    if dims:
-        return dims[0]
+    return get_cf_dims(da, "y", errors=errors, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring
@@ -513,7 +512,7 @@ def get_zdim(da, errors="warn", **kwargs):
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :func:`get_dims`
+        Extra parameters are passed to :func:`get_cf_dims`
 
     Return
     ------
@@ -522,11 +521,9 @@ def get_zdim(da, errors="warn", **kwargs):
 
     See also
     --------
-    get_dims
+    get_cf_dims
     """
-    dims = get_cf_dims(da, "z", errors=errors)
-    if dims:
-        return dims[0]
+    return get_cf_dims(da, "z", errors=errors, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring
@@ -543,7 +540,7 @@ def get_tdim(da, errors="warn", **kwargs):
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :func:`get_dims`
+        Extra parameters are passed to :func:`get_cf_dims`
 
     Return
     ------
@@ -552,11 +549,9 @@ def get_tdim(da, errors="warn", **kwargs):
 
     See also
     --------
-    get_dims
+    get_cf_dims
     """
-    dims = get_cf_dims(da, "t", errors=errors)
-    if dims:
-        return dims[0]
+    return get_cf_dims(da, "t", errors=errors, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring
@@ -573,7 +568,7 @@ def get_fdim(da, errors="warn", **kwargs):
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :func:`get_dims`
+        Extra parameters are passed to :func:`get_cf_dims`
 
     Return
     ------
@@ -582,11 +577,9 @@ def get_fdim(da, errors="warn", **kwargs):
 
     See also
     --------
-    get_dims
+    get_cf_dims
     """
-    dims = get_cf_dims(da, "f", errors=errors)
-    if dims:
-        return dims[0]
+    return get_cf_dims(da, "f", errors=errors, **kwargs)
 
 
 class transpose_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
@@ -908,7 +901,9 @@ def get_binding_data_vars(ds, coord, as_names=False):
     return out
 
 
-def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False):
+def geo_stack(
+    obj, stack_dim="npts", rename=False, drop=False, reset_index=False, create_index=False
+):
     """Stack the dimensions of longitude and latitude coordinates
 
     .. note:: If already stacked or similar, a simple copy is returned,
@@ -925,6 +920,10 @@ def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False
         If no need to stack, rename the single dimension to `stack_dim`.
     drop: bool
         Drop all variables and coordinates that does not contain final stack dimension
+    reset_index: bool
+        Remove MultiIndexes that contains lon and lat dimensions before any operations
+    create_index: bool
+        Create a MultiIndex when calling :meth:`~xarray.DataArray.stack`
 
     Return
     ------
@@ -970,7 +969,7 @@ def geo_stack(obj, stack_dim="npts", rename=False, drop=False, reset_index=False
             stack_dim = dims[0]
             obj = obj.copy()
     else:
-        obj = obj.stack({stack_dim: dims})
+        obj = obj.stack({stack_dim: dims}, create_index=create_index)
 
     # No multiindex?
     if not singleton and reset_index and lon.name not in obj.coords:

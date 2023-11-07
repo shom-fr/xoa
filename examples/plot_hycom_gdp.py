@@ -18,6 +18,7 @@ In this notebook, we show :
 # ---------------
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
@@ -26,7 +27,7 @@ from xoa.grid import dz2depth, shift
 from xoa.regrid import grid2loc, regrid1d
 import xoa.cf as xcf
 import xoa.geo as xgeo
-from xoa.plot import plot_flow
+from xoa.plot import plot_flow, plot_double_minimap
 
 xr.set_options(display_style="text")
 
@@ -108,8 +109,9 @@ print(hycom)
 #
 # The drifter comes as a `csv` file and we read it as :class:`pandas.DataFrame` instance.
 
-drifter = xoa.open_data_sample(
-    "gdp-6203641.csv", header=0, skiprows=[1], parse_dates=[2], index_col=2
+csv_name = xoa.get_data_sample("gdp-6203641.csv")
+drifter = pd.read_csv(
+    csv_name, header=0, skiprows=[1], parse_dates=[0], index_col=0, usecols=[2, 3, 4, 5, 6, 7]
 )
 
 # %%
@@ -175,7 +177,8 @@ vh15 = regrid1d(hycom["v"], d15).squeeze(drop=True).mean(dim="time")
 
 pmerc = ccrs.Mercator()
 pcarr = ccrs.PlateCarree()
-fig, ax = plt.subplots(figsize=(7, 7), subplot_kw={"facecolor": "teal", "projection": pmerc})
+fig, ax = plt.subplots(figsize=(8, 7), subplot_kw={"facecolor": "teal", "projection": pmerc})
+plt.subplots_adjust(right=0.85)
 ax.gridlines(draw_labels=True, dms=True)
 ax.set_extent(xgeo.get_extent(uh15))
 kwqv = dict(scale_units="dots", scale=0.1 / 20, units="dots", transform=pcarr)
@@ -203,6 +206,7 @@ ax.quiver(
 )
 plt.quiverkey(qv, 0.1, 1.06, 0.1, r"0.1 $m\,s^{-1}$", color="k", alpha=1, labelpos="E")
 plt.legend()
+plot_double_minimap(drifter)
 
 # %%
 # The discrepancies between the lagrangian and mean eulerian currents highlight

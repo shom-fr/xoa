@@ -118,8 +118,8 @@ cfgm_rst_file = "cf.txt"
 
 # %% Extlinks
 extlinks = {
-    "issue": ("https://github.com/VACUMM/xoa/issues/%s", "GH"),
-    "pull": ("https://github.com/VACUMM/xoa/pulls/%s", "PR"),
+    "issue": ("https://github.com/shom-fr/xoa/issues/%s", "GH%s"),
+    "pull": ("https://github.com/shom-fr/xoa/pulls/%s", "PR%s"),
 }
 
 # %% Nbsphinx
@@ -131,7 +131,7 @@ sphinx_gallery_conf = {
     "examples_dirs": "../examples",
     "gallery_dirs": "examples",
     "binder": {
-        'org': 'VACUMM',
+        'org': 'shom-fr',
         'repo': 'xoa',
         'branch': 'master',
         'binderhub_url': 'https://mybinder.org',
@@ -141,11 +141,13 @@ sphinx_gallery_conf = {
     },
 }
 
+# %% IPython
+ipython_warning_is_error = False
+
 # %% User directives
 
 
 def setup(app):
-
     app.add_css_file('custom.css')
 
     app.add_object_type(
