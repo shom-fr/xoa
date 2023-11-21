@@ -110,7 +110,7 @@ def bearing(lon0, lat0, lon1, lat1):
 @numba.vectorize
 def _bearing_(lon0, lat0, lon1, lat1):
     deg2rad = math.pi / 180.0
-    a = math.arctan2(
+    a = math.atan2(
         math.cos(deg2rad * lat0) * math.sin(deg2rad * lat1)
         - math.sin(deg2rad * lat0) * math.cos(deg2rad * lat1) * math.cos(deg2rad * (lon1 - lon0)),
         math.sin(deg2rad * (lon1 - lon0)) * math.cos(deg2rad * lat1),
