@@ -89,21 +89,33 @@ def test_filter_erode_coast():
     )
 
 
-def test_filter_dermerliac():
+def test_filter_tide():
 
     times = np.arange("2000-01-01", "2000-01-10", dtype="M8[h]")
     nt = len(times)
-    data = np.cos(np.arange(nt) * np.pi / 12.2)
+    data = np.cos(np.arange(nt) * np.pi / 12.5)
     data = np.resize(data, (3, 4, nt)).T
     da_in = xr.DataArray(data, dims=('time', 'ny', 'nx'), coords={"time": times})
 
-    da_out = xfilter.demerliac(da_in, na_thres=0)
+    da_out = xfilter.tidal_filter(da_in, "demerliac", na_thres=0)
     assert da_out.dims == da_in.dims
     assert da_out.shape == da_in.shape
     assert da_out.min() > -1e-4
     assert da_out.max() < 1e-4
 
-    da_out = xfilter.demerliac(da_in, na_thres=1)
+    da_out = xfilter.tidal_filter(da_in, "godin", na_thres=0)
+    assert da_out.dims == da_in.dims
+    assert da_out.shape == da_in.shape
+    assert da_out.min() > -1e-4
+    assert da_out.max() < 1e-4
+    
+    da_out = xfilter.tidal_filter(da_in, "mean", na_thres=0)
+    assert da_out.dims == da_in.dims
+    assert da_out.shape == da_in.shape
+    assert da_out.min() > -1e-4
+    assert da_out.max() < 1e-4
+
+    da_out = xfilter.tidal_filter(da_in, "demerliac", na_thres=1)
     assert abs(da_out.mean()) < 0.1
 
 
