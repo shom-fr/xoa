@@ -927,6 +927,58 @@ def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
     return erode_mask(data, until=until, kernel=kernel)
 
 
+def demerliac(da, na_thres=0, dt_tol=0.01):
+    """Apply a dermerliac filter on a data array
+    Note that the data array must have a valid time dimension.
+    When the time step is less than an hour, an interpolation is made on the weights
+    since they are made for hourly time series.
+    Parameters
+    ----------
+    da: xarray.DataArray
+    dt_tol: float
+        Relative tolerance for the time step variability
+    na_thres: float
+        A float between 0 and 1 that defines the allowed level a NaN contamination.
+        See :func:`convolve`.
+    Return
+    ------
+    xarray.DataArray
+    """
+    xoa_warn("Use of demerliac is deprecated,  use tidal_filter instead.")
+    # Get time dimension
+    tdim = xcoords.get_tdim(da, errors="ignore")
+    if tdim is None:
+        xoa_warn("Cannot apply the Demerliac filter since to time dimension found")
+        return da.copy()
+
+    # Weights
+    weights = np.array(HOURLY_TIDAL_FILTERS_WEIGHTS["demerliac"], "d")
+    if tdim not in da.indexes:
+        xoa_warn("Not time coordinate found so we assume hourly data")
+    else:
+        dt = np.diff(da[tdim].values) / np.timedelta64(3600, "s")
+        ddt = dt.ptp()
+        mdt = dt.mean()
+        if ddt > dt_tol * mdt:
+            raise XoaError(
+                "The variability of your time steps is above the allowed level "
+                " to apply a Dermerliac filter"
+            )
+        if mdt > 1 + dt_tol:
+            xoa_warn(
+                "You should not apply a Demerliac filter to data that are less "
+                f"than hourly sampled. Current time step: {dt:1.2f}"
+            )
+        elif mdt < 1 - dt_tol:
+            nw = len(weights)
+            from scipy.interpolate import interp1d
+
+            weights = interp1d(weights, np.linspace(0, 1, nw), "cubic")(np.linspace(0, 1, nw / dt))
+
+    # Apply
+    return convolve(da, {tdim: weights}, normalize=True, na_thres=na_thres)
+
+
 def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
     """Apply a tidal filter on a data array
 
