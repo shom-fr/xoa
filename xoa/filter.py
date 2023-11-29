@@ -929,9 +929,8 @@ def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
 
 def demerliac(da, na_thres=0, dt_tol=0.01):
     """Apply a dermerliac filter on a data array
-    Note that the data array must have a valid time dimension.
-    When the time step is less than an hour, an interpolation is made on the weights
-    since they are made for hourly time series.
+    Note that the demerliac function is a shortcut of the :func:`tidal_filter` function with 
+    `demerliac` as ``filter_name``.
     Parameters
     ----------
     da: xarray.DataArray
