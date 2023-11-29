@@ -945,38 +945,7 @@ def demerliac(da, na_thres=0, dt_tol=0.01):
     xarray.DataArray
     """
     xoa_warn("Use of demerliac is deprecated,  use tidal_filter instead.")
-    # Get time dimension
-    tdim = xcoords.get_tdim(da, errors="ignore")
-    if tdim is None:
-        xoa_warn("Cannot apply the Demerliac filter since to time dimension found")
-        return da.copy()
-
-    # Weights
-    weights = np.array(HOURLY_TIDAL_FILTERS_WEIGHTS["demerliac"], "d")
-    if tdim not in da.indexes:
-        xoa_warn("Not time coordinate found so we assume hourly data")
-    else:
-        dt = np.diff(da[tdim].values) / np.timedelta64(3600, "s")
-        ddt = dt.ptp()
-        mdt = dt.mean()
-        if ddt > dt_tol * mdt:
-            raise XoaError(
-                "The variability of your time steps is above the allowed level "
-                " to apply a Dermerliac filter"
-            )
-        if mdt > 1 + dt_tol:
-            xoa_warn(
-                "You should not apply a Demerliac filter to data that are less "
-                f"than hourly sampled. Current time step: {dt:1.2f}"
-            )
-        elif mdt < 1 - dt_tol:
-            nw = len(weights)
-            from scipy.interpolate import interp1d
-
-            weights = interp1d(weights, np.linspace(0, 1, nw), "cubic")(np.linspace(0, 1, nw / dt))
-
-    # Apply
-    return convolve(da, {tdim: weights}, normalize=True, na_thres=na_thres)
+    return tidal_filter(da, "demerliac", na_thres=na_thres, dt_tol=dt_tol)
 
 
 def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
