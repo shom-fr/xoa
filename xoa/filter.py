@@ -927,6 +927,26 @@ def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
     return erode_mask(data, until=until, kernel=kernel)
 
 
+def demerliac(da, na_thres=0, dt_tol=0.01):
+    """Apply a dermerliac filter on a data array
+    Note that the demerliac function is a shortcut of the :func:`tidal_filter` function with 
+    `demerliac` as ``filter_name``.
+    Parameters
+    ----------
+    da: xarray.DataArray
+    dt_tol: float
+        Relative tolerance for the time step variability
+    na_thres: float
+        A float between 0 and 1 that defines the allowed level a NaN contamination.
+        See :func:`convolve`.
+    Return
+    ------
+    xarray.DataArray
+    """
+    xoa_warn("Use of demerliac is deprecated,  use tidal_filter instead.")
+    return tidal_filter(da, "demerliac", na_thres=na_thres, dt_tol=dt_tol)
+
+
 def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
     """Apply a tidal filter on a data array
 
