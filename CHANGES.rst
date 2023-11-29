@@ -1,6 +1,29 @@
 What's new
 ##########
 
+Current
+=======
+
+New features
+------------
+
+- Add the :func:`xoa.filter.tidal_filter` function to apply a tidal filter
+  to time serie [:pull:`87`].
+
+Breaking changes
+----------------
+
+Deprecations
+------------
+
+- :func:`xoa.filter.demerliac` is deprecated, use :func:`xoa.filter.tidal_filter` instead [:pull:`88`].
+
+Bug fixes
+---------
+
+Documentation
+-------------
+
 
 0.7.1 (2023-07-21)
 ==================
