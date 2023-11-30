@@ -990,7 +990,7 @@ def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
             )
         if mdt > 1 + dt_tol:
             xoa_warn(
-                "You should not apply a Demerliac filter to data that are less "
+                f"You should not apply a {filter_name} filter to data that are less "
                 f"than hourly sampled. Current time step: {dt:1.2f}"
             )
         elif mdt < 1 - dt_tol:
