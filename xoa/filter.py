@@ -662,14 +662,14 @@ def _convolve_(data, kernel, normalize, na_thres, axis=None):
     # Convolution function
     kwc = {"mode": "constant"}
     if kernel.ndim != 1:
-        from scipy.ndimage.filters import convolve as convolve_func
+        from scipy.ndimage import convolve as convolve_func
 
         # from scipy.signal import convolve
         assert data.ndim == kernel.ndim
     # elif data.ndim == 1:
     #     convolve_func = np.convolve
     else:
-        from scipy.ndimage.filters import convolve1d as convolve_func
+        from scipy.ndimage import convolve1d as convolve_func
 
         kwc["axis"] = axis
 
@@ -929,7 +929,7 @@ def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
 
 def demerliac(da, na_thres=0, dt_tol=0.01):
     """Apply a dermerliac filter on a data array
-    Note that the demerliac function is a shortcut of the :func:`tidal_filter` function with 
+    Note that the demerliac function is a shortcut of the :func:`tidal_filter` function with
     `demerliac` as ``filter_name``.
     Parameters
     ----------
@@ -953,6 +953,7 @@ def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
     Note that the data array must have a valid time dimension.
     When the time step is less than an hour, an interpolation is made on the weights
     since they are made for hourly time series.
+    An error is raised when the time step is too variable or above one hour.
 
     Parameters
     ----------
@@ -981,17 +982,17 @@ def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
         xoa_warn("Not time coordinate found so we assume hourly data")
     else:
         dt = np.diff(da[tdim].values) / np.timedelta64(3600, "s")
-        ddt = dt.ptp()
-        mdt = dt.mean()
+        ddt = float(dt.ptp())
+        mdt = float(dt.mean())
         if ddt > dt_tol * mdt:
             raise XoaError(
                 "The variability of your time steps is above the allowed level "
                 f" to apply a {filter_name} filter"
             )
         if mdt > 1 + dt_tol:
-            xoa_warn(
+            raise XoaError(
                 f"You should not apply a {filter_name} filter to data that are less "
-                f"than hourly sampled. Current time step: {dt:1.2f}"
+                f"than hourly sampled. Current mean time step: {mdt:1.2f} s"
             )
         elif mdt < 1 - dt_tol:
             nw = len(weights)

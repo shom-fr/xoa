@@ -6,20 +6,19 @@ Current
 
 New features
 ------------
-
-- Add the :func:`xoa.filter.tidal_filter` function to apply a tidal filter
-  to time serie [:pull:`87`].
+- Add the :func:`xoa.filter.tidal_filter` function to apply a tidal filter to time serie [:pull:`87`].
 
 Breaking changes
 ----------------
+- :func:`xoa.filter.tidal_filter` raises an :class:`~xoa.XoaError` instead of a simple warning when the time step is greater than an hour.
 
 Deprecations
 ------------
-
 - :func:`xoa.filter.demerliac` is deprecated, use :func:`xoa.filter.tidal_filter` instead [:pull:`88`].
 
 Bug fixes
 ---------
+- Fix string formatting in :func:`xoa.filter.tidal_filter` warning.
 
 Documentation
 -------------
