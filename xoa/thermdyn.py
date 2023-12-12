@@ -22,7 +22,7 @@ def _get_array_(ds, func, variants, variant, errors, name):
     das = []
     for da in ds.values():
         for vr in variant:
-            if func(da, variant):
+            if func(da, vr):
                 das.append(da)
 
     errors = xmisc.ERRORS[errors]
@@ -48,6 +48,7 @@ TEMP_VARIANTS = xmisc.Choices(
         "insitu": "In situ",
         "conservative": "Conservative temperature",
         "absolute": "Absolute temperature",
+        "potential": "Potential temperature"
     },
     parameter="variant",
     description="Restrict checking to a given variant",
