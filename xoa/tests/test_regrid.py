@@ -104,6 +104,36 @@ def test_regrid_extrap1d(mode, expected):
     assert 'z' in vo.coords
 
 
+@pytest.mark.parametrize(
+    "method,mode,expected",
+    [
+        ["linear", "both", [1, 1, 1]],
+        ["linear", "bottom", [np.nan, 1, 1]],
+        ["linear", "no", [np.nan, 1, np.nan]],
+        ["linear", "top", [1, 1, np.nan]],
+        ["cubic", "both", [1, 1, 1]],
+        ["cubic", "bottom", [np.nan, 1, 1]],
+        ["cubic", "no", [np.nan, 1, np.nan]],
+        ["cubic", "top", [1, 1, np.nan]],
+        ["hermit", "both", [1, 1, 1]],
+        ["hermit", "bottom", [np.nan, 1, 1]],
+        ["hermit", "no", [np.nan, 1, np.nan]],
+        ["hermit", "top", [1, 1, np.nan]],
+        ["nearest", "both", [1, 1, 1]],
+        ["nearest", "bottom", [np.nan, 1, 1]],
+        ["nearest", "no", [np.nan, 1, np.nan]],
+        ["nearest", "top", [1, 1, np.nan]],
+    ],
+)
+def test_regrid_regri1d_extrap(method, mode, expected):
+    nz, ny, nx = 2, 1, 1
+    zi = xr.DataArray([1, 2], dims="z")
+    zo = xr.DataArray([0, 1.5, 3], dims="z")
+    vi = xr.DataArray(np.ones((nz, ny, nx)), dims=('z', 'y', 'x'), coords={"z": zi})
+    vo = regrid.regrid1d(vi, zo, dim="z", method=method, extrap=mode)
+    np.testing.assert_allclose(vo.values[:, 0, 0], expected)
+
+
 def test_regrid_grid2loc():
 
     np.random.seed(0)

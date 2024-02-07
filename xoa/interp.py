@@ -86,6 +86,16 @@ def nearest1d(vari, yi, yo, eshapes, extrap="no"):
             # Loop on output grid
             for iyo in range(iyomin, iyomax + 1):
 
+                # Extrapolation
+                dytop = yo[ixoy, iyo] - yi[ixiy, iyimin]
+                dybot = yi[ixiy, iyimax] - yo[ixoy, iyo]
+                if dytop < 0.0 and extrap in ("top", "both"):
+                    varo[ix, iyo] = vari[ix, iyimin]
+                    continue
+                elif dybot < 0.0 and extrap in ("bottom", "both"):
+                    varo[ix, iyo] = vari[ix, iyimax]
+                    continue                
+
                 dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
                 dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
 
@@ -102,10 +112,6 @@ def nearest1d(vari, yi, yo, eshapes, extrap="no"):
                     varo[ix, iyo] = vari[ixi, iyi]
                 else:
                     varo[ix, iyo] = vari[ixi, iyi + 1]
-
-    # Extrapolation
-    if extrap != "no":
-        varo = extrap1d(varo, extrap)
 
     return varo
 
@@ -153,6 +159,7 @@ def linear1d(vari, yi, yo, eshapes, extrap="no"):
         # Loop on input grid
         iyimin, iyimax = get_iminmax(yi[ixiy])
         iyomin, iyomax = get_iminmax(yo[ixoy])
+            
         for iyi in range(iyimin, iyimax):
 
             # Out of bounds
@@ -163,6 +170,16 @@ def linear1d(vari, yi, yo, eshapes, extrap="no"):
 
             # Loop on output grid
             for iyo in range(iyomin, iyomax + 1):
+
+                # Extrapolation
+                dytop = yo[ixoy, iyo] - yi[ixiy, iyimin]
+                dybot = yi[ixiy, iyimax] - yo[ixoy, iyo]
+                if dytop < 0.0 and extrap in ("top", "both"):
+                    varo[ix, iyo] = vari[ix, iyimin]
+                    continue
+                elif dybot < 0.0 and extrap in ("bottom", "both"):
+                    varo[ix, iyo] = vari[ix, iyimax]
+                    continue
 
                 dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
                 dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
@@ -179,10 +196,6 @@ def linear1d(vari, yi, yo, eshapes, extrap="no"):
                 elif dy0 > 0.0 or dy1 > 0.0:
 
                     varo[ix, iyo] = (vari[ixi, iyi] * dy1 + vari[ixi, iyi + 1] * dy0) / (dy0 + dy1)
-
-    # Extrapolation
-    if extrap != "no":
-        varo = extrap1d(varo, extrap)
 
     return varo
 
@@ -240,7 +253,17 @@ def cubic1d(vari, yi, yo, eshapes, extrap="no"):
 
             # Loop on output grid
             for iyo in range(iyomin, iyomax + 1):
-
+                
+                # Extrapolation
+                dytop = yo[ixoy, iyo] - yi[ixiy, iyimin]
+                dybot = yi[ixiy, iyimax] - yo[ixoy, iyo]
+                if dytop < 0.0 and extrap in ("top", "both"):
+                    varo[ix, iyo] = vari[ix, iyimin]
+                    continue
+                elif dybot < 0.0 and extrap in ("bottom", "both"):
+                    varo[ix, iyo] = vari[ix, iyimax]
+                    continue
+                
                 dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
                 dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
 
@@ -275,10 +298,6 @@ def cubic1d(vari, yi, yo, eshapes, extrap="no"):
                     )
                     varo[ix, iyo] += mu * (vari[ixi, iyi + 1] - vc0)
                     varo[ix, iyo] += vari[ixi, iyi]
-
-    # Extrapolation
-    if extrap != "no":
-        varo = extrap1d(varo, extrap)
 
     return varo
 
@@ -338,6 +357,16 @@ def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0):
 
             # Loop on output grid
             for iyo in range(iyomin, iyomax + 1):
+                
+                # Extrapolation
+                dytop = yo[ixoy, iyo] - yi[ixiy, iyimin]
+                dybot = yi[ixiy, iyimax] - yo[ixoy, iyo]
+                if dytop < 0.0 and extrap in ("top", "both"):
+                    varo[ix, iyo] = vari[ix, iyimin]
+                    continue
+                elif dybot < 0.0 and extrap in ("bottom", "both"):
+                    varo[ix, iyo] = vari[ix, iyimax]
+                    continue
 
                 dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
                 dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
@@ -382,9 +411,6 @@ def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0):
                         + (vc1 - vari[ixi, iyi + 1]) * (1 - bias) * (1 - tension) / 2
                     )
                     varo[ix, iyo] += a3 * vari[ixi, iyi + 1]
-
-    if extrap != "no":
-        varo = extrap1d(varo, extrap)
 
     return varo
 

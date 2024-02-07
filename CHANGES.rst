@@ -11,6 +11,7 @@ New features
 Breaking changes
 ----------------
 - :func:`xoa.filter.tidal_filter` raises an :class:`~xoa.XoaError` instead of a simple warning when the time step is greater than an hour.
+- :func:`xoa.regrid.regrid1d`: extrapolation from input data instead of output data
 
 Deprecations
 ------------
