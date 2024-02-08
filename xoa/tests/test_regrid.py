@@ -12,7 +12,6 @@ from test_interp import get_grid2locs_coords, vfunc, get_interp1d_data
 
 
 def test_regrid_regrid1d():
-
     # Get some data
     xxi, yyi, vari, xxo, yyo, eshapes = get_interp1d_data()
 
@@ -104,25 +103,14 @@ def test_regrid_extrap1d(mode, expected):
     assert 'z' in vo.coords
 
 
+@pytest.mark.parametrize("method", ["linear", "cubic", "hermit", "nearest"])
 @pytest.mark.parametrize(
-    "method,mode,expected",
+    "mode,expected",
     [
-        ["linear", "both", [1, 1, 1]],
-        ["linear", "bottom", [np.nan, 1, 1]],
-        ["linear", "no", [np.nan, 1, np.nan]],
-        ["linear", "top", [1, 1, np.nan]],
-        ["cubic", "both", [1, 1, 1]],
-        ["cubic", "bottom", [np.nan, 1, 1]],
-        ["cubic", "no", [np.nan, 1, np.nan]],
-        ["cubic", "top", [1, 1, np.nan]],
-        ["hermit", "both", [1, 1, 1]],
-        ["hermit", "bottom", [np.nan, 1, 1]],
-        ["hermit", "no", [np.nan, 1, np.nan]],
-        ["hermit", "top", [1, 1, np.nan]],
-        ["nearest", "both", [1, 1, 1]],
-        ["nearest", "bottom", [np.nan, 1, 1]],
-        ["nearest", "no", [np.nan, 1, np.nan]],
-        ["nearest", "top", [1, 1, np.nan]],
+        ["both", [1, 1, 1]],
+        ["top", [np.nan, 1, 1]],
+        ["no", [np.nan, 1, np.nan]],
+        ["bottom", [1, 1, np.nan]],
     ],
 )
 def test_regrid_regri1d_extrap(method, mode, expected):
@@ -135,7 +123,6 @@ def test_regrid_regri1d_extrap(method, mode, expected):
 
 
 def test_regrid_grid2loc():
-
     np.random.seed(0)
 
     # Multi-dimensional generic coordinates
@@ -183,7 +170,6 @@ def test_regrid_grid2loc():
 
 
 def test_regrid_isoslice():
-
     depth = xr.DataArray(np.linspace(-50, 0.0, 6), dims="z", attrs={"long_name": "Depth"})
     values = xr.DataArray(np.linspace(10, 20.0, 6), dims="z")
     isoval = 15.0
