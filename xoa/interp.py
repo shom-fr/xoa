@@ -4,7 +4,7 @@ Low level interpolation routines accelerated with numba
 The numerical inputs and outputs of all these routines are of scalar
 or numpy.ndarray type.
 """
-# Copyright 2020-2022 Shom
+# Copyright 2020-2024 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ NOT_CI = os.environ.get("CI", "false") == "false"
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def nearest1d(vari, yi, yo, eshapes, extrap="no"):
+def nearest1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
     """Nearest interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -65,7 +65,6 @@ def nearest1d(vari, yi, yo, eshapes, extrap="no"):
 
     # Loop on the varying dimension
     for ix in numba.prange(nx):
-
         # Index along x for all arrays
         ii = unravel_index(ix, eshape)
         ixi = ravel_index(np.minimum(ii, eshapes[0] - 1), eshapes[0])
@@ -73,31 +72,33 @@ def nearest1d(vari, yi, yo, eshapes, extrap="no"):
         ixoy = ravel_index(np.minimum(ii, eshapes[2] - 1), eshapes[2])
 
         # Loop on input grid
-        iyimin, iyimax = get_iminmax(yi[ixiy])
+        iyimin, iyimax = get_iminmax(yi[ixiy] * vari[ixi])
         iyomin, iyomax = get_iminmax(yo[ixoy])
+        iyominv = iyomin
+        gap = 0
         for iyi in range(iyimin, iyimax):
-
             # Out of bounds
             if yi[ixiy, iyi + 1] < yo[ixoy, iyomin]:
                 continue
             if yi[ixiy, iyi] > yo[ixoy, iyomax]:
                 break
 
+            # Gap check
+            if (
+                drop_na
+                and (np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1]))
+                and (maxgap == 0 or gap < maxgap)
+            ):
+                gap += 1
+                continue
+
+            iyi0 = iyi - gap
+            iyi1 = iyi + 1
+
             # Loop on output grid
-            for iyo in range(iyomin, iyomax + 1):
-
-                # Extrapolation
-                dytop = yo[ixoy, iyo] - yi[ixiy, iyimin]
-                dybot = yi[ixiy, iyimax] - yo[ixoy, iyo]
-                if dytop < 0.0 and extrap in ("top", "both"):
-                    varo[ix, iyo] = vari[ix, iyimin]
-                    continue
-                elif dybot < 0.0 and extrap in ("bottom", "both"):
-                    varo[ix, iyo] = vari[ix, iyimax]
-                    continue                
-
-                dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
-                dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
+            for iyo in range(iyominv, iyomax + 1):
+                dy0 = yo[ixoy, iyo] - yi[ixiy, iyi0]
+                dy1 = yi[ixiy, iyi1] - yo[ixoy, iyo]
 
                 # Above
                 if dy1 < 0.0:  # above
@@ -105,19 +106,33 @@ def nearest1d(vari, yi, yo, eshapes, extrap="no"):
 
                 # Below
                 if dy0 < 0.0:
-                    iyomin = iyo + 1
+                    iyominv = iyo + 1
 
                 # Interpolations
                 elif dy0 <= dy1:
-                    varo[ix, iyo] = vari[ixi, iyi]
+                    varo[ix, iyo] = vari[ixi, iyi0]
                 else:
-                    varo[ix, iyo] = vari[ixi, iyi + 1]
+                    varo[ix, iyo] = vari[ixi, iyi1]
+
+            gap = 0
+
+        # Extrapolation with nearest
+        if extrap in ("bottom", "both") and yo[ixoy, iyomin] < yi[ixiy, iyimin]:
+            for iyo in range(iyomin, iyomax + 1):
+                if yo[ixoy, iyo] >= yi[ixiy, iyimin]:
+                    varo[ix, :iyo] = vari[ixi, iyimin]
+                    break
+        if extrap in ("top", "both") and yo[ixoy, iyomax] > yi[ixiy, iyimax]:
+            for iyo in range(iyomin, iyomax + 1):
+                if yo[ixoy, iyo] > yi[ixiy, iyimax]:
+                    varo[ix, iyo:] = vari[ixi, iyimax]
+                    break
 
     return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def linear1d(vari, yi, yo, eshapes, extrap="no"):
+def linear1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
     """Linear interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -149,7 +164,6 @@ def linear1d(vari, yi, yo, eshapes, extrap="no"):
 
     # Loop on the varying dimension
     for ix in numba.prange(nx):
-
         # Index along x for all arrays
         ii = unravel_index(ix, eshape)
         ixi = ravel_index(np.minimum(ii, eshapes[0] - 1), eshapes[0])
@@ -157,32 +171,33 @@ def linear1d(vari, yi, yo, eshapes, extrap="no"):
         ixoy = ravel_index(np.minimum(ii, eshapes[2] - 1), eshapes[2])
 
         # Loop on input grid
-        iyimin, iyimax = get_iminmax(yi[ixiy])
+        iyimin, iyimax = get_iminmax(yi[ixiy] * vari[ixi])
         iyomin, iyomax = get_iminmax(yo[ixoy])
-            
+        iyominv = iyomin
+        gap = 0
         for iyi in range(iyimin, iyimax):
-
             # Out of bounds
             if yi[ixiy, iyi + 1] < yo[ixoy, iyomin]:
                 continue
             if yi[ixiy, iyi] > yo[ixoy, iyomax]:
                 break
 
+            # Gap check
+            if (
+                drop_na
+                and (np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1]))
+                and (maxgap == 0 or gap < maxgap)
+            ):
+                gap += 1
+                continue
+
+            iyi0 = iyi - gap
+            iyi1 = iyi + 1
+
             # Loop on output grid
-            for iyo in range(iyomin, iyomax + 1):
-
-                # Extrapolation
-                dytop = yo[ixoy, iyo] - yi[ixiy, iyimin]
-                dybot = yi[ixiy, iyimax] - yo[ixoy, iyo]
-                if dytop < 0.0 and extrap in ("top", "both"):
-                    varo[ix, iyo] = vari[ix, iyimin]
-                    continue
-                elif dybot < 0.0 and extrap in ("bottom", "both"):
-                    varo[ix, iyo] = vari[ix, iyimax]
-                    continue
-
-                dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
-                dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
+            for iyo in range(iyominv, iyomax + 1):
+                dy0 = yo[ixoy, iyo] - yi[ixiy, iyi0]
+                dy1 = yi[ixiy, iyi1] - yo[ixoy, iyo]
 
                 # Above
                 if dy1 < 0.0:  # above
@@ -190,18 +205,31 @@ def linear1d(vari, yi, yo, eshapes, extrap="no"):
 
                 # Below
                 if dy0 < 0.0:
-                    iyomin = iyo + 1
+                    iyominv = iyo + 1
 
                 # Interpolation
                 elif dy0 > 0.0 or dy1 > 0.0:
+                    varo[ix, iyo] = (vari[ixi, iyi0] * dy1 + vari[ixi, iyi1] * dy0) / (dy0 + dy1)
 
-                    varo[ix, iyo] = (vari[ixi, iyi] * dy1 + vari[ixi, iyi + 1] * dy0) / (dy0 + dy1)
+            gap = 0
+
+        # Extrapolation with nearest
+        if extrap in ("bottom", "both") and yo[ixoy, iyomin] < yi[ixiy, iyimin]:
+            for iyo in range(iyomin, iyomax + 1):
+                if yo[ixoy, iyo] >= yi[ixiy, iyimin]:
+                    varo[ix, :iyo] = vari[ixi, iyimin]
+                    break
+        if extrap in ("top", "both") and yo[ixoy, iyomax] > yi[ixiy, iyimax]:
+            for iyo in range(iyomin, iyomax + 1):
+                if yo[ixoy, iyo] > yi[ixiy, iyimax]:
+                    varo[ix, iyo:] = vari[ixi, iyimax]
+                    break
 
     return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def cubic1d(vari, yi, yo, eshapes, extrap="no"):
+def cubic1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
     """Cubic interpolation of nD data along an axis with varying coordinates
 
     Warning
@@ -233,7 +261,6 @@ def cubic1d(vari, yi, yo, eshapes, extrap="no"):
 
     # Loop on the varying dimension
     for ix in numba.prange(nx):
-
         # Index along x for all arrays
         ii = unravel_index(ix, eshape)
         ixi = ravel_index(np.minimum(ii, eshapes[0] - 1), eshapes[0])
@@ -241,31 +268,41 @@ def cubic1d(vari, yi, yo, eshapes, extrap="no"):
         ixoy = ravel_index(np.minimum(ii, eshapes[2] - 1), eshapes[2])
 
         # Loop on input grid
-        iyimin, iyimax = get_iminmax(yi[ixiy])
+        iyimin, iyimax = get_iminmax(yi[ixiy] * vari[ixi])
         iyomin, iyomax = get_iminmax(yo[ixoy])
+        iyominv = iyomin
+        gap = 0
         for iyi in range(iyimin, iyimax):
-
             # Out of bounds
             if yi[ixiy, iyi + 1] < yo[ixoy, iyomin]:
                 continue
             if yi[ixiy, iyi] > yo[ixoy, iyomax]:
                 break
 
+            # Gap check
+            if (
+                drop_na
+                and (np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1]))
+                and (maxgap == 0 or gap < maxgap)
+            ):
+                gap += 1
+                continue
+
+            iyi0 = iyi - gap
+            iyi1 = iyi + 1
+            if iyi0 == iyimin or np.isnan(vari[ixi, iyi0 - 1]):
+                iyim1 = iyi0
+            else:
+                iyim1 = iyi0 - 1
+            if iyi1 == iyimax or np.isnan(vari[ixi, iyi1 + 1]):
+                iyi2 = iyi1
+            else:
+                iyi2 = iyi1 + 1
+
             # Loop on output grid
-            for iyo in range(iyomin, iyomax + 1):
-                
-                # Extrapolation
-                dytop = yo[ixoy, iyo] - yi[ixiy, iyimin]
-                dybot = yi[ixiy, iyimax] - yo[ixoy, iyo]
-                if dytop < 0.0 and extrap in ("top", "both"):
-                    varo[ix, iyo] = vari[ix, iyimin]
-                    continue
-                elif dybot < 0.0 and extrap in ("bottom", "both"):
-                    varo[ix, iyo] = vari[ix, iyimax]
-                    continue
-                
-                dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
-                dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
+            for iyo in range(iyominv, iyomax + 1):
+                dy0 = yo[ixoy, iyo] - yi[ixiy, iyi0]
+                dy1 = yi[ixiy, iyi1] - yo[ixoy, iyo]
 
                 # Above
                 if dy1 < 0.0:  # above
@@ -273,37 +310,50 @@ def cubic1d(vari, yi, yo, eshapes, extrap="no"):
 
                 # Below
                 if dy0 < 0.0:
-                    iyomin = iyo + 1
+                    iyominv = iyo + 1
 
                 # Inside
                 if dy0 >= 0.0 and dy1 >= 0.0:
-
-                    iyomin = iyo
+                    iyominv = iyo
                     mu = dy0 / (dy0 + dy1)
 
                     # Extrapolations
-                    if iyi == iyimin:  # y0
-                        vc0 = 2 * vari[ixi, iyi] - vari[ixi, iyi + 1]
+                    if iyi0 == iyimin:  # y0
+                        vc0 = 2 * vari[ixi, iyi0] - vari[ixi, iyi1]
                     else:
-                        vc0 = vari[ixi, iyi - 1]
-                    if iyi == iyimax - 1:  # y3
-                        vc1 = 2 * vari[ixi, iyi + 1] - vari[ixi, iyi]
+                        vc0 = vari[ixi, iyim1]
+                    if iyi1 == iyimax:  # y3
+                        vc1 = 2 * vari[ixi, iyi1] - vari[ixi, iyi0]
                     else:
-                        vc1 = vari[ixi, iyi + 2]
+                        vc1 = vari[ixi, iyi2]
 
                     # Interpolation
-                    varo[ix, iyo] = vc1 - vari[ixi, iyi + 1] - vc0 + vari[ixi, iyi]
+                    varo[ix, iyo] = vc1 - vari[ixi, iyi1] - vc0 + vari[ixi, iyi0]
                     varo[ix, iyo] = mu**3 * varo[ix, iyo] + mu**2 * (
-                        vc0 - vari[ixi, iyi] - varo[ix, iyo]
+                        vc0 - vari[ixi, iyi0] - varo[ix, iyo]
                     )
-                    varo[ix, iyo] += mu * (vari[ixi, iyi + 1] - vc0)
-                    varo[ix, iyo] += vari[ixi, iyi]
+                    varo[ix, iyo] += mu * (vari[ixi, iyi1] - vc0)
+                    varo[ix, iyo] += vari[ixi, iyi0]
+
+            gap = 0
+
+        # Extrapolation with nearest
+        if extrap in ("bottom", "both") and yo[ixoy, iyomin] < yi[ixiy, iyimin]:
+            for iyo in range(iyomin, iyomax + 1):
+                if yo[ixoy, iyo] >= yi[ixiy, iyimin]:
+                    varo[ix, :iyo] = vari[ixi, iyimin]
+                    break
+        if extrap in ("top", "both") and yo[ixoy, iyomax] > yi[ixiy, iyimax]:
+            for iyo in range(iyomin, iyomax + 1):
+                if yo[ixoy, iyo] > yi[ixiy, iyimax]:
+                    varo[ix, iyo:] = vari[ixi, iyimax]
+                    break
 
     return varo
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0):
+def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0, drop_na=False, maxgap=0):
     """Hermitian interp. of nD data along an axis with varying coordinates
 
     Warning
@@ -337,7 +387,6 @@ def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0):
 
     # Loop on the varying dimension
     for ix in numba.prange(nx):
-
         # Index along x for all arrays
         ii = unravel_index(ix, eshape)
         ixi = ravel_index(np.minimum(ii, eshapes[0] - 1), eshapes[0])
@@ -345,31 +394,41 @@ def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0):
         ixoy = ravel_index(np.minimum(ii, eshapes[2] - 1), eshapes[2])
 
         # Loop on input grid
-        iyimin, iyimax = get_iminmax(yi[ixiy])
+        iyimin, iyimax = get_iminmax(yi[ixiy] * vari[ixi])
         iyomin, iyomax = get_iminmax(yo[ixoy])
+        iyominv = iyomin
+        gap = 0
         for iyi in range(iyimin, iyimax):
-
             # Out of bounds
             if yi[ixiy, iyi + 1] < yo[ixoy, iyomin]:
                 continue
             if yi[ixiy, iyi] > yo[ixoy, iyomax]:
                 break
 
-            # Loop on output grid
-            for iyo in range(iyomin, iyomax + 1):
-                
-                # Extrapolation
-                dytop = yo[ixoy, iyo] - yi[ixiy, iyimin]
-                dybot = yi[ixiy, iyimax] - yo[ixoy, iyo]
-                if dytop < 0.0 and extrap in ("top", "both"):
-                    varo[ix, iyo] = vari[ix, iyimin]
-                    continue
-                elif dybot < 0.0 and extrap in ("bottom", "both"):
-                    varo[ix, iyo] = vari[ix, iyimax]
-                    continue
+            # Gap check
+            if (
+                drop_na
+                and (np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1]))
+                and (maxgap == 0 or gap < maxgap)
+            ):
+                gap += 1
+                continue
 
-                dy0 = yo[ixoy, iyo] - yi[ixiy, iyi]
-                dy1 = yi[ixiy, iyi + 1] - yo[ixoy, iyo]
+            iyi0 = iyi - gap
+            iyi1 = iyi + 1
+            if iyi0 == iyimin or np.isnan(vari[ixi, iyi0 - 1]):
+                iyim1 = iyi0
+            else:
+                iyim1 = iyi0 - 1
+            if iyi1 == iyimax or np.isnan(vari[ixi, iyi1 + 1]):
+                iyi2 = iyi1
+            else:
+                iyi2 = iyi1 + 1
+
+            # Loop on output grid
+            for iyo in range(iyominv, iyomax + 1):
+                dy0 = yo[ixoy, iyo] - yi[ixiy, iyi0]
+                dy1 = yi[ixiy, iyi1] - yo[ixoy, iyo]
 
                 # Above
                 if dy1 < 0.0:  # above
@@ -377,23 +436,22 @@ def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0):
 
                 # Below
                 if dy0 < 0.0:
-                    iyomin = iyo + 1
+                    iyominv = iyo + 1
 
                 # Inside
                 if dy0 >= 0.0 and dy1 >= 0.0:
-
-                    iyomin = iyo
+                    iyominv = iyo
                     mu = dy0 / (dy0 + dy1)
 
                     # Extrapolations
-                    if iyi == iyimin:  # y0
-                        vc0 = 2 * vari[ixi, iyi] - vari[ixi, iyi + 1]
+                    if iyi0 == iyimin:  # y0
+                        vc0 = 2 * vari[ixi, iyi0] - vari[ixi, iyi1]
                     else:
-                        vc0 = vari[ixi, iyi - 1]
-                    if iyi == iyimax - 1:  # y3
-                        vc1 = 2 * vari[ixi, iyi + 1] - vari[ixi, iyi]
+                        vc0 = vari[ixi, iyim1]
+                    if iyi1 == iyimax:  # y3
+                        vc1 = 2 * vari[ixi, iyi1] - vari[ixi, iyi0]
                     else:
-                        vc1 = vari[ixi, iyi + 2]
+                        vc1 = vari[ixi, iyi2]
 
                     # Interpolation
                     mu = dy0 / (dy0 + dy1)
@@ -401,16 +459,30 @@ def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0):
                     a1 = mu**3 - 2 * mu**2 + mu
                     a2 = mu**3 - mu**2
                     a3 = -2 * mu**3 + 3 * mu**2
-                    varo[ix, iyo] = a0 * vari[ixi, iyi]
+                    varo[ix, iyo] = a0 * vari[ixi, iyi0]
                     varo[ix, iyo] += a1 * (
-                        (vari[ixi, iyi] - vc0) * (1 + bias) * (1 - tension) / 2
-                        + (vari[ixi, iyi + 1] - vari[ixi, iyi]) * (1 - bias) * (1 - tension) / 2
+                        (vari[ixi, iyi0] - vc0) * (1 + bias) * (1 - tension) / 2
+                        + (vari[ixi, iyi1] - vari[ixi, iyi0]) * (1 - bias) * (1 - tension) / 2
                     )
                     varo[ix, iyo] += a2 * (
-                        (vari[ixi, iyi + 1] - vari[ixi, iyi]) * (1 + bias) * (1 - tension) / 2
-                        + (vc1 - vari[ixi, iyi + 1]) * (1 - bias) * (1 - tension) / 2
+                        (vari[ixi, iyi1] - vari[ixi, iyi0]) * (1 + bias) * (1 - tension) / 2
+                        + (vc1 - vari[ixi, iyi1]) * (1 - bias) * (1 - tension) / 2
                     )
-                    varo[ix, iyo] += a3 * vari[ixi, iyi + 1]
+                    varo[ix, iyo] += a3 * vari[ixi, iyi1]
+
+            gap = 0
+
+        # Extrapolation with nearest
+        if extrap in ("bottom", "both") and yo[ixoy, iyomin] < yi[ixiy, iyimin]:
+            for iyo in range(iyomin, iyomax + 1):
+                if yo[ixoy, iyo] >= yi[ixiy, iyimin]:
+                    varo[ix, :iyo] = vari[ixi, iyimin]
+                    break
+        if extrap in ("top", "both") and yo[ixoy, iyomax] > yi[ixiy, iyimax]:
+            for iyo in range(iyomin, iyomax + 1):
+                if yo[ixoy, iyo] > yi[ixiy, iyimax]:
+                    varo[ix, iyo:] = vari[ixi, iyimax]
+                    break
 
     return varo
 
@@ -448,7 +520,7 @@ def extrap1d(vari, mode):
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def cellave1d(vari, yib, yob, eshapes, extrap="no", conserv=False):
+def cellave1d(vari, yib, yob, eshapes, extrap="no", conserv=False, drop_na=False, maxgap=0):
     """Cell average regrid. of nD data along an axis with varying coordinates
 
     Warning
@@ -487,7 +559,6 @@ def cellave1d(vari, yib, yob, eshapes, extrap="no", conserv=False):
 
     # Loop on the varying dimension
     for ix in numba.prange(nx):
-
         # Index along x for coordinate arrays
         ii = unravel_index(ix, eshape)
         ixi = ravel_index(np.minimum(ii, eshapes[0] - 1), eshapes[0])
@@ -497,14 +568,12 @@ def cellave1d(vari, yib, yob, eshapes, extrap="no", conserv=False):
         # Loop on output cells to be filled
         iyi0 = 0
         for iyo in range(nyo):
-
             if yob[ixoy, iyo] == yob[ixoy, iyo + 1]:
                 continue
 
             # Loop on input cells
             wo = 0.0
             for iyi in range(iyi0, nyi):
-
                 # Current input bounds
                 yib0 = yib[ixiy, iyi]
                 yib1 = yib[ixiy, iyi + 1]
@@ -695,7 +764,6 @@ def grid2relloc(xxi, yyi, xo, yo):
     # Curvilinear to rectangular with a loop on four candidate cells
     for j in range(max(jc - 1, 0), min(jc + 1, nyi - 1)):
         for i in range(max(ic - 1, 0), min(ic + 1, nxi - 1)):
-
             # Get relative position
             a, b = cell2relloc(
                 xxi[j, i],
@@ -833,7 +901,6 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
 
         # Weights
         if curved:
-
             p, q = grid2relloc(xxi, yyi, xo[io], yo[io])
             if p < 0 or p > nxi - 1 or q < 0 or q > nyi - 1:
                 continue  # outside the grid
@@ -906,7 +973,6 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
             c[:] = 0.0
             npk[:] = 1
         else:
-
             # Local zi
 
             if nxiz == 1:

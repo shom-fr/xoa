@@ -6,12 +6,13 @@ Current
 
 New features
 ------------
+- Add the `drop_na` and `maxgap` parameters to the :func:`xoa.regrid.regrid1d` function to fill gaps [:pull:`92`].
 - Add the :func:`xoa.filter.tidal_filter` function to apply a tidal filter to time serie [:pull:`87`].
 
 Breaking changes
 ----------------
 - :func:`xoa.filter.tidal_filter` raises an :class:`~xoa.XoaError` instead of a simple warning when the time step is greater than an hour.
-- :func:`xoa.regrid.regrid1d`: extrapolation from input data instead of output data
+- :func:`xoa.regrid.regrid1d`: extrapolation from input data instead of output data [:pull:`91`].
 
 Deprecations
 ------------

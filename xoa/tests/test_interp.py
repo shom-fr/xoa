@@ -12,7 +12,7 @@ from xoa import interp
 
 def vfunc(t=0, z=0, y=0, x=0):
     """A function that returns a linear combination of coordinates"""
-    return 1.13 * x + 2.35 * y + 3.24 * z - 0.65 * t
+    return 1.13 * x + 12.35 * y + 3.24 * z - 0.65 * t
 
 
 def round_as_time(arr, units="us", origin="1950-01-01"):
@@ -34,7 +34,6 @@ def get_interp1d_data(
     nyo=25,
     mask=True,
 ):
-
     np.random.seed(0)
 
     # coords
@@ -64,7 +63,6 @@ def get_interp1d_data(
 
 
 def test_interp_nearest1d():
-
     # Get data
     xxi, yyi, vari, xxo, yyo, eshapes = get_interp1d_data()
 
@@ -78,7 +76,6 @@ def test_interp_nearest1d():
 
 
 def test_interp_linear1d():
-
     # Get data
     xxi, yyi, vari, xxo, yyo, eshapes = get_interp1d_data()
 
@@ -91,7 +88,6 @@ def test_interp_linear1d():
 
 
 def test_interp_cubic1d():
-
     # Get data
     xxi, yyi, vari, xxo, yyo, eshapes = get_interp1d_data()
 
@@ -103,7 +99,6 @@ def test_interp_cubic1d():
 
 
 def test_interp_hermit1d():
-
     # Get data
     xxi, yyi, vari, xxo, yyo, eshapes = get_interp1d_data()
 
@@ -116,7 +111,6 @@ def test_interp_hermit1d():
 
 @pytest.mark.parametrize("method", ["nearest", "linear", "cubic", "hermit"])
 def test_interp1d_nans_in_coords(method):
-
     # Get data
     xxi, yyi, vari, xxo, yyo, eshapes = get_interp1d_data()
 
@@ -135,9 +129,22 @@ def test_interp1d_nans_in_coords(method):
     np.testing.assert_allclose(varol, varoln[:, 3:-3])
 
 
+def test_linear1d_drop_na():
+    # Get data
+    xxi, yyi, vari, xxo, yyo, eshapes = get_interp1d_data(yomax=-20)
+
+    varo = interp.linear1d(vari, yyi, yyo, eshapes, drop_na=True)
+    assert not np.isnan(varo).any()
+    varo_true = vfunc(y=yyo, x=xxo)
+    np.testing.assert_allclose(varo_true, varo)
+
+    varo0 = interp.linear1d(vari, yyi, yyo, eshapes, drop_na=False)
+    varo1 = interp.linear1d(vari, yyi, yyo, eshapes, drop_na=True, maxgap=1)
+    np.testing.assert_allclose(varo0, varo1)
+
+
 @pytest.mark.parametrize("method", ["nearest", "linear", "cubic", "hermit"])
 def test_interp_interp1d_eshapes(method):
-
     # Get data and func
     xxi, yyi, vari, xxo, yyo, eshapes = get_interp1d_data(nx=18, mask=False, irregular=False)
     eshapes = np.repeat([[3, 6]], 3, axis=0)
@@ -192,7 +199,6 @@ def test_interp_interp1d_eshapes(method):
 
 
 def test_interp_cellave1d():
-
     np.random.seed(0)
 
     # coords
@@ -240,7 +246,6 @@ def test_interp_cellave1d():
     ],
 )
 def test_interp_cell2relloc(x, y, pt, qt):
-
     x1, y1 = 0.0, 0.0
     x2, y2 = 3.0, 1.0
     x3, y3 = 2.0, 3.0
@@ -252,7 +257,6 @@ def test_interp_cell2relloc(x, y, pt, qt):
 
 @functools.lru_cache()
 def get_grid2locs_coords(nex=4, nexz=2, nxi=7, nyi=6, nzi=5, nti=4, no=10):
-
     np.random.seed(0)
 
     tti, zzi, yyi, xxi = np.mgrid[
@@ -278,7 +282,6 @@ def get_grid2locs_coords(nex=4, nexz=2, nxi=7, nyi=6, nzi=5, nti=4, no=10):
 
 
 def test_interp_grid2locs():
-
     # Multi-dimensional generic coordinates
     nex = 4
     nexz = 2
@@ -375,7 +378,6 @@ def test_interp_grid2locs():
 
 
 def test_interp_isoslice():
-
     depth = np.linspace(-50, 0.0, 6)
     values = np.linspace(10, 20.0, 6)
     isoval = 15.0
