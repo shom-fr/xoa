@@ -3,7 +3,7 @@
 """
 Regridding utilities
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2024 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -137,6 +137,8 @@ def regrid1d(
     extrap="no",
     bias=0.0,
     tension=0.0,
+    drop_na=False,
+    maxgap=0,
     dask='parallelized',
 ):
     """Regrid along a single dimension
@@ -177,6 +179,12 @@ def regrid1d(
     extrap: str, int
         Extrapolation mode as one of the following:
         {extrap_modes.rst_with_links}
+    drop_na: bool
+        Drop input inner NaNs during interpolation. Note that outer NaNs are
+        always ignored. ``cellave`` and ``cellerr`` methods don't support the parameter.
+    maxgap: int
+        Max size for a gap to be interpolated when `drop_name is True.
+        Size is not checked when `maxgap` is zero.
     dask: str
         See :func:`xarray.apply_ufunc`.
 
@@ -265,6 +273,12 @@ def regrid1d(
     func_kwargs = {"func_name": func_name, "extrap": extrap}
     if method == "hermit":
         func_kwargs.update(bias=bias, tension=tension)
+    if drop_na:
+        if method == "cellave" or method == "cellerr":
+            raise XoaRegridError(
+                "cellerr and cellave regrid method still not support the drop_na paramater"
+            )
+        func_kwargs.update(drop_na=drop_na, maxgap=maxgap)
 
     # Apply
     da_out = xr.apply_ufunc(
