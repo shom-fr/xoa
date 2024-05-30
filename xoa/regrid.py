@@ -484,7 +484,7 @@ def grid2loc(da, loc, compat="warn"):
     glon = xcoords.get_lon(da)  # before to_rect
     glat = xcoords.get_lat(da)  # before to_rect
     dims_in = set(glon.dims).union(glat.dims)
-    da_tmp = xgrid.to_rect(da)
+    da_tmp = xgrid.to_rect(da, errors="ignore")
     da_tmp = xcoords.reorder(da_tmp, order)
 
     # To numpy with singletons

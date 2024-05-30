@@ -137,7 +137,6 @@ def apply_along_dim(
 
 
 def _pad_(da, dim, pad_width, mode, **kwargs):
-
     pad_width = pad_width.get(dim, 0)
     if not pad_width:
         return da.copy()
@@ -615,7 +614,8 @@ def to_rect(da, tol=1e-5, errors="warn"):
             )
             if errors == "errors":
                 raise XoaError(msg)
-            xoa_warn(msg)
+            elif errors == "ignore":
+                xoa_warn(msg)
     if new_coords:
         return (
             da.reset_coords(list(new_coords), drop=True)
