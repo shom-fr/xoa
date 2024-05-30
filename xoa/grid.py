@@ -583,7 +583,7 @@ def to_rect(da, tol=1e-5, errors="warn"):
     ------
     xarray.DataArray, xarray.Dataset
     """
-    da = da.copy()
+    #da = da.copy()
     new_coords = {}
     rename_args = {}
     da = cf.infer_coords(da)
