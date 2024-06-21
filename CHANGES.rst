@@ -21,6 +21,7 @@ Deprecations
 Bug fixes
 ---------
 - Fix string formatting in :func:`xoa.filter.tidal_filter` warning.
+- Fix default value of `deltadens` in :func:`xoa.thermdyn.mixed_layer_depth`
 
 Documentation
 -------------
