@@ -137,7 +137,6 @@ def apply_along_dim(
 
 
 def _pad_(da, dim, pad_width, mode, **kwargs):
-
     pad_width = pad_width.get(dim, 0)
     if not pad_width:
         return da.copy()
@@ -584,7 +583,7 @@ def to_rect(da, tol=1e-5, errors="warn"):
     ------
     xarray.DataArray, xarray.Dataset
     """
-    da = da.copy()
+    #da = da.copy()
     new_coords = {}
     rename_args = {}
     da = cf.infer_coords(da)
@@ -613,9 +612,10 @@ def to_rect(da, tol=1e-5, errors="warn"):
                 "Cannot convert to curvilinear to rectangular grid since since coordinate "
                 f"'{name}' is not constant along one of its dimensions"
             )
-            if errors == "errors":
+            if errors == "raise":
                 raise XoaError(msg)
-            xoa_warn(msg)
+            elif errors == "ignore":
+                xoa_warn(msg)
     if new_coords:
         return (
             da.reset_coords(list(new_coords), drop=True)
