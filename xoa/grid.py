@@ -612,7 +612,7 @@ def to_rect(da, tol=1e-5, errors="warn"):
                 "Cannot convert to curvilinear to rectangular grid since since coordinate "
                 f"'{name}' is not constant along one of its dimensions"
             )
-            if errors == "errors":
+            if errors == "raise":
                 raise XoaError(msg)
             elif errors == "ignore":
                 xoa_warn(msg)
