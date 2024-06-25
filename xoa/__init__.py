@@ -71,6 +71,8 @@ _PACKAGES = [
     "xesmf",
 ]
 
+_XOA_CACHE = {}
+
 
 class XoaError(Exception):
     pass
@@ -100,11 +102,13 @@ def xoa_warn(message, stacklevel=2):
 
 
 def _get_cache_():
-    from . import __init__
+    from . import _XOA_CACHE
 
-    if not hasattr(__init__, "_XOA_CACHE"):
-        __init__._XOA_CACHE = {}
-    return __init__._XOA_CACHE
+    return _XOA_CACHE
+
+    # if not hasattr(__init__, "_XOA_CACHE"):
+    #     __init__._XOA_CACHE = {}
+    # return __init__._XOA_CACHE
 
 
 def load_options(cfgfile=None):
