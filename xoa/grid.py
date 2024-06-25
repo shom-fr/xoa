@@ -583,7 +583,7 @@ def to_rect(da, tol=1e-5, errors="warn"):
     ------
     xarray.DataArray, xarray.Dataset
     """
-    #da = da.copy()
+    # da = da.copy()
     new_coords = {}
     rename_args = {}
     da = cf.infer_coords(da)
@@ -599,7 +599,7 @@ def to_rect(da, tol=1e-5, errors="warn"):
             continue
         dims = [odim] if odim else coord.dims
         for odim in dims:
-            if np.allclose(coord.min(odim), coord.max(odim), atol=tol):
+            if np.allclose(coord.min(odim), coord.max(odim), atol=tol, equal_nan=True):
                 new_coords[name] = xr.DataArray(
                     coord.isel({odim: 0}).values, dims=name, attrs=coord.attrs
                 )

@@ -106,10 +106,6 @@ def _get_cache_():
 
     return _XOA_CACHE
 
-    # if not hasattr(__init__, "_XOA_CACHE"):
-    #     __init__._XOA_CACHE = {}
-    # return __init__._XOA_CACHE
-
 
 def load_options(cfgfile=None):
     """Load specified options
