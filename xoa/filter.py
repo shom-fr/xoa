@@ -99,7 +99,7 @@ HOURLY_TIDAL_FILTERS_WEIGHTS = {
         3,
         1,
     ],
-    "godin":[
+    "godin": [
         1,
         3,
         6,
@@ -172,7 +172,7 @@ HOURLY_TIDAL_FILTERS_WEIGHTS = {
         3,
         1,
     ],
-    "mean":[
+    "mean": [
         1,
         1,
         1,
@@ -198,8 +198,7 @@ HOURLY_TIDAL_FILTERS_WEIGHTS = {
         1,
         1,
         1,
-    ]
-
+    ],
 }
 
 
@@ -538,7 +537,11 @@ def generate_kernel(
             if isotropic is True:
                 isotropic = data.dims
             elif not set(isotropic).issubset(data.dims):
-                raise XoaError("invalid dimensions for isotropic keyword")
+                raise XoaError(
+                    "Invalid dimensions for isotropic keyword: {}".format(
+                        set(isotropic) - set(data.dims)
+                    )
+                )
 
         # Split into consistant isotropic and orthogonal kernels
         isokernels_sizes = {}
@@ -562,7 +565,7 @@ def generate_kernel(
                         and not np.isscalar(isokernel)
                         and not np.allclose(kn, isokernel)
                     ):
-                        raise XoaError("Inconsistant 1d kernels for building " "isotropic kernel")
+                        raise XoaError("Inconsistant 1d kernels for building isotropic kernel")
                 else:
                     isokernel = kn
                 size = kn if np.isscalar(kn) else len(kn)
@@ -604,7 +607,7 @@ def generate_kernel(
     elif isinstance(kernel, np.ndarray):
         if kernel.ndim > data.ndim:
             raise XoaError(
-                "too many dimensions for your numpy kernel: {} > {}".format(kernel.dim, data.ndim)
+                "Too many dimensions for your numpy kernel: {} > {}".format(kernel.dim, data.ndim)
             )
         dims = data.dims[-kernel.ndim :]
 
@@ -612,7 +615,7 @@ def generate_kernel(
     if not isinstance(kernel, xr.DataArray):
         kernel = xr.DataArray(kernel, dims=dims)
     elif not set(kernel.dims).issubset(set(data.dims)):
-        raise XoaError(f"kernel dimensions {kernel.dims} " f"are not a subset of {data.dims}")
+        raise XoaError(f"Kernel dimensions {kernel.dims} are not a subset of {data.dims}")
 
     # Finalize
     kernel = kernel.astype(data.dtype)
@@ -684,7 +687,7 @@ def _convolve_(data, kernel, normalize, na_thres, axis=None):
 
     # Convolutions
     cdata = convolve_func(data, kernel, cval=0.0, **kwc)
-    weights = convolve_func((~bad).astype('i'), kernel, cval=0, **kwc)
+    weights = convolve_func((~bad).astype('d'), kernel, cval=0, **kwc)
     # weights = np.clip(weights, 0, kernel.sum())
 
     # Weigthing and masking
@@ -854,7 +857,7 @@ def erode_mask(data, until=1, kernel=None):
     else:
         mask = until
         if not set(mask.dims).issubset(data.dims):
-            raise XoaError('mask dims must be a subset of data dims')
+            raise XoaError('Mask dims must be a subset of data dims')
         mask = xcoords.transpose(mask, data, mode="compat")
 
     # Filter
@@ -915,7 +918,7 @@ def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
     if isinstance(kernel, xr.DataArray):
         assert xdim in kernel.dims, f"kernel must have dimension: {xdim}"
         assert ydim in kernel.dims, f"kernel must have dimension: {ydim}"
-    elif kernel is None or kernel == "shapiro":
+    elif kernel is None or (isinstance(kernel, str) and kernel == "shapiro"):
         kernel = shapiro_kernel((ydim, xdim))
 
     # Mask array
