@@ -246,7 +246,7 @@ def mixed_layer_depth(
     method=None,
     zref=0.0,
     deltatemp=0.2,
-    deltadens=0.3,
+    deltadens=0.03,
     kzmax=0.0005,
     zdim=None,
     dask="parallelized",
