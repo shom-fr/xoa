@@ -23,6 +23,7 @@ Bug fixes
 - Fix weighting of :func:`xoa.filter.convolve`.
 - Fix :func:`xoa.grid.to_rect` raising of errors and handling of missing data in coordinates.
 - Fix string formatting in :func:`xoa.filter.tidal_filter` warning.
+- Fix default value of `deltadens` in :func:`xoa.thermdyn.mixed_layer_depth`
 
 Documentation
 -------------
