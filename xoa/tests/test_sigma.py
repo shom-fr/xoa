@@ -7,6 +7,7 @@ import xarray as xr
 
 import xoa
 from xoa import sigma
+from xoa import cf
 
 
 def test_sigma_get_cs():
@@ -70,6 +71,8 @@ def test_ocean_s_coordinate_g2():
 
 
 def test_sigma_decode_cf_sigma():
+
+    cf.register_cf_specs(cf.CFSpecs(xoa.get_data_sample("croco.cfg")))
 
     ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
     dsd = sigma.decode_cf_sigma(ds)
