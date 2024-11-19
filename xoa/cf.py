@@ -147,7 +147,9 @@ class SGLocator(object):
         # Init
         self.formats = self.formats.copy()
         self.re_match = self.re_match.copy()
-        self._name_format = name_format
+        self.update(name_format, valid_locations, encoding)
+
+    def update(self, name_format=None, valid_locations=None, encoding=None):
         if valid_locations:
             valid_locations = list(valid_locations)
         self.valid_locations = valid_locations
@@ -3630,12 +3632,8 @@ def get_cf_specs(name=None, cache="rw"):
         if isinstance(name, str):
             return get_cf_specs_from_name(name, errors="raise")
 
-        # Name as dataset or data array so we guess the name
-        cfspecs = get_cf_specs_from_encoding(name)
-        if cfspecs:
-            return cfspecs
-        else:
-            name = "current"
+        # Name as dataset or data array so we infer the specs
+        return infer_cf_specs(name)
 
     # Not named => current or default specs
     if name == "current":
@@ -3753,7 +3751,7 @@ def get_cf_specs_matching_score(ds, cfspecs):
     return 100 * hit / total
 
 
-def infer_cf_specs(ds, named=False):
+def infer_cf_specs(ds, named=False, from_attrs=True, from_score=False):
     """Get the registered CFSpecs that are best matching this dataset
 
     This accomplished with some heurestics.
@@ -3770,6 +3768,10 @@ def infer_cf_specs(ds, named=False):
     ds: xarray.Dataset, xarray.DataArray
     named: bool
         Make sure the candidate CFSpecs have a name
+    from_attrs: bool
+        Scan attributes to infer specs
+    from_score: bool
+        Compute the matching score to infer specs
 
     Return
     ------
@@ -3795,30 +3797,32 @@ def infer_cf_specs(ds, named=False):
     candidates = get_registered_cf_specs(named=named)
 
     # By attributes
-    attrs = dict(ds.attrs)
-    attrs.update(ds.encoding)
-    if attrs:
-        for cfspecs in candidates:
-            for attr, pattern in cfspecs["register"]["attrs"].items():
-                if attr in attrs:
-                    if isinstance(pattern, str):
-                        pattern = [pattern]
-                    for pat in pattern:
-                        if fnmatch.fnmatch(str(attrs[attr]).lower(), pat.lower()):
-                            return cfspecs
+    if from_attrs:
+        attrs = dict(ds.attrs)
+        attrs.update(ds.encoding)
+        if attrs:
+            for cfspecs in candidates:
+                for attr, pattern in cfspecs["register"]["attrs"].items():
+                    if attr in attrs:
+                        if isinstance(pattern, str):
+                            pattern = [pattern]
+                        for pat in pattern:
+                            if fnmatch.fnmatch(str(attrs[attr]).lower(), pat.lower()):
+                                return cfspecs
 
     # By matching score
-    best_score = -1
-    for cfspecs in candidates:
-        score = get_cf_specs_matching_score(ds, cfspecs)
-        if score != 0 and score > best_score:
-            best_cfspecs = cfspecs
-            best_score = score
-    if best_score != -1:
-        return best_cfspecs
+    if from_score:
+        best_score = -1
+        for cfspecs in candidates:
+            score = get_cf_specs_matching_score(ds, cfspecs)
+            if score != 0 and score > best_score:
+                best_cfspecs = cfspecs
+                best_score = score
+        if best_score != -1:
+            return best_cfspecs
 
     # Fallback to default specs
-    cfspecs = get_cf_specs()
+    cfspecs = get_cf_specs("current")
     if named and not cfspecs.name:
         return
     return cfspecs
