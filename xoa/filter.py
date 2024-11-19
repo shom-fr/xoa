@@ -1,7 +1,8 @@
 """
 Filtering utilities
 """
-# Copyright 2020-2021 Shom
+
+# Copyright 2020-2024 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -976,7 +977,7 @@ def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
     # Get time dimension
     tdim = xcoords.get_tdim(da, errors="ignore")
     if tdim is None:
-        xoa_warn("Cannot apply the Demerliac filter since to time dimension found")
+        xoa_warn("Cannot apply the Demerliac filter since no time dimension found")
         return da.copy()
 
     # Weights
@@ -985,7 +986,7 @@ def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
         xoa_warn("Not time coordinate found so we assume hourly data")
     else:
         dt = np.diff(da[tdim].values) / np.timedelta64(3600, "s")
-        ddt = float(dt.ptp())
+        ddt = float(np.ptp(dt))
         mdt = float(dt.mean())
         if ddt > dt_tol * mdt:
             raise XoaError(
