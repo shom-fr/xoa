@@ -68,9 +68,6 @@ instance/
 # Scrapy stuff:
 .scrapy
 
-# Sphinx documentation
-doc/_build/
-doc/accessors/
 
 # PyBuilder
 target/
@@ -130,6 +127,9 @@ dmypy.json
 .pyre/
 
 # Sphinx
+doc/_build/
+doc/accessors/
+doc/examples/
 doc/api/
 doc/savefig/
 doc/genoptions/

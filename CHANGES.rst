@@ -6,6 +6,7 @@ Current
 
 New features
 ------------
+- Call :func:`xoa.cf.infer_cf_specs` from :func:`xoa.cf.get_cf_specs`  when an data arrray or dataset is passed.
 - Add the `drop_na` and `maxgap` parameters to the :func:`xoa.regrid.regrid1d` function to fill gaps [:pull:`92`].
 - Add the :func:`xoa.filter.tidal_filter` function to apply a tidal filter to time serie [:pull:`87`].
 

@@ -569,6 +569,7 @@ def test_cf_cfspecs_format_obj_with_loc():
 
     cf_dict0 = {
         "sglocator": {
+            "name_format": "{root}_{loc}",
             "valid_locations": ["u", "v"],
         },
         "data_vars": {
@@ -634,14 +635,26 @@ def test_cf_cfspecs_format_data_var_specialize():
 
 def test_cf_cfspecs_format_data_var_loc():
     temp = xr.DataArray(0, name='xtemp', attrs={'standard_name': 'banana_at_x_location'})
-    cfspecs = cf.get_cf_specs()
 
-    temp_fmt = cfspecs.format_data_var(temp, "temp", format_coords=False, replace_attrs=True)
+    cf_dict0 = {
+        "sglocator": {
+            "name_format": "{root}_{loc}",
+        },
+    }
+    cfspecs0 = cf.CFSpecs(cf_dict0)
+
+    temp_fmt = cfspecs0.format_data_var(temp, "temp", format_coords=False, replace_attrs=True)
     assert temp_fmt.name == "temp"
     assert temp_fmt.standard_name == "sea_water_temperature"  # _at_x_location"
 
-    cfspecs = cf.CFSpecs({"data_vars": {"temp": {"add_loc": True}}})
-    temp_fmt = cfspecs.format_data_var(temp, "temp", format_coords=False, replace_attrs=True)
+    cf_dict1 = {
+        "sglocator": {
+            "name_format": "{root}_{loc}",
+        },
+        "data_vars": {"temp": {"add_loc": True}},
+    }
+    cfspecs1 = cf.CFSpecs(cf_dict1)
+    temp_fmt = cfspecs1.format_data_var(temp, "temp", format_coords=False, replace_attrs=True)
     assert temp_fmt.name == "temp_x"
 
 
@@ -675,7 +688,7 @@ def test_cf_cfspecs_to_loc():
             "time": ("time", [1]),
         },
     )
-    cfspecs = cf.get_cf_specs()
+    cfspecs = cf.CFSpecs({"sglocator": {"name_format": "{root}_{loc}"}})
     dso = cfspecs.to_loc(ds, x=False, y='v', u=None)
     assert "x" in dso.dims
     assert "y_v" in dso.dims
@@ -692,7 +705,7 @@ def test_cf_cfspecs_reloc():
             "time": ("time", [1]),
         },
     )
-    cfspecs = cf.get_cf_specs()
+    cfspecs = cf.CFSpecs({"sglocator": {"name_format": "{root}_{loc}"}})
     dso = cfspecs.reloc(ds, u=False, t='u')
     assert "x" in dso.dims
     assert "u_u" in dso
@@ -1110,37 +1123,10 @@ def test_cf_infer_cf_specs():
     lon = xr.DataArray([1], dims="mylon")
 
     ds = xr.Dataset({"mytemp": temp, "mysal": sal}, coords={"mylon": lon})
-    assert cf.infer_cf_specs(ds) is cf_specs1
+    assert cf.infer_cf_specs(ds, from_score=True) is cf_specs1
 
     ds.attrs.update(source="my hycom3d!")
-    assert cf.infer_cf_specs(ds) is cf_specs0
+    assert cf.infer_cf_specs(ds, from_score=True) is cf_specs0
 
     ds.attrs.update(cf_specs="hycom3d")
-    assert cf.infer_cf_specs(ds) is cf_specs2
-
-
-# test_cf_cfspecs_decode_encode()
-# test_cf_cfspecs_format_data_var_loc()
-# test_cf_cfspecs_coords_get_loc_arg()
-# test_cf_cfspecs_format_obj_with_loc()
-# test_cf_cfspecs_get_loc_mapping()
-# test_cf_cfspecs_coords_search_dim()
-test_cf_cfspecs_search_coord_with_stacking()
-
-# lon = xr.DataArray(range(5), dims="lon")
-# banana = xr.DataArray(
-#     lon + 20,
-#     dims="lon",
-#     coords=[lon],
-#     name="banana_t",
-#     attrs={"standard_name": "banana", "taste": "good"},
-# )
-# floc, fname, fattrs, out_name, out_standard_name, replace_attrs=None, "sst_q", {"standard_name": ["potatoe"]}, "sst_q", "potatoe_at_q_location", True
-# print(cf.SGLocator().format_dataarray(
-#     banana, loc=floc, name=fname, attrs=fattrs, replace_attrs=replace_attrs
-# ))
-
-# sg = cf.SGLocator()
-# print(sg.get_loc(name="u_t", attrs=dict(standard_name = None, long_name = None)))
-
-# test_cf_cfspecs_decode_encode()
+    assert cf.infer_cf_specs(ds, from_score=True) is cf_specs2
