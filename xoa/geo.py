@@ -465,7 +465,6 @@ def clusterize(obj, npmax, split=False):
     nclust = len(centroids)
 
     if split:
-
         #  Reorder
         sindices = [sindices[i] for i in order]
         sdistorsions = [sdistorsions[i] for i in order]
@@ -508,7 +507,7 @@ def deg2m(deg, lat=None, radius=EARTH_RADIUS):
     float
     """
     dd = deg * np.pi * radius / 180.0
-    if lat:
+    if lat is not None:
         dd *= np.cos(np.radians(lat))
     return dd
 
@@ -528,6 +527,6 @@ def m2deg(met, lat=None, radius=EARTH_RADIUS):
     float
     """
     dd = met * 180 / (np.pi * radius)
-    if lat:
+    if lat is not None:
         dd /= np.cos(np.radians(lat))
     return dd

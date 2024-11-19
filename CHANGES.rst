@@ -21,6 +21,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix `lat` keyword in :func:`~xoa.geo.deg2m` and :func:`~xoa.geo.m2deg` which now accepts arrays.
 - Fix weighting of :func:`xoa.filter.convolve`.
 - Fix :func:`xoa.grid.to_rect` raising of errors and handling of missing data in coordinates.
 - Fix string formatting in :func:`xoa.filter.tidal_filter` warning.
