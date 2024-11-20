@@ -1,3 +1,4 @@
 #include setup.cfg.*
 #exclude setup.cfg
 #recursive-exclude *.so *.png *.pdf *.nc *.log
+recursive-exclude *.old *.bak

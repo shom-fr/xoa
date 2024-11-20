@@ -17,7 +17,7 @@ dependencies:
   - numba
   - owslib
   - pip
-  - python>=3.7
+  - python>=3.10
   - xarray>=0.17
   - pip:
       - configobj
