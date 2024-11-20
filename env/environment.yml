@@ -6,11 +6,10 @@ channels:
 
 dependencies:
   - appdirs
-  #- cartopy
   - configobj
   - gsw
   - matplotlib-base
   - numba
-  - python>=3
+  - python>=3.10
   - scipy
   - xarray>=0.17

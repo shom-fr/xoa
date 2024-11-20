@@ -23,19 +23,15 @@ import re
 import warnings
 import platform
 
-import pkg_resources
+# from importlib.metadata import version as _version
+
 import appdirs
 import configobj
 import validate
 
+from ._get_version import _get_version
 
-# Taken from xarray
-try:
-    __version__ = pkg_resources.get_distribution("xoa").version
-except Exception:
-    # Local copy or not installed with setuptools.
-    # Disable minimum version checks on downstream libraries.
-    __version__ = "999"
+__version__ = _get_version()
 
 _RE_OPTION_MATCH = re.compile(r"^(\w+)\W(\w+)$").match
 
