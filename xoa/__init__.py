@@ -23,7 +23,7 @@ import re
 import warnings
 import platform
 
-# from importlib.metadata import version as _version
+from importlib.metadata import version as im_get_version
 
 import appdirs
 import configobj
@@ -338,8 +338,8 @@ def show_versions():
     print("- xoa:", __version__)
     for package in _PACKAGES:
         try:
-            version = pkg_resources.get_distribution(package).version
-        except pkg_resources.DistributionNotFound:
+            version = im_get_version(package)
+        except Exception:
             version = "NOT INSTALLED or UKNOWN"
         print(f"- {package}: {version}")
 
