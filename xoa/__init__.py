@@ -25,10 +25,6 @@ import platform
 
 from importlib.metadata import version as im_get_version
 
-import appdirs
-import configobj
-import validate
-
 from ._get_version import _get_version
 
 __version__ = _get_version()
@@ -47,9 +43,6 @@ cmapneg = string(default="cmo.tempo_r") # default negative colormap
 cmapcyc = string(default="cmo.phase")   # default cyclic colormap
 
 """
-
-#: Default xoa user configuration file
-DEFAULT_USER_CONFIG_FILE = os.path.join(appdirs.user_config_dir("xoa"), "xoa.cfg")
 
 # Directory of sample files
 _SAMPLE_DIR = os.path.join(os.path.dirname(__file__), '_samples')
@@ -103,6 +96,13 @@ def _get_cache_():
     return _XOA_CACHE
 
 
+def get_default_user_config_file():
+    """Get the default user config file name"""
+    import appdirs
+
+    return os.path.join(appdirs.user_config_dir("xoa"), "xoa.cfg")
+
+
 def load_options(cfgfile=None):
     """Load specified options
 
@@ -123,6 +123,9 @@ def load_options(cfgfile=None):
         optlines = "[plot]\\n cmappos=mycmap".split('\\n')
         load_options(optlines)
     """
+    import configobj
+    import validate
+
     _get_cache_()
     xoa_cache = _get_cache_()
 
@@ -135,8 +138,9 @@ def load_options(cfgfile=None):
             file_error=True,
         )
     if "options" not in xoa_cache:
+        default_user_config_file = get_default_user_config_file()
         xoa_cache["options"] = configobj.ConfigObj(
-            (DEFAULT_USER_CONFIG_FILE if os.path.exists(DEFAULT_USER_CONFIG_FILE) else None),
+            (default_user_config_file if os.path.exists(default_user_config_file) else None),
             configspec=xoa_cache["cfgspecs"],
             file_error=False,
             raise_errors=True,
@@ -360,8 +364,9 @@ def show_paths():
     from . import cf
 
     asterix = False
+    default_user_config_file = get_default_user_config_file()
     for label, path in [
-        ("user config file", DEFAULT_USER_CONFIG_FILE),
+        ("user config file", default_user_config_file),
         ("user CF specs file", cf.USER_CF_FILE),
         ("user CF cache file", cf.USER_CF_CACHE_FILE),
     ]:
