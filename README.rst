@@ -13,10 +13,10 @@ xoa - xarray-based ocean analysis library
     :alt: Documentation Status
     :target: https://xoa.readthedocs.io/en/latest/
 .. image:: https://anaconda.org/conda-forge/xoa/badges/downloads.svg
-    :alt: Number of downloads on anaconda.org/conda-forge
+    :alt: Total number of downloads on anaconda.org/conda-forge
     :target: https://anaconda.org/conda-forge/xoa/
-.. image:: https://pepy.tech/badge/xoa
-    :alt: Number of downloads on pypi
+.. image:: https://img.shields.io/pypi/dm/xoa
+    :alt: PyPI - Downloads
     :target: https://pypi.org/project/xoa
 .. image:: https://img.shields.io/badge/code%20style-black-black
     :alt: Black code style

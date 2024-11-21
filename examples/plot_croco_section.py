@@ -82,7 +82,9 @@ lat_name = temp.xoa.lat.name
 #
 # Let's create the output depths.
 
-depth = xr.DataArray(np.linspace(ds.depth.min(), ds.depth.max(), 1000), name="depth", dims="depth")
+depth = xr.DataArray(
+    np.linspace(ds.depth.values.min(), ds.depth.values.max(), 1000), name="depth", dims="depth"
+)
 
 # %%
 # Let's interpolate the temperature.

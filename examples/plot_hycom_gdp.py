@@ -117,7 +117,7 @@ drifter = pd.read_csv(
 # %%
 # Since the sampling is not that nice, we resample it to 3-hour intervals.
 
-drifter = drifter.resample("3H").mean()
+drifter = drifter.resample("3h").mean()
 
 # %%
 # We convert it to and :class:`xarray.Dataset`, fix the time coordinate and decode it.
