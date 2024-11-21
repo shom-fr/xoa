@@ -88,6 +88,7 @@ html_theme_options = {
         "image_dark": "_static/xoa-logo-dark.png",
     },
     "repository_url": "https://github.com/shom-fr/xoa",
+    "repository_branch": "develop",
     "use_repository_button": True,
     "use_issues_button": True,
     "use_source_button": True,

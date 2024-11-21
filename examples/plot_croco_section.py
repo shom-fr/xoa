@@ -89,6 +89,7 @@ depth = xr.DataArray(np.linspace(ds.depth.min(), ds.depth.max(), 1000), name="de
 
 tempz = regrid1d(temp, depth, extrap="top")
 
+# %%
 # Compute the mixed layer depths
 # -------------------------------
 #
