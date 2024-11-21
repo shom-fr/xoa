@@ -8,7 +8,7 @@ Naming convention tools for reading and formatting variables
 See the :ref:`uses.cf` section.
 
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2024 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1588,7 +1588,7 @@ class CFSpecs(object):
 
         # Assign cf specs
         if self.name and self in get_registered_cf_specs():
-            obj = assign_cf_specs(obj, self.name)
+            obj = assign_cf_specs(obj, self.name, set_encoding=False)
 
         return obj
 
@@ -3485,7 +3485,7 @@ def get_cf_specs_from_name(name, errors="warn"):
         if cfspecs["register"]["name"] and cfspecs["register"]["name"] == name.lower():
             return cfspecs
     errors = ERRORS[errors]
-    msg = f"Invalid registration name for CF specs: {name}"
+    msg = f"Unknown registration name for CF specs: {name}"
     if errors == "raise":
         raise XoaCFError(msg)
     elif errors == "warn":
@@ -3798,17 +3798,16 @@ def infer_cf_specs(ds, named=False, from_attrs=True, from_score=False):
 
     # By attributes
     if from_attrs:
-        attrs = dict(ds.attrs)
-        attrs.update(ds.encoding)
-        if attrs:
-            for cfspecs in candidates:
-                for attr, pattern in cfspecs["register"]["attrs"].items():
-                    if attr in attrs:
-                        if isinstance(pattern, str):
-                            pattern = [pattern]
-                        for pat in pattern:
-                            if fnmatch.fnmatch(str(attrs[attr]).lower(), pat.lower()):
-                                return cfspecs
+        for attrs in (ds.attrs, ds.encoding):
+            if attrs:
+                for cfspecs in candidates:
+                    for attr, pattern in cfspecs["register"]["attrs"].items():
+                        if attr in attrs:
+                            if isinstance(pattern, str):
+                                pattern = [pattern]
+                            for pat in pattern:
+                                if fnmatch.fnmatch(str(attrs[attr]).lower(), pat.lower()):
+                                    return cfspecs
 
     # By matching score
     if from_score:
@@ -3828,7 +3827,7 @@ def infer_cf_specs(ds, named=False, from_attrs=True, from_score=False):
     return cfspecs
 
 
-def assign_cf_specs(ds, name=None, register=False):
+def assign_cf_specs(ds, name=None, register=False, set_encoding=True):
     """Set the ``cf_specs`` encoding to ``name`` in all data vars and coords
 
     Parameters
@@ -3847,6 +3846,8 @@ def assign_cf_specs(ds, name=None, register=False):
 
     register: bool
         Register the specs if name is a named, unregistered :class:`CFSpecs` instance.
+    set_encoding: bool
+        Set the "cf_specs" encoding to name.
 
     Return
     ------
@@ -3887,9 +3888,11 @@ def assign_cf_specs(ds, name=None, register=False):
         name = name.name
 
     # Set as encoding
-    targets = [ds] + [ds[name] for name in _list_xr_names_(ds, dims=False)]
-    for target in targets:
-        target.encoding.update(cf_specs=name)
+    if set_encoding:
+        targets = [ds] + [ds[name] for name in _list_xr_names_(ds, dims=False)]
+        for target in targets:
+            target.encoding.update(cf_specs=name)
+
     return ds
 
 
