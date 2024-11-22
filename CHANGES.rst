@@ -6,14 +6,14 @@ Current
 
 New features
 ------------
-- Call :func:`xoa.cf.infer_cf_specs` from :func:`xoa.cf.get_cf_specs`  when an data arrray or dataset is passed.
+- Call :func:`xoa.cf.infer_cf_specs` from :func:`xoa.cf.get_cf_specs`  when an data arrray or dataset is passed [:pull:`96`].
 - Add the `drop_na` and `maxgap` parameters to the :func:`xoa.regrid.regrid1d` function to fill gaps [:pull:`92`].
 - Add the :func:`xoa.filter.tidal_filter` function to apply a tidal filter to time serie [:pull:`87`].
 
 Breaking changes
 ----------------
-- The :meth:`xoa.cf.CFSpecs.decode` no longer sets the "cf_specs" encoding.
-- The default `name_format` option of the :cfsec:`sglocator` Cf specication option is set to False to prvent parsing the grid location in names.
+- The :meth:`xoa.cf.CFSpecs.decode` no longer sets the "cf_specs" encoding [:pull:`96`].
+- The default `name_format` option of the :cfsec:`sglocator` Cf specication option is set to False to prevent parsing the grid location in names [:pull:`96`].
 - :func:`xoa.filter.tidal_filter` raises an :class:`~xoa.XoaError` instead of a simple warning when the time step is greater than an hour.
 - :func:`xoa.regrid.regrid1d`: extrapolation from input data instead of output data [:pull:`91`].
 
@@ -23,7 +23,7 @@ Deprecations
 
 Bug fixes
 ---------
-- Fix `xoa.cf.infer_cf_specs` that was mising attributes and encoding.
+- Fix `xoa.cf.infer_cf_specs` that was mising attributes and encoding [:pull:`96`].
 - Fix `lat` keyword in :func:`~xoa.geo.deg2m` and :func:`~xoa.geo.m2deg` which now accepts arrays.
 - Fix weighting of :func:`xoa.filter.convolve`.
 - Fix :func:`xoa.grid.to_rect` raising of errors and handling of missing data in coordinates.
@@ -32,7 +32,7 @@ Bug fixes
 
 Documentation
 -------------
-
+- Now using `Sphinx book theme <https://sphinx-book-theme.readthedocs.io/en/stable/#>`_
 
 0.7.1 (2023-07-21)
 ==================
