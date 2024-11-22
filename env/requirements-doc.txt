@@ -14,7 +14,7 @@ scipy
 xarray>=0.17
 sphinx
 sphinx-autosummary-accessors
-sphinx_rtd_theme
+sphinx-book-theme
 sphinx-argparse
 sphinxcontrib-programoutput
 sphinx-gallery

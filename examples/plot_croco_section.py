@@ -25,6 +25,7 @@ import cmocean
 import xoa
 from xoa.regrid import regrid1d
 from xoa.thermdyn import mixed_layer_depth
+import xoa.cf as xcf
 
 xr.set_options(display_style="text")
 
@@ -36,6 +37,17 @@ xoa.register_accessors(decode_sigma=True)
 # %%
 # The :ref:`xoa <accessors>` accessor is also registered by default, and give access
 # to most of the fonctionalities of the other accessors.
+
+# %%
+# Register the Mercator and ARGO naming specifications
+
+xcf.register_cf_specs(xoa.get_data_sample("croco.cfg"))
+
+# %%
+# In this way, the :mod:`xoa.cf` module will recognise the
+# CROCO netcdf names.
+# It would be equivalent to force loading name specs with
+# `xoa.cf.set_cf_specs(xoa.get_data_sample("croco.cfg"))`.
 
 # %%
 # Read the model
@@ -82,18 +94,21 @@ lat_name = temp.xoa.lat.name
 #
 # Let's create the output depths.
 
-depth = xr.DataArray(np.linspace(ds.depth.min(), ds.depth.max(), 1000), name="depth", dims="depth")
+depth = xr.DataArray(
+    np.linspace(ds.depth.values.min(), ds.depth.values.max(), 1000), name="depth", dims="depth"
+)
 
 # %%
 # Let's interpolate the temperature.
 
 tempz = regrid1d(temp, depth, extrap="top")
 
+# %%
 # Compute the mixed layer depths
 # -------------------------------
 #
-# The mixed layer depths are computed here as the depth at wich the temperature
-# is `deltatemp` below the surface temperature,
+# The mixed layer depths are computed here as the depth at which the temperature
+# is `deltatemp` lower than the surface temperature,
 # thanks to the :func:`xoa.thermdyn.mixed_layer_depth` function.
 
 deltatemp = 0.2
@@ -113,6 +128,8 @@ temp.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[0], **kw)
 temp.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[0], **kw)
 tempz.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[1], **kw)
 tempz.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[1], **kw)
+axs[0].set_title("Original")
+axs[1].set_title("Interpolated")
 
 # %%
 # Plot a zoom near the surface and add the mixed layer depth isoline.
@@ -126,6 +143,8 @@ tempz.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[1], **kw)
 tempz.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[1], **kw)
 mldz.plot.line(x=lat_name, color="k", linewidth=2, linestyle="--", ax=axs[1])
 axs[0].set_ylim(-300, 0)
+axs[0].set_title("Original")
+axs[1].set_title("Interpolated")
 
 # # %%
 # # Et voilà!
