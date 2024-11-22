@@ -23,7 +23,7 @@ dependencies:
       - configobj
       - sphinx
       - sphinx-autosummary-accessors
-      - sphinx_rtd_theme
+      - sphinx-book-theme
       - sphinx-argparse
       - sphinx-gallery
       - sphinxcontrib-programoutput

@@ -8,7 +8,7 @@ Naming convention tools for reading and formatting variables
 See the :ref:`uses.cf` section.
 
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2024 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -130,7 +130,7 @@ class SGLocator(object):
 
     valid_attrs = ("name", "standard_name", "long_name")
 
-    formats = {
+    default_formats = {
         "name": "{root}_{loc}",
         "standard_name": "{root}_at_{loc}_location",
         "long_name": "{root} at {loc} location",
@@ -141,11 +141,11 @@ class SGLocator(object):
     location_pattern = "[a-z]+"
 
     re_match = {}
-    _compile_sg_match_(re_match, valid_attrs, formats, root_patterns, location_pattern)
+    _compile_sg_match_(re_match, valid_attrs, default_formats, root_patterns, location_pattern)
 
     def __init__(self, name_format=None, valid_locations=None, encoding=None):
         # Init
-        self.formats = self.formats.copy()
+        self.formats = self.default_formats.copy()
         self.re_match = self.re_match.copy()
         self.update(name_format, valid_locations, encoding)
 
@@ -460,14 +460,23 @@ class SGLocator(object):
         loc = loc or ploc
         if not loc:
             return root
+
+        # Better looking loc
         if standardize:
             if attr == "long_name":
                 loc = loc.upper()
             elif attr == "standard_name":
                 loc = loc.lower()
-        if not self.formats[attr]:
+
+        _format = self.formats[attr]
+
+        # Force the default format for names when the loc is specified
+        if attr == "name " and (not _format or "{loc}" not in _format):
+            _format = self.default_formats["name"]
+
+        if not _format:
             return root
-        return self.formats[attr].format(root=root, loc=loc)
+        return _format.format(root=root, loc=loc)
 
     def format_attrs(self, attrs, loc=None, standardize=True):
         """Copy and format a dict of attributes
@@ -1588,7 +1597,7 @@ class CFSpecs(object):
 
         # Assign cf specs
         if self.name and self in get_registered_cf_specs():
-            obj = assign_cf_specs(obj, self.name)
+            obj = assign_cf_specs(obj, self.name, set_encoding=False)
 
         return obj
 
@@ -3485,7 +3494,7 @@ def get_cf_specs_from_name(name, errors="warn"):
         if cfspecs["register"]["name"] and cfspecs["register"]["name"] == name.lower():
             return cfspecs
     errors = ERRORS[errors]
-    msg = f"Invalid registration name for CF specs: {name}"
+    msg = f"Unknown registration name for CF specs: {name}"
     if errors == "raise":
         raise XoaCFError(msg)
     elif errors == "warn":
@@ -3798,17 +3807,16 @@ def infer_cf_specs(ds, named=False, from_attrs=True, from_score=False):
 
     # By attributes
     if from_attrs:
-        attrs = dict(ds.attrs)
-        attrs.update(ds.encoding)
-        if attrs:
-            for cfspecs in candidates:
-                for attr, pattern in cfspecs["register"]["attrs"].items():
-                    if attr in attrs:
-                        if isinstance(pattern, str):
-                            pattern = [pattern]
-                        for pat in pattern:
-                            if fnmatch.fnmatch(str(attrs[attr]).lower(), pat.lower()):
-                                return cfspecs
+        for attrs in (ds.attrs, ds.encoding):
+            if attrs:
+                for cfspecs in candidates:
+                    for attr, pattern in cfspecs["register"]["attrs"].items():
+                        if attr in attrs:
+                            if isinstance(pattern, str):
+                                pattern = [pattern]
+                            for pat in pattern:
+                                if fnmatch.fnmatch(str(attrs[attr]).lower(), pat.lower()):
+                                    return cfspecs
 
     # By matching score
     if from_score:
@@ -3828,7 +3836,7 @@ def infer_cf_specs(ds, named=False, from_attrs=True, from_score=False):
     return cfspecs
 
 
-def assign_cf_specs(ds, name=None, register=False):
+def assign_cf_specs(ds, name=None, register=False, set_encoding=True):
     """Set the ``cf_specs`` encoding to ``name`` in all data vars and coords
 
     Parameters
@@ -3847,6 +3855,8 @@ def assign_cf_specs(ds, name=None, register=False):
 
     register: bool
         Register the specs if name is a named, unregistered :class:`CFSpecs` instance.
+    set_encoding: bool
+        Set the "cf_specs" encoding to name.
 
     Return
     ------
@@ -3887,9 +3897,11 @@ def assign_cf_specs(ds, name=None, register=False):
         name = name.name
 
     # Set as encoding
-    targets = [ds] + [ds[name] for name in _list_xr_names_(ds, dims=False)]
-    for target in targets:
-        target.encoding.update(cf_specs=name)
+    if set_encoding:
+        targets = [ds] + [ds[name] for name in _list_xr_names_(ds, dims=False)]
+        for target in targets:
+            target.encoding.update(cf_specs=name)
+
     return ds
 
 

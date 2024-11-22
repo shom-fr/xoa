@@ -6,7 +6,7 @@ This follows the CF conventions for
 `Parametric Vertical Coordinates <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#parametric-v-coord>`_.
 
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2024 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

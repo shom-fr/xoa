@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ext
 # %% Project information
 
 project = 'xoa'
-copyright = '2020-2022, Shom'
+copyright = '2020-2024, Shom'
 author = 'Shom'
 
 # The full version, including alpha/beta/rc tags
@@ -49,6 +49,7 @@ extensions = [
     "IPython.sphinxext.ipython_console_highlighting",
     'genoptions',
     'gencfspecs',
+    'genlogos',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput',
     'sphinx_autosummary_accessors',
@@ -74,12 +75,26 @@ modindex_common_prefix = ['xoa.']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+html_theme = 'sphinx_book_theme'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+html_theme_options = {
+    "logo": {
+        "image_light": "_static/xoa-logo-light.png",
+        "image_dark": "_static/xoa-logo-dark.png",
+    },
+    "repository_url": "https://github.com/shom-fr/xoa",
+    "repository_branch": "develop",
+    "use_repository_button": True,
+    "use_issues_button": True,
+    "use_source_button": True,
+    "path_to_docs": "doc/",
+}
+
 
 # %% Autosumarry
 autosummary_generate = True
@@ -93,10 +108,9 @@ intersphinx_mapping = {
     'numba:': ('https://numba.readthedocs.io/en/stable/', None),
     'numpy': ("https://numpy.org/doc/stable/", None),
     'pandas': ('https://pandas.pydata.org/docs/', None),
-    'proplot': ('https://proplot.readthedocs.io/en/latest/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
     'xarray': ('http://xarray.pydata.org/en/stable/', None),
-    'gsw': ('https://teos-10.github.io/GSW-Python', None)
+    'gsw': ('https://teos-10.github.io/GSW-Python', None),
     # 'xesmf': ("https://xesmf.readthedocs.io/en/latest/", None)
 }
 

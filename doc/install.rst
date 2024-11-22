@@ -1,5 +1,7 @@
-Installation
-============
+.. _install:
+
+How to install
+==============
 
 .. highlight:: bash
 
@@ -12,23 +14,22 @@ xoa requires ``python>3`` and depends on the following packages:
    :widths: 10 90
 
    * - `appdirs <http://github.com/ActiveState/appdirs>`_
-     - A small Python module for determining appropriate platform-specific
-       dirs, e.g. a "user data dir".
+     - A small Python module to determine appropriate platform specific dirs, e.g. a "user data dir".
    * - `cmocean <https://matplotlib.org/cmocean>`_
      - Beautiful colormaps for oceanography.
    * - `configobj <https://configobj.readthedocs.io/en/latest/configobj.html>`_
      - ConfigObj is a simple but powerful config file reader and writer:
-       an ini file round tripper.
+       an ini file round-tripper.
    * - `gsw <https://teos-10.github.io/GSW-Python/>`_
      - gsw is the python implementation of the Thermodynamic Equation of
        Seawater 2010 (TEOS-10).
    * - `matplotlib <https://matplotlib.org/>`_
      - Matplotlib is a comprehensive library for creating static, animated,
-       and interactive visualizations in Python.
+       and interactive visualisations in Python.
    * - `numba <https://numba.pydata.org/>`_
      - A high performance python compiler.
    * - `pandas <https://pandas.pydata.org/>`_
-     - pandas is a fast, powerful, flexible and easy to use open source
+     - pandas is a fast, powerful, flexible and easy-to-use open source
        data analysis and manipulation tool, built on top of the
        Python programming language.
    * - `scipy <https://www.scipy.org/scipylib/index.html>`_
@@ -38,7 +39,6 @@ xoa requires ``python>3`` and depends on the following packages:
    * - `xarray <http://xarray.pydata.org/en/stable/>`_
      - xarray is an open source project and Python package that makes working
        with labelled multi-dimensional arrays simple, efficient, and fun!
-
 
 
 From packages
