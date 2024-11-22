@@ -4,7 +4,7 @@
 Interpolate a meridional section of CROCO outputs to regular depths
 ===================================================================
 
-This notebook, we show:
+In this notebook, we show:
 
 * how to compute the depths from s-coordinates,
 * how to easily find the name of variables and coordinates,
@@ -146,5 +146,5 @@ axs[0].set_ylim(-300, 0)
 axs[0].set_title("Original")
 axs[1].set_title("Interpolated")
 
-# # %%
-# # Et voilà!
+# %%
+# Et voilà!

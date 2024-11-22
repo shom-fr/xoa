@@ -731,6 +731,14 @@ class SGLocator(object):
         )
 
 
+def get_sglocator_pivot():
+    """Get the :class:`SGLocator` instance that is used as a pivot format"""
+    cache = _get_cache_()
+    if "sglocator_pivot" not in cache:
+        cache["sglocator_pivot"] = SGLocator()
+    return cache["sglocator_pivot"]
+
+
 def _solve_rename_conflicts_(rename_args):
     """Skip renaming items that overwride previous items"""
     used = {}
@@ -932,6 +940,17 @@ class CFSpecs(object):
     def sglocator(self):
         """:class:`SGLocator` instance"""
         return self._sgl
+
+    def get_sglocator(self, specialize):
+        """Get the right :class:`SGLocator` instance
+
+        Parameters
+        ----------
+        specialize: book
+            If True, the locator is the one of this dataset, as given by :attr:`sglocator`.
+            Else, if is the pivot locator as given by :func:`get_sglocator_pivot`.
+        """
+        return self._sgl if specialize else get_sglocator_pivot()
 
     @property
     def cfgspecs(self):
@@ -2746,8 +2765,11 @@ class _CFCatSpecs_(object):
         elif not attrs:
             attrs = {}
 
+        # Get the appropriate sglocator for formatting
+        sglocator = self.parent.get_sglocator(specialize)
+
         # Format array
-        new_da = self.sglocator.format_dataarray(
+        new_da = sglocator.format_dataarray(
             da,
             loc=loc,
             name=new_name,
@@ -2763,8 +2785,8 @@ class _CFCatSpecs_(object):
         # Return new name but don't rename
         if not rename:
             if old_name is None:
-                return self.sglocator.format_attr("name", new_name, loc)
-            return self.sglocator.merge_attr("name", old_name, new_name, loc)
+                return sglocator.format_attr("name", new_name, loc)
+            return sglocator.merge_attr("name", old_name, new_name, loc)
 
         # # Rename dim if axis coordinate
         # rename_dim = rename and rename_dim

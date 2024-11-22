@@ -27,14 +27,15 @@ default behaviors for user's special datasets.
 
 
 .. note:: This module shares common feature with the excellent and long
-    awaited `xf_xarray <https://cf-xarray.readthedocs.io/en/latest/>`_
+    awaited `cf_xarray <https://cf-xarray.readthedocs.io/en/latest/>`_
     package and started a long time before with the Vacumm package.
     The most notable differences differences include:
 
-    - The current module is also designed for data variables, not only
+    - The current module is also designed for data variables an dimensions, not only
       coordinates.
-    - It search for items not only using standard_names but also
-      specialized names.
+    - It searches for items not only using standard_names but also
+      specialized names. It means that objetcs can be found a dataset or data array
+      even if they are not properly formatted.
     - It is not only available as accessors, but also as independant
       objects that can be configured for each type of dataset or in
       contexts by the user.
@@ -801,5 +802,6 @@ Now we can read, decode and merge all files without any conflict:
 
     dsv = xoa.open_data_sample("hycom.gdp.u.nc").xoa.decode()
     dsh = xoa.open_data_sample("hycom.gdp.h.nc").xoa.decode()
+    print(dsu)
     ds = xr.merge([dsu, dsv, dsh])
     ds

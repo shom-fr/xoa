@@ -12,6 +12,8 @@ New features
 
 Breaking changes
 ----------------
+- The :meth:`xoa.cf.CFSpecs.decode` no uses the :class:`SGLocator` instance provided by
+  :func:`xoa.cf.get_sglocator_pivot` to manage staggered grid locations for the pivot format.
 - The :meth:`xoa.cf.CFSpecs.decode` no longer sets the "cf_specs" encoding [:pull:`96`].
 - The default `name_format` option of the :cfsec:`sglocator` Cf specication option is set to False to prevent parsing the grid location in names [:pull:`96`].
 - :func:`xoa.filter.tidal_filter` raises an :class:`~xoa.XoaError` instead of a simple warning when the time step is greater than an hour.
