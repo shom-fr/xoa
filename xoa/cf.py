@@ -130,7 +130,7 @@ class SGLocator(object):
 
     valid_attrs = ("name", "standard_name", "long_name")
 
-    formats = {
+    default_formats = {
         "name": "{root}_{loc}",
         "standard_name": "{root}_at_{loc}_location",
         "long_name": "{root} at {loc} location",
@@ -141,11 +141,11 @@ class SGLocator(object):
     location_pattern = "[a-z]+"
 
     re_match = {}
-    _compile_sg_match_(re_match, valid_attrs, formats, root_patterns, location_pattern)
+    _compile_sg_match_(re_match, valid_attrs, default_formats, root_patterns, location_pattern)
 
     def __init__(self, name_format=None, valid_locations=None, encoding=None):
         # Init
-        self.formats = self.formats.copy()
+        self.formats = self.default_formats.copy()
         self.re_match = self.re_match.copy()
         self.update(name_format, valid_locations, encoding)
 
@@ -460,14 +460,23 @@ class SGLocator(object):
         loc = loc or ploc
         if not loc:
             return root
+
+        # Better looking loc
         if standardize:
             if attr == "long_name":
                 loc = loc.upper()
             elif attr == "standard_name":
                 loc = loc.lower()
-        if not self.formats[attr]:
+
+        _format = self.formats[attr]
+
+        # Force the default format for names when the loc is specified
+        if attr == "name " and (not _format or "{loc}" not in _format):
+            _format = self.default_formats["name"]
+
+        if not _format:
             return root
-        return self.formats[attr].format(root=root, loc=loc)
+        return _format.format(root=root, loc=loc)
 
     def format_attrs(self, attrs, loc=None, standardize=True):
         """Copy and format a dict of attributes
