@@ -33,6 +33,7 @@ from argparse import _HelpAction
 from collections import OrderedDict
 from warnings import warn
 import logging
+import importlib
 
 try:
     import configobj.validate as validate
@@ -584,7 +585,7 @@ VALIDATOR_SPECS = {
     "cmap": is_cmap,
     "color": is_color,
     "dict": is_dict,
-    "boolstr": is_boolstr
+    "boolstr": is_boolstr,
     # lists validators for these scalars will be automatically generated
 }
 
@@ -2175,7 +2176,10 @@ def gen_cfgm_rst(app):
 
     logging.info("Generating rst declarations for the ConfigManager")
 
-    rst = app.config.cfgm_get_cfgm_func().to_rst(secrole="cfgmsec", optrole="cfgmopt")
+    mname, fname = os.path.splitext(app.config.cfgm_get_cfgm_func)
+    mloaded = importlib.import_module(mname)
+    func = getattr(mloaded, fname[1:])
+    rst = func().to_rst(secrole="cfgmsec", optrole="cfgmopt")
 
     outfile = os.path.abspath(app.config.cfgm_rst_file)
     outdir = os.path.dirname(outfile)
@@ -2192,7 +2196,10 @@ def gen_cfgm_cfg(app):
         return
 
     logging.info("Generating the default config from the ConfigManager")
-    cfg = app.config.cfgm_get_cfgm_func().defaults
+    mname, fname = os.path.splitext(app.config.cfgm_get_cfgm_func)
+    mloaded = importlib.import_module(mname)
+    func = getattr(mloaded, fname[1:])
+    cfg = func().defaults
     outfile = os.path.abspath(app.config.cfgm_cfg_file)
     outdir = os.path.dirname(outfile)
     if not os.path.exists(outdir):

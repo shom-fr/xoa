@@ -125,9 +125,7 @@ genoptions_table = 'genoptions/table.txt'
 genoptions_declarations = 'genoptions/declarations.txt'
 
 # %% Cfgm
-import xoa.cf
-
-cfgm_get_cfgm_func = xoa.cf._get_cfgm_
+cfgm_get_cfgm_func = "xoa.cf._get_cfgm_"
 cfgm_rst_file = "cf.txt"
 
 # %% Extlinks

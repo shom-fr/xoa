@@ -4,7 +4,7 @@
 Compare Mercator to ARGO
 ========================
 
-This notebook, we show:
+In this notebook, we show:
 
 * how to easily rename variables and coordinates in an ARGO and a Mercator datasets,
 * how to plot a T-S diagram,
@@ -99,7 +99,7 @@ xplot.plot_ts(
     scatter_cmap="cmo.deep",
     axes=axs[1],
 )
-axs[1].axvline(x=35.65, ls="--", color="k");
+axs[1].axvline(x=35.65, ls="--", color="k")
 
 # %%
 # Here we select the last ARGO profile as a reference profile
@@ -161,7 +161,7 @@ kws = dict(c="C3", s=15, marker="s", transform=pcar)
 ax.scatter(ds_merc_ens_rect.lon, ds_merc_ens_rect.lat, label="Rejected", alpha=0.15, **kws)
 ax.scatter(ds_merc_ens.lon, ds_merc_ens.lat, label='Mercator', **kws)
 ax.scatter(ds_argo_prof.lon, ds_argo_prof.lat, s=100, c="C2", transform=pcar, label='ARGO')
-plt.legend();
+plt.legend()
 
 # %%
 # We used the :func:`xoa.geo.get_extent` to compute a square geographical extent based
@@ -191,7 +191,11 @@ plt.plot(ds_merc_prof.sal.values, ds_merc_prof.depth, "o-", color="C1")
 ds_argo_prof.sal.plot(y="depth", label="ARGO", color="C0")
 plt.title("Uncertain profile")
 plt.legend()
-xplot.plot_double_minimap(ds_argo_prof, regional_ax="left", global_ax=(0.88, 0.88, 0.11),);
+xplot.plot_double_minimap(
+    ds_argo_prof,
+    regional_ax="left",
+    global_ax=(0.88, 0.88, 0.11),
+)
 
 # %%
 # Therefore, if we accept an uncertainty in the positioning of the ocean
@@ -228,7 +232,7 @@ plt.stairs(ds_merc_prof.sal, merc_prof_edges, orientation="horizontal", color="C
 sal_argo_prof_m.plot(y="depth", label="ARGO", color="C0", ax=axes[1])
 plt.stairs(sal_argo_prof_m, merc_prof_edges, orientation="horizontal", color="C0", lw=0.5)
 axes[1].set_title("On Mercator depths")
-axes[1].axis(axis);
+axes[1].axis(axis)
 
 # %%
 # These plots show that the model is too haline, except at the

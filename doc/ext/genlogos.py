@@ -28,7 +28,7 @@ def genlogo(outfile, dark=False):
     circlecolor = tuple(c / 255 for c in shomlightblue)
 
     with plt.rc_context({"font.sans-serif": [font]}):
-        plt.figure(figsize=(width, height))
+        fig = plt.figure(figsize=(width, height))
         ax = plt.axes([0, 0, 1, 1], aspect=1, facecolor="b")
         kw = dict(
             family="sans-serif",
@@ -40,8 +40,8 @@ def genlogo(outfile, dark=False):
         )
         ax.text(0.05, 0.5, "X", ha="left", **kw)
         ax.text(0.95, 0.5, "A", ha="right", **kw)
-        plt.xlim(0, width)
-        plt.ylim(0, height)
+        ax.set_xlim(0, width)
+        ax.set_ylim(0, height)
 
         clip_height = 0.26
         for y0 in (0, 1 - clip_height):
@@ -61,7 +61,9 @@ def genlogo(outfile, dark=False):
             circle.set_clip_box(clip)
 
         ax.axis("off")
-        plt.savefig(outfile, transparent=True)
+        fig.savefig(outfile, transparent=True)
+        plt.close(fig)
+        del fig
 
 
 def genlogos(app):
