@@ -15,13 +15,26 @@ import xoa
 from xoa import cf
 
 
+def test_cf_sglocator_valid_locations():
+    assert cf.SGLocator(
+        pivot_locations=["rho", "u", "w"],
+        locations={"rho": {"name": "r", "alt_names": ["t"]}, "u": {}},
+    ).valid_locations == {"r", "rho", "u", "w", "t"}
+
+
+@pytest.mark.parametrize("loc,expected", [("r", "rho"), ("rho", "rho"), ("t", "rho"), ("u", "u")])
+def test_cf_sglocator_get_pivot_name(loc, expected):
+    sglocator = cf.SGLocator(locations={"rho": {"name": "r", "alt_names": ["t"]}, "u": {}})
+    assert sglocator.get_pivot_loc(loc) == expected
+
+
 @pytest.mark.parametrize(
     "attr,value,expected",
     [
-        ("standard_name", "my_var_at_t_location", ("my_var", "t")),
+        ("standard_name", "my_var_at_u_location", ("my_var", "u")),
         ("standard_name", "my_var", ("my_var", None)),
-        ("long_name", "My var at T location", ("My var", "t")),
-        ("name", "myvar_t", ("myvar", "t")),
+        ("long_name", "My var at U location", ("My var", "u")),
+        ("name", "myvar_u", ("myvar", "u")),
     ],
 )
 def test_cf_sglocator_parse_attr(attr, value, expected):
@@ -31,31 +44,32 @@ def test_cf_sglocator_parse_attr(attr, value, expected):
 @pytest.mark.parametrize(
     "attr,value,expected",
     [
-        ("standard_name", "my_var_at_t_location", ("my_var_at_t_location", None)),
+        ("standard_name", "my_var_at_z_location", ("my_var_at_z_location", None)),
         ("standard_name", "my_var_at_u_location", ("my_var", "u")),
         ("long_name", "My var at RHO location", ("My var", "rho")),
         ("long_name", "My var at rho location", ("My var", "rho")),
-        ("name", "myvarrho", ("myvar", "rho")),
+        ("long_name", "My var at psi location", ("My var", "psi")),
+        ("name", "myvar_rho", ("myvar", "rho")),
     ],
 )
-def test_cf_sglocator_parse_attr_with_valid_locations(attr, value, expected):
-    assert (
-        cf.SGLocator(
-            valid_locations=['u', 'rho'],
-            name_format="{root}{loc}",
-        ).parse_attr(attr, value)
-        == expected
-    )
+def test_cf_sglocator_parse_attr_with_locations(attr, value, expected):
+    assert cf.SGLocator(locations={"f": {"name": "psi"}}).parse_attr(attr, value) == expected
+
+
+def test_cf_sglocator_parse_attr_loc_false():
+    sglocator = cf.SGLocator(pivot_locations=["t", "u"], locations={"u": {"name": False}})
+    assert sglocator.parse_attr("name", "sst_u") == ("sst_u", None)
+    assert sglocator.parse_attr("name", "sst_t") == ("sst", "t")
 
 
 @pytest.mark.parametrize(
     "name,standard_name,long_name,loc",
     [
-        ("u_t", None, None, "t"),
-        (None, "u_at_t_location", None, "t"),
-        (None, None, "U at T location", "t"),
-        ("u_t", "_at_t_location", "U at T location", "t"),
-        ("u", "u_at_t_location", None, "t"),
+        ("u_rho", None, None, "rho"),
+        (None, "u_at_rho_location", None, "rho"),
+        (None, None, "U at RHO location", "rho"),
+        ("u_rho", "u_at_rho_location", "U at RHO location", "rho"),
+        ("u", "u_at_rho_location", None, "rho"),
         ("u", "u", "U", None),
     ],
 )
@@ -76,10 +90,10 @@ def test_cf_sglocator_get_loc_from_da(name, standard_name, long_name, loc):
 @pytest.mark.parametrize(
     "name,standard_name,long_name",
     [
-        ("u_t", "u_at_u_location", None),
-        (None, "u_at_t_location", "U at U location"),
-        ("u_u", None, "U at T location"),
-        ("u_u", "u_at_w_location", "U at T location"),
+        ("u_rho", "u_at_u_location", None),
+        (None, "u_at_rho_location", "U at U location"),
+        ("u_u", None, "U at RHO location"),
+        ("u_u", "u_at_w_location", "U at RHO location"),
     ],
 )
 def test_cf_sglocator_get_loc_from_da_error(name, standard_name, long_name):
@@ -91,7 +105,6 @@ def test_cf_sglocator_get_loc_from_da_error(name, standard_name, long_name):
         da.attrs["standard_name"] = standard_name
     if long_name:
         da.attrs["long_name"] = long_name
-
     with pytest.raises(cf.XoaCFError):
         cf.SGLocator().get_loc_from_da(da, errors="raise")
 
@@ -101,22 +114,22 @@ def test_cf_sglocator_get_loc_from_da_error(name, standard_name, long_name):
 @pytest.mark.parametrize(
     "attr,root,loc,expected",
     [
-        ("standard_name", "my_var", "t", True),
-        ("standard_name", "my_var2", "t", False),
-        ("standard_name", "my_var", "x", False),
+        ("standard_name", "my_var", "rho", True),
+        ("standard_name", "my_var2", "rho", False),
+        ("standard_name", "my_var", "u", False),
         ("standard_name", "my_var", None, True),
-        ("standard_name", "my_var", "xtu", True),
-        ("long_name", "My var", "t", True),
-        ("long_name", "My var", "x", False),
-        ("name", "myvar", "t", True),
-        ("name", "myvar", "x", False),
+        ("standard_name", "my_var", "any", True),
+        ("long_name", "My var", "rho", True),
+        ("long_name", "My var", "u", False),
+        ("name", "myvar", "rho", True),
+        ("name", "myvar", "u", False),
     ],
 )
 def test_cf_sglocator_match_attr(attr, root, loc, expected):
     value = dict(
-        standard_name="my_var_at_t_location",
-        long_name="My var at T location",
-        name="myvar_t",
+        standard_name="my_var_at_rho_location",
+        long_name="My var at RHO location",
+        name="myvar_rho",
     )[attr]
     assert cf.SGLocator().match_attr(attr, value, root, loc) is expected
 
@@ -124,30 +137,33 @@ def test_cf_sglocator_match_attr(attr, root, loc, expected):
 @pytest.mark.parametrize(
     "attr,root,loc,expected",
     [
-        ("standard_name", "my_var", "t", "my_var_at_t_location"),
+        ("standard_name", "my_var", "rho", "my_var_at_rho_location"),
         ("standard_name", "my_var", "", "my_var"),
-        ("long_name", "My var", "t", "My var at T location"),
-        ("name", "myvar", "t", "myvar_t"),
+        ("long_name", "My var", "rho", "My var at RHO location"),
+        ("name", "myvar", "rho", "myvar_rho"),
     ],
 )
 def test_cf_sglocator_format_attr(attr, root, loc, expected):
     assert cf.SGLocator().format_attr(attr, root, loc) == expected
 
 
+def test_cf_sglocator_format_attr_loc_false():
+    sglocator = cf.SGLocator(pivot_locations=["t", "u"], locations={"u": {"name": False}})
+    assert sglocator.format_attr("name", "sst", "u", errors="ignore") == "sst"
+    assert sglocator.format_attr("name", "sst", "t") == "sst_t"
+
+
 def test_cf_sglocator_format_attr_valid_locations():
     with pytest.raises(cf.XoaCFError) as excinfo:
-        cf.SGLocator(valid_locations="x").format_attr("name", "banana", "y")
-    assert str(excinfo.value) == (
-        'Location "y" is not recognised by the currents '
-        'specifications. Registered locations are: x'
-    )
+        cf.SGLocator(pivot_locations=["x"]).format_attr("name", "banana", "y", errors="raise")
+    assert str(excinfo.value) == ("Invalid location 'y'. Please one of: x")
 
 
 def test_cf_sglocator_format_attrs_no_loc():
     attrs = {
         "name": "u_u",
-        "standard_name": "banana_at_t_location",
-        "long_name": "Banana at T location",
+        "standard_name": "banana_at_u_location",
+        "long_name": "Banana at U location",
         "int_attr": 10,
         "str_attr": "good",
     }
@@ -163,7 +179,7 @@ def test_cf_sglocator_format_attrs_no_loc():
 def test_cf_sglocator_format_attrs_with_loc():
     attrs = {
         "name": "u_u",
-        "standard_name": "banana_at_t_location",
+        "standard_name": "banana_at_u_location",
         "long_name": "Banana",
         "int_attr": 10,
         "str_attr": "good",
@@ -192,7 +208,7 @@ def test_cf_sglocator_format_attrs_with_loc():
     ],
 )
 def test_cf_sglocator_merge_attr(value0, value1, loc, value):
-    out = cf.SGLocator().merge_attr("name", value0, value1, loc)
+    out = cf.SGLocator(pivot_locations=["t", "u", "x", "y"]).merge_attr("name", value0, value1, loc)
     assert out == value
 
 
@@ -203,12 +219,12 @@ def test_cf_sglocator_merge_attr(value0, value1, loc, value):
         (None, "sst", "sst", None, False),
         ("sst", "temp", "sst", None, False),
         ("sst", "temp", "temp", None, True),
-        ("sst_at_t_location", "temp_at_u_location", "sst_at_t_location", None, False),
-        ("sst_at_t_location", "temp_at_u_location", "temp_at_u_location", None, True),
+        ("sst_at_rho_location", "temp_at_u_location", "sst_at_rho_location", None, False),
+        ("sst_at_rho_location", "temp_at_u_location", "temp_at_u_location", None, True),
         ("sst", "temp", "sst_at_u_location", "u", False),
         ("sst", "temp", "temp_at_u_location", "u", True),
-        ("sst_at_t_location", "temp_at_x_location", "sst_at_u_location", "u", False),
-        ("sst_at_t_location", "temp_at_x_location", "temp_at_u_location", "u", True),
+        ("sst_at_rho_location", "temp_at_f_location", "sst_at_u_location", "u", False),
+        ("sst_at_rho_location", "temp_at_f_location", "temp_at_u_location", "u", True),
     ],
 )
 def test_cf_sglocator_patch_attrs(isn, psn, osn, loc, replace):
@@ -233,20 +249,20 @@ def test_cf_sglocator_patch_attrs(isn, psn, osn, loc, replace):
 @pytest.mark.parametrize(
     "floc,fname,fattrs,out_name,out_standard_name,replace_attrs",
     [
-        # ("p", None, None, "banana_p", "banana_at_p_location", False),
-        # (None, None, None, "banana_t", "banana", False),
-        # ("p", "sst", {"standard_name": "potatoe"}, "sst_p", "banana_at_p_location", False),
-        # ("p", "sst", {"standard_name": "potatoe"}, "sst_p", "potatoe_at_p_location", True),
-        # (
-        #     'x',
-        #     "sst",
-        #     {"standard_name": ["potatoe", "banana"]},
-        #     "sst_x",
-        #     "banana_at_x_location",
-        #     True,
-        # ),
-        (None, "sst_q", {"standard_name": ["potatoe"]}, "sst_q", "potatoe_at_q_location", True),
-        # (None, "sst", {"standard_name": ["potatoe"]}, "sst_t", "potatoe_at_t_location", True),
+        ("p", None, None, "banana_p", "banana_at_p_location", False),
+        (False, None, None, "banana", "banana", False),
+        ("p", "sst", {"standard_name": "potatoe"}, "sst_p", "banana_at_p_location", False),
+        ("p", "sst", {"standard_name": "potatoe"}, "sst_p", "potatoe_at_p_location", True),
+        (
+            'x',
+            "sst",
+            {"standard_name": ["potatoe", "banana"]},
+            "sst_x",
+            "banana_at_x_location",
+            True,
+        ),
+        (None, "sst_q", {"standard_name": "potatoe"}, "sst_q", "potatoe_at_q_location", True),
+        (None, "sst", {"standard_name": "potatoe"}, "sst_t", "potatoe_at_t_location", True),
     ],
 )
 def test_cf_sglocator_format_dataarray(
@@ -261,7 +277,7 @@ def test_cf_sglocator_format_dataarray(
         name="banana_t",
         attrs={"standard_name": "banana", "taste": "good"},
     )
-    banana_fmt = cf.SGLocator().format_dataarray(
+    banana_fmt = cf.SGLocator(pivot_locations=["q", "x", "p", "t"]).format_dataarray(
         banana, loc=floc, name=fname, attrs=fattrs, replace_attrs=replace_attrs
     )
     assert banana_fmt.name == out_name
@@ -271,10 +287,10 @@ def test_cf_sglocator_format_dataarray(
 
 def test_cf_sglocator_format_dataarray_no_copy_no_rename():
     banana = xr.DataArray(1, name="banana_t", attrs={"standard_name": "banana"})
-    banana_fmt = cf.SGLocator().format_dataarray(banana, "p", copy=False, rename=False)
+    banana_fmt = cf.SGLocator().format_dataarray(banana, "f", copy=False, rename=False)
     assert banana_fmt is banana
     assert banana_fmt.name == "banana_t"
-    assert banana_fmt.standard_name == "banana_at_p_location"
+    assert banana_fmt.standard_name == "banana_at_f_location"
 
 
 @pytest.mark.parametrize("cache", ["ignore", "write", "rw", "read", "ignore", "clean", "rw"])
@@ -370,9 +386,6 @@ def test_cf_cfspecs_get_attrs():
 def test_cf_cfspecs_get_loc_mapping():
 
     cf_dict0 = {
-        "sglocator": {
-            "valid_locations": ["u", "v"],
-        },
         "data_vars": {
             "u": {
                 "loc": "u",
@@ -404,7 +417,7 @@ def test_cf_cfspecs_get_loc_mapping():
     [
         ("lon", None),
         ("xxx", {"standard_name": "longitude"}),
-        ("xxx", {"standard_name": "longitude_at_t_location"}),
+        ("xxx", {"standard_name": "longitude_at_rho_location"}),
         ("xxx", {"units": "degree_east"}),
     ],
 )
@@ -424,7 +437,7 @@ def test_cf_cfspecs_match_coord(cf_name, in_name, in_attrs):
     [
         ("lon", None),
         ("xxx", {"standard_name": "longitude"}),
-        ("xxx", {"standard_name": "longitude_at_t_location"}),
+        ("xxx", {"standard_name": "longitude_at_rho_location"}),
         ("xxx", {"units": "degree_east"}),
     ],
 )
@@ -493,9 +506,6 @@ def test_cf_cfspecs_search_data_var(cf_name, in_name, in_attrs):
 def test_cf_cfspecs_cats_get_loc_arg():
 
     cf_dict0 = {
-        "sglocator": {
-            "valid_locations": ["u", "v"],
-        },
         "data_vars": {
             "u": {
                 "loc": "u",
@@ -568,10 +578,6 @@ def test_cf_cfspecs_cats_get_allowed_names():
 def test_cf_cfspecs_format_obj_with_loc():
 
     cf_dict0 = {
-        "sglocator": {
-            "name_format": "{root}_{loc}",
-            "valid_locations": ["u", "v"],
-        },
         "data_vars": {
             "u": {
                 "loc": "u",
@@ -634,7 +640,7 @@ def test_cf_cfspecs_format_data_var_specialize():
 
 
 def test_cf_cfspecs_format_data_var_loc():
-    temp = xr.DataArray(0, name='xtemp', attrs={'standard_name': 'banana_at_x_location'})
+    temp = xr.DataArray(0, name='xtemp', attrs={'standard_name': 'banana_at_u_location'})
 
     cf_dict0 = {
         "sglocator": {
@@ -648,14 +654,12 @@ def test_cf_cfspecs_format_data_var_loc():
     assert temp_fmt.standard_name == "sea_water_temperature"  # _at_x_location"
 
     cf_dict1 = {
-        "sglocator": {
-            "name_format": "{root}_{loc}",
-        },
+        "sglocator": {"name_format": "{root}_{loc}"},
         "data_vars": {"temp": {"add_loc": True}},
     }
     cfspecs1 = cf.CFSpecs(cf_dict1)
     temp_fmt = cfspecs1.format_data_var(temp, "temp", format_coords=False, replace_attrs=True)
-    assert temp_fmt.name == "temp_x"
+    assert temp_fmt.name == "temp_u"
 
 
 def test_cf_cfspecs_format_data_var_unkown():
@@ -681,24 +685,24 @@ def test_cf_cfspecs_exclude_data_var():
 
 def test_cf_cfspecs_to_loc():
     ds = xr.Dataset(
-        {"u_t": (("time", "y", "x_u"), np.ones((1, 2, 3)))},
+        {"u_rho": (("time", "y", "x_u"), np.ones((1, 2, 3)))},
         coords={
             "lon_u": (("y", "x_u"), np.ones((2, 3))),
             "lat": (("y", "x_u"), np.ones((2, 3))),
             "time": ("time", [1]),
         },
     )
-    cfspecs = cf.CFSpecs({"sglocator": {"name_format": "{root}_{loc}"}})
+    cfspecs = cf.CFSpecs()
     dso = cfspecs.to_loc(ds, x=False, y='v', u=None)
     assert "x" in dso.dims
     assert "y_v" in dso.dims
-    assert "u_t" in dso
+    assert "u_rho" in dso
     assert "lon_u" in dso
 
 
 def test_cf_cfspecs_reloc():
     ds = xr.Dataset(
-        {"u_t": (("time", "y", "x_u"), np.ones((1, 2, 3)))},
+        {"u_rho": (("time", "y", "x_u"), np.ones((1, 2, 3)))},
         coords={
             "lon_u": (("y", "x_u"), np.ones((2, 3))),
             "lat": (("y", "x_u"), np.ones((2, 3))),
@@ -706,7 +710,7 @@ def test_cf_cfspecs_reloc():
         },
     )
     cfspecs = cf.CFSpecs({"sglocator": {"name_format": "{root}_{loc}"}})
-    dso = cfspecs.reloc(ds, u=False, t='u')
+    dso = cfspecs.reloc(ds, u=False, rho='u')
     assert "x" in dso.dims
     assert "u_u" in dso
     assert "lon" in dso
@@ -857,7 +861,7 @@ def test_cf_cfspecs_decode_encode():
     dsc = cfspecs.decode(ds)
     assert list(dsc) == [
         'akt',
-        'cs_r',
+        'cs_rho',
         'cs_w',
         'Vtransform',
         'angle',

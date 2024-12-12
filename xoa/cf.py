@@ -28,6 +28,7 @@ import re
 import pprint
 import fnmatch
 import copy
+import warnings
 
 import appdirs
 
@@ -109,9 +110,11 @@ def _compile_sg_match_(re_match, attrs, formats, root_patterns, location_pattern
         if formats[attr]:
             root_pattern = root_patterns[attr]
             re_match[attr] = re.compile(
-                formats[attr].format(
+                "^"
+                + formats[attr].format(
                     root=rf"(?P<root>{root_pattern})", loc=rf"(?P<loc>{location_pattern})"
-                ),
+                )
+                + "$",
                 re.I,
             ).match
 
@@ -124,12 +127,30 @@ class SGLocator(object):
     name_format: str
         A string containing the string patterns ``{root}`` and ``{loc}``,
         which defaults to ``"{root}_{loc}"``
+    locations: None, dict(dict())
+        The dictionary keys give the generic pivot names of the locations,
+        while the values contains the specifications including the name used for
+        encoding, and the list of alternative names that can be parsed during decoding.
+    pivot_locations: list(str), None
+        The list of valid names for pivot locations.
+
+        .. note:: The keys of the `locations` argument must be included in the `pivot_locations`.
+
     valid_locations: list(str), None
         Valid location strings that are used when parsing
+
+        .. warning:: Deprecated
+
+            Please use the `locations` keyword to specify valid locations
+
     """
+
+    #: Default pivot location names
+    default_pivot_locations = {"rho", "u", "v", "f", "w", "uw", "vw", "fw"}
 
     valid_attrs = ("name", "standard_name", "long_name")
 
+    #: Defaults formats used for formatting and parsing
     default_formats = {
         "name": "{root}_{loc}",
         "standard_name": "{root}_at_{loc}_location",
@@ -143,55 +164,161 @@ class SGLocator(object):
     re_match = {}
     _compile_sg_match_(re_match, valid_attrs, default_formats, root_patterns, location_pattern)
 
-    def __init__(self, name_format=None, valid_locations=None, encoding=None):
+    def __init__(
+        self,
+        name_format=None,
+        locations=None,
+        pivot_locations=None,
+        valid_locations=None,
+        encoding=None,
+    ):
         # Init
         self.formats = self.default_formats.copy()
         self.re_match = self.re_match.copy()
-        self.update(name_format, valid_locations, encoding)
+        self.update(
+            name_format=name_format,
+            locations=locations,
+            pivot_locations=pivot_locations,
+            valid_locations=valid_locations,
+            encoding=encoding,
+        )
 
-    def update(self, name_format=None, valid_locations=None, encoding=None):
-        if valid_locations:
-            valid_locations = list(valid_locations)
-        self.valid_locations = valid_locations
+    def update(
+        self,
+        name_format=None,
+        locations=None,
+        valid_locations=None,
+        pivot_locations=None,
+        encoding=None,
+    ):
 
-        # # Check encoding
-        # self.encoding = encoding or {}
-        # self._re_encoded = re.compile("^[01]{3}$").match
-        # for key, val in self.encoding:
-        #     if not self._re_encoded(key):
-        #         del self.encoding[key]
-        #     if isinstance(val, str):
-        #         self.encoding[key] = [val]
-
-        # Formats and regexps
-        to_recompile = set()
+        # Formats
+        to_compile = {"name"}
         if name_format:
             for pat in ("{root}",):  # "{loc}"):
                 if pat not in name_format:
                     raise XoaCFError("name_format must contain strings {root}: " + name_format)
-            if len(name_format) == 10:
-                xoa_warn(
-                    'No separator found in "name_format" and '
-                    'and no "valid_locations" specified: '
-                    f'{name_format}. This leads to ambiguity during '
-                    'regular expression parsing.'
-                )
+            # if len(name_format) == 10:
+            #     xoa_warn(
+            #         'No separator found in "name_format" and '
+            #         'and no "valid_locations" specified: '
+            #         f'{name_format}. This leads to ambiguity during '
+            #         'regular expression parsing.'
+            #     )
             self.formats["name"] = name_format
-            to_recompile.add("name")
         elif name_format is not None:
             self.formats["name"] = "{root}"
-            to_recompile.add("name")
-        all_locations = []
-        if self.valid_locations:
-            all_locations.extend(self.valid_locations)
-        # for locs in self.encoding.values():
-        #     all_locations.extend(locs)
-        if all_locations:
-            self.location_pattern = "|".join(self.valid_locations)
-            to_recompile.update(("name", "standard_name", "long_name"))
-        _compile_sg_match_(
-            self.re_match, to_recompile, self.formats, self.root_patterns, self.location_pattern
+
+        # Locations
+        self.pivot_locations = (
+            self.default_pivot_locations if pivot_locations is None else set(pivot_locations)
         )
+        if valid_locations:
+            xxxx
+            warnings.warn(
+                "The 'valid_locations' keyword is deprecated and ignored. Please use 'locations' instead."
+            )
+        if locations is None:
+            locations = {}
+        self.locations = {}
+        for loc, specs in locations.items():
+            if loc not in self.pivot_locations:
+                raise XoaCFError(
+                    f"Invalid pivot locations: '{loc}'. Choose one of: "
+                    + ", ".join(self.pivot_locations)
+                )
+                continue
+            if specs is False:
+                specs = {}
+            if isinstance(specs, dict):
+                self.locations[loc] = specs
+            else:
+                self.locations[loc] = {}
+        for pivot in self.pivot_locations:
+            if pivot not in self.locations:
+                self.locations[pivot] = {}
+
+        # Compile regular expressions
+        if self.locations:
+            self.location_pattern = "|".join(self.valid_locations)
+            to_compile.update(("name", "standard_name", "long_name"))
+        _compile_sg_match_(
+            self.re_match, to_compile, self.formats, self.root_patterns, self.location_pattern
+        )
+
+    @property
+    def valid_locations(self):
+        """The list of valid locations, including the pivots, names and alternative names"""
+        locs = set()
+
+        for pivot_name, specs in self.locations.items():
+            name = specs.get("name")
+            if name is not False:  # pivot
+                locs.add(pivot_name)
+            if name:  # specialized name
+                locs.add(specs["name"])
+            if specs.get("alt_names"):  # alternatives names
+                locs.update(specs["alt_names"])
+
+        return locs
+
+    def is_valid_loc(self, loc):
+        """Check if a location string represents a valid location"""
+        valid_locs = self.valid_locations
+        return loc.lower() in [vloc.lower() for vloc in valid_locs]
+
+    @ERRORS.format_method_docstring
+    def check_valid_loc(self, loc, errors="raise"):
+        """Make sur that a location string represents a valid location
+
+        Parameters
+        ----------
+        loc: str
+        {errors}
+
+        Return
+        ------
+        str
+        """
+        msg = None
+        errors = ERRORS[errors]
+        if not self.is_valid_loc(loc):
+            msg = f"Invalid location '{loc}'. "
+            if not self.valid_locations:
+                msg += "No location are registered."
+            else:
+                msg += "Please one of: " + ", ".join(self.valid_locations)
+            if errors == "raise":
+                raise XoaCFError(msg)
+            if errors == "warn":
+                xoa_warn(msg + " Skip.")
+            return False
+        return loc
+
+    def get_pivot_loc(self, loc):
+        """Get the generic pivot location given a valid location string"""
+        self.check_valid_loc(loc)
+        for pivot_loc, specs in self.locations.items():
+            locs = {pivot_loc.lower()}
+            if specs.get("name"):
+                locs.add(specs["name"])
+            if specs.get("alt_names"):
+                locs = locs.union(specs["alt_names"])
+            locs = [ll.lower() for ll in locs]
+            if loc.lower() in locs:
+                return pivot_loc
+
+    def get_specialized_loc(self, loc):
+        """Get the specialized location that can be used for encoding"""
+        pivot_loc = self.get_pivot_loc(loc)
+        specs = self.locations[pivot_loc]
+        if loc == pivot_loc and specs[pivot_loc].get("name"):
+            return specs[pivot_loc]["name"]
+        return loc
+
+    def are_same_locs(self, loc0, loc1):
+        """Check that two locations are equivalent, i.e at the same pivot location"""
+        return self.get_pivot_loc(loc0) == self.get_pivot_loc(loc1)
 
     def parse_attr(self, attr, value):
         """Parse an attribute string to get its root and location
@@ -216,12 +343,12 @@ class SGLocator(object):
 
             @suppress
             from xoa.cf import SGLocator
-            sg = SGLocator(name_format="{root}_{loc}")
+            sg = SGLocator(name_format="{root}_{loc}", locations={"t": {}, "rhum": {}})
             sg.parse_attr("name", "super_banana_t")
             sg.parse_attr("standard_name", "super_banana_at_rhum_location")
             sg.parse_attr("standard_name", "super_banana_at_rhum_place")
 
-            sg = SGLocator(valid_locations=["u", "rho"])
+            sg = SGLocator(locations={"u": {}, "rho": {}})
             sg.parse_attr("name", "super_banana_t")
             sg.parse_attr("name", "super_banana_rho")
         """
@@ -274,7 +401,7 @@ class SGLocator(object):
                 standard_name = standard_name[0]
             loc_ = self.parse_attr("standard_name", standard_name)[1]
             if loc_:
-                if not loc or loc_ == loc:
+                if not loc or self.are_same_locs(loc_, loc):
                     loc = loc_
                     src.append("standard_name")
                 elif errors != "ignore":
@@ -295,7 +422,7 @@ class SGLocator(object):
                 long_name = long_name[0]
             loc_ = self.parse_attr("long_name", long_name)[1]
             if loc_:
-                if not loc or loc_ == loc:
+                if not loc or self.are_same_locs(loc_, loc):
                     loc = loc_
                 elif errors != "ignore":
                     src = ' and '.join(src)
@@ -341,7 +468,6 @@ class SGLocator(object):
 
             * `None`: None, True, "any"
             * `False`: `False`, ""
-            * [01][01][01]: `encoding[loc][0]` or False
             * str: str
         """
         if loc is None or loc is True or loc == "any":
@@ -353,14 +479,10 @@ class SGLocator(object):
                 'Invalid loc argument. Must one of: '
                 'None, Trye, "any", False, "" or a location string'
             )
+        #   """          * [01][01][01]: `encoding[loc][0]` or False"""
         # if self._re_encoded(loc):
         #     locs = self.encoding.get(loc)
         #     return locs[0] if locs else False
-        if self.valid_locations is not None and loc not in self.valid_locations:
-            raise XoaCFError(
-                f'Location "{loc}" is not recognised by the currents specifications. '
-                'Registered locations are: ' + ', '.join(self.valid_locations)
-            )
         return loc
 
     def match_attr(self, attr, value, root, loc=None):
@@ -394,21 +516,25 @@ class SGLocator(object):
             return vloc is None
         return vloc in loc  # one of these locs
 
-    def format_attr(self, attr, value, loc, standardize=True):
+    @ERRORS.format_method_docstring
+    def format_attr(self, attr, value, loc, standardize=True, specialize=True, errors="warn"):
         """Format a single attribute at a specified location
 
         Parameters
         ----------
-        attr: {'name', 'standard_name', 'long_name'}
+        attr: {{'name', 'standard_name', 'long_name'}}
             Attribute name
         value: str
             Current attribute value. It is parsed to get current ``root``.
-        loc: {True, None}, str, {False, ""}
+        loc: {{True, None}}, str, {{False, ""}}
             If None, location is left unchanged;
             if a non empty str, it is set;
             else, it is removed.
         standardize: bool
             If True, standardize ``root`` and ``loc`` values.
+        specialize: bool
+            Format with the given location instead of the corresponding generic pivot location
+        {errors}
 
         Return
         ------
@@ -420,7 +546,7 @@ class SGLocator(object):
 
             @suppress
             from xoa.cf import SGLocator
-            sg = SGLocator()
+            sg = SGLocator(locations={{"t": None}})
             sg.format_attr('standard_name', 'sea_water_temperature', 't')
             sg.format_attr('standard_name', 'sea_water_temperature', False)
             sg.format_attr('name', 'banana_t', None)
@@ -439,6 +565,8 @@ class SGLocator(object):
                 if attr == "standard_name":
                     root = root.lower()
         loc = self.parse_loc_arg(loc)
+        if isinstance(loc, str):
+            loc = self.check_valid_loc(loc, errors=errors)
         if loc is False:
             return root
             # loc = None
@@ -461,6 +589,10 @@ class SGLocator(object):
         if not loc:
             return root
 
+        # Pivot location instead
+        if not specialize:
+            loc = self.get_pivot_loc(loc)
+
         # Better looking loc
         if standardize:
             if attr == "long_name":
@@ -478,18 +610,22 @@ class SGLocator(object):
             return root
         return _format.format(root=root, loc=loc)
 
-    def format_attrs(self, attrs, loc=None, standardize=True):
+    @ERRORS.format_method_docstring
+    def format_attrs(self, attrs, loc=None, standardize=True, specialize=True, errors="warn"):
         """Copy and format a dict of attributes
 
         Parameters
         ----------
         attrs: dict
-        loc: {True, None}, letter, {False, ""}
+        loc: {{True, None}}, letter, {{False, ""}}
             If None, location is left unchanged;
             if a letter, it is set;
             else, it is removed.
         standardize: bool
             If True, standardize ``root`` and ``loc`` values.
+        specialize: bool
+            Format with the given location instead of the corresponding generic pivot location
+        {errors}
 
         Return
         ------
@@ -501,7 +637,7 @@ class SGLocator(object):
 
             @suppress
             from xoa.cf import SGLocator
-            sg = SGLocator()
+            sg = SGLocator(locations={{"t": None}})
             attrs = dict(standard_name='sea_water_temperature_at_t_location',
                          long_name='sea_water_temperature',
                          other_attr=23.)
@@ -513,27 +649,42 @@ class SGLocator(object):
         for attr, value in attrs.items():
             if attr in self.valid_attrs and attr != 'name':
                 if isinstance(value, list):
-                    value = [self.format_attr(attr, v, loc, standardize=standardize) for v in value]
+                    value = [
+                        self.format_attr(
+                            attr, v, loc, standardize=standardize, specialize=specialize
+                        )
+                        for v in value
+                    ]
                 else:
-                    value = self.format_attr(attr, value, loc, standardize=standardize)
+                    value = self.format_attr(
+                        attr, value, loc, standardize=standardize, specialize=specialize
+                    )
                 attrs[attr] = value
         return attrs
 
-    def merge_attr(self, attr, value0, value1, loc=None, standardize=True):
+    @ERRORS.format_method_docstring
+    def merge_attr(
+        self, attr, value0, value1, loc=None, standardize=True, specialize=True, errors="warn"
+    ):
         """Merge two attribute values taking care of location
 
         Parameters
         ----------
-        attr: {'name', 'standard_name', 'long_name'}
+        attr: {{'name', 'standard_name', 'long_name'}}
             Attribute name
         value0: str, None
             First attribute value
         value1: str, None
             Second attribute value, which is prioritary over the first one
-        loc: letters, {"any", None} or {"", False}
+        loc: letters, {{"any", None}} or {{"", False}}
             - letters: one of these locations
             - None or "any": any
             - False or '': no location
+        standardize: bool
+            If True, standardize ``root`` and ``loc`` values.
+        specialize: bool
+            Format with the given location instead of the corresponding generic pivot location
+        {errors}
 
         Returns
         -------
@@ -554,11 +705,17 @@ class SGLocator(object):
         if value0 is None and value1 is None:
             return
         if value0 is None:
-            return self.format_attr(attr, value1, loc, standardize=standardize)
+            return self.format_attr(
+                attr, value1, loc, standardize=standardize, specialize=specialize, errors=errors
+            )
         if value1 is None:
-            return self.format_attr(attr, value0, loc, standardize=standardize)
+            return self.format_attr(
+                attr, value0, loc, standardize=standardize, specialize=specialize, errors=errors
+            )
 
         loc = self.parse_loc_arg(loc)
+        if isinstance(loc, str):
+            loc = self.check_valid_loc(loc, errors=errors)
         if loc is None:
             loc0 = self.parse_attr(attr, value0)[1]
             loc1 = self.parse_attr(attr, value1)[1]
@@ -566,10 +723,20 @@ class SGLocator(object):
                 loc = loc1
             elif loc0 is not None:
                 loc = loc0
-        return self.format_attr(attr, value1, loc, standardize=standardize)
+        return self.format_attr(attr, value1, loc, standardize=standardize, specialize=specialize)
 
-    def patch_attrs(self, attrs, patch, loc=None, standardize=True, replace=False):
-        """Patch a dict of attribute with another dict taking care of loc
+    @ERRORS.format_method_docstring
+    def patch_attrs(
+        self,
+        attrs,
+        patch,
+        loc=None,
+        standardize=True,
+        specialize=True,
+        replace=False,
+        errors="warn",
+    ):
+        """Patch a dict of attributes with another dict taking care of loc
 
         Parameters
         ----------
@@ -577,14 +744,17 @@ class SGLocator(object):
             Dictionary of attributes to patch
         patch: dict
             Patch to apply
-        loc: {None, "any"}, letter, {False, ""}
+        loc:  lette, {{"any", None}} or {{"", False}}
             If None, location is left unchanged;
             if a letter, it is set;
             else, it is removed.
         standardize: bool
             If True, standardize ``root`` and ``loc`` values.
+        specialize: bool
+            Format with the given location instead of the corresponding generic pivot location
         replace: bool
             Replace existing attributes?
+        {errors}
 
         Returns
         -------
@@ -598,7 +768,11 @@ class SGLocator(object):
         # Reloc if needed
         attrs = attrs.copy()
         if attrs:
-            attrs.update(self.format_attrs(attrs, loc, standardize=standardize))
+            attrs.update(
+                self.format_attrs(
+                    attrs, loc, standardize=standardize, specialize=specialize, errors=errors
+                )
+            )
 
         # Loop patching on attributes
         for attr, value in patch.items():
@@ -622,7 +796,13 @@ class SGLocator(object):
 
                 # Location
                 value = self.merge_attr(
-                    attr, attrs.get(attr, None), value, loc, standardize=standardize
+                    attr,
+                    attrs.get(attr, None),
+                    value,
+                    loc,
+                    standardize=standardize,
+                    specialize=specialize,
+                    errors=errors,
                 )
 
             if value is not None:
@@ -630,11 +810,13 @@ class SGLocator(object):
 
         return attrs
 
+    @ERRORS.format_method_docstring
     def format_dataarray(
         self,
         da,
         loc=None,
         standardize=True,
+        specialize=True,
         name=None,
         attrs=None,
         rename=True,
@@ -642,18 +824,21 @@ class SGLocator(object):
         replace_attrs=False,
         add_loc_to_name=True,
         add_loc_to_attrs=True,
+        errors="warn",
     ):
         """Format name and attributes of a copy of DataArray
 
         Parameters
         ----------
         da: xarray.DataArray
-        loc: {True, None}, str, {False, ""}
+        loc: {{True, None}}, str, {{False, ""}}
             If None, location is left unchanged;
             if a string, it is set;
             else, it is removed.
         standardize: bool
             If True, standardize ``root`` and ``loc`` values.
+        specialize: bool
+            Format with the given location instead of the corresponding generic pivot location
         name: str, None
             Substitute for data array name
         attrs: str, None
@@ -669,6 +854,7 @@ class SGLocator(object):
             Replace existing attributes?
         copy: bool
             Make sure to work on a copy
+        {errors}
 
         Return
         ------
@@ -684,25 +870,38 @@ class SGLocator(object):
 
         # Location argument
         loc = self.parse_loc_arg(loc)  # specified
+        if isinstance(loc, str):
+            loc = self.check_valid_loc(loc, errors=errors)
         if loc is None:
             loc0 = self.get_loc_from_da(da)  # parsed from
             loc1 = self.get_loc(name=name, attrs=attrs)  # parsed from specs
             loc = loc0 if loc1 is None else loc1
 
         # Attributes
-        kwloc = {"loc": loc if add_loc_to_attrs else False}
+        kwloc = {"loc": loc if add_loc_to_attrs else False, "errors": errors}
         if attrs:
             da.attrs.update(
                 self.patch_attrs(
-                    da.attrs, attrs, standardize=standardize, replace=replace_attrs, **kwloc
+                    da.attrs,
+                    attrs,
+                    standardize=standardize,
+                    specialize=specialize,
+                    replace=replace_attrs,
+                    **kwloc,
                 )
             )
         else:
-            da.attrs.update(self.format_attrs(da.attrs, standardize=standardize, **kwloc))
+            da.attrs.update(
+                self.format_attrs(da.attrs, standardize=standardize, specialize=specialize, **kwloc)
+            )
 
         # Name
         if rename:
-            kwloc = {"loc": loc if add_loc_to_name else False}
+            kwloc = {
+                "loc": loc if add_loc_to_name else False,
+                "specialize": specialize,
+                "errors": errors,
+            }
             if da.name:  # change the name
                 da.name = self.merge_attr("name", da.name, name, **kwloc)
             else:  # set it
@@ -719,7 +918,7 @@ class SGLocator(object):
 
         return da
 
-    def add_loc(self, da, loc, to_name=True, to_attrs=True):
+    def add_loc(self, da, loc, to_name=True, to_attrs=True, **kwargs):
         """A shortcut to :meth:`format_dataarray` to update `da` with loc without copy"""
         return self.format_dataarray(
             da,
@@ -728,15 +927,8 @@ class SGLocator(object):
             replace_attrs=True,
             add_loc_to_name=to_name,
             add_loc_to_attrs=to_attrs,
+            **kwargs,
         )
-
-
-def get_sglocator_pivot():
-    """Get the :class:`SGLocator` instance that is used as a pivot format"""
-    cache = _get_cache_()
-    if "sglocator_pivot" not in cache:
-        cache["sglocator_pivot"] = SGLocator()
-    return cache["sglocator_pivot"]
 
 
 def _solve_rename_conflicts_(rename_args):
@@ -940,17 +1132,6 @@ class CFSpecs(object):
     def sglocator(self):
         """:class:`SGLocator` instance"""
         return self._sgl
-
-    def get_sglocator(self, specialize):
-        """Get the right :class:`SGLocator` instance
-
-        Parameters
-        ----------
-        specialize: book
-            If True, the locator is the one of this dataset, as given by :attr:`sglocator`.
-            Else, if is the pivot locator as given by :func:`get_sglocator_pivot`.
-        """
-        return self._sgl if specialize else get_sglocator_pivot()
 
     @property
     def cfgspecs(self):
@@ -2756,7 +2937,9 @@ class _CFCatSpecs_(object):
         # Attributes
         if attrs is True:
             # Get attributes from Cf specs
-            attrs = self.get_attrs(cf_name, loc=None, standardize=False, multi=True)
+            attrs = self.get_attrs(
+                cf_name, loc=None, standardize=False, multi=True, specialize=specialize
+            )
 
             # Remove axis attribute for auxilary coordinates
             if da.name and da.name not in da.indexes and "axis" in attrs:
@@ -2765,16 +2948,14 @@ class _CFCatSpecs_(object):
         elif not attrs:
             attrs = {}
 
-        # Get the appropriate sglocator for formatting
-        sglocator = self.parent.get_sglocator(specialize)
-
         # Format array
-        new_da = sglocator.format_dataarray(
+        new_da = self.sglocator.format_dataarray(
             da,
             loc=loc,
             name=new_name,
             attrs=attrs,
             standardize=standardize,
+            specialize=specialize,
             rename=rename,
             # add_loc_to_name=add_loc_to_name,
             replace_attrs=replace_attrs,
@@ -2785,8 +2966,8 @@ class _CFCatSpecs_(object):
         # Return new name but don't rename
         if not rename:
             if old_name is None:
-                return sglocator.format_attr("name", new_name, loc)
-            return sglocator.merge_attr("name", old_name, new_name, loc)
+                return self.sglocator.format_attr("name", new_name, loc, specialize=specialize)
+            return self.sglocator.merge_attr("name", old_name, new_name, loc, specialize=specialize)
 
         # # Rename dim if axis coordinate
         # rename_dim = rename and rename_dim
@@ -3485,7 +3666,9 @@ def reset_cache(disk=True, memory=False):
         os.remove(USER_CF_CACHE_FILE)
 
     if memory:
-        cf_cache = _get_cfgm_()
+        cf_cache = _get_cache_()
+        if "cfgm" in cf_cache:
+            del cf_cache["cfgm"]
         cf_cache["loaded_dicts"].clear()
         cf_cache["current"] = None
         cf_cache["default"] = None

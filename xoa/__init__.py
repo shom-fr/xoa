@@ -75,7 +75,7 @@ class XoaWarning(UserWarning):
     pass
 
 
-def xoa_warn(message, stacklevel=2):
+def xoa_warn(message, stacklevel=2, category=XoaWarning):
     """Issue a :class:`XoaWarning` warning
 
     Example
@@ -87,7 +87,7 @@ def xoa_warn(message, stacklevel=2):
         from xoa import xoa_warn
         xoa_warn('Be careful!')
     """
-    warnings.warn(message, XoaWarning, stacklevel=stacklevel)
+    warnings.warn(message, category, stacklevel=stacklevel)
 
 
 def _get_cache_():
