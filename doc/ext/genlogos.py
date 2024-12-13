@@ -38,8 +38,8 @@ def genlogo(outfile, dark=False):
             weight="extra bold",
             transform=ax.transAxes,
         )
-        ax.text(0.05, 0.5, "X", ha="left", **kw)
-        ax.text(0.95, 0.5, "A", ha="right", **kw)
+        ax.text(0.05, 0.515, "X", ha="left", **kw)
+        ax.text(0.95, 0.515, "A", ha="right", **kw)
         ax.set_xlim(0, width)
         ax.set_ylim(0, height)
 

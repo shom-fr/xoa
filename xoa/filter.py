@@ -933,8 +933,10 @@ def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
 
 def demerliac(da, na_thres=0, dt_tol=0.01):
     """Apply a dermerliac filter on a data array
-    Note that the demerliac function is a shortcut of the :func:`tidal_filter` function with
-    `demerliac` as ``filter_name``.
+
+    Note that the demerliac function is a shortcut of the :func:`tidal_filter` function with `filter_name`
+    set to `demerliac`.
+
     Parameters
     ----------
     da: xarray.DataArray
@@ -943,6 +945,7 @@ def demerliac(da, na_thres=0, dt_tol=0.01):
     na_thres: float
         A float between 0 and 1 that defines the allowed level a NaN contamination.
         See :func:`convolve`.
+
     Return
     ------
     xarray.DataArray
