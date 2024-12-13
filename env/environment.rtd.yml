@@ -21,6 +21,7 @@ dependencies:
   - xarray>=0.17
   - pip:
       - configobj
+      - seaborn
       - sphinx
       - sphinx-autosummary-accessors
       - sphinx-book-theme
