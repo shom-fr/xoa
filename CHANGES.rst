@@ -158,13 +158,15 @@ New features
 
 Bug fixes
 ---------
+- Fix :class:`xoa.cf.SGLocator.parse_attr` parsing since regular expressions were not matching full strings.
 - Fix :func:`xoa.regrid.regrid1d` with "cellave" method  [:pull:`34`].
-- Fix :meth:`xoa.cf.CFSpecs.get_location_mapping` for coordinates that have no axis attribute specifications  [:pull:`34`].
+- Fix :meth:`xoa.cf.CFSpecs.get_location_mapping` for coordinates that have no axis attribute specifications [:pull:`34`].
 - Fix :func:`xoa.grid.dz2depth` that was not working properly with 4D+ arrays [:pull:`34`].
 
 
 Breaking changes
 ----------------
+- The default `name_format` of :class:`xoa.cf.SGLocator` no longer contains the location pattern `{loc}` to prevent unwanted location catching.
 - The `loc` argument of :func:`xoa.sigma.get_sigma_terms` is renamed `vloc` [:pull:`34`].
 
 

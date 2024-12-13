@@ -104,8 +104,8 @@ def _get_cache_():
     return cf._CF_CACHE
 
 
-def _compile_sg_match_(re_match, attrs, formats, root_patterns, location_pattern):
-    for attr in attrs:
+def _compile_sg_match_(re_match, formats, root_patterns, location_pattern):
+    for attr in ("name", "standard_name", "long_name"):
         if formats[attr]:
             root_pattern = root_patterns[attr]
             re_match[attr] = re.compile(
@@ -113,7 +113,7 @@ def _compile_sg_match_(re_match, attrs, formats, root_patterns, location_pattern
                     root=rf"(?P<root>{root_pattern})", loc=rf"(?P<loc>{location_pattern})"
                 ),
                 re.I,
-            ).match
+            ).fullmatch
 
 
 class SGLocator(object):
@@ -131,7 +131,7 @@ class SGLocator(object):
     valid_attrs = ("name", "standard_name", "long_name")
 
     default_formats = {
-        "name": "{root}_{loc}",
+        "name": "{root}",
         "standard_name": "{root}_at_{loc}_location",
         "long_name": "{root} at {loc} location",
     }
@@ -141,7 +141,7 @@ class SGLocator(object):
     location_pattern = "[a-z]+"
 
     re_match = {}
-    _compile_sg_match_(re_match, valid_attrs, default_formats, root_patterns, location_pattern)
+    _compile_sg_match_(re_match, default_formats, root_patterns, location_pattern)
 
     def __init__(self, name_format=None, valid_locations=None, encoding=None):
         # Init
@@ -151,8 +151,8 @@ class SGLocator(object):
 
     def update(self, name_format=None, valid_locations=None, encoding=None):
         if valid_locations:
-            valid_locations = list(valid_locations)
-        self.valid_locations = valid_locations
+            valid_locations = set(valid_locations)
+        self.valid_locations = valid_locations or set()
 
         # # Check encoding
         # self.encoding = encoding or {}
@@ -164,11 +164,10 @@ class SGLocator(object):
         #         self.encoding[key] = [val]
 
         # Formats and regexps
-        to_recompile = set()
         if name_format:
             for pat in ("{root}",):  # "{loc}"):
                 if pat not in name_format:
-                    raise XoaCFError("name_format must contain strings {root}: " + name_format)
+                    raise XoaCFError("name_format must contain string {root}: " + name_format)
             if len(name_format) == 10:
                 xoa_warn(
                     'No separator found in "name_format" and '
@@ -177,21 +176,10 @@ class SGLocator(object):
                     'regular expression parsing.'
                 )
             self.formats["name"] = name_format
-            to_recompile.add("name")
         elif name_format is not None:
             self.formats["name"] = "{root}"
-            to_recompile.add("name")
-        all_locations = []
-        if self.valid_locations:
-            all_locations.extend(self.valid_locations)
-        # for locs in self.encoding.values():
-        #     all_locations.extend(locs)
-        if all_locations:
-            self.location_pattern = "|".join(self.valid_locations)
-            to_recompile.update(("name", "standard_name", "long_name"))
-        _compile_sg_match_(
-            self.re_match, to_recompile, self.formats, self.root_patterns, self.location_pattern
-        )
+        location_pattern = "|".join(self.valid_locations) or "[a-z]+"
+        _compile_sg_match_(self.re_match, self.formats, self.root_patterns, location_pattern)
 
     def parse_attr(self, attr, value):
         """Parse an attribute string to get its root and location
@@ -356,10 +344,10 @@ class SGLocator(object):
         # if self._re_encoded(loc):
         #     locs = self.encoding.get(loc)
         #     return locs[0] if locs else False
-        if self.valid_locations is not None and loc not in self.valid_locations:
+        if self.valid_locations and loc not in self.valid_locations:
             raise XoaCFError(
-                f'Location "{loc}" is not recognised by the currents specifications. '
-                'Registered locations are: ' + ', '.join(self.valid_locations)
+                f'Location "{loc}" is invalid. '
+                'Valid locations are: ' + ', '.join(self.valid_locations)
             )
         return loc
 
@@ -468,15 +456,9 @@ class SGLocator(object):
             elif attr == "standard_name":
                 loc = loc.lower()
 
-        _format = self.formats[attr]
-
-        # Force the default format for names when the loc is specified
-        if attr == "name " and (not _format or "{loc}" not in _format):
-            _format = self.default_formats["name"]
-
-        if not _format:
+        if not self.formats[attr]:
             return root
-        return _format.format(root=root, loc=loc)
+        return self.formats[attr].format(root=root, loc=loc)
 
     def format_attrs(self, attrs, loc=None, standardize=True):
         """Copy and format a dict of attributes
@@ -731,14 +713,6 @@ class SGLocator(object):
         )
 
 
-def get_sglocator_pivot():
-    """Get the :class:`SGLocator` instance that is used as a pivot format"""
-    cache = _get_cache_()
-    if "sglocator_pivot" not in cache:
-        cache["sglocator_pivot"] = SGLocator()
-    return cache["sglocator_pivot"]
-
-
 def _solve_rename_conflicts_(rename_args):
     """Skip renaming items that overwride previous items"""
     used = {}
@@ -940,17 +914,6 @@ class CFSpecs(object):
     def sglocator(self):
         """:class:`SGLocator` instance"""
         return self._sgl
-
-    def get_sglocator(self, specialize):
-        """Get the right :class:`SGLocator` instance
-
-        Parameters
-        ----------
-        specialize: book
-            If True, the locator is the one of this dataset, as given by :attr:`sglocator`.
-            Else, if is the pivot locator as given by :func:`get_sglocator_pivot`.
-        """
-        return self._sgl if specialize else get_sglocator_pivot()
 
     @property
     def cfgspecs(self):
@@ -1238,7 +1201,7 @@ class CFSpecs(object):
                         locations[coord.name] = False
                 check_coords(coord, self.coords[cf_coord_name], locations)
 
-        # Loop again on data vars: if loc is True for an datarray and loc is unique
+        # Loop again on data vars: if loc is True for an datarray and loc is defined an unique
         # for all dims, it is set to the array too
         for da in das:
             if locations.get(da.name) is True:
@@ -1597,7 +1560,7 @@ class CFSpecs(object):
             return self.format_dataset(obj, **kwargs)
         return self.format_data_var(obj, **kwargs)
 
-    def decode(self, obj, **kwargs):
+    def decode(self, obj, set_encoding=True, **kwargs):
         """Auto format, infer coordinates and rename to generic names
 
         See also
@@ -1615,8 +1578,10 @@ class CFSpecs(object):
         obj = self.auto_format(obj, **kwargs)
 
         # Assign cf specs
-        if self.name and self in get_registered_cf_specs():
-            obj = assign_cf_specs(obj, self.name, set_encoding=False)
+        if self.name:
+            if not is_registered_cf_specs(self.name):
+                register_cf_specs(self)
+            obj = assign_cf_specs(obj, self.name, set_encoding=set_encoding)
 
         return obj
 
@@ -2613,7 +2578,7 @@ class _CFCatSpecs_(object):
         attrs.update(extra)
 
         # Finalize and optionally change location
-        attrs = self.parent.sglocator.format_attrs(attrs, loc=loc, standardize=standardize)
+        attrs = self.sglocator.format_attrs(attrs, loc=loc, standardize=standardize)
 
         return attrs
 
@@ -2765,11 +2730,8 @@ class _CFCatSpecs_(object):
         elif not attrs:
             attrs = {}
 
-        # Get the appropriate sglocator for formatting
-        sglocator = self.parent.get_sglocator(specialize)
-
         # Format array
-        new_da = sglocator.format_dataarray(
+        new_da = self.sglocator.format_dataarray(
             da,
             loc=loc,
             name=new_name,
@@ -2785,8 +2747,8 @@ class _CFCatSpecs_(object):
         # Return new name but don't rename
         if not rename:
             if old_name is None:
-                return sglocator.format_attr("name", new_name, loc)
-            return sglocator.merge_attr("name", old_name, new_name, loc)
+                return self.sglocator.format_attr("name", new_name, loc)
+            return self.sglocator.merge_attr("name", old_name, new_name, loc)
 
         # # Rename dim if axis coordinate
         # rename_dim = rename and rename_dim

@@ -265,16 +265,16 @@ def plot_ts(
         # Register the main xoa accessor
         xoa.register_accessors()
 
-        # Load the CROCO meridional section
-        ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
-        ds = ds.isel(eta_rho=slice(40))
-        temp = ds.xoa.get('temp')     # requests are based...
-        sal = ds.xoa.get('sal')       # ...on the generic name
-        depth = ds.xoa.get_depth(ds)  # or xoa.coords.get_depth(ds)
+        # Load the Mercator data
+        file_name = xoa.get_data_sample("ibi-argo-7900573.nc")
+        ds = xr.open_dataset(file_name)
+        temp = ds.thetao
+        sal = ds.so
+        depth = ds.depth.broadcast_like(temp)
 
         # Plot
         @savefig api.plot.plot_ts.png
-        plot_ts(temp, sal, potential=True, scatter_c=depth, contour_linewidths=0.2, clabel_fontsize=8)
+        plot_ts(temp, sal, potential=True, scatter_c=depth, contour_linewidths=0.2, clabel_fontsize=8, cmap="cmo.deep_r")
 
     """
 

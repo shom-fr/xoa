@@ -37,9 +37,8 @@ xr.set_options(display_style="text")
 xoa.register_accessors()
 
 # %%
-# Register the Hycom naming specifications
-
-xcf.register_cf_specs(xoa.get_data_sample("hycom.cfg"))
+# Set the Hycom naming specifications as the current ones
+xcf.set_cf_specs(xoa.get_data_sample("hycom.cfg"))
 
 # %%
 # Here is what these CF specifications contain
@@ -118,6 +117,12 @@ drifter = pd.read_csv(
 # Since the sampling is not that nice, we resample it to 3-hour intervals.
 
 drifter = drifter.resample("3h").mean()
+
+# %%
+# We switch to default naming conventions for the drifter.
+
+xcf.set_cf_specs("default")
+
 
 # %%
 # We convert it to and :class:`xarray.Dataset`, fix the time coordinate and decode it.
