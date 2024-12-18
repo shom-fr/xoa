@@ -901,6 +901,11 @@ class CFSpecs(object):
 
     name = property(fset=set_name, fget=get_name, doc="Name")
 
+    @property
+    def excluded_names(self):
+        """Data array names that are excluded from all parsings"""
+        return self._dict["exclude_names"] or []
+
     def pprint(self, **kwargs):
         """Pretty print the specs as dict using :func:`pprint.pprint`"""
         pprint.pprint(self.dict, **kwargs)
@@ -1275,6 +1280,8 @@ class CFSpecs(object):
         else:
             data_vars = [obj]
         for da in data_vars:
+            if da.name in self.excluded_names:
+                continue
             for cat in categories:
                 cf_name = cf_names.get(da.name) if cf_names else None
                 if cf_name and cf_name not in self[cat]:
@@ -1301,6 +1308,8 @@ class CFSpecs(object):
         if format_coords:
             # for cname, cda in list(obj.coords.items()):
             for cname in _list_xr_names_(obj, data_vars=False, dims=False):
+                if cname in self.excluded_names:
+                    continue
                 cda = obj.coords[cname]
                 new_coord_name = self.coords.format_dataarray(
                     cda,
@@ -2301,11 +2310,12 @@ class _CFCatSpecs_(object):
         list
         """
         specs = self[cf_name]
-        allowed_names = [cf_name]
+        allowed_names = []
         if "name" in specs and specs["name"]:
             allowed_names.append(specs["name"])
         if "alt_names" in specs:
             allowed_names.extend(specs["alt_names"])
+        allowed_names.append(cf_name)
         return allowed_names
 
     def get_loc_mapping(self, obj, cf_names=None):
