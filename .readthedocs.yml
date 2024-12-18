@@ -3,6 +3,7 @@ version: 2
 
 # Sphinx
 sphinx:
+  configuration: doc/conf.py
   fail_on_warning: false
 
 # Install current library
