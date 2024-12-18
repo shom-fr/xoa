@@ -569,7 +569,7 @@ def test_cf_cfspecs_cats_format_dataarray_unknown():
 def test_cf_cfspecs_cats_get_allowed_names():
     cfg = {"data_vars": {"banana": {"name": "bonono", "alt_names": ["binini", "bununu"]}}}
     cfspecs = cf.CFSpecs(cfg)
-    assert cfspecs.data_vars.get_allowed_names("banana") == ['banana', 'bonono', 'binini', 'bununu']
+    assert cfspecs.data_vars.get_allowed_names("banana") == ['bonono', 'binini', 'bununu', 'banana']
 
 
 def test_cf_cfspecs_format_obj_with_loc():
