@@ -25,6 +25,9 @@ It has two intents:
 The module offers capabilities for the user to extend and specialize
 default behaviors for user's special datasets.
 
+:mod:`xoa` makes available **ready-to-use configurations** for decoding and encoding a few **standard dataset types**. 
+Look at :ref:`appendix.cf.specialized`.
+
 
 .. note:: This module shares common feature with the excellent and long
     awaited `cf_xarray <https://cf-xarray.readthedocs.io/en/latest/>`_
@@ -39,8 +42,7 @@ default behaviors for user's special datasets.
       objects that can be configured for each type of dataset or in
       contexts by the user.
 
-:mod:`xoa` make available **ready-to-use configurations** for decoding and encoding a few **standard dataset types**. 
-Looks at :ref:`appendix.cf.specialized`.
+
 
 Accessing the current specifications
 ====================================
