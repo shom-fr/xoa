@@ -11,10 +11,12 @@ Package API
     xoa
     xoa.accessors
     xoa.cf
+    xoa.cf_configs
     xoa.cfgm
     xoa.cli
     xoa.color
     xoa.coords
+    xoa.data_samples
     xoa.dyn
     xoa.filter
     xoa.geo

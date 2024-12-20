@@ -34,11 +34,13 @@ default behaviors for user's special datasets.
     - The current module is also designed for data variables an dimensions, not only
       coordinates.
     - It searches for items not only using standard_names but also
-      specialized names. It means that objetcs can be found a dataset or data array
-      even if they are not properly formatted.
+      specialized names. It means that **it works even of datasets are not well formatted**.
     - It is not only available as accessors, but also as independant
       objects that can be configured for each type of dataset or in
       contexts by the user.
+
+:mod:`xoa` make available **ready-to-use configurations** for decoding and encoding a few **standard dataset types**. 
+Looks at :ref:`appendix.cf.specialized`.
 
 Accessing the current specifications
 ====================================
@@ -710,7 +712,7 @@ Example: decoding/encoding Croco model outputs
 
 Here are the specs for Croco:
 
-.. literalinclude:: ../xoa/_samples/croco.cfg
+.. literalinclude:: ../xoa/cf_configs/croco.cfg
     :language: ini
 
 Register them:
@@ -719,7 +721,9 @@ Register them:
 
     @suppress
     import xoa, xoa.cf
-    xoa.cf.register_cf_specs(xoa.get_data_sample("croco.cfg"))
+    cf_config_file = xoa.get_cf_config_file("croco")
+    print(cf_config_file)
+    xoa.cf.register_cf_specs(cf_config_file) # xoa.cf.register_cf_specs("croco")
     xoa.cf.is_registered_cf_specs("croco")
 
 
@@ -766,7 +770,7 @@ staggered variables are renamed to indicate their location.
 
 Here are the specs to take care of the staggered grid indicators in the names:
 
-.. literalinclude:: ../xoa/_samples/hycom.cfg
+.. literalinclude:: ../xoa/cf_configs/hycom.cfg
     :language: ini
 
 Note the ``add_coords_loc`` sections.
@@ -779,7 +783,7 @@ Register them:
 
     @suppress
     import xoa, xoa.cf
-    xoa.cf.register_cf_specs(xoa.get_data_sample("hycom.cfg"))
+    xoa.cf.register_cf_specs("hycom")
     xoa.cf.is_registered_cf_specs("hycom")
 
 Overview of the U dataset:
