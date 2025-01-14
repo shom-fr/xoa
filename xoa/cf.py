@@ -3435,7 +3435,7 @@ class set_cf_specs(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.old_specs is None:
-            del self.cf_cache["current"]
+            self.cf_cache["current"] = None
         else:
             self.cf_cache["current"] = self.old_specs
 
@@ -3457,7 +3457,7 @@ def reset_cache(disk=True, memory=False):
         os.remove(USER_CF_CACHE_FILE)
 
     if memory:
-        cf_cache = _get_cfgm_()
+        cf_cache = _get_cache_()
         cf_cache["loaded_dicts"].clear()
         cf_cache["current"] = None
         cf_cache["default"] = None
@@ -3650,7 +3650,7 @@ def get_cf_specs(name=None, cache="rw"):
     # Not named => current or default specs
     if name == "current":
         cf_cache = _get_cache_()
-        if cf_cache["current"] is None:
+        if cf_cache.get("current") is None:
             cf_cache["current"] = get_default_cf_specs()
         cfspecs = cf_cache["current"]
     else:
@@ -3839,7 +3839,7 @@ def infer_cf_specs(ds, named=False, from_attrs=True, from_score=False):
         if best_score != -1:
             return best_cfspecs
 
-    # Fallback to default specs
+    # Fallback to current specs
     cfspecs = get_cf_specs("current")
     if named and not cfspecs.name:
         return

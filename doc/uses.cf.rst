@@ -25,7 +25,7 @@ It has two intents:
 The module offers capabilities for the user to extend and specialize
 default behaviors for user's special datasets.
 
-:mod:`xoa` makes available **ready-to-use configurations** for decoding and encoding a few **standard dataset types**. 
+:mod:`xoa` provides **ready-to-use configurations** for decoding and encoding a few **standard dataset types**. 
 Look at :ref:`appendix.cf.specialized`.
 
 
@@ -37,10 +37,10 @@ Look at :ref:`appendix.cf.specialized`.
     - The current module is also designed for data variables an dimensions, not only
       coordinates.
     - It searches for items not only using standard_names but also
-      specialized names. It means that **it works even of datasets are not well formatted**.
+      specialized names. It means that **it works even with datasets that are not well formatted**.
     - It is not only available as accessors, but also as independant
-      objects that can be configured for each type of dataset or in
-      contexts by the user.
+      specification objects that can be configured by the user
+      for each type of dataset.
 
 
 
