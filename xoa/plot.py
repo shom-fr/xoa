@@ -195,8 +195,10 @@ def plot_ts(
     temp,
     sal,
     dens=True,
+    ref_dens=0,
     pres=None,
     potential=None,
+    absolute=None,
     axes=None,
     scatter_kwargs=None,
     contour_kwargs=None,
@@ -208,23 +210,32 @@ def plot_ts(
 ):
     """Plot a TS diagram
 
-    A TS diagram is a scatter plot with absolute salinity as X axis
+    A TS diagram is a scatter plot with salinity (practical or absolute) as X axis
     and potential temperature as Y axis.
     The density is generally added as background contours.
 
     Parameters
     ----------
     temp: xarray.DataArray
-        Temperature. If not potential temperature, please set `potential=True`.
+        Temperature. If not potential, it will be converted into potential
+        if `potential=None` or `potential=False`.
+        Note that if temp is not potential and **contain a depth coordinate**, depth values must be negative
+        (to compute pres with `gsw.p_from_z` if necessary)
     sal: xarray.DataArray
-        Salinity
+        Salinity (practical or absolute). If not absolute, it will be converted into absolute salinity
+        if the potential temperature needs to be computed.
     dens: bool
         Add contours of density.
-        The density is computed with function :func:`gsw.density.sigma0`.
+        The density is by default computed with function :func:`gsw.density.sigma0` (ref_dens=0).
+    ref_dens: integer, 0
+        choice of reference for density calculation (between 0 and 4)
+        ref_dens=0 will consider func:`gsw.density.sigma0`, etc..
     pres: xarray.DataArray, None
-        Pressure to compute potential temperature.
+        Pressure to compute potential temperature and absolute salinity.
     potential: bool, None
         Is the temperature potential? If None, infer from attributes.
+    absolute: bool, None
+        Is the salinity absolute? If None, infer from attributes.
     clabel: bool
         Add labels to density contours
     clabel_kwargs: dict, None
@@ -291,8 +302,18 @@ def plot_ts(
             depth = xcoords.get_depth(temp)
             lat, depth = xr.broadcast(lat, depth)
             pres = gsw.p_from_z(depth, lat)
+
+        if absolute is None:
+            absolute = cfspecs.match_data_var(sal, "asal")
+        if not absolute:
+            lon = xcoords.get_lon(temp)
+            lat = xcoords.get_lat(temp)
+            sal_abs = gsw.SA_from_SP(sal, pres, lon, lat)
+        else:
+            sal_abs = sal.copy()
+
         attrs = temp.attrs
-        temp = gsw.pt0_from_t(sal, temp, pres)
+        temp = gsw.pt0_from_t(sal_abs, temp, pres)
         temp.attrs.update(attrs)
         cfspecs.format_data_var(temp, cf_name="ptemp", copy=False, replace_attrs=True)
 
@@ -337,12 +358,30 @@ def plot_ts(
 
         import gsw
 
-        # Density as sigma0
         (smin, tmin), (smax, tmax) = axes.viewLim.get_points()
         tt = np.linspace(tmin, tmax, 100)
         ss = np.linspace(smin, smax, 100)
         ss, tt = np.meshgrid(ss, tt)
-        dd = gsw.sigma0(ss, tt)
+
+        # absolute salinity and conservative temperature calculation
+        lon_m = xcoords.get_lon(temp).mean()
+        lat_m = xcoords.get_lat(temp).mean()
+        ss_absolute = gsw.SA_from_SP(ss, 0, lon_m.values, lat_m.values)
+        tt_conservative = gsw.CT_from_pt(ss_absolute, tt)
+
+        # Density as sigma{0-1-2-3-4} depending on ref_dens value
+        if ref_dens == 0:
+            func = gsw.sigma0
+        elif ref_dens == 1:
+            func = gsw.sigma1
+        elif ref_dens == 2:
+            func = gsw.sigma2
+        elif ref_dens == 3:
+            func = gsw.sigma3
+        elif ref_dens == 4:
+            func = gsw.sigma4
+
+        dd = func(ss_absolute, tt_conservative)
 
         # Contours
         contour_kwargs = xmisc.dict_filter(
