@@ -294,6 +294,7 @@ def plot_ts(
     # potential = POTENTIAL[potential]
     if potential is None:
         potential = cfspecs.match_data_var(temp, "ptemp")
+
     if not potential:
         import gsw
 
@@ -366,7 +367,12 @@ def plot_ts(
         # absolute salinity and conservative temperature calculation
         lon_m = xcoords.get_lon(temp).mean()
         lat_m = xcoords.get_lat(temp).mean()
-        ss_absolute = gsw.SA_from_SP(ss, 0, lon_m.values, lat_m.values)
+        if absolute is None:
+            absolute = cfspecs.match_data_var(sal, "asal")
+        if not absolute:
+            ss_absolute = gsw.SA_from_SP(ss, 0, lon_m.values, lat_m.values)
+        else:
+            ss_absolute = ss.copy()
         tt_conservative = gsw.CT_from_pt(ss_absolute, tt)
 
         # Density as sigma{0-1-2-3-4} depending on ref_dens value
