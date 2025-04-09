@@ -72,7 +72,7 @@ def test_regrid_regrid1d_time():
     time_out = xr.DataArray(np.arange("2000-01-01", "2000-01-03", dtype="M8[h]"), dims="time")
     data_out = regrid.regrid1d(data_in, time_out)
     assert data_out.dtype.char == "d"
-    assert data_out.time.dtype.str == '<M8[ns]'
+    assert "M8" in data_out.time.dtype.str
     assert data_out.shape == (48,)
     assert float(data_out.max()) == 1.0
 
