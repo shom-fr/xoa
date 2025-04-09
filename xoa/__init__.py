@@ -58,7 +58,7 @@ cmapcyc = string(default="cmo.phase")   # default cyclic colormap
 _SAMPLE_DIR = os.path.join(os.path.dirname(__file__), '_samples')
 
 _PACKAGES = [
-    "appdirs",
+    "platformdirs",
     "cartopy",
     "cmocean",
     "configobj",
@@ -108,9 +108,15 @@ def _get_cache_():
 
 def get_default_user_config_file():
     """Get the default user config file name"""
-    import appdirs
+    try:
+        from platformdirs import user_config_dir
+    except ImportError:
+        from appdirs import user_config_dir
 
-    return os.path.join(appdirs.user_config_dir("xoa"), "xoa.cfg")
+        warnings.warn(
+            "appdirs is deprecated. Please install platformdirs.", warnings.DeprecationWarning
+        )
+    return os.path.join(user_config_dir("xoa"), "xoa.cfg")
 
 
 def load_options(cfgfile=None):
