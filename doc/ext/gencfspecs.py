@@ -4,6 +4,7 @@ import os
 import logging
 
 import xoa.cf
+import xoa.cf_configs
 
 
 skip_keys = ["inherit", "processed"]
@@ -133,6 +134,21 @@ def genrst(app):
 
             # Table
             f.write(rst_tables[key] + "\n\n")
+
+    # Specialized CF specs
+    with open(os.path.join(gendir, "specialized.txt"), "w") as fi:
+        fi.write(".. toctree::\n\n")
+        for name in list(xoa.cf_configs.CF_CONFIGS):
+            logging.info(f"Generating rst file for xoa.cf_config.CF_CONFIGS[{name}]")
+            title = f"CF specifications for ``{name}`` datasets"
+            title = title + "\n" + "=" * len(title)
+            with open(os.path.join(gendir, name + ".rst"), "w") as f:
+                f.write(f".. _appendix.cf.specialized.{name}:\n\n{title}\n\n")
+                f.write(
+                    f".. literalinclude:: ../../xoa/cf_configs/{name}.cfg\n    :language: ini\n\n"
+                )
+            fi.write(f"    gencfspecs/{name}\n")
+        fi.write("\n")
 
 
 def setup(app):

@@ -33,14 +33,12 @@ import appdirs
 
 from .__init__ import XoaError, xoa_warn, get_option
 from .misc import dict_merge, match_string, ERRORS, Choices
+from .cf_configs import CF_CONFIGS, get_cf_config_file
 
 _THISDIR = os.path.dirname(__file__)
 
 # Joint variables and coords config specification file
 _INIFILE = os.path.join(_THISDIR, "cf.ini")
-
-# Base config file for CF specifications
-_CFGFILE = os.path.join(_THISDIR, "cf.cfg")
 
 _user_cache_dir = appdirs.user_cache_dir("xoa")
 
@@ -823,10 +821,12 @@ class CFSpecs(object):
                 return copy.deepcopy(cf_cache["loaded_dicts"][cache_key])
 
         # Check input type
-        if isinstance(cfg, str) and '\n' in cfg:
+        if isinstance(cfg, str) and '\n' in cfg:  # multi-line content
             cfg = cfg.split("\n")
         elif isinstance(cfg, CFSpecs):
             cfg = cfg._dict
+        elif isinstance(cfg, str) and cfg in CF_CONFIGS:
+            cfg = CF_CONFIGS[cfg]  # full path to internal config file
 
         # Load, validate and convert to dict
         cfg_dict = cfgm.load(cfg).dict()
@@ -864,7 +864,7 @@ class CFSpecs(object):
         if self._load_user and os.path.exists(USER_CF_FILE):
             to_load.append(USER_CF_FILE)
         if self._load_default:
-            to_load.append(_CFGFILE)
+            to_load.append(get_cf_config_file("default"))
         if not to_load:
             to_load = [None]
 
@@ -3435,7 +3435,7 @@ class set_cf_specs(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         if self.old_specs is None:
-            del self.cf_cache["current"]
+            self.cf_cache["current"] = None
         else:
             self.cf_cache["current"] = self.old_specs
 
@@ -3457,7 +3457,7 @@ def reset_cache(disk=True, memory=False):
         os.remove(USER_CF_CACHE_FILE)
 
     if memory:
-        cf_cache = _get_cfgm_()
+        cf_cache = _get_cache_()
         cf_cache["loaded_dicts"].clear()
         cf_cache["current"] = None
         cf_cache["default"] = None
@@ -3483,10 +3483,19 @@ def get_cf_specs_from_name(name, errors="warn"):
     CFSpecs or None
         Issue a warning if not found
     """
+    # Registered specs
     cf_cache = _get_cache_()
     for cfspecs in cf_cache["registered"][::-1]:
         if cfspecs["register"]["name"] and cfspecs["register"]["name"] == name.lower():
             return cfspecs
+
+    # Internal specs
+    if name in CF_CONFIGS:
+        cfspecs = CFSpecs(CF_CONFIGS[name])
+        register_cf_specs(cfspecs)
+        return cfspecs
+
+    # Not found
     errors = ERRORS[errors]
     msg = f"Unknown registration name for CF specs: {name}"
     if errors == "raise":
@@ -3566,7 +3575,7 @@ def get_default_cf_specs(cache="rw"):
     # Try from disk cache
     if cache in ("read", "rw"):
         if os.path.exists(USER_CF_CACHE_FILE) and (
-            os.stat(_CFGFILE).st_mtime < os.stat(USER_CF_CACHE_FILE).st_mtime
+            os.stat(get_cf_config_file("default")).st_mtime < os.stat(USER_CF_CACHE_FILE).st_mtime
         ):
             try:
                 with open(USER_CF_CACHE_FILE, "rb") as f:
@@ -3641,7 +3650,7 @@ def get_cf_specs(name=None, cache="rw"):
     # Not named => current or default specs
     if name == "current":
         cf_cache = _get_cache_()
-        if cf_cache["current"] is None:
+        if cf_cache.get("current") is None:
             cf_cache["current"] = get_default_cf_specs()
         cfspecs = cf_cache["current"]
     else:
@@ -3652,17 +3661,24 @@ def get_cf_specs(name=None, cache="rw"):
 
 def register_cf_specs(*args, **kwargs):
     """Register :class:`CFSpecs` in a bank optionally with a name"""
+    # Named arguments
     args = list(args)
     for name, cfspecs in kwargs.items():
         if not isinstance(cfspecs, CFSpecs):
             cfspecs = CFSpecs(cfspecs)
         cfspecs.name = name
         args.append(cfspecs)
+
+    # Update the cache
     for cfspecs in args:
+        cf_cache = _get_cache_()
         if not isinstance(cfspecs, CFSpecs):
             cfspecs = CFSpecs(cfspecs)
-        cf_cache = _get_cache_()
         if cfspecs not in cf_cache["registered"]:
+            if cfspecs.name:  # replace if same name. warn?
+                for rcfs in cf_cache["registered"]:
+                    if rcfs.name and rcfs.name == cfspecs.name:
+                        cf_cache["registered"].remove(rcfs)
             cf_cache["registered"].append(cfspecs)
 
 
@@ -3823,7 +3839,7 @@ def infer_cf_specs(ds, named=False, from_attrs=True, from_score=False):
         if best_score != -1:
             return best_cfspecs
 
-    # Fallback to default specs
+    # Fallback to current specs
     cfspecs = get_cf_specs("current")
     if named and not cfspecs.name:
         return

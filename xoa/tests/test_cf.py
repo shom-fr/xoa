@@ -858,8 +858,8 @@ def test_cf_cfspecs_infer_coords():
 
 
 def test_cf_cfspecs_decode_encode():
-    ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
-    cfspecs = cf.CFSpecs(xoa.get_data_sample("croco.cfg"))
+    ds = xr.open_dataset(xoa.get_data_sample("croco.south-africa.meridional.nc"))
+    cfspecs = cf.CFSpecs("croco")
 
     dsc = cfspecs.decode(ds)
     assert list(dsc) == [

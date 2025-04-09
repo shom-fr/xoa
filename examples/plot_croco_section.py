@@ -39,22 +39,27 @@ xoa.register_accessors(decode_sigma=True)
 # to most of the fonctionalities of the other accessors.
 
 # %%
-# Register the Mercator and ARGO naming specifications
+# Register the internal CROCO naming specifications
 
-xcf.register_cf_specs(xoa.get_data_sample("croco.cfg"))
+croco_cfg_file = xoa.get_cf_config_file("croco")
+print(croco_cfg_file)
+xcf.register_cf_specs(croco_cfg_file)
 
 # %%
+# You can provide your own configuration file.
+#
 # In this way, the :mod:`xoa.cf` module will recognise the
 # CROCO netcdf names.
 # It would be equivalent to force loading name specs with
-# `xoa.cf.set_cf_specs(xoa.get_data_sample("croco.cfg"))`.
+# `xoa.cf.set_cf_specs(xoa.get_cf_config_file("croco"))`.
 
 # %%
 # Read the model
 # --------------
 # This sample is a meridional extraction of a full 3D CROCO output.
-
-ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
+sample_file = xoa.get_data_sample("croco.south-africa.meridional.nc")
+print(sample_file)
+ds = xr.open_dataset(sample_file)
 print(ds)
 
 # %%

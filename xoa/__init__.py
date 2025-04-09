@@ -25,6 +25,8 @@ import platform
 
 from importlib.metadata import version as im_get_version
 
+from .cf_configs import CF_CONFIGS, get_cf_config_file
+from .data_samples import DATA_SAMPLES, get_data_sample, show_data_samples, open_data_sample
 from ._get_version import _get_version
 
 __version__ = _get_version()
@@ -397,120 +399,6 @@ def show_info(opt_specs=True):
     show_paths()
     print("\n# OPTIONS")
     show_options(specs=opt_specs)
-
-
-def get_data_sample(filename=None):
-    """Get the absolute path to a sample file
-
-    Parameters
-    ----------
-    filename: str, None
-        Name of the sample. If ommited, a list of available samples
-        name is returned.
-
-    Returns
-    -------
-    str OR list(str)
-
-    Example
-    -------
-    .. .ipython:: python
-
-        @suppress
-        from xoa import get_data_sample
-        get_data_sample("croco.south-africa.surf.nc")
-        get_data_sample()
-
-    See also
-    --------
-    show_data_samples
-    open_data_sample
-    """
-    if not os.path.exists(_SAMPLE_DIR):
-        filenames = []
-    else:
-        filenames = os.listdir(_SAMPLE_DIR)
-    if filename is None:
-        return filenames
-    if filename not in filenames:
-        raise XoaError('Invalid data sample: "{}"'.format(filename))
-    return os.path.join(_SAMPLE_DIR, filename)
-
-
-def open_data_sample(filename, **kwargs):
-    """Open a data sample with :func:`xarray.open_dataset` or :func:`pandas.read_csv`
-
-    Parameters
-    ----------
-    filename: str
-        File name of the sample.
-        If not an existing sample, a warning is raised and if the path exists and has
-        a csv or nc extension, it is opened.
-
-    Returns
-    -------
-    xarray.Dataset, pandas.DataFrame
-
-    Example
-    -------
-    .. .ipython:: python
-
-        @suppress
-        from xoa import open_data_sample
-        open_data_sample("croco.south-africa.nc")
-
-
-    See also
-    --------
-    get_data_sample
-    show_data_samples
-    """
-    try:
-        path = get_data_sample(filename)
-    except XoaError as e:
-        msg = str(e) + ".\nThis function is for opening xoa internal sample file."
-        path = filename
-        if not os.path.exists(path):
-            raise XoaError("Invalid path: " + path)
-        else:
-            msg += "\nTrying to open it..."
-        xoa_warn(msg)
-    if path.endswith("nc"):
-        import xarray as xr
-
-        return xr.open_dataset(path, **kwargs)
-    if path.endswith("csv"):
-        import pandas as pd
-
-        return pd.read_csv(path, **kwargs)
-    raise XoaError("Don't know haw to open this file")
-
-
-def show_data_samples(full_paths=False):
-    """Print the list of data samples
-
-    Parameters
-    ----------
-    full_paths: bool
-        Show full absolute paths.
-
-    Example
-    -------
-    .. ipython:: python
-
-        @suppress
-        from xoa import show_data_samples
-        show_data_samples()
-
-    See also
-    --------
-    get_data_samples
-    open_data_sample
-    """
-    paths = get_data_sample()
-    if full_paths:
-        paths = [os.path.join(_SAMPLE_DIR, path) for path in paths]
-    print(' '.join(paths))
 
 
 def register_accessors(xoa=True, xcf=False, decode_sigma=False):

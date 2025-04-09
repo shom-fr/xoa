@@ -37,13 +37,19 @@ xr.set_options(display_style="text")
 xoa.register_accessors()
 
 # %%
-# Set the Hycom naming specifications as the current ones
-xcf.set_cf_specs(xoa.get_data_sample("hycom.cfg"))
+# Set the internal Hycom naming specifications as the current ones
+hycom_cfg_file = xoa.get_cf_config_file("hycom")
+print(hycom_cfg_file)
+xcf.set_cf_specs(hycom_cfg_file)
 
 # %%
+# Note that, since this file is internal, you can do it simply with::
+#
+#        xcf.set_cf_specs("hycom")
+#
 # Here is what these CF specifications contain
 
-with open(xoa.get_data_sample("hycom.cfg")) as f:
+with open(hycom_cfg_file) as f:
     print(f.read())
 
 # %%

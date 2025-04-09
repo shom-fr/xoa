@@ -1,11 +1,13 @@
 What's new
 ##########
 
-Current
+Develop
 =======
 
 New features
 ------------
+- Add modules :mod:`xoa.data_sample` and :mod:`xoa.cf_configs`.
+- :class:`xoa.cf.CFSpecs`, :func:`xoa.cf.register_cf_specs`, :func:`get_cf_specs` and :class:`xoa.cf.set_cf_specs` now accepts short names of internal CF config like "croco" or "argo".
 - Add `absolute` option for salinity and the `ref_dens` option to enable using different formulae for density to :func:`xoa.plot.plot_ts`.
 - Add the `exclude_names` option to :mod:`xoa.cf` configurations to ignore data array names.
 - Call :func:`xoa.cf.infer_cf_specs` from :func:`xoa.cf.get_cf_specs`  when an data arrray or dataset is passed [:pull:`96`].
@@ -26,8 +28,8 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix :func:`xoa.cf.infer_cf_specs` that was missing attributes and encoding [:pull:`96`].
 - Fix :func:`xoa.plot.plot_ts` that now uses absolute salinity along with potential temperature and potential density anomaly formulas.
-- Fix `xoa.cf.infer_cf_specs` that was missing attributes and encoding [:pull:`96`].
 - Fix `lat` keyword in :func:`~xoa.geo.deg2m` and :func:`~xoa.geo.m2deg` which now accepts arrays.
 - Fix weighting of :func:`xoa.filter.convolve`.
 - Fix :func:`xoa.grid.to_rect` raising of errors and handling of missing data in coordinates.
