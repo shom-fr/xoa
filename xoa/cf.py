@@ -29,7 +29,15 @@ import pprint
 import fnmatch
 import copy
 
-import appdirs
+try:
+    from platformdirs import user_config_dir, user_cache_dir
+except ImportError:
+    from appdirs import user_config_dir, user_cache_dir
+    import warnings
+
+    warnings.warn(
+        "appdirs is deprecated. Please install platformdirs.", warnings.DeprecationWarning, 2
+    )
 
 from .__init__ import XoaError, xoa_warn, get_option
 from .misc import dict_merge, match_string, ERRORS, Choices
@@ -40,13 +48,13 @@ _THISDIR = os.path.dirname(__file__)
 # Joint variables and coords config specification file
 _INIFILE = os.path.join(_THISDIR, "cf.ini")
 
-_user_cache_dir = appdirs.user_cache_dir("xoa")
+_user_cache_dir = user_cache_dir("xoa")
 
 #: User cache file for cf specs
 USER_CF_CACHE_FILE = os.path.join(_user_cache_dir, "cf.pyk")
 
 #: User CF config file
-USER_CF_FILE = os.path.join(appdirs.user_config_dir("xoa"), "cf.cfg")
+USER_CF_FILE = os.path.join(user_config_dir("xoa"), "cf.cfg")
 
 # Argument passed to dict_merge to merge CF configs
 _CF_DICT_MERGE_KWARGS = dict(

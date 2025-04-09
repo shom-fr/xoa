@@ -22,7 +22,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "appdirs",
+    "platformdirs",
     "configobj",
     "gsw",
     "netCDF4",

@@ -1,4 +1,4 @@
-appdirs
+platformdirs
 cartopy
 cmocean
 configobj
