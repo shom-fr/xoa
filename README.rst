@@ -1,28 +1,28 @@
 xoa - xarray-based ocean analysis library
 =========================================
 
-.. image:: https://github.com/shom-fr/xoa/actions/workflows/python-package-conda.yml/badge.svg
-    :alt: Install, linting and tests
-.. image:: https://img.shields.io/conda/vn/conda-forge/xoa.svg
+.. image:: https://anaconda.org/conda-forge/xoa/badges/version.svg
+    :target: https://anaconda.org/conda-forge/xoa
     :alt: Available on conda-forge
-    :target: https://conda.anaconda.org/conda-forge/xoa
-.. image:: https://img.shields.io/pypi/v/xoa.svg
-    :alt: Available on pypi
-    :target: ttps://pypi.python.org/pypi/xoa/
-.. image:: https://readthedocs.org/projects/docs/badge/?version=latest
-    :alt: Documentation Status
-    :target: https://xoa.readthedocs.io/en/latest/
 .. image:: https://anaconda.org/conda-forge/xoa/badges/downloads.svg
     :alt: Total number of downloads on anaconda.org/conda-forge
     :target: https://anaconda.org/conda-forge/xoa/
+.. image:: https://img.shields.io/pypi/v/xoa.svg
+    :alt: Available on pypi
+    :target: ttps://pypi.python.org/pypi/xoa/
 .. image:: https://img.shields.io/pypi/dm/xoa
     :alt: PyPI - Downloads
     :target: https://pypi.org/project/xoa
-.. image:: https://img.shields.io/badge/code%20style-black-black
-    :alt: Black code style
+.. image:: https://github.com/shom-fr/xoa/actions/workflows/python-package-conda.yml/badge.svg
+    :alt: Install, linting and tests
+.. image:: https://readthedocs.org/projects/docs/badge/?version=latest
+    :alt: Documentation Status
+    :target: https://xoa.readthedocs.io/en/latest/
 .. image:: https://anaconda.org/conda-forge/xoa/badges/platforms.svg
     :alt: noarch
     :target: https://anaconda.org/conda-forge/xoa
+.. image:: https://img.shields.io/badge/code%20style-black-black
+    :alt: Black code style
 .. image:: https://anaconda.org/conda-forge/xoa/badges/license.svg
     :alt: Apache 2.0
     :target: https://anaconda.org/conda-forge/xoa

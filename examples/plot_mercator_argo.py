@@ -41,14 +41,16 @@ xoa.register_accessors()
 
 # %%
 # Register the Mercator and ARGO naming specifications
-xcf.register_cf_specs(xoa.get_data_sample("mercator.cfg"))
-xcf.register_cf_specs(xoa.get_data_sample("argo.cfg"))
+mercator_cfg = xoa.get_cf_config_file("mercator")
+argo_cfg = xoa.get_cf_config_file("argo")
+xcf.register_cf_specs(mercator_cfg)
+xcf.register_cf_specs(argo_cfg)
 
 # %%
 # Here is what these CF specifications contain
-with open(xoa.get_data_sample("mercator.cfg")) as f:
+with open(mercator_cfg) as f:
     print(f.read())
-with open(xoa.get_data_sample("argo.cfg")) as f:
+with open(argo_cfg) as f:
     print(f.read())
 
 # %%
