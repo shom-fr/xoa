@@ -13,8 +13,8 @@ xoa requires ``python>3`` and depends on the following packages:
 .. list-table::
    :widths: 10 90
 
-   * - `appdirs <http://github.com/ActiveState/appdirs>`_
-     - A small Python module to determine appropriate platform specific dirs, e.g. a "user data dir".
+   * - `platformdirs <https://github.com/tox-dev/platformdirs>`_
+     - A small Python module for determining appropriate platform-specific dirs, e.g. a "user data dir".
    * - `cmocean <https://matplotlib.org/cmocean>`_
      - Beautiful colormaps for oceanography.
    * - `configobj <https://configobj.readthedocs.io/en/latest/configobj.html>`_
