@@ -37,11 +37,7 @@ Look at :ref:`appendix.cf.specialized`.
     - The current module is also designed for data variables an dimensions, not only
       coordinates.
     - It searches for items not only using standard_names but also
-<<<<<<< HEAD
       specialized names. It means that **it works even with datasets that are not well formatted**.
-=======
-      specialized names. It means that **it works even of datasets are not well formatted**.
->>>>>>> ee9045b (Add the xoa.cf_configs and xoa.data_samples modules)
     - It is not only available as accessors, but also as independant
       specification objects that can be configured by the user
       for each type of dataset.
