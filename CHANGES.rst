@@ -24,6 +24,7 @@ Breaking changes
 
 Deprecations
 ------------
+- Now using ``platformdirs`` instead of ``appdirs``.
 - :func:`xoa.filter.demerliac` is deprecated, use :func:`xoa.filter.tidal_filter` instead [:pull:`88`].
 
 Bug fixes
