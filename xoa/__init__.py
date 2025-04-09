@@ -25,11 +25,19 @@ import platform
 
 from importlib.metadata import version as im_get_version
 
-from .cf_configs import CF_CONFIGS, get_cf_config_file
-from .data_samples import DATA_SAMPLES, get_data_sample, show_data_samples, open_data_sample
-from ._get_version import _get_version
+from .cf_configs import CF_CONFIGS, get_cf_config_file  # noqa: F401
+from .data_samples import (
+    DATA_SAMPLES,  # noqa: F401
+    get_data_sample,
+    show_data_samples,  # noqa: F401
+    open_data_sample,  # noqa: F401
+)
 
-__version__ = _get_version()
+try:
+    from ._version import version as __version__
+except ImportError:
+    __version__ = "0.0.0"
+
 
 _RE_OPTION_MATCH = re.compile(r"^(\w+)\W(\w+)$").match
 
