@@ -29,6 +29,8 @@ def genlogo(outfile, dark=False):
 
     with plt.rc_context({"font.sans-serif": [font]}):
         fig = plt.figure(figsize=(width, height))
+        if not dark:
+            fig.patch.set_facecolor("w")
         ax = plt.axes([0, 0, 1, 1], aspect=1, facecolor="b")
         kw = dict(
             family="sans-serif",
@@ -61,7 +63,7 @@ def genlogo(outfile, dark=False):
             circle.set_clip_box(clip)
 
         ax.axis("off")
-        fig.savefig(outfile, transparent=True)
+        fig.savefig(outfile, transparent=dark)
         plt.close(fig)
         del fig
 
@@ -86,5 +88,5 @@ def setup(app):
 
 
 if __name__ == "__main__":
-    genlogo("../_static/xoa-logo-light.png")
-    genlogo("../_static/xoa-logo-dark.png", dark=True)
+    genlogo("xoa-logo-light.png")
+    genlogo("xoa-logo-dark.png", dark=True)
