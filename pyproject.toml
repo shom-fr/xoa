@@ -51,32 +51,24 @@ homepage = "https://xoa.readthedocs.io/"
 issue-tracker = "https://github.com/shom-fr/xoa/issues"
 source-code = "https://github.com/shom-fr/xoa"
 
-
 [project.entry-points.console_scripts]
 xoa = "xoa.cli:main"
 
 [build-system]
-requires = ["setuptools >= 64", "wheel", "setuptools-scm[toml]>=8"]
+requires = ["setuptools>=64", "wheel", "setuptools-scm[toml]>=8"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["xoa"]
 include-package-data = true
 
-[tool.setuptools.dynamic]
-version = {attr = "xoa.__version__"}
+#[tool.setuptools.dynamic]
+#version = {attr = "xoa.__version__"}
 
 [tool.setuptools_scm]
 fallback_version = "0.0.0"
 write_to = "xoa/_version.py"
 tag_regex= "^(?P<prefix>v)?(?P<version>[^\\+]+)(?P<suffix>.*)?$"
-
-[tool.setuptools.package-data]
-xoa = [
-    "cf.cfg",
-    "cf.ini",
-    "_samples/*"
-]
 
 [tool.flake8]
 max-line-length = 100
@@ -91,6 +83,7 @@ exclude = [
     ".eggs",
     "doc"
 ]
+
 [tool.black]
 line-length = 100
 target-version = ['py311']
