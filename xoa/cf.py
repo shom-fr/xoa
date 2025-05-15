@@ -2127,7 +2127,7 @@ class CFSpecs(object):
         --------
         get_axis
         """
-        return self.coords.get_dim_type(dim, da=da, lower=lower)
+        return self.coords.get_dim_type(dim, obj=da, lower=lower)
 
     def get_dim_types(self, da, unknown=None, asdict=False):
         """Get a tuple of the dimension types of an array

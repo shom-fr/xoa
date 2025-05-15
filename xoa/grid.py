@@ -614,7 +614,7 @@ def to_rect(da, tol=1e-5, errors="warn"):
             )
             if errors == "raise":
                 raise XoaError(msg)
-            elif errors == "ignore":
+            elif errors == "warn":
                 xoa_warn(msg)
     if new_coords:
         return (

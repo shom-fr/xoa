@@ -1,13 +1,34 @@
 What's new
 ##########
 
+Develop
+=======
+
+New features
+------------
+
+Breaking changes
+----------------
+
+Deprecations
+------------
+
+Bug fixes
+---------
+- Fix :func:`xoa.grid.to_rect` warnings.
+- Fix :meth:`xoa.cf.CFSpecs.get_dim_types`.
+
+Documentation
+-------------
+
+
 0.8.0 (2025-05-12)
 ==================
 
 New features
 ------------
-- Add modules :mod:`xoa.data_sample` and :mod:`xoa.cf_configs`.
-- :class:`xoa.cf.CFSpecs`, :func:`xoa.cf.register_cf_specs`, :func:`get_cf_specs` and :class:`xoa.cf.set_cf_specs` now accepts short names of internal CF config like "croco" or "argo".
+- Add modules :mod:`xoa.data_samples` and :mod:`xoa.cf_configs`.
+- :class:`xoa.cf.CFSpecs`, :func:`xoa.cf.register_cf_specs`, :func:`xoa.cf.get_cf_specs` and :class:`xoa.cf.set_cf_specs` now accepts short names of internal CF config like "croco" or "argo".
 - Add `absolute` option for salinity and the `ref_dens` option to enable using different formulae for density to :func:`xoa.plot.plot_ts`.
 - Add the `exclude_names` option to :mod:`xoa.cf` configurations to ignore data array names.
 - Call :func:`xoa.cf.infer_cf_specs` from :func:`xoa.cf.get_cf_specs`  when an data arrray or dataset is passed [:pull:`96`].
@@ -35,7 +56,7 @@ Bug fixes
 - Fix weighting of :func:`xoa.filter.convolve`.
 - Fix :func:`xoa.grid.to_rect` raising of errors and handling of missing data in coordinates.
 - Fix string formatting in :func:`xoa.filter.tidal_filter` warning.
-- Fix default value of `deltadens` in :func:`xoa.thermdyn.mixed_layer_depth`
+- Fix default value of `deltadens` in :func:`xoa.thermdyn.mixed_layer_depth`.
 
 Documentation
 -------------
@@ -242,8 +263,8 @@ Bug fixes
 - Fix u and v CF config [:pull:`6`]
 
 
-0.2.0
-=====
+YYYY-MM-XX
+==========
 
 New features
 ------------
