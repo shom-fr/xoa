@@ -1,6 +1,7 @@
 """
 Routines related to the ocean dynamics.
 """
+
 # Copyright 2020-2022 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,8 +24,22 @@ import xarray as xr
 from .__init__ import XoaError
 from . import coords as xcoords
 from . import grid as xgrid
+from . import cf as xcf
+from . import misc as xmisc
 from xoa.interp import grid2locs
 from xoa.geo import EARTH_RADIUS
+
+
+@xmisc.ERRORS.format_function_docstring
+def get_sea_level(ds, candidates=["ssh", "adt", "sla", "mdt"], errors="ignore"):
+    """Try to find a unique sea level variable in a dataset"""
+    errors = xmisc.ERRORS[errors]
+    cfspecs = xcf.get_cf_specs(ds)
+    try:
+        sea_level = cfspecs.get(ds, candidates, errors=errors)
+    except Exception as e:
+        raise XoaError("Can't find a single sea level-like variable: " + e.message)
+    return sea_level
 
 
 def _get_uv2d_(t, txy, gx, gy, gz, gt, guv):

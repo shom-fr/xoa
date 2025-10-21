@@ -5,7 +5,7 @@ or perform operations on a grid.
 
 For operations between different grids, please see :mod:`xoa.regrid`.
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2025 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -601,7 +601,7 @@ def to_rect(da, tol=1e-5, errors="warn"):
         for odim in dims:
             if np.allclose(coord.min(odim), coord.max(odim), atol=tol, equal_nan=True):
                 new_coords[name] = xr.DataArray(
-                    coord.isel({odim: 0}).values, dims=name, attrs=coord.attrs
+                    coord.isel({odim: 0}).data, dims=name, attrs=coord.attrs
                 )
                 new_coords[name].encoding.update(coord.encoding)
                 dim = coord.dims[0] if coord.dims[1] == odim else coord.dims[1]
