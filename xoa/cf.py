@@ -77,9 +77,9 @@ class XoaCFError(XoaError):
 
 
 def _check_single_(errors, found, target_type, targets=None):
-    """Check that we found a signle item"""
+    """Check that we found a single item"""
 
-    # Single one to its ok
+    # Single one so its ok
     if len(found) == 1:
         return found[0]
 
@@ -95,9 +95,11 @@ def _check_single_(errors, found, target_type, targets=None):
             msg = f"Found multiple {target_type}s{suffix} instead of single one"
             if errors == "raise":
                 raise XoaCFError(msg)
+            msg += ". Returning the first item."
             xoa_warn(msg, stacklevel=3)
+            return found[0]
         else:
-            return found
+            return found[0]
 
     # No one
     if errors != "ignore":
@@ -2054,6 +2056,8 @@ class CFSpecs(object):
             res = self[category].search(
                 obj, cf_name=cf_name, loc=loc, get=get, single=single, errors="ignore"
             )
+            if res is None:
+                continue
             if not single:
                 res = [r for r in res if r.name not in [f.name for f in found]]
                 found.extend(res)
@@ -2078,7 +2082,7 @@ class CFSpecs(object):
         cf_name: str, list(str)
             Generic CF name to search for.
             When a list, loop over possible cf_names and stop at the first found.
-        get: {"obj", "name"}
+        get: {{"obj", "name"}}
             "Getthe object or its cf_name.
         {errors}
 
@@ -2575,7 +2579,7 @@ class _CFCatSpecs_(object):
         cf_name: str, list(str)
             Generic CF name to search for.
             When a list, loop over possible cf_names and stop at the first found.
-        get: {"obj", "name"}
+        get: {{"obj", "name"}}
             "Getthe object or its cf_name.
         {errors}
 

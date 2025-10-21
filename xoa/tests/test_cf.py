@@ -506,6 +506,9 @@ def test_cf_cfspecs_get():
     assert cfspecs.get(ds, "depth") is None
 
 
+test_cf_cfspecs_get()
+
+
 def test_cf_cfspecs_cats_get_loc_arg():
 
     cf_dict0 = {
