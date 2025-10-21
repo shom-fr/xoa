@@ -6,9 +6,9 @@ Develop
 
 New features
 ------------
-- Add the ``rename_args`` argument to formatting routing of :mod:`xoa.cf` to retreive renaming information.
-- Add the :func:`xoa.dyn.get_sea_level` function to get either SSH, ADT, SLA or MDT in a dataset.
-- Allow passing a list of "cf_name" to :meth:`xoa.cf.CfSpecs.get` for enlarging a search.
+- Add the ``rename_args`` argument to formatting routing of :mod:`xoa.cf` to retreive renaming information [:pull:`102`].
+- Add the :func:`xoa.dyn.get_sea_level` function to get either SSH, ADT, SLA or MDT in a dataset [:pull:`102`].
+- Allow passing a list of "cf_name" to :meth:`xoa.cf.CfSpecs.get` for enlarging a search [:pull:`102`].
 
 Breaking changes
 ----------------
