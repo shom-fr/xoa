@@ -6,6 +6,9 @@ Develop
 
 New features
 ------------
+- Add the ``rename_args`` argument to formatting routing of :mod:`xoa.cf` to retreive renaming information.
+- Add the :func:`xoa.dyn.get_sea_level` function to get either SSH, ADT, SLA or MDT in a dataset.
+- Allow passing a list of "cf_name" to :meth:`xoa.cf.CfSpecs.get` for enlarging a search.
 
 Breaking changes
 ----------------
@@ -263,8 +266,8 @@ Bug fixes
 - Fix u and v CF config [:pull:`6`]
 
 
-YYYY-MM-XX
-==========
+YYYY-0M-MICRO
+=============
 
 New features
 ------------

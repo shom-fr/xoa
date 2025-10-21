@@ -48,11 +48,6 @@ _THISDIR = os.path.dirname(__file__)
 # Joint variables and coords config specification file
 _INIFILE = os.path.join(_THISDIR, "cf.ini")
 
-_user_cache_dir = user_cache_dir("xoa")
-
-#: User cache file for cf specs
-USER_CF_CACHE_FILE = os.path.join(_user_cache_dir, "cf.pyk")
-
 #: User CF config file
 USER_CF_FILE = os.path.join(user_config_dir("xoa"), "cf.cfg")
 
@@ -79,6 +74,37 @@ ATTRS_PATCH_MODE = Choices(
 
 class XoaCFError(XoaError):
     pass
+
+
+def _check_single_(errors, found, target_type, targets=None):
+    """Check that we found a signle item"""
+
+    # Single one to its ok
+    if len(found) == 1:
+        return found[0]
+
+    if targets is not None:
+        if not isinstance(targets, str):
+            targets = ", ".join(targets)
+        suffix = f" matching '{targets}'"
+    errors = ERRORS[errors]
+
+    # Multiple
+    if len(found) > 1:
+        if errors != "ignore":
+            msg = f"Found multiple {target_type}s{suffix} instead of single one"
+            if errors == "raise":
+                raise XoaCFError(msg)
+            xoa_warn(msg, stacklevel=3)
+        else:
+            return found
+
+    # No one
+    if errors != "ignore":
+        msg = f"No {target_type} found{suffix}"
+        if errors == "raise":
+            raise XoaCFError(msg)
+        xoa_warn(msg, stacklevel=3)
 
 
 def _list_xr_names_(obj, data_vars=True, coords=True, dims=True):
@@ -1252,6 +1278,7 @@ class CFSpecs(object):
         specialize=False,
         rename_dims=None,
         categories=["coords", "data_vars"],
+        rename_args=None,
     ):
         """Auto-format a whole xarray.Dataset
 
@@ -1265,7 +1292,8 @@ class CFSpecs(object):
             obj = obj.copy(deep=False)
 
         # Init rename dict
-        rename_args = {}
+        if rename_args is None:
+            rename_args = {}
         if rename_dims is None:
             rename_dims = format_coords
 
@@ -1361,6 +1389,7 @@ class CFSpecs(object):
         replace_attrs=False,
         # add_loc_to_name=None,
         rename_dims=True,
+        rename_args=None,
     ):
         """Format a coordinate array
 
@@ -1392,6 +1421,8 @@ class CFSpecs(object):
             If a dict, use this dict.
         replace_attrs: bool
             Replace existing attributes?
+        rename_args: dict, None
+            Dictionay to collect args to rename
 
         Returns
         -------
@@ -1417,6 +1448,7 @@ class CFSpecs(object):
             specialize=specialize,
             categories=["coords"],
             loc=loc,
+            rename_args=rename_args,
         )
 
     def format_data_var(
@@ -1432,6 +1464,7 @@ class CFSpecs(object):
         attrs=True,
         replace_attrs=False,
         standardize=True,
+        rename_args=None,
         # add_loc_to_name=None,
     ):
         """Format a data_var array
@@ -1464,6 +1497,8 @@ class CFSpecs(object):
             If a dict, use this dict.
         replace_attrs: bool
             Replace existing attributes?
+        rename_args: dict, None
+            Dictionay to collect args to rename
 
         Returns
         -------
@@ -1489,6 +1524,7 @@ class CFSpecs(object):
             standardize=standardize,
             categories=["coords", "data_vars"],
             loc=loc,
+            rename_args=rename_args,
         )
 
     def format_dataset(
@@ -1504,6 +1540,7 @@ class CFSpecs(object):
         specialize=False,
         attrs=True,
         replace_attrs=False,
+        rename_args=None,
         # add_loc_to_name=None
     ):
         """Format a whole dataset
@@ -1537,6 +1574,8 @@ class CFSpecs(object):
             If a dict, use this dict.
         replace_attrs: bool
             Replace existing attributes?
+        rename_args: dict, None
+            Dictionay to collect args to rename
 
         Returns
         -------
@@ -1561,6 +1600,7 @@ class CFSpecs(object):
             attrs=attrs,
             specialize=specialize,
             categories=["coords", "data_vars"],
+            rename_args=rename_args,
         )
 
     def auto_format(self, obj, **kwargs):
@@ -1939,7 +1979,7 @@ class CFSpecs(object):
             - None or "any": any
             - False or '"": no location
         get: {{"obj", "name"}}
-            When found, get the object found or its name.
+            When found, get the object found or its cf_name.
         single: bool
             If True, return the first item found or None.
             If False, return a possible empty list of found items.
@@ -1992,6 +2032,8 @@ class CFSpecs(object):
             Generic CF name to search for.
         categories: str, list, None
             Explicty categories with "coords" and "data_vars".
+        get: {{"obj", "cf_name"}}
+            "Getthe object or its cf_name.
         {errors}
 
         Return
@@ -2025,17 +2067,29 @@ class CFSpecs(object):
         elif errors == "raise":
             raise XoaCFError(msg)
 
-    def get(self, obj, cf_name, get="obj"):
-        """A shortcut to :meth:`search` with an explicit generic CF name
+    @ERRORS.format_method_docstring
+    def get(self, obj, cf_name, get="obj", errors="ignore"):
+        """A shortcut to :meth:`search` with an explicit generic CF name or a list of them
+
+        Parameters
+        ----------
+        obj: xarray.DataArray, xarray.Dataset
+            Array or dataset to scan
+        cf_name: str, list(str)
+            Generic CF name to search for.
+            When a list, loop over possible cf_names and stop at the first found.
+        get: {"obj", "name"}
+            "Getthe object or its cf_name.
+        {errors}
 
         A single element is searched for into all :attr:`categories`
         and errors are ignored.
         """
-        return self.search(obj, cf_name, errors="ignore", single=True, get=get)
-        # if da is None:
-        #     raise XoaCFError("Search failed for the following cf name: "
-        #                      + name)
-        # return da
+        cf_names = [cf_name] if isinstance(cf_name, str) else cf_name
+        found = []
+        for cf_name in cf_names:
+            found.extend(self.search(obj, cf_name, errors="ignore", single=False, get=get))
+        return _check_single_(errors, found, "item", cf_names)
 
     @ERRORS.format_method_docstring
     def get_dims(
@@ -2508,23 +2562,31 @@ class _CFCatSpecs_(object):
         # Return
         if not single:
             return found
-        errors = ERRORS[errors]
-        if errors != "ignore" and len(found) > 1:
-            msg = "Multiple items found while you requested a single one"
-            if errors == "raise":
-                raise XoaCFError(msg)
-            xoa_warn(msg)
-        if found:
-            return found[0]
-        if errors != "ignore":
-            msg = "No matching item found"
-            if errors == "raise":
-                raise XoaCFError(msg)
-            xoa_warn(msg)
+        return _check_single_(errors, found, "item", cf_name)
 
-    def get(self, obj, cf_name):
-        """Call to :meth:`search` with an explicit name and ignoring errors"""
-        return self.search(obj, cf_name, errors="ignore")
+    @ERRORS.format_method_docstring
+    def get(self, obj, cf_name, get="obj", errors="ignore"):
+        """A shortcut to :meth:`search` with an explicit generic CF name or a list of them
+
+        Parameters
+        ----------
+        obj: xarray.DataArray, xarray.Dataset
+            Array or dataset to scan
+        cf_name: str, list(str)
+            Generic CF name to search for.
+            When a list, loop over possible cf_names and stop at the first found.
+        get: {"obj", "name"}
+            "Getthe object or its cf_name.
+        {errors}
+
+        A single element is searched for into all :attr:`categories`
+        and errors are ignored.
+        """
+        cf_names = [cf_name] if isinstance(cf_name, str) else cf_name
+        found = []
+        for cf_name in cf_names:
+            found.extend(self.search(obj, cf_name, errors="ignore", single=False, get=get))
+        return _check_single_(errors, found, "item", cf_names)
 
     @ERRORS.format_method_docstring
     def get_attrs(
@@ -3053,25 +3115,28 @@ class CFCoordSpecs(_CFCatSpecs_):
             found.append(out)
 
         # Single?
-        errors = ERRORS[errors]
         if single:
-            if len(found) == 1:
-                return found[0]
-            if len(found) > 1:
-                if errors != "ignore":
-                    msg = f"Multiple candidates dimensions matching: {cf_arg}"
-                    if errors == "raise":
-                        raise XoaCFError(msg)
-                    xoa_warn(msg)
-        else:
-            return found
+            return _check_single_(errors, found, "dimension", cf_arg)
+        return found
+        # errors = ERRORS[errors]
+        # if single:
+        #     if len(found) == 1:
+        #         return found[0]
+        #     if len(found) > 1:
+        #         if errors != "ignore":
+        #             msg = f"Multiple candidates dimensions matching: {cf_arg}"
+        #             if errors == "raise":
+        #                 raise XoaCFError(msg)
+        #             xoa_warn(msg)
+        # else:
+        #     return found
 
-        # Failed
-        if errors != "ignore":
-            msg = f"No dimension found in dataarray matching: {cf_arg}"
-            if errors == "raise":
-                raise XoaCFError(msg)
-            xoa_warn(msg)
+        # # Failed
+        # if errors != "ignore":
+        #     msg = f"No dimension found in dataarray matching: {cf_arg}"
+        #     if errors == "raise":
+        #         raise XoaCFError(msg)
+        #     xoa_warn(msg)
 
     @ERRORS.format_method_docstring
     def search_from_dim(self, obj, dim, errors="ignore"):
@@ -3448,22 +3513,19 @@ class set_cf_specs(object):
             self.cf_cache["current"] = self.old_specs
 
 
-def reset_cache(disk=True, memory=False):
-    """Reset the on disk and/or in memory cf specs cache
+def reset_cache(memory=False, **kwargs):
+    """Reset the in memory cf specs cache
 
     Parameters
     ----------
-    disk: bool
-        Remove the cf specs cahce file (:data:`USER_CF_CACHE_FILE`)
     memory: bool
         Remove the in-memory cache.
 
         .. warning:: This may lead to unpredicted behaviors.
 
     """
-    if disk and os.path.exists(USER_CF_CACHE_FILE):
-        os.remove(USER_CF_CACHE_FILE)
-
+    if "disk" in kwargs:
+        xoa_warn("Disk cachng is no longer supported", category="deprecation")
     if memory:
         cf_cache = _get_cache_()
         cf_cache["loaded_dicts"].clear()
@@ -3474,7 +3536,7 @@ def reset_cache(disk=True, memory=False):
 
 def show_cache():
     """Show the cf specs cache file"""
-    print(USER_CF_CACHE_FILE)
+    xoa_warn("Disk cachng is no longer supported", category="deprecation")
 
 
 @ERRORS.format_function_docstring
@@ -3555,58 +3617,16 @@ def get_cf_specs_from_encoding(ds):
             return get_cf_specs_from_name(name, errors="warn")
 
 
-def get_default_cf_specs(cache="rw"):
-    """Get the default CF specifications
-
-    Parameters
-    ----------
-    cache: str, bool, None
-        Cache default specs on disk with pickling for fast loading.
-        If ``None``, it defaults to boolean option :xoaoption:`cf.cache`.
-        Possible string values: ``"ignore"``, ``"rw"``, ``"read"``,
-        ``"write"``, ``"clean"``.
-        If ``True``, it is set to ``"rw"``.
-        If ``False``, it is set to ``"ignore"``.
-    """
-    if cache is None:
-        cache = get_option('cf.cache')
-    if cache is True:
-        cache = "rw"
-    elif cache is False:
-        cache = "ignore"
-    assert cache in ("ignore", "rw", "read", "write", "clean")
+def get_default_cf_specs(**kwargs):
+    """Get the default CF specifications"""
+    if "cache " in kwargs:
+        xoa_warn("Disk cachng is no longer supported", category="deprecation")
     cf_cache = _get_cache_()
     if cf_cache["default"] is not None:
         return cf_cache["default"]
-    cfspecs = None
 
-    # Try from disk cache
-    if cache in ("read", "rw"):
-        if os.path.exists(USER_CF_CACHE_FILE) and (
-            os.stat(get_cf_config_file("default")).st_mtime < os.stat(USER_CF_CACHE_FILE).st_mtime
-        ):
-            try:
-                with open(USER_CF_CACHE_FILE, "rb") as f:
-                    cfspecs = pickle.load(f)
-            except Exception as e:
-                xoa_warn("Error while loading cached cf specs: " + str(e.args))
-
-    # Compute it from scratch
-    if cfspecs is None:
-        # Setup
-        cfspecs = CFSpecs()
-
-        # Cache it on disk
-        if cache in ("write", "rw"):
-            try:
-                cachedir = os.path.dirname(USER_CF_CACHE_FILE)
-                if not os.path.exists(cachedir):
-                    os.makedirs(cachedir)
-                with open(USER_CF_CACHE_FILE, "wb") as f:
-                    pickle.dump(cfspecs, f)
-            except Exception as e:
-                xoa_warn("Error while caching cf specs: " + str(e.args))
-
+    # Setup
+    cfspecs = CFSpecs()
     cf_cache["default"] = cfspecs
     if not is_registered_cf_specs(cfspecs):
         register_cf_specs(cfspecs)

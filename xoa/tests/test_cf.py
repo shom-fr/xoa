@@ -343,7 +343,6 @@ def test_cf_cfspecs_copy():
 
 
 def test_cf_set_cf_specs():
-    cf.reset_cache(disk=False)
     cfspecs = cf.get_cf_specs()
     cf.set_cf_specs(cfspecs)
     cf_cache = cf._get_cache_()
@@ -495,6 +494,16 @@ def test_cf_cfspecs_search_data_var(cf_name, in_name, in_attrs):
     )
     ds = temp.to_dataset()
     assert cf.get_cf_specs().search_data_var(ds, cf_name, get="cf_name") == 'temp'
+
+
+def test_cf_cfspecs_get():
+
+    ds = xr.Dataset({"xtemp": ("x", [0], {"standard_name": "sea_water_temperature"}), "psal": 1})
+
+    cfspecs = cf.get_cf_specs()
+    assert cfspecs.get(ds, "temp").name == "xtemp"
+    assert cfspecs.get(ds, ["temp", "psal"]).name == "xtemp"
+    assert cfspecs.get(ds, "depth") is None
 
 
 def test_cf_cfspecs_cats_get_loc_arg():

@@ -85,7 +85,11 @@ class XoaWarning(UserWarning):
     pass
 
 
-def xoa_warn(message, stacklevel=2):
+class XoaDeprecationWarning(XoaWarning, DeprecationWarning):
+    pass
+
+
+def xoa_warn(message, stacklevel=2, category=None):
     """Issue a :class:`XoaWarning` warning
 
     Example
@@ -97,7 +101,11 @@ def xoa_warn(message, stacklevel=2):
         from xoa import xoa_warn
         xoa_warn('Be careful!')
     """
-    warnings.warn(message, XoaWarning, stacklevel=stacklevel)
+    if category is None:
+        category = XoaWarning
+    elif category == "deprecation":
+        category = XoaDeprecationWarning
+    warnings.warn(message, category, stacklevel=stacklevel)
 
 
 def _get_cache_():
