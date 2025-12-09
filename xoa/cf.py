@@ -1135,26 +1135,64 @@ class CFSpecs(object):
         isdataset = hasattr(obj, "data_vars")
         das = obj.values() if isdataset else [obj]
 
-        def check_coords(da, specs, locations):
-            """Scan the add_coords_loc section and the coordinates and dimensions"""
-            for cf_coord_name, coord_loc in specs["add_coords_loc"].items():
-                if self.coords[cf_coord_name]["attrs"].get("axis", "").lower() not in 'xyz':
-                    continue
+        # Process data variables
+        self._process_data_var_locations_(das, categories, cf_names, isdataset, loc, locations)
 
-                loc = specs["loc"] if coord_loc is True else coord_loc
+        # Process coordinates
+        self._process_coord_locations_(obj, cf_names, locations)
 
-                # Coordinates
-                coord = self.search_coord(da, cf_coord_name, errors="ignore")
-                if coord is not None and locations.get(coord.name) is None:
-                    locations[coord.name] = loc
-                    continue
+        # Infer locations from dimensions
+        self._infer_locations_from_dims_(das, locations)
 
-                # Dimensions
-                dim = self.search_dim(da, cf_coord_name, errors="ignore")
-                if dim is not None and locations.get(dim) is None:
-                    locations[dim] = loc
+        return locations
 
-        # Loop on data vars
+    def _check_coord_locations_(self, da, specs, locations):
+        """Scan add_coords_loc section and update locations for coordinates and dimensions.
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Data array to scan
+        specs: dict
+            CF specs for the data array
+        locations: dict
+            Dictionary to update with location mappings
+        """
+        for cf_coord_name, coord_loc in specs["add_coords_loc"].items():
+            if self.coords[cf_coord_name]["attrs"].get("axis", "").lower() not in 'xyz':
+                continue
+
+            loc = specs["loc"] if coord_loc is True else coord_loc
+
+            # Coordinates
+            coord = self.search_coord(da, cf_coord_name, errors="ignore")
+            if coord is not None and locations.get(coord.name) is None:
+                locations[coord.name] = loc
+                continue
+
+            # Dimensions
+            dim = self.search_dim(da, cf_coord_name, errors="ignore")
+            if dim is not None and locations.get(dim) is None:
+                locations[dim] = loc
+
+    def _process_data_var_locations_(self, das, categories, cf_names, isdataset, loc, locations):
+        """Process data variables and assign locations.
+
+        Parameters
+        ----------
+        das: list
+            List of data arrays
+        categories: list
+            Categories to search in (coords, data_vars)
+        cf_names: dict, None
+            CF names mapping
+        isdataset: bool
+            Whether obj is a dataset
+        loc: str, None
+            Location override for DataArray
+        locations: dict
+            Dictionary to update with location mappings
+        """
         for da in das:
             for cat in categories:
                 cf_name = cf_names.get(da.name) if cf_names else self[cat].match(da)
@@ -1171,12 +1209,21 @@ class CFSpecs(object):
                             locations[da.name] = specs["loc"]  # from config
                     else:
                         locations[da.name] = False
-                    check_coords(da, specs, locations)  # check coords from config
+                    self._check_coord_locations_(da, specs, locations)
                     break  # good category
-            else:
-                continue
 
-        # Loop on coordinates
+    def _process_coord_locations_(self, obj, cf_names, locations):
+        """Process coordinates and assign locations.
+
+        Parameters
+        ----------
+        obj: xarray.Dataset or xarray.DataArray
+            Object with coordinates
+        cf_names: dict, None
+            CF names mapping
+        locations: dict
+            Dictionary to update with location mappings
+        """
         for coord in obj.coords.values():
             cf_coord_name = cf_names.get(coord.name) if cf_names else self.coords.match(coord)
             if (
@@ -1198,10 +1245,21 @@ class CFSpecs(object):
                             locations[coord.name] = self.coords[cf_coord_name]["loc"]
                     else:
                         locations[coord.name] = False
-                check_coords(coord, self.coords[cf_coord_name], locations)
+                self._check_coord_locations_(coord, self.coords[cf_coord_name], locations)
 
-        # Loop again on data vars: if loc is True for an datarray and loc is defined an unique
-        # for all dims, it is set to the array too
+    def _infer_locations_from_dims_(self, das, locations):
+        """Infer locations for data vars from their dimensions when location is True.
+
+        If a data array has location True and all its dimensions have the same
+        unique location, assign that location to the array.
+
+        Parameters
+        ----------
+        das: list
+            List of data arrays
+        locations: dict
+            Dictionary to update with location mappings
+        """
         for da in das:
             if locations.get(da.name) is True:
                 loc = None
@@ -1215,60 +1273,32 @@ class CFSpecs(object):
                 else:
                     locations[da.name] = loc
 
-        return locations
+    def _format_data_arrays_(self, obj, data_vars, categories, cf_names, attrs, locations,
+                             kwargs, rename, rename_args, is_dataset):
+        """Format data arrays and collect rename arguments.
 
-    def _format_obj_(
-        self,
-        obj,
-        cf_names=None,
-        rename=True,
-        standardize=True,
-        format_coords=True,
-        copy=True,
-        replace_attrs=False,
-        attrs=True,
-        loc=None,
-        # add_loc_to_name=None, add_loc_to_coord_names=None,
-        specialize=False,
-        rename_dims=None,
-        categories=["coords", "data_vars"],
-        rename_args=None,
-    ):
-        """Auto-format a whole xarray.Dataset
-
-        See also
-        --------
-        format_data_var
-        format_coord
+        Parameters
+        ----------
+        obj: xarray.Dataset or xarray.DataArray
+        data_vars: list
+            List of data arrays to format
+        categories: list
+            Categories to search in (coords, data_vars)
+        cf_names: dict, None
+            CF names mapping
+        attrs: bool, dict
+            Attributes to apply
+        locations: dict
+            Location mapping
+        kwargs: dict
+            Common formatting arguments
+        rename: bool
+            Whether renaming is enabled
+        rename_args: dict
+            Dictionary to collect rename arguments
+        is_dataset: bool
+            Whether obj is a dataset
         """
-        # Copy
-        if copy:
-            obj = obj.copy(deep=False)
-
-        # Init rename dict
-        if rename_args is None:
-            rename_args = {}
-        if rename_dims is None:
-            rename_dims = format_coords
-
-        # Common formatting kwargs
-        kwargs = dict(
-            copy=False,
-            rename=False,
-            replace_attrs=replace_attrs,
-            standardize=True,
-            specialize=specialize,
-        )
-
-        # Staggared grid locations
-        locations = self.get_loc_mapping(obj, cf_names=cf_names, loc=loc, categories=categories)
-
-        # Data arrays
-        is_dataset = hasattr(obj, "data_vars")
-        if is_dataset:  # dataset
-            data_vars = obj.values()
-        else:
-            data_vars = [obj]
         for da in data_vars:
             if da.name in self.excluded_names:
                 continue
@@ -1293,33 +1323,129 @@ class CFSpecs(object):
                 else:
                     da.name = new_name
 
-        # Coordinates
-        if format_coords:
-            for cname in _list_xr_names_(obj, data_vars=False, dims=False):
-                if cname in self.excluded_names:
-                    continue
-                cda = obj.coords[cname]
-                new_coord_name = self.coords.format_dataarray(
-                    cda,
-                    cf_name=cf_names.get(cname) if isinstance(cf_names, dict) else None,
-                    attrs=attrs if isinstance(attrs, bool) else attrs.get(cname, True),
-                    loc=locations.get(cda.name),
-                    **kwargs,
-                )
-                if rename and new_coord_name:
-                    rename_args[cda.name] = new_coord_name
+    def _format_coordinates_(self, obj, cf_names, attrs, locations, kwargs, rename, rename_args):
+        """Format coordinates and collect rename arguments.
 
-        # Dimensions
+        Parameters
+        ----------
+        obj: xarray.Dataset or xarray.DataArray
+        cf_names: dict, None
+            CF names mapping
+        attrs: bool, dict
+            Attributes to apply
+        locations: dict
+            Location mapping
+        kwargs: dict
+            Common formatting arguments
+        rename: bool
+            Whether renaming is enabled
+        rename_args: dict
+            Dictionary to collect rename arguments
+        """
+        for cname in _list_xr_names_(obj, data_vars=False, dims=False):
+            if cname in self.excluded_names:
+                continue
+            cda = obj.coords[cname]
+            new_coord_name = self.coords.format_dataarray(
+                cda,
+                cf_name=cf_names.get(cname) if isinstance(cf_names, dict) else None,
+                attrs=attrs if isinstance(attrs, bool) else attrs.get(cname, True),
+                loc=locations.get(cda.name),
+                **kwargs,
+            )
+            if rename and new_coord_name:
+                rename_args[cda.name] = new_coord_name
+
+    def _apply_renames_(self, obj, rename_args, rename_dims, locations, specialize, rename):
+        """Apply dimension and final renaming.
+
+        Parameters
+        ----------
+        obj: xarray.Dataset or xarray.DataArray
+        rename_args: dict
+            Dictionary of rename mappings
+        rename_dims: bool
+            Whether to rename dimensions
+        locations: dict
+            Location mapping
+        specialize: bool
+            Whether to use specialized names
+        rename: bool
+            Whether renaming is enabled
+
+        Returns
+        -------
+        xarray.Dataset or xarray.DataArray
+            Renamed object
+        """
         if rename_dims:
             rename_dims_args = self.coords.get_rename_dims_args(
                 obj, locations=locations, specialize=specialize
-            )  # , exclude=list(rename_args.keys()))
+            )
             rename_args.update(rename_dims_args)
 
-        # Final renaming
         if rename and rename_args:
             _solve_rename_conflicts_(rename_args)
             obj = obj.rename(rename_args)
+
+        return obj
+
+    def _format_obj_(
+        self,
+        obj,
+        cf_names=None,
+        rename=True,
+        standardize=True,
+        format_coords=True,
+        copy=True,
+        replace_attrs=False,
+        attrs=True,
+        loc=None,
+        specialize=False,
+        rename_dims=None,
+        categories=["coords", "data_vars"],
+        rename_args=None,
+    ):
+        """Auto-format a whole xarray.Dataset
+
+        See also
+        --------
+        format_data_var
+        format_coord
+        """
+        # Copy and initialization
+        if copy:
+            obj = obj.copy(deep=False)
+        if rename_args is None:
+            rename_args = {}
+        if rename_dims is None:
+            rename_dims = format_coords
+
+        # Common formatting kwargs
+        kwargs = dict(
+            copy=False,
+            rename=False,
+            replace_attrs=replace_attrs,
+            standardize=True,
+            specialize=specialize,
+        )
+
+        # Get staggered grid locations
+        locations = self.get_loc_mapping(obj, cf_names=cf_names, loc=loc, categories=categories)
+
+        # Format data arrays
+        is_dataset = hasattr(obj, "data_vars")
+        data_vars = obj.values() if is_dataset else [obj]
+        self._format_data_arrays_(
+            obj, data_vars, categories, cf_names, attrs, locations, kwargs, rename, rename_args, is_dataset
+        )
+
+        # Format coordinates
+        if format_coords:
+            self._format_coordinates_(obj, cf_names, attrs, locations, kwargs, rename, rename_args)
+
+        # Apply renaming
+        obj = self._apply_renames_(obj, rename_args, rename_dims, locations, specialize, rename)
 
         return obj
 
@@ -2371,6 +2497,116 @@ class _CFCatSpecs_(object):
                     match_specs[attr] = specs["attrs"][attr]
         return match_specs
 
+    def _get_search_scope_(self, obj, within):
+        """Determine search scope and get list of names to search.
+
+        Parameters
+        ----------
+        obj: xarray.DataArray or xarray.Dataset
+            Object to search in
+        within: str, list, None
+            Object types to search within
+
+        Returns
+        -------
+        list
+            List of names to search
+
+        Raises
+        ------
+        XoaCFError
+            If within parameter is invalid
+        """
+        if within is None:
+            if not hasattr(obj, "data_vars"):
+                within = ["coords"]
+            else:
+                within = ["coords", "data_vars"]
+                if self.category == "data_vars":
+                    within = within[::-1]
+        else:
+            if isinstance(within, str):
+                within = [within]
+            for ot in within:
+                if ot not in ["coords", "data_vars"]:
+                    raise XoaCFError("with parameter must one or a list of: coords, data_vars")
+
+        return _list_xr_names_(
+            obj, dims=False, coords="coords" in within, data_vars="data_vars" in within
+        )
+
+    def _build_match_specs_(self, cf_name, errors):
+        """Build match specifications for search.
+
+        Parameters
+        ----------
+        cf_name: str, dict, None
+            CF name to search for
+        errors: str
+            Error handling mode
+
+        Returns
+        -------
+        list
+            List of match specifications
+        """
+        if cf_name:  # Explicit name so we loop on search specs
+            if isinstance(cf_name, str):
+                if not self._assert_known_(cf_name, errors):
+                    return None
+            match_specs = []
+            for attr, refs in self._get_ordered_match_specs_(cf_name).items():
+                match_specs.append({attr: refs})
+        else:
+            match_specs = [None]
+        return match_specs
+
+    def _search_in_objects_(self, obj, names, match_specs, loc, get, cf_name):
+        """Search for matching objects in the given list of names.
+
+        Parameters
+        ----------
+        obj: xarray.DataArray or xarray.Dataset
+            Object containing the arrays to search
+        names: list
+            List of names to search through
+        match_specs: list
+            List of match specifications
+        loc: str, None
+            Location parameter
+        get: str
+            What to return ("obj", "cf_name", or "both")
+        cf_name: str, None
+            Original cf_name argument
+
+        Returns
+        -------
+        list
+            List of found items
+        """
+        assert get in (
+            "cf_name",
+            "obj",
+            "both",
+        ), f"'get' must be either 'cf_name' or 'obj' or 'both', NOT '{get}'"
+
+        found = []
+        found_objs = []
+        for match_arg in match_specs:
+            for this_name in names:
+                this_obj = obj[this_name]
+                m = self.match(this_obj, match_arg, loc=loc)
+                if m:
+                    if this_name in found_objs:
+                        continue
+                    found_objs.append(this_name)
+                    matched_cf_name = cf_name if cf_name else m
+                    if get == "both":
+                        found.append((this_obj, matched_cf_name))
+                    else:
+                        found.append(this_obj if get == "obj" else matched_cf_name)
+        return found
+
     def match(self, da, cf_name=None, loc=None):
         """Check if da attributes match given or any specs
 
@@ -2482,59 +2718,18 @@ class _CFCatSpecs_(object):
         -------
         None or str or object
         """
+        # Get search scope
+        names = self._get_search_scope_(obj, within)
 
-        # Get target objects
-        if within is None:
-            if not hasattr(obj, "data_vars"):
-                within = ["coords"]
-            else:
-                within = ["coords", "data_vars"]
-                if self.category == "data_vars":
-                    within = within[::-1]
-        else:
-            if isinstance(within, str):
-                within = [within]
-            for ot in within:
-                if ot not in ["coords", "data_vars"]:
-                    raise XoaCFError("with parameter must one or a list of: coords, data_vars")
-        names = _list_xr_names_(
-            obj, dims=False, coords="coords" in within, data_vars="data_vars" in within
-        )
+        # Build match specifications
+        match_specs = self._build_match_specs_(cf_name, errors)
+        if match_specs is None:
+            return
 
-        # Get match specs
-        if cf_name:  # Explicit name so we loop on search specs
-            if isinstance(cf_name, str):
-                if not self._assert_known_(cf_name, errors):
-                    return
-            match_specs = []
-            for attr, refs in self._get_ordered_match_specs_(cf_name).items():
-                match_specs.append({attr: refs})
-        else:
-            match_specs = [None]
+        # Search in objects
+        found = self._search_in_objects_(obj, names, match_specs, loc, get, cf_name)
 
-        # Loops
-        assert get in (
-            "cf_name",
-            "obj",
-            "both",
-        ), f"'get' must be either 'cf_name' or 'obj' or 'both', NOT '{get}'"
-        found = []
-        found_objs = []
-        for match_arg in match_specs:
-            for this_name in names:
-                this_obj = obj[this_name]
-                m = self.match(this_obj, match_arg, loc=loc)
-                if m:
-                    if this_name in found_objs:
-                        continue
-                    found_objs.append(this_name)
-                    cf_name = cf_name if cf_name else m
-                    if get == "both":
-                        found.append((this_obj, cf_name))
-                    else:
-                        found.append(this_obj if get == "obj" else cf_name)
-
-        # Return
+        # Return result
         if not single:
             return found
         return _check_single_(errors, found, "item", cf_name)
@@ -2696,19 +2891,98 @@ class _CFCatSpecs_(object):
         # From the array attributes
         return self.sglocator.get_loc_from_da(da)
 
+    def _resolve_cf_name_(self, da, cf_name, specialize, rename, copy):
+        """Resolve and validate CF name for a data array.
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Data array to process
+        cf_name: str, None
+            CF name or None to match
+        specialize: bool
+            Use specialized name
+        rename: bool
+            Whether renaming is enabled
+        copy: bool
+            Whether copying is enabled
+
+        Returns
+        -------
+        tuple: (cf_name, old_name, new_name) or (None, None, None)
+            CF name, original name, and formatted new name
+        """
+        if cf_name is None:
+            cf_name = self.match(da)
+        if cf_name is None:
+            if not rename:
+                return None, None, None
+            return None, None, da.copy(deep=False) if copy else None
+        assert cf_name in self.names
+        old_name = da.name
+        new_name = self.get_name(cf_name, specialize=specialize)
+        return cf_name, old_name, new_name
+
+    def _resolve_location_(self, da, loc):
+        """Resolve location for a data array.
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Data array to process
+        loc: str, None
+            Location or None to infer
+
+        Returns
+        -------
+        str, None
+            Resolved location
+        """
+        if loc is None:
+            loc = self.get_loc_arg(da)
+        return loc
+
+    def _get_format_attrs_(self, cf_name, da, attrs):
+        """Get attributes for formatting a data array.
+
+        Parameters
+        ----------
+        cf_name: str
+            CF name
+        da: xarray.DataArray
+            Data array to process
+        attrs: bool, dict
+            Attributes specification
+
+        Returns
+        -------
+        dict
+            Attributes to apply
+        """
+        if attrs is True:
+            # Get attributes from CF specs
+            attrs = self.get_attrs(cf_name, loc=None, standardize=False, multi=True)
+
+            # Remove axis attribute for auxiliary coordinates
+            if da.name and da.name not in da.indexes and "axis" in attrs:
+                del attrs["axis"]
+
+        elif not attrs:
+            attrs = {}
+
+        return attrs
+
     def format_dataarray(
         self,
         da,
         cf_name=None,
         rename=True,
         specialize=False,
-        # rename_dim=True,
         loc=None,
         attrs=True,
         standardize=True,
         replace_attrs=False,
         copy=True,
-        # add_loc_to_name=None,
     ):
         """Format a DataArray's name and attributes
 
@@ -2750,37 +3024,24 @@ class _CFCatSpecs_(object):
             if not matching.
 
         """
+        # Handle copy
         if rename:
             copy = True
         if copy:
             da = da.copy(deep=False)
 
-        # Names
-        if cf_name is None:
-            cf_name = self.match(da)
+        # Resolve CF name
+        cf_name, old_name, new_name = self._resolve_cf_name_(da, cf_name, specialize, rename, copy)
         if cf_name is None:
             if not rename:
                 return
-            return da.copy(deep=False) if copy else None
-        assert cf_name in self.names
-        old_name = da.name
-        new_name = self.get_name(cf_name, specialize=specialize)  # if specialize else cf_name
+            return new_name  # Returns None or copied da
 
-        # Location
-        if loc is None:
-            loc = self.get_loc_arg(da)  # from config
+        # Resolve location
+        loc = self._resolve_location_(da, loc)
 
-        # Attributes
-        if attrs is True:
-            # Get attributes from Cf specs
-            attrs = self.get_attrs(cf_name, loc=None, standardize=False, multi=True)
-
-            # Remove axis attribute for auxilary coordinates
-            if da.name and da.name not in da.indexes and "axis" in attrs:
-                del attrs["axis"]
-
-        elif not attrs:
-            attrs = {}
+        # Get attributes
+        attrs = self._get_format_attrs_(cf_name, da, attrs)
 
         # Format array
         new_da = self.sglocator.format_dataarray(
@@ -2997,6 +3258,95 @@ class CFCoordSpecs(_CFCatSpecs_):
             return dim_types
         return tuple(dim_types.values())
 
+    def _parse_dim_search_args_(self, obj, cf_arg, loc, errors):
+        """Parse and validate search arguments for dimension search.
+
+        Parameters
+        ----------
+        obj: xarray.DataArray or xarray.Dataset
+            Object to search in
+        cf_arg: str, None
+            CF argument (name or type)
+        loc: str, None
+            Location argument
+        errors: str
+            Error handling mode
+
+        Returns
+        -------
+        tuple: (cf_name, dim_type, loc, isds)
+            Parsed arguments
+        """
+        cf_name = dim_type = None
+        if cf_arg:
+            if len(cf_arg) == 1:
+                dim_type = cf_arg.lower()
+                if cf_arg in self.names:
+                    cf_name = cf_arg
+            else:
+                if not self._assert_known_(cf_arg, errors=errors):
+                    return None, None, None, None
+                cf_name = cf_arg
+        isds = hasattr(obj, "data_vars")
+        if not isds and dim_type is None:
+            dim_type = self.get_axis(obj, lower=True)
+        loc = self.sglocator.parse_loc_arg(loc)
+        return cf_name, dim_type, loc, isds
+
+    def _match_dimension_(self, obj, dim, cf_name, dim_type, loc, cf_arg):
+        """Match a single dimension against search criteria.
+
+        Parameters
+        ----------
+        obj: xarray.DataArray or xarray.Dataset
+            Object containing the dimension
+        dim: str
+            Dimension name to match
+        cf_name: str, None
+            Target CF name
+        dim_type: str, None
+            Target dimension type
+        loc: str, None
+            Target location
+        cf_arg: str, None
+            Original cf_arg for output formatting
+
+        Returns
+        -------
+        tuple: (match, out)
+            match: str, dict, or None if no match
+            out: dict with dim info (always returned for fallback)
+        """
+        # Filter-out by loc
+        pname, ploc = self.sglocator.parse_attr('name', dim)
+        ploc = self.sglocator.parse_loc_arg(ploc)
+        if loc is not None and loc != ploc:
+            return None, None
+
+        # From generic name
+        if dim in obj.coords:
+            this_cf_name = self.match(obj.coords[dim])
+        else:
+            this_cf_name = self.match_from_name(dim)
+        if cf_name:
+            if this_cf_name == cf_name:
+                return dim, None
+            if dim_type is None:  # keep searching if dim_type is not None
+                # Still compute out for potential fallback
+                this_dim_type = self.get_dim_type(dim, obj=obj)
+                out = {"dim": dim, "type": this_dim_type, "cf_name": this_cf_name}
+                return None, out
+
+        # From dimension type
+        this_dim_type = self.get_dim_type(dim, obj=obj)
+        out = {"dim": dim, "type": this_dim_type, "cf_name": this_cf_name}
+        if this_dim_type and this_dim_type == dim_type:
+            if cf_arg:
+                return dim, out
+            else:
+                return out, out
+        return None, out
+
     @ERRORS.format_method_docstring
     def search_dim(self, obj, cf_arg=None, loc=None, single=True, errors="ignore"):
         """Search a dataarray/dataset for a dimension name according to its generic name or type
@@ -3026,58 +3376,29 @@ class CFCoordSpecs(_CFCatSpecs_):
             Dim name OR, dict with dim, type and cf_name keys if dim_type is None.
             None if nothing found.
         """
-        # Explicit?
-        cf_name = dim_type = None
-        if cf_arg:
-            if len(cf_arg) == 1:
-                dim_type = cf_arg.lower()
-                if cf_arg in self.names:
-                    cf_name = cf_arg
-            else:
-                if not self._assert_known_(cf_arg, errors=errors):
-                    return
-                cf_name = cf_arg
-        isds = hasattr(obj, "data_vars")
-        if not isds and dim_type is None:
-            dim_type = self.get_axis(obj, lower=True)
-        loc = self.sglocator.parse_loc_arg(loc)
+        # Parse search arguments
+        result = self._parse_dim_search_args_(obj, cf_arg, loc, errors)
+        if result == (None, None, None, None):  # Validation error
+            return
+        cf_name, dim_type, loc, isds = result
 
-        # Loop on dims
+        # Search dimensions
         found = []
+        out = None
         for dim in obj.dims:
-            # Filter-out by loc
-            pname, ploc = self.sglocator.parse_attr('name', dim)
-            ploc = self.sglocator.parse_loc_arg(ploc)
-            if loc is not None and loc != ploc:
-                continue
-
-            # From generic name
-            if dim in obj.coords:
-                this_cf_name = self.match(obj.coords[dim])
-            else:
-                this_cf_name = self.match_from_name(dim)
-            if cf_name:
-                if this_cf_name == cf_name:
-                    found.append(dim)
-                    continue
-                if dim_type is None:  # keep searching if dim_type is not None
-                    continue
-
-            # From dimension type
-            this_dim_type = self.get_dim_type(dim, obj=obj)
-            out = {"dim": dim, "type": this_dim_type, "cf_name": this_cf_name}
-            if this_dim_type and this_dim_type == dim_type:
-                if cf_arg:
-                    found.append(dim)
-                else:
-                    found.append(out)
+            match, dim_out = self._match_dimension_(obj, dim, cf_name, dim_type, loc, cf_arg)
+            if match is not None:
+                found.append(match)
+            # Track last dim_out for fallback
+            if dim_out is not None:
+                out = dim_out
 
         # Not found but only 1d and no dim_type specified
-        if not found and len(obj.dims) == 1 and not cf_arg:
+        if not found and len(obj.dims) == 1 and not cf_arg and out is not None:
             # FIXME: loop on coordinates?
             found.append(out)
 
-        # Single?
+        # Return result
         if single:
             return _check_single_(errors, found, "dimension", cf_arg)
         return found
