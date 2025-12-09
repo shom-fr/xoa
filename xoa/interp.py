@@ -216,13 +216,16 @@ def linear1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
         # Extrapolation with nearest
         if extrap in ("bottom", "both") and yo[ixoy, iyomin] < yi[ixiy, iyimin]:
             for iyo in range(iyomin, iyomax + 1):
-                if yo[ixoy, iyo] >= yi[ixiy, iyimin]:
-                    varo[ix, :iyo] = vari[ixi, iyimin]
+                if yo[ixoy, iyo] < yi[ixiy, iyimin]:
+                    varo[ix, iyo] = vari[ixi, iyimin]
+                else:
                     break
+                    
         if extrap in ("top", "both") and yo[ixoy, iyomax] > yi[ixiy, iyimax]:
-            for iyo in range(iyomin, iyomax + 1):
+            for iyo in range(iyomax, iyomin - 1, -1):  # Loop backwards
                 if yo[ixoy, iyo] > yi[ixiy, iyimax]:
-                    varo[ix, iyo:] = vari[ixi, iyimax]
+                    varo[ix, iyo] = vari[ixi, iyimax]
+                else:
                     break
 
     return varo
