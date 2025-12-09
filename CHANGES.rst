@@ -15,6 +15,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix :func:`xoa.interp.linear1d` extraplation [:pull:`107`]
 - Fix :func:`xoa.grid.to_rect` warnings.
 - Fix :meth:`xoa.cf.CFSpecs.get_dim_types`.
 
