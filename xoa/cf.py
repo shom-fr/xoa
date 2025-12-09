@@ -188,15 +188,6 @@ class SGLocator(object):
             valid_locations = set(valid_locations)
         self.valid_locations = valid_locations or set()
 
-        # # Check encoding
-        # self.encoding = encoding or {}
-        # self._re_encoded = re.compile("^[01]{3}$").match
-        # for key, val in self.encoding:
-        #     if not self._re_encoded(key):
-        #         del self.encoding[key]
-        #     if isinstance(val, str):
-        #         self.encoding[key] = [val]
-
         # Formats and regexps
         if name_format:
             for pat in ("{root}",):  # "{loc}"):
@@ -375,9 +366,6 @@ class SGLocator(object):
                 'Invalid loc argument. Must one of: '
                 'None, Trye, "any", False, "" or a location string'
             )
-        # if self._re_encoded(loc):
-        #     locs = self.encoding.get(loc)
-        #     return locs[0] if locs else False
         if self.valid_locations and loc not in self.valid_locations:
             raise XoaCFError(
                 f'Location "{loc}" is invalid. '
@@ -463,22 +451,8 @@ class SGLocator(object):
         loc = self.parse_loc_arg(loc)
         if loc is False:
             return root
-            # loc = None
         if loc is None:
             loc = ploc
-        # if (
-        #     loc
-        #     and self.valid_locations
-        #     and loc.lower() not in self.valid_locations
-        # ):
-        #     raise XoaCFError(
-        #         "Invalid location: {}. Please one use of: {}.".format(
-        #             loc, ', '.join(self.valid_locations))
-        #     )
-        # elif loc is False or loc == '':
-        #     ploc = None
-        # elif loc is True or loc is None:
-        #     loc = ploc
         loc = loc or ploc
         if not loc:
             return root
@@ -723,15 +697,6 @@ class SGLocator(object):
                 da.name = self.merge_attr("name", da.name, name, **kwloc)
             else:  # set it
                 da.name = self.format_attr("name", name, **kwloc)
-
-        # # Check location consistency
-        # loc = self.parse_loc_arg(loc)
-        # if loc is None:
-        #     loc = self.get_loc(da)
-        #     if loc:
-        #         da = self.format_dataarray(
-        #             da, loc=loc, rename=True, replace_attrs=True,
-        #             add_loc_to_name=add_loc_to_name)
 
         return da
 
@@ -995,9 +960,6 @@ class CFSpecs(object):
         """Specification for data_vars :class:`CFVarSpecs`"""
         return self._cfs['data_vars']
 
-    # def __str__(self):
-    #     return pformat(self._dict)
-
     def set_specs_from_cfg(self, cfg):
         """Update or create specs from a config"""
         self.load_cfg(cfg)
@@ -1169,10 +1131,6 @@ class CFSpecs(object):
             This dict is also stored in the `cf_locs` key of the `encoding`
             attribute of `obj`.
         """
-        # # Check cache
-        # if "cf_locs" in obj.encoding:
-        #     return obj.encoding["cf_locs"]
-
         locations = {}
         isdataset = hasattr(obj, "data_vars")
         das = obj.values() if isdataset else [obj]
@@ -1257,12 +1215,6 @@ class CFSpecs(object):
                 else:
                     locations[da.name] = loc
 
-        # # Store in encoding
-        # obj.encoding["cf_locs"] = locations
-        # for name, loc in locations.items():
-        #     if name in obj.coords or name not in obj.dims:
-        #         obj[name].encoding["cf_loc"] = loc
-
         return locations
 
     def _format_obj_(
@@ -1328,7 +1280,6 @@ class CFSpecs(object):
                     da,
                     cf_name=cf_name,
                     attrs=attrs if isinstance(attrs, bool) else attrs.get(da.name),
-                    # format_coords=False,
                     loc=locations.get(da.name),
                     **kwargs,
                 )
@@ -1344,7 +1295,6 @@ class CFSpecs(object):
 
         # Coordinates
         if format_coords:
-            # for cname, cda in list(obj.coords.items()):
             for cname in _list_xr_names_(obj, data_vars=False, dims=False):
                 if cname in self.excluded_names:
                     continue
@@ -1353,11 +1303,7 @@ class CFSpecs(object):
                     cda,
                     cf_name=cf_names.get(cname) if isinstance(cf_names, dict) else None,
                     attrs=attrs if isinstance(attrs, bool) else attrs.get(cname, True),
-                    # related=obj,
-                    # format_coords=False,
-                    # loc=loc, add_loc_to_name=add_loc_to_coord_names,
                     loc=locations.get(cda.name),
-                    # rename_dim=False,
                     **kwargs,
                 )
                 if rename and new_coord_name:
@@ -1718,9 +1664,6 @@ class CFSpecs(object):
         """
         rename_args = {}
         names = _list_xr_names_(obj)
-        # names = set(obj.dims).union(obj.coords)
-        # if hasattr(obj, "data_vars"):
-        #     names = names.union(obj.data_vars)
         for name in names:
             if name not in rename_args:
                 root_name, old_loc = self.sglocator.parse_attr("name", name)
@@ -1839,7 +1782,6 @@ class CFSpecs(object):
         -------
         str
         """
-        # if da.name is not None and (da.name in da.dims or da.name in da.coords):
         if da.name is not None and _list_xr_names_(da, data_vars=False):
             return "coords"
         return "data_vars"
@@ -2021,7 +1963,15 @@ class CFSpecs(object):
 
     @ERRORS.format_method_docstring
     def search(
-        self, obj, cf_name=None, loc="any", get="obj", single=True, categories=None, errors="warn"
+        self,
+        obj,
+        cf_name=None,
+        loc="any",
+        get="obj",
+        single=True,
+        categories=None,
+        within=None,
+        errors="warn",
     ):
         """Search for a dataarray with data_vars and/or coords
 
@@ -2036,6 +1986,10 @@ class CFSpecs(object):
             Explicty categories with "coords" and "data_vars".
         get: {{"obj", "cf_name"}}
             "Getthe object or its cf_name.
+        within: str, None
+            Object types to search within: "coords", "data_vars".
+            Data vars are search only with "data_vars" and coordinates
+            are both in "coords" and "data_vars".
         {errors}
 
         Return
@@ -2054,7 +2008,13 @@ class CFSpecs(object):
             found = []
         for category in categories:
             res = self[category].search(
-                obj, cf_name=cf_name, loc=loc, get=get, single=single, errors="ignore"
+                obj,
+                cf_name=cf_name,
+                loc=loc,
+                get=get,
+                single=single,
+                within=within,
+                errors="ignore",
             )
             if res is None:
                 continue
@@ -2072,7 +2032,7 @@ class CFSpecs(object):
             raise XoaCFError(msg)
 
     @ERRORS.format_method_docstring
-    def get(self, obj, cf_name, get="obj", errors="ignore"):
+    def get(self, obj, cf_name, get="obj", within=None, errors="ignore"):
         """A shortcut to :meth:`search` with an explicit generic CF name or a list of them
 
         Parameters
@@ -2084,6 +2044,10 @@ class CFSpecs(object):
             When a list, loop over possible cf_names and stop at the first found.
         get: {{"obj", "name"}}
             "Getthe object or its cf_name.
+        within: str, None
+            Object types to search within: "coords", "data_vars".
+            Data vars are searched only with "data_vars" and coordinates
+            are both in "coords" and "data_vars".
         {errors}
 
         A single element is searched for into all :attr:`categories`
@@ -2092,7 +2056,9 @@ class CFSpecs(object):
         cf_names = [cf_name] if isinstance(cf_name, str) else cf_name
         found = []
         for cf_name in cf_names:
-            found.extend(self.search(obj, cf_name, errors="ignore", single=False, get=get))
+            found.extend(
+                self.search(obj, cf_name, errors="ignore", single=False, get=get, within=within)
+            )
         return _check_single_(errors, found, "item", cf_names)
 
     @ERRORS.format_method_docstring
@@ -2300,9 +2266,6 @@ class _CFCatSpecs_(object):
     def __contains__(self, key):
         return key in self._dict
 
-    # def __str__(self):
-    #     return pformat(self._dict)
-
     def _validate_name_(self, name):
         if name in self:
             return name
@@ -2402,7 +2365,6 @@ class _CFCatSpecs_(object):
             ):
                 if attr[0] != sm:
                     continue
-                # if attr == "name" and "name" in specs:
                 if attr == "name":
                     match_specs["name"] = self.get_allowed_names(cf_name)
                 elif "attrs" in specs and attr in specs["attrs"]:
@@ -2490,7 +2452,9 @@ class _CFCatSpecs_(object):
         return None if not explicit else False
 
     @ERRORS.format_method_docstring
-    def search(self, obj, cf_name=None, loc=None, get="obj", single=True, errors="raise"):
+    def search(
+        self, obj, cf_name=None, loc=None, get="obj", single=True, within=None, errors="raise"
+    ):
         """Search for a data_var or coord that maches given or any specs
 
         Parameters
@@ -2508,6 +2472,10 @@ class _CFCatSpecs_(object):
             If True, return the first item found or None.
             If False, return a possible empty list of found items.
             A warning is emitted when set to True and multiple item are found.
+        within: str, None
+            Object types to search within: "coords", "data_vars".
+            Data vars are searched only with "data_vars" and coordinates
+            are both in "coords" and "data_vars".
         {errors}
 
         Returns
@@ -2516,17 +2484,22 @@ class _CFCatSpecs_(object):
         """
 
         # Get target objects
-        if self.category and hasattr(obj, self.category):
-            names = getattr(obj, self.category)
-            kw = dict(data_vars=False, coords=False, dims=False)
-            kw[self.category] = True
-            names = _list_xr_names_(obj, **kw)
+        if within is None:
+            if not hasattr(obj, "data_vars"):
+                within = ["coords"]
+            else:
+                within = ["coords", "data_vars"]
+                if self.category == "data_vars":
+                    within = within[::-1]
         else:
-            names = (
-                list(obj)
-                if hasattr(obj, "keys")
-                else _list_xr_names_(obj, data_vars=False, dims=False)
-            )
+            if isinstance(within, str):
+                within = [within]
+            for ot in within:
+                if ot not in ["coords", "data_vars"]:
+                    raise XoaCFError("with parameter must one or a list of: coords, data_vars")
+        names = _list_xr_names_(
+            obj, dims=False, coords="coords" in within, data_vars="data_vars" in within
+        )
 
         # Get match specs
         if cf_name:  # Explicit name so we loop on search specs
@@ -2548,12 +2521,10 @@ class _CFCatSpecs_(object):
         found = []
         found_objs = []
         for match_arg in match_specs:
-            # for obj in objs.values():
             for this_name in names:
                 this_obj = obj[this_name]
                 m = self.match(this_obj, match_arg, loc=loc)
                 if m:
-                    # if obj.name in found_objs:
                     if this_name in found_objs:
                         continue
                     found_objs.append(this_name)
@@ -2716,9 +2687,6 @@ class _CFCatSpecs_(object):
             return self.sglocator.parse_attr("name", da)[1]
 
         # From config
-        # if "cf_loc" in da.encoding:  # Already infered and stored in encoding
-        #     loc = da.encoding["cf_loc"]
-        # else:  # Infer from config
         if locations is None:
             locations = self.get_loc_mapping(da, cf_names={da.name: cf_name})
         loc = locations.get(da.name)
@@ -2822,22 +2790,15 @@ class _CFCatSpecs_(object):
             attrs=attrs,
             standardize=standardize,
             rename=rename,
-            # add_loc_to_name=add_loc_to_name,
             replace_attrs=replace_attrs,
             copy=False,
         )
-        # new_da.encoding["cf_name"] = cf_name
 
         # Return new name but don't rename
         if not rename:
             if old_name is None:
                 return self.sglocator.format_attr("name", new_name, loc)
             return self.sglocator.merge_attr("name", old_name, new_name, loc)
-
-        # # Rename dim if axis coordinate
-        # rename_dim = rename and rename_dim
-        # if (rename_dim and old_name and old_name in da.indexes):
-        #     new_da = new_da.rename({old_name: new_da.name})
 
         return new_da
 
@@ -3068,8 +3029,6 @@ class CFCoordSpecs(_CFCatSpecs_):
         # Explicit?
         cf_name = dim_type = None
         if cf_arg:
-            # if cf_arg in obj.dims:
-            #     return cf_arg
             if len(cf_arg) == 1:
                 dim_type = cf_arg.lower()
                 if cf_arg in self.names:
@@ -3122,25 +3081,6 @@ class CFCoordSpecs(_CFCatSpecs_):
         if single:
             return _check_single_(errors, found, "dimension", cf_arg)
         return found
-        # errors = ERRORS[errors]
-        # if single:
-        #     if len(found) == 1:
-        #         return found[0]
-        #     if len(found) > 1:
-        #         if errors != "ignore":
-        #             msg = f"Multiple candidates dimensions matching: {cf_arg}"
-        #             if errors == "raise":
-        #                 raise XoaCFError(msg)
-        #             xoa_warn(msg)
-        # else:
-        #     return found
-
-        # # Failed
-        # if errors != "ignore":
-        #     msg = f"No dimension found in dataarray matching: {cf_arg}"
-        #     if errors == "raise":
-        #         raise XoaCFError(msg)
-        #     xoa_warn(msg)
 
     @ERRORS.format_method_docstring
     def search_from_dim(self, obj, dim, errors="ignore"):

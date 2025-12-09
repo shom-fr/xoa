@@ -6,6 +6,7 @@ Develop
 
 New features
 ------------
+- Add the ``within`` parameter to :mod:`xoa.cf` search methods.
 - Add the ``rename_args`` argument to formatting routing of :mod:`xoa.cf` to retreive renaming information [:pull:`102`].
 - Add the :func:`xoa.dyn.get_sea_level` function to get either SSH, ADT, SLA or MDT in a dataset [:pull:`102`].
 - Allow passing a list of "cf_name" to :meth:`xoa.cf.CfSpecs.get` for enlarging a search [:pull:`102`].
@@ -18,6 +19,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix :func:`xoa.coords.get_time` that was returning None.
 - Fix :func:`xoa.interp.linear1d` extraplation [:pull:`107`]
 - Fix :func:`xoa.grid.to_rect` warnings.
 - Fix :meth:`xoa.cf.CFSpecs.get_dim_types`.
