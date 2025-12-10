@@ -55,7 +55,7 @@ cmapcyc = string(default="cmo.phase")   # default cyclic colormap
 """
 
 # Directory of sample files
-_SAMPLE_DIR = os.path.join(os.path.dirname(__file__), '_samples')
+_SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "_samples")
 
 _PACKAGES = [
     "platformdirs",
@@ -122,7 +122,8 @@ def get_default_user_config_file():
         from appdirs import user_config_dir
 
         warnings.warn(
-            "appdirs is deprecated. Please install platformdirs.", warnings.DeprecationWarning
+            "appdirs is deprecated. Please install platformdirs.",
+            warnings.DeprecationWarning,
         )
     return os.path.join(user_config_dir("xoa"), "xoa.cfg")
 
@@ -164,7 +165,11 @@ def load_options(cfgfile=None):
     if "options" not in xoa_cache:
         default_user_config_file = get_default_user_config_file()
         xoa_cache["options"] = configobj.ConfigObj(
-            (default_user_config_file if os.path.exists(default_user_config_file) else None),
+            (
+                default_user_config_file
+                if os.path.exists(default_user_config_file)
+                else None
+            ),
             configspec=xoa_cache["cfgspecs"],
             file_error=False,
             raise_errors=True,
@@ -172,7 +177,9 @@ def load_options(cfgfile=None):
         )
     if cfgfile:
         xoa_cache["options"].merge(
-            configobj.ConfigObj(cfgfile, file_error=True, raise_errors=True, list_values=True)
+            configobj.ConfigObj(
+                cfgfile, file_error=True, raise_errors=True, list_values=True
+            )
         )
     xoa_cache["options"].validate(validate.Validator(), copy=True)
 
@@ -202,7 +209,9 @@ def get_option(section, option=None):
         if m:
             section, option = m.groups()
         else:
-            raise XoaConfigError("You must provide an option name to get_option")
+            raise XoaConfigError(
+                "You must provide an option name to get_option"
+            )
     try:
         value = options[section][option]
     except Exception:
@@ -311,7 +320,7 @@ def reset_options():
         print(get_option('plot.cmapdiv'))
     """
     xoa_cache = _get_cache_()
-    del xoa_cache['options']
+    del xoa_cache["options"]
 
 
 def show_options(specs=False):
@@ -334,7 +343,9 @@ def show_options(specs=False):
     if specs:
         print(CONFIG_SPECS.strip("\n"))
     else:
-        print("\n".join(_get_options_().write()).strip("\n").replace('#', ' #'))
+        print(
+            "\n".join(_get_options_().write()).strip("\n").replace("#", " #")
+        )
 
 
 def _parse_requirements_(reqfile):
