@@ -950,7 +950,6 @@ def demerliac(da, na_thres=0, dt_tol=0.01):
     ------
     xarray.DataArray
     """
-    xoa_warn("Use of demerliac is deprecated,  use tidal_filter instead.")
     return tidal_filter(da, "demerliac", na_thres=na_thres, dt_tol=dt_tol)
 
 
@@ -984,6 +983,11 @@ def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
         return da.copy()
 
     # Weights
+    if filter_name not in HOURLY_TIDAL_FILTERS_WEIGHTS:
+        raise XoaError(
+            f"Invalid filter name '{filter_name}'. Please use one of: "
+            + ', '.join(HOURLY_TIDAL_FILTERS_WEIGHTS)
+        )
     weights = np.array(HOURLY_TIDAL_FILTERS_WEIGHTS[filter_name], "d")
     if tdim not in da.indexes:
         xoa_warn("Not time coordinate found so we assume hourly data")
