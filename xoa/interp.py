@@ -4,6 +4,7 @@ Low level interpolation routines accelerated with numba
 The numerical inputs and outputs of all these routines are of scalar
 or numpy.ndarray type.
 """
+
 # Copyright 2020-2024 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -86,7 +87,9 @@ def nearest1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
             # Gap check
             if (
                 drop_na
-                and (np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1]))
+                and (
+                    np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1])
+                )
                 and (maxgap == 0 or gap < maxgap)
             ):
                 gap += 1
@@ -117,7 +120,10 @@ def nearest1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
             gap = 0
 
         # Extrapolation with nearest
-        if extrap in ("bottom", "both") and yo[ixoy, iyomin] < yi[ixiy, iyimin]:
+        if (
+            extrap in ("bottom", "both")
+            and yo[ixoy, iyomin] < yi[ixiy, iyimin]
+        ):
             for iyo in range(iyomin, iyomax + 1):
                 if yo[ixoy, iyo] >= yi[ixiy, iyimin]:
                     varo[ix, :iyo] = vari[ixi, iyimin]
@@ -185,7 +191,9 @@ def linear1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
             # Gap check
             if (
                 drop_na
-                and (np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1]))
+                and (
+                    np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1])
+                )
                 and (maxgap == 0 or gap < maxgap)
             ):
                 gap += 1
@@ -209,18 +217,23 @@ def linear1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
 
                 # Interpolation
                 elif dy0 > 0.0 or dy1 > 0.0:
-                    varo[ix, iyo] = (vari[ixi, iyi0] * dy1 + vari[ixi, iyi1] * dy0) / (dy0 + dy1)
+                    varo[ix, iyo] = (
+                        vari[ixi, iyi0] * dy1 + vari[ixi, iyi1] * dy0
+                    ) / (dy0 + dy1)
 
             gap = 0
 
         # Extrapolation with nearest
-        if extrap in ("bottom", "both") and yo[ixoy, iyomin] < yi[ixiy, iyimin]:
+        if (
+            extrap in ("bottom", "both")
+            and yo[ixoy, iyomin] < yi[ixiy, iyimin]
+        ):
             for iyo in range(iyomin, iyomax + 1):
                 if yo[ixoy, iyo] < yi[ixiy, iyimin]:
                     varo[ix, iyo] = vari[ixi, iyimin]
                 else:
                     break
-                    
+
         if extrap in ("top", "both") and yo[ixoy, iyomax] > yi[ixiy, iyimax]:
             for iyo in range(iyomax, iyomin - 1, -1):  # Loop backwards
                 if yo[ixoy, iyo] > yi[ixiy, iyimax]:
@@ -285,7 +298,9 @@ def cubic1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
             # Gap check
             if (
                 drop_na
-                and (np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1]))
+                and (
+                    np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1])
+                )
                 and (maxgap == 0 or gap < maxgap)
             ):
                 gap += 1
@@ -331,7 +346,9 @@ def cubic1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
                         vc1 = vari[ixi, iyi2]
 
                     # Interpolation
-                    varo[ix, iyo] = vc1 - vari[ixi, iyi1] - vc0 + vari[ixi, iyi0]
+                    varo[ix, iyo] = (
+                        vc1 - vari[ixi, iyi1] - vc0 + vari[ixi, iyi0]
+                    )
                     varo[ix, iyo] = mu**3 * varo[ix, iyo] + mu**2 * (
                         vc0 - vari[ixi, iyi0] - varo[ix, iyo]
                     )
@@ -341,7 +358,10 @@ def cubic1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
             gap = 0
 
         # Extrapolation with nearest
-        if extrap in ("bottom", "both") and yo[ixoy, iyomin] < yi[ixiy, iyimin]:
+        if (
+            extrap in ("bottom", "both")
+            and yo[ixoy, iyomin] < yi[ixiy, iyimin]
+        ):
             for iyo in range(iyomin, iyomax + 1):
                 if yo[ixoy, iyo] >= yi[ixiy, iyimin]:
                     varo[ix, :iyo] = vari[ixi, iyimin]
@@ -356,7 +376,17 @@ def cubic1d(vari, yi, yo, eshapes, extrap="no", drop_na=False, maxgap=0):
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0, drop_na=False, maxgap=0):
+def hermit1d(
+    vari,
+    yi,
+    yo,
+    eshapes,
+    extrap="no",
+    bias=0.0,
+    tension=0.0,
+    drop_na=False,
+    maxgap=0,
+):
     """Hermitian interp. of nD data along an axis with varying coordinates
 
     Warning
@@ -411,7 +441,9 @@ def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0, drop_na=
             # Gap check
             if (
                 drop_na
-                and (np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1]))
+                and (
+                    np.isnan(yi[ixiy, iyi + 1]) or np.isnan(vari[ixi, iyi + 1])
+                )
                 and (maxgap == 0 or gap < maxgap)
             ):
                 gap += 1
@@ -464,19 +496,34 @@ def hermit1d(vari, yi, yo, eshapes, extrap="no", bias=0.0, tension=0.0, drop_na=
                     a3 = -2 * mu**3 + 3 * mu**2
                     varo[ix, iyo] = a0 * vari[ixi, iyi0]
                     varo[ix, iyo] += a1 * (
-                        (vari[ixi, iyi0] - vc0) * (1 + bias) * (1 - tension) / 2
-                        + (vari[ixi, iyi1] - vari[ixi, iyi0]) * (1 - bias) * (1 - tension) / 2
+                        (vari[ixi, iyi0] - vc0)
+                        * (1 + bias)
+                        * (1 - tension)
+                        / 2
+                        + (vari[ixi, iyi1] - vari[ixi, iyi0])
+                        * (1 - bias)
+                        * (1 - tension)
+                        / 2
                     )
                     varo[ix, iyo] += a2 * (
-                        (vari[ixi, iyi1] - vari[ixi, iyi0]) * (1 + bias) * (1 - tension) / 2
-                        + (vc1 - vari[ixi, iyi1]) * (1 - bias) * (1 - tension) / 2
+                        (vari[ixi, iyi1] - vari[ixi, iyi0])
+                        * (1 + bias)
+                        * (1 - tension)
+                        / 2
+                        + (vc1 - vari[ixi, iyi1])
+                        * (1 - bias)
+                        * (1 - tension)
+                        / 2
                     )
                     varo[ix, iyo] += a3 * vari[ixi, iyi1]
 
             gap = 0
 
         # Extrapolation with nearest
-        if extrap in ("bottom", "both") and yo[ixoy, iyomin] < yi[ixiy, iyimin]:
+        if (
+            extrap in ("bottom", "both")
+            and yo[ixoy, iyomin] < yi[ixiy, iyimin]
+        ):
             for iyo in range(iyomin, iyomax + 1):
                 if yo[ixoy, iyo] >= yi[ixiy, iyimin]:
                     varo[ix, :iyo] = vari[ixi, iyimin]
@@ -523,7 +570,16 @@ def extrap1d(vari, mode):
 
 
 @numba.njit(parallel=False, cache=NOT_CI)
-def cellave1d(vari, yib, yob, eshapes, extrap="no", conserv=False, drop_na=False, maxgap=0):
+def cellave1d(
+    vari,
+    yib,
+    yob,
+    eshapes,
+    extrap="no",
+    conserv=False,
+    drop_na=False,
+    maxgap=0,
+):
     """Cell average regrid. of nD data along an axis with varying coordinates
 
     Warning
@@ -582,7 +638,11 @@ def cellave1d(vari, yib, yob, eshapes, extrap="no", conserv=False, drop_na=False
                 yib1 = yib[ixiy, iyi + 1]
 
                 # Extrapolation
-                if (extrap == "bellow" or extrap == "both") and iyi == 0 and yib0 > yob[ixoy, iyo]:
+                if (
+                    (extrap == "bellow" or extrap == "both")
+                    and iyi == 0
+                    and yib0 > yob[ixoy, iyo]
+                ):
                     yib0 = yob[ixoy, iyo]
                 if (
                     (extrap == "above" or extrap == "both")
@@ -599,7 +659,9 @@ def cellave1d(vari, yib, yob, eshapes, extrap="no", conserv=False, drop_na=False
                     continue
 
                 # Contribution of intersection
-                dyio = min(yib1, yob[ixoy, iyo + 1]) - max(yib0, yob[ixoy, iyo])
+                dyio = min(yib1, yob[ixoy, iyo + 1]) - max(
+                    yib0, yob[ixoy, iyo]
+                )
                 if conserv and yib0 != yib1:
                     dyio = dyio / (yob[ixoy, iyo + 1] - yob[ixoy, iyo])
                 if not np.isnan(vari[ixi, iyi]):
@@ -882,7 +944,9 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     curved = nyix != 1
 
     # Verifications
-    assert not curved or (nxi == nxiy and nyi == nyix), "linear4dto1: Invalid curved dimensions"
+    assert not curved or (
+        nxi == nxiy and nyi == nyix
+    ), "linear4dto1: Invalid curved dimensions"
     assert nxiz == 1 or nxiz == nxi, "grid2locs: Invalid nxiz dimension"
     assert nyiz == 1 or nyiz == nyi, "grid2locs: Invalid nyiz dimension"
     assert ntiz == 1 or ntiz == nti, "grid2locs: Invalid ntiz dimension"
@@ -969,8 +1033,8 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
 
         # - Z
         c = np.zeros(nexz)
-        k = np.zeros(nexz, 'l')
-        npk = np.zeros(nexz, 'l')
+        k = np.zeros(nexz, "l")
+        npk = np.zeros(nexz, "l")
         if nzi == 1:
             k[:] = 0
             c[:] = 0.0
@@ -1030,7 +1094,9 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
                         c[ie] = 0.0
                         npk[ie] = 1
                     else:
-                        c[ie] = (zo[io] - zi[ie, k[ie]]) / (zi[ie, k[ie] + 1] - zi[ie, k[ie]])
+                        c[ie] = (zo[io] - zi[ie, k[ie]]) / (
+                            zi[ie, k[ie] + 1] - zi[ie, k[ie]]
+                        )
                         npk[ie] = 2
 
         # Interpolate
@@ -1048,11 +1114,16 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
                         for jj in range(npj):
                             for ii in range(npi):
                                 vo[ie % nex, io] = vo[ie % nex, io] + vi[
-                                    ie % nex, l + ll, k[ie % nexz] + kk, j + jj, i + ii
+                                    ie % nex,
+                                    l + ll,
+                                    k[ie % nexz] + kk,
+                                    j + jj,
+                                    i + ii,
                                 ] * ((1 - a) * (1 - ii) + a * ii) * (
                                     (1 - b) * (1 - jj) + b * jj
                                 ) * (
-                                    (1 - c[ie % nexz]) * (1 - kk) + c[ie % nexz] * kk
+                                    (1 - c[ie % nexz]) * (1 - kk)
+                                    + c[ie % nexz] * kk
                                 ) * (
                                     (1 - d) * (1 - ll) + d * ll
                                 )
@@ -1061,7 +1132,15 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
 
 
 @numba.guvectorize(
-    [(numba.float64[:], numba.float64[:], numba.float64[:], numba.boolean, numba.float64[:])],
+    [
+        (
+            numba.float64[:],
+            numba.float64[:],
+            numba.float64[:],
+            numba.boolean,
+            numba.float64[:],
+        )
+    ],
     "(nz),(nz),(),()->()",
 )
 def isoslice(var, values, isoval, reverse, isovar):
@@ -1109,6 +1188,6 @@ def isoslice(var, values, isoval, reverse, isovar):
             if values[i + istep] == values[i]:
                 isovar[0] = values[i]
             else:
-                isovar[0] = var[i + istep] + (isoval[0] - values[i + istep]) * (
-                    var[i] - var[i + istep]
-                ) / (values[i] - values[i + istep])
+                isovar[0] = var[i + istep] + (
+                    isoval[0] - values[i + istep]
+                ) * (var[i] - var[i + istep]) / (values[i] - values[i + istep])

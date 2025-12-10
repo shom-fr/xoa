@@ -29,7 +29,14 @@ from . import coords as xcoords
 
 
 def apply_along_dim(
-    ds, dim, func, coord_func=None, data_kwargs=None, coord_kwargs=None, name_kwargs=None, **kwargs
+    ds,
+    dim,
+    func,
+    coord_func=None,
+    data_kwargs=None,
+    coord_kwargs=None,
+    name_kwargs=None,
+    **kwargs,
 ):
     """Apply an operator on data array or dataset dimensions
 
@@ -123,7 +130,11 @@ def apply_along_dim(
                 for dd in (coord_kwargs, name_kwargs.get(coord_name)):
                     if dd:
                         kw.update(dd)
-                coord = coord_func(xr.DataArray(old_coord.data, dims=old_coord.dims), dim, **kw)
+                coord = coord_func(
+                    xr.DataArray(old_coord.data, dims=old_coord.dims),
+                    dim,
+                    **kw,
+                )
                 coord.attrs = old_coord.attrs
                 coord.encoding = old_coord.encoding
             else:
@@ -164,7 +175,14 @@ def _pad_(da, dim, pad_width, mode, **kwargs):
     return xr.concat(to_concat, dim=dim)
 
 
-def pad(da, pad_width, mode="edge", coord_mode="linear_extrap", name_kwargs=None, **kwargs):
+def pad(
+    da,
+    pad_width,
+    mode="edge",
+    coord_mode="linear_extrap",
+    name_kwargs=None,
+    **kwargs,
+):
     """Pad data and coordinates along dimensions
 
     This function adds the ``"linear_extrap"`` mode support to the builtin
@@ -383,7 +401,7 @@ class dz2depth_ref_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     bathy = -1
 
 
-def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type='infer', centered=False):
+def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=False):
     """Integrate layer thicknesses to compute depths
 
     The output depths are the depths at the bottom of the layers and the top
@@ -531,7 +549,7 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
 
     # Find needed stuff
     cfspecs = cf.get_cf_specs(ds)
-    dz = cfspecs.search(ds, 'dz', errors=errors)
+    dz = cfspecs.search(ds, "dz", errors=errors)
     if dz is None:
         return ds
     zdim = xcoords.get_cf_dims(dz, "z", errors=errors)
@@ -546,8 +564,8 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
             raise XoaError(msg)
         xoa_warn(msg)
         return ds
-    ssh = cfspecs.search(ds, 'ssh', errors="ignore")
-    bathy = cfspecs.search(ds, 'bathy', errors="ignore")
+    ssh = cfspecs.search(ds, "ssh", errors="ignore")
+    bathy = cfspecs.search(ds, "bathy", errors="ignore")
 
     # Make choices
     if ssh is None and bathy is None:
@@ -558,7 +576,14 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
                 break
 
     # Compute depth
-    depth = dz2depth(dz, positive=positive, zdim=zdim, ref=ref, ref_type=ref_type, centered=True)
+    depth = dz2depth(
+        dz,
+        positive=positive,
+        zdim=zdim,
+        ref=ref,
+        ref_type=ref_type,
+        centered=True,
+    )
 
     # Assign to dataset
     return ds.assign_coords(depth=depth)

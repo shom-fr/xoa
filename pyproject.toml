@@ -62,13 +62,12 @@ build-backend = "setuptools.build_meta"
 packages = ["xoa"]
 include-package-data = true
 
-#[tool.setuptools.dynamic]
-#version = {attr = "xoa.__version__"}
 
 [tool.setuptools_scm]
 fallback_version = "0.0.0"
 write_to = "xoa/_version.py"
 tag_regex= "^(?P<prefix>v)?(?P<version>[^\\+]+)(?P<suffix>.*)?$"
+
 
 [tool.flake8]
 max-line-length = 100
