@@ -3,7 +3,7 @@
 """
 Miscellaneaous low level utilities
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2026Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,12 +21,13 @@ import types
 from enum import IntEnum, EnumMeta
 
 import numpy as np
+import xarray as xr
 
-from .__init__ import XoaError
+from . import exceptions
 
 
 class XEnumMeta(EnumMeta):
-    """Exented version ofnum meta-class
+    """Exented version of num meta-class
 
     This version supports:
 
@@ -188,13 +189,24 @@ class Choices(object):
         Short description of the parameter.
     aliases: dict, None
         Allowed alternate values for selected choices
+    multi: bool
+        Allow multiple choices
     """
 
     def __init__(
-        self, choices, case_insensitive=True, parameter=None, description="Choices", aliases=None
+        self,
+        choices,
+        case_insensitive=True,
+        parameter=None,
+        description="Choices",
+        aliases=None,
+        multi=False,
     ):
         self._ci = case_insensitive
         self._docs = {}
+        self._multi = multi
+        self.aliases = aliases
+
         if aliases:
             aa = {}
             for key, values in aliases.items():
@@ -205,7 +217,8 @@ class Choices(object):
                     values = list(values)
                 values = [self._reformat_value_(value) for value in values]
                 aa[key] = values
-            aliases = aa
+            aliases = self.aliases = aa
+
         if isinstance(choices, dict):
             self._choices = []
             for value, doc in choices.items():
@@ -237,12 +250,20 @@ class Choices(object):
         return value
 
     def __getitem__(self, choice):
+        if isinstance(choice, (list, set, tuple)):
+            if self._multi:
+                return [self[cc] for cc in choice]
+            raise exceptions.XoaError("Multiple choices are not allowed: " + ", ".join(choice))
         choice = self._reformat_value_(choice)
         if choice not in self._choices:
             desc = self._description if self._description else 'choice'
-            raise XoaError(
+            raise exceptions.XoaError(
                 f"Invalid choice for \"{desc}\": {choice}. " f"Please choose one of: {self}"
             )
+        if self.aliases:
+            for ref, values in self.aliases.items():
+                if choice in values:
+                    return ref
         return choice
 
     def __str__(self):
@@ -582,7 +603,7 @@ def dict_merge(
             if isinstance(d, Section):
                 break
         else:
-            raise XoaError("Can't initialise Section for merging")
+            raise exceptions.XoaError("Can't initialise Section for merging")
         outd = Section(d.parent, d.depth, d.main, name=d.name)
     else:
         outd = cls()
@@ -728,7 +749,7 @@ def match_attrs(obj, checks, ignorecase=True, transform=None):
 
 
 def gunique(seq):
-    """Create a generator that yields unique item whlist presrving the order
+    """Create a generator that yields unique item whlist preserving the order
 
     Parameters
     ----------
@@ -831,3 +852,31 @@ class ArgTuple(object):
         if so and not self.single:
             return (argso,)
         return argso[0]
+
+
+def list_xr_names(obj, data_vars=True, coords=True, dims=True):
+    """List the data vars, coords and dims names of a xarray dataset or data array
+
+    Parameters
+    ----------
+    obj: xarray.Dataset, xarray.DataArray
+    data_vars: bool
+    coords: bool
+    dims: bool
+
+    Returns
+    -------
+    set(str)
+    """
+    out = set()
+    if data_vars and hasattr(obj, "data_vars"):
+        out = out.union(list(obj))
+    if coords:
+        cnames = set(obj.coords)
+        for cname in cnames:  # multiindexes
+            if cname in obj.indexes and hasattr(obj.indexes[cname], "names"):
+                cnames = cnames.union(obj.indexes[cname].names)
+        out = out.union(cnames)
+    if dims:
+        out = out.union(obj.dims)
+    return out

@@ -25,9 +25,8 @@ See the :ref:`uses.cf` section.
 import re
 
 
-from ..__init__ import xoa_warn
-from .__init__ import XoaMetaError
-from ..misc import ERRORS
+from .. import exceptions
+from .. import misc
 
 
 def _compile_sg_match_(re_match, formats, root_patterns, location_pattern):
@@ -89,9 +88,11 @@ class SGLocator(object):
         if name_format:
             for pat in ("{root}",):  # "{loc}"):
                 if pat not in name_format:
-                    raise XoaMetaError("name_format must contain string {root}: " + name_format)
+                    raise exceptions.XoaMetaError(
+                        "name_format must contain string {root}: " + name_format
+                    )
             if len(name_format) == 10:
-                xoa_warn(
+                exceptions.xoa_warn(
                     'No separator found in "name_format" and '
                     'and no "valid_locations" specified: '
                     f"{name_format}. This leads to ambiguity during "
@@ -142,7 +143,7 @@ class SGLocator(object):
             return value, None
         return m.group("root"), m.group("loc").lower()
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def get_loc(self, name=None, attrs=None, errors="warn"):
         """Parse name and attributes to find a unique location
 
@@ -167,7 +168,7 @@ class SGLocator(object):
             Thus, this method method is a way to check location consistency.
         """
         loc = None
-        errors = ERRORS[errors]
+        errors = misc.ERRORS[errors]
         src = []
 
         # Name
@@ -194,9 +195,9 @@ class SGLocator(object):
                         f"name [{loc}]"
                     )
                     if errors == "raise":
-                        raise XoaMetaError(msg)
+                        raise exceptions.XoaMetaError(msg)
                     else:
-                        xoa_warn(msg)
+                        exceptions.xoa_warn(msg)
 
         # Long name
         if "long_name" in attrs and attrs["long_name"]:
@@ -215,13 +216,13 @@ class SGLocator(object):
                         f"{src} [{loc}]"
                     )
                     if errors == "raise":
-                        raise XoaMetaError(msg)
+                        raise exceptions.XoaMetaError(msg)
                     else:
-                        xoa_warn(msg)
+                        exceptions.xoa_warn(msg)
 
         return loc
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def get_loc_from_da(self, da, errors="warn"):
         """Parse a data array name and attributes to find a unique location
 
@@ -259,12 +260,12 @@ class SGLocator(object):
         if loc is False or loc == "":
             return False
         if not isinstance(loc, str):
-            raise XoaMetaError(
+            raise exceptions.XoaMetaError(
                 "Invalid loc argument. Must one of: "
                 'None, Trye, "any", False, "" or a location string'
             )
         if self.valid_locations and loc not in self.valid_locations:
-            raise XoaMetaError(
+            raise exceptions.XoaMetaError(
                 f'Location "{loc}" is invalid. '
                 "Valid locations are: " + ", ".join(self.valid_locations)
             )

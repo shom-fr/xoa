@@ -2,7 +2,7 @@
 Routines related to the ocean dynamics.
 """
 
-# Copyright 2020-2022 Shom
+# Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,25 +21,61 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .__init__ import XoaError
+from . import exceptions
 from . import coords as xcoords
 from . import grid as xgrid
-from . import cf as xcf
+from . import meta as xmeta
 from . import misc as xmisc
-from xoa.interp import grid2locs
-from xoa.geo import EARTH_RADIUS
+from . import interp
+from . import geo
+
+
+SEA_LEVEL_VARIANTS = xmisc.Choices(
+    {
+        None: "No restriction",
+        "ssh": "sea surface height",
+        "adt": "absolute dynamic topography",
+        "sla": "sea level anomaly",
+        "mdt": "mean dynamic topography",
+        "mss": "mean sea surface",
+    },
+    parameter="variant",
+    description="Restrict checking to a given variant(s)",
+)
+
+
+def _get_sea_level_variant_(variant):
+    variant = SEA_LEVEL_VARIANTS[variant]
+    if variant is None:
+        variant = ["ssh", "adt", "sla", "mdt", "mss"]
+    return variant
 
 
 @xmisc.ERRORS.format_function_docstring
-def get_sea_level(ds, candidates=["ssh", "adt", "sla", "mdt"], errors="ignore"):
-    """Try to find a unique sea level variable in a dataset"""
-    errors = xmisc.ERRORS[errors]
-    cfspecs = xcf.get_cf_specs(ds)
-    try:
-        sea_level = cfspecs.get(ds, candidates, errors=errors)
-    except Exception as e:
-        raise XoaError("Can't find a single sea level-like variable: " + e.message)
-    return sea_level
+def get_sea_level(ds, variant=None, errors="ignore"):
+    """Try to find a unique sea level variable in a dataset
+
+    See: https://help.marine.copernicus.eu/en/articles/6025269-what-are-the-differences-between-the-ssh-and-sla-variables
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+    {variant}
+
+    Return
+    ------
+    xarray.DataArray, None
+
+    """
+    variant = _get_sea_level_variant_(variant)
+    return xmeta.get_meta_specs(ds).get(ds, variant, errors=errors)
+    # errors = xmisc.ERRORS[errors]
+    # meta_specs = xmeta.get_meta_specs(ds)
+    # try:
+    #     sea_level = meta_specs.get(ds, candidates, errors=errors)
+    # except Exception as e:
+    #     raise exceptions.XoaError("Can't find a single sea level-like variable: " + e.message)
+    # return sea_level
 
 
 def _get_uv2d_(t, txy, gx, gy, gz, gt, guv):
@@ -52,11 +88,11 @@ def _get_uv2d_(t, txy, gx, gy, gz, gt, guv):
     tz = np.zeros(npts)
 
     # Interpolate
-    tuv = grid2locs(gx, gy, gz, gt, guv, tx, ty, tz, tt)
+    tuv = interp.grid2locs(gx, gy, gz, gt, guv, tx, ty, tz, tt)
 
     # Scale the speed for degrees
-    tuv[0] *= 180.0 / (np.pi * EARTH_RADIUS)
-    tuv[1] *= 180.0 / (np.pi * EARTH_RADIUS)
+    tuv[0] *= 180.0 / (np.pi * geo.EARTH_RADIUS)
+    tuv[1] *= 180.0 / (np.pi * geo.EARTH_RADIUS)
     tuv[1] *= np.cos(ty * np.pi / 180)
 
     # Pack velocity
@@ -130,7 +166,7 @@ def flow2d(u, v, xy0, duration, step, date=None):
     u = u.squeeze(drop=True)
     v = v.squeeze(drop=True)
     if u.ndim != 2 or v.ndim != 2:
-        raise XoaError("The velocity field must 2D")
+        raise exceptions.XoaError("The velocity field must 2D")
     u = xgrid.to_rect(u)
     gx = xcoords.get_lon(u).values
     gy = xcoords.get_lat(u).values

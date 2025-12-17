@@ -5,4 +5,4 @@ Appendices
     :maxdepth: 1
 
     appendix.options
-    appendix.cf
+    appendix.meta

@@ -2,7 +2,7 @@
 Filtering utilities
 """
 
-# Copyright 2020-2024 Shom
+# Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import numpy as np
 import xarray as xr
 import numba
 
-from .__init__ import XoaError, xoa_warn
+from . import exceptions
 from . import misc as xmisc
 from . import coords as xcoords
 from . import geo as xgeo
@@ -268,7 +268,7 @@ def get_window_func(window, **kwargs):
 
             func = getattr(sw, window, None)
             if func is None:
-                raise XoaError(f'Invalid window name: {window}')
+                raise exceptions.XoaError(f'Invalid window name: {window}')
 
     else:
         func = window
@@ -522,7 +522,7 @@ def generate_kernel(
     # Convert tuple to dict with dims
     if isinstance(kernel, tuple):
         if len(kernel) > data.ndim:
-            raise XoaError(
+            raise exceptions.XoaError(
                 "Too many dimensions for your kernel: {} > {}".format(len(kernel), data.ndim)
             )
         kernel = dict(item for item in zip(data.dims[-len(kernel) :], kernel))
@@ -538,7 +538,7 @@ def generate_kernel(
             if isotropic is True:
                 isotropic = data.dims
             elif not set(isotropic).issubset(data.dims):
-                raise XoaError(
+                raise exceptions.XoaError(
                     "Invalid dimensions for isotropic keyword: {}".format(
                         set(isotropic) - set(data.dims)
                     )
@@ -556,7 +556,7 @@ def generate_kernel(
                     if (np.isscalar(isokernel) and not np.isscalar(kn)) or (
                         not np.isscalar(isokernel) and np.isscalar(kn)
                     ):
-                        raise XoaError(
+                        raise exceptions.XoaError(
                             "Inconsistant mix of 1d and scalar "
                             "kernel specs for building isotropic "
                             "kernel"
@@ -566,7 +566,9 @@ def generate_kernel(
                         and not np.isscalar(isokernel)
                         and not np.allclose(kn, isokernel)
                     ):
-                        raise XoaError("Inconsistant 1d kernels for building isotropic kernel")
+                        raise exceptions.XoaError(
+                            "Inconsistant 1d kernels for building isotropic kernel"
+                        )
                 else:
                     isokernel = kn
                 size = kn if np.isscalar(kn) else len(kn)
@@ -607,7 +609,7 @@ def generate_kernel(
     # Numpy
     elif isinstance(kernel, np.ndarray):
         if kernel.ndim > data.ndim:
-            raise XoaError(
+            raise exceptions.XoaError(
                 "Too many dimensions for your numpy kernel: {} > {}".format(kernel.dim, data.ndim)
             )
         dims = data.dims[-kernel.ndim :]
@@ -616,7 +618,9 @@ def generate_kernel(
     if not isinstance(kernel, xr.DataArray):
         kernel = xr.DataArray(kernel, dims=dims)
     elif not set(kernel.dims).issubset(set(data.dims)):
-        raise XoaError(f"Kernel dimensions {kernel.dims} are not a subset of {data.dims}")
+        raise exceptions.XoaError(
+            f"Kernel dimensions {kernel.dims} are not a subset of {data.dims}"
+        )
 
     # Finalize
     kernel = kernel.astype(data.dtype)
@@ -679,7 +683,9 @@ def _convolve_(data, kernel, normalize, na_thres, axis=None):
 
     # Kernel
     if kernel.dtype is not data.dtype:
-        xoa_warn("The dtype of your kernel is not the same as that of your data. Converting it...")
+        exceptions.exceptions.xoa_warn(
+            "The dtype of your kernel is not the same as that of your data. Converting it..."
+        )
         kernel = kernel.astype(data.dtype)
 
     # Guess mask
@@ -858,7 +864,7 @@ def erode_mask(data, until=1, kernel=None):
     else:
         mask = until
         if not set(mask.dims).issubset(data.dims):
-            raise XoaError('Mask dims must be a subset of data dims')
+            raise exceptions.XoaError('Mask dims must be a subset of data dims')
         mask = xcoords.transpose(mask, data, mode="compat")
 
     # Filter
@@ -979,29 +985,29 @@ def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
     # Get time dimension
     tdim = xcoords.get_tdim(da, errors="ignore")
     if tdim is None:
-        xoa_warn("Cannot apply the Demerliac filter since no time dimension found")
+        exceptions.xoa_warn("Cannot apply the Demerliac filter since no time dimension found")
         return da.copy()
 
     # Weights
     if filter_name not in HOURLY_TIDAL_FILTERS_WEIGHTS:
-        raise XoaError(
+        raise exceptions.XoaError(
             f"Invalid filter name '{filter_name}'. Please use one of: "
             + ', '.join(HOURLY_TIDAL_FILTERS_WEIGHTS)
         )
     weights = np.array(HOURLY_TIDAL_FILTERS_WEIGHTS[filter_name], "d")
     if tdim not in da.indexes:
-        xoa_warn("Not time coordinate found so we assume hourly data")
+        exceptions.xoa_warn("Not time coordinate found so we assume hourly data")
     else:
         dt = np.diff(da[tdim].values) / np.timedelta64(3600, "s")
         ddt = float(np.ptp(dt))
         mdt = float(dt.mean())
         if ddt > dt_tol * mdt:
-            raise XoaError(
+            raise exceptions.XoaError(
                 "The variability of your time steps is above the allowed level "
                 f" to apply a {filter_name} filter"
             )
         if mdt > 1 + dt_tol:
-            raise XoaError(
+            raise exceptions.XoaError(
                 f"You should not apply a {filter_name} filter to data that are less "
                 f"than hourly sampled. Current mean time step: {mdt:1.2f} s"
             )

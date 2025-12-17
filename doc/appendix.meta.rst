@@ -1,14 +1,14 @@
-.. _appendix.cf:
+.. _appendix.meta:
 
-Default and specialized CF specs
-================================
+Default and specialized meta specs
+==================================
 
 This appendix refers to the searching and formatting specifications
 for data variables and coordinates, and related tools,
-available in the :mod:`xoa.cf` module.
-Their usage is introduced in the :ref:`uses.cf` section.
+available in the :mod:`xoa.meta` module.
+Their usage is introduced in the :ref:`uses.meta` section.
 
-.. _appendix.cf.specialized:
+.. _appendix.meta.specialized:
 
 Specialized configurations
 --------------------------
@@ -20,33 +20,33 @@ You can use them at your own risk.
 
 For instance, load the croco specs with directly::
 
-    import xoa.cf
-    xoa.cf.set_cf_specs("croco")
+    import xoa.meta
+    xoa.meta.set_meta_specs("croco")
 
 Register it with::
 
-    xoa.cf.register_cf_specs("croco")
+    xoa.meta.register_meta_specs("croco")
 
-You can access the associated `.cfg` file with :func:`xoa.cf_congs.get_cf_conf_file`.
+You can access the associated `.cfg` file with :func:`xoa.meta_configs.get_meta_config_file`.
 
 
-.. include:: gencfspecs/specialized.txt
+.. include:: genmetaspecs/specialized.txt
 
-.. _appendix.cf.default:
+.. _appendix.meta.default:
 
 The default configuration
 -------------------------
 
 .. note:: You can define you own specifications for each of your datasets.
-    Have a look to the :ref:`uses.cf` section and to the :ref:`examples`.
+    Have a look to the :ref:`uses.meta` section and to the :ref:`examples`.
 
 As a :file:`.cfg` file
 ^^^^^^^^^^^^^^^^^^^^^^
 
-Look at :ref:`appendix.cf.specialized.default`.
+Look at :ref:`appendix.meta.specialized.default`.
 
 
-.. include:: gencfspecs/index.txt
+.. include:: genmetaspecs/index.txt
 
 The configuration syntax specifications
 ---------------------------------------
@@ -58,12 +58,12 @@ See `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_.
 Details
 ^^^^^^^
 
-.. include:: cf.txt
+.. include:: meta.txt
 
 File
 ^^^^
 
-.. literalinclude:: ../xoa/cf.ini
+.. literalinclude:: ../xoa/meta/meta.ini
     :language: ini
 
 

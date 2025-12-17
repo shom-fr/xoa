@@ -7,22 +7,26 @@ Develop
 New features
 ------------
 - Add the ``within`` parameter to :mod:`xoa.cf` search methods.
-- Add the ``rename_args`` argument to formatting routing of :mod:`xoa.cf` to retreive renaming information [:pull:`102`].
+- Add the ``rename_args`` argument to formatting routing of :mod:`xoa.meta` to retreive renaming information [:pull:`102`].
 - Add the :func:`xoa.dyn.get_sea_level` function to get either SSH, ADT, SLA or MDT in a dataset [:pull:`102`].
-- Allow passing a list of "cf_name" to :meth:`xoa.cf.CfSpecs.get` for enlarging a search [:pull:`102`].
+- Allow passing a list of "meta_name" to :meth:`xoa.cf.MetaSpecs.get` for enlarging a search [:pull:`102`].
+- The :mod:`xoa.data_samples` module now use Pooch to manage sample files.
+- Add the ``multi`` parameter to :class:`xoa.misc.Choices` to allow multiple choices.
 
 Breaking changes
 ----------------
 
 Deprecations
 ------------
+- The :mod:`xoa.cf` module is deprecated. Use :mod:`xoa.meta` instead. All references to "cf" must be converted to "meta" in modules, functions, classes, methods and accessors. A backward compatibility layer has been added.
+- The :mod:`xoa.cf_configs` module is deprecated in favour of module :mod:`xoa.meta.configs` 
 
 Bug fixes
 ---------
 - Fix :func:`xoa.coords.get_time` that was returning None.
 - Fix :func:`xoa.interp.linear1d` extraplation [:pull:`107`]
 - Fix :func:`xoa.grid.to_rect` warnings.
-- Fix :meth:`xoa.cf.CFSpecs.get_dim_types`.
+- Fix :meth:`xoa.meta.MetaSpecs.get_dim_types`.
 
 Documentation
 -------------

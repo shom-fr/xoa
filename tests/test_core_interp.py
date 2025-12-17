@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Test the :mod:`xoa.interp` module
+Test the :mod:`xoa.core.interp` module
 """
 
 import functools
 import numpy as np
 import pytest
 
-from xoa import interp
+from xoa.core import interp
 
 
 def vfunc(t=0, z=0, y=0, x=0):

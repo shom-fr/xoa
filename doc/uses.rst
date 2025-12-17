@@ -6,5 +6,5 @@ Using the modules
 .. toctree::
     :maxdepth: 1
 
-    uses.cf
+    uses.meta
     uses.cfgm

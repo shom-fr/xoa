@@ -26,7 +26,7 @@ Attributes
     DataArray.xoa.attrs
     DataArray.xoa.coords
     DataArray.xoa.data_vars
-    DataArray.xoa.cf
+    DataArray.xoa.meta
 
 
 Methods
@@ -62,7 +62,7 @@ Attributes
 
     Dataset.xoa.coords
     Dataset.xoa.data_vars
-    Dataset.xoa.cf
+    Dataset.xoa.meta
     Dataset.xoa.decode_sigma
 
 

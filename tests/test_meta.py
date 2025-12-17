@@ -12,7 +12,7 @@ from xoa import meta
 from xoa.meta.sglocator import SGLocator
 from xoa.meta.general import MetaSpecs
 from xoa.meta.categories import MetaVarSpecs, MetaCoordSpecs
-from xoa.meta_configs import META_CONFIGS
+from xoa.meta.configs import META_CONFIGS
 
 
 class TestSGLocator:

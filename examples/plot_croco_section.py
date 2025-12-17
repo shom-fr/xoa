@@ -21,11 +21,11 @@ In this notebook, we show:
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
-import cmocean
+import cmocean  # noqa
 import xoa
 from xoa.regrid import regrid1d
 from xoa.thermdyn import mixed_layer_depth
-import xoa.cf as xcf
+import xoa.meta as xmeta
 
 xr.set_options(display_style="text")
 
@@ -43,15 +43,15 @@ xoa.register_accessors(decode_sigma=True)
 
 croco_cfg_file = xoa.get_cf_config_file("croco")
 print(croco_cfg_file)
-xcf.register_cf_specs(croco_cfg_file)
+xmeta.register_meta_specs(croco_cfg_file)
 
 # %%
 # You can provide your own configuration file.
 #
-# In this way, the :mod:`xoa.cf` module will recognise the
+# In this way, the :mod:`xoa.meta` module will recognise the
 # CROCO netcdf names.
 # It would be equivalent to force loading name specs with
-# `xoa.cf.set_cf_specs(xoa.get_cf_config_file("croco"))`.
+# `xoa.meta.set_meta_specs(xoa.get_cf_config_file("croco"))`.
 
 # %%
 # Read the model

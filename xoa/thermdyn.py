@@ -4,55 +4,64 @@
 Thermodynamics utilities
 """
 import numpy as np
-
 import xarray as xr
-from .__init__ import XoaError, xoa_warn
-from . import cf as xcf
+
+from . import exceptions
+from . import meta as xmeta
 from . import misc as xmisc
 from . import coords as xcoords
 from . import regrid as xregrid
 
 
-def _get_array_(ds, func, variants, variant, errors, name):
-    if not variant:
-        variant = None
-    if isinstance(variant, str) or variant is None:
-        variant = [variant]
+# def _get_array_(ds, func, variants, variant, errors, name):
+#     if not variant:
+#         variant = None
+#     if isinstance(variant, str) or variant is None:
+#         variant = [variant]
 
-    das = []
-    for da in ds.values():
-        for vr in variant:
-            if func(da, vr):
-                das.append(da)
+#     das = []
+#     for da in ds.values():
+#         for vr in variant:
+#             if func(da, vr):
+#                 das.append(da)
 
-    errors = xmisc.ERRORS[errors]
-    if not das:
-        msg = f"Found no {name} array"
-        if errors == "raise":
-            raise XoaError(msg)
-        if errors == "warning":
-            xoa_warn(msg)
-        return
-    if len(das) > 1:
-        msg = f"Found more than one {name} array"
-        if errors == "raise":
-            raise XoaError(msg)
-        if errors == "warning":
-            xoa_warn(msg, stacklevel=3)
-    return das[0]
+#     errors = xmisc.ERRORS[errors]
+#     if not das:
+#         msg = f"Found no {name} array"
+#         if errors == "raise":
+#             raise exceptions.XoaThermdynError(msg)
+#         if errors == "warning":
+#             exceptions.xoa_warn(msg)
+#         return
+#     if len(das) > 1:
+#         msg = f"Found more than one {name} array"
+#         if errors == "raise":
+#             raise exceptions.XoaThermdynError(msg)
+#         if errors == "warning":
+#             exceptions.xoa_warn(msg, stacklevel=3)
+#     return das[0]
 
 
 TEMP_VARIANTS = xmisc.Choices(
     {
         None: "No restriction",
-        "insitu": "In situ",
-        "conservative": "Conservative temperature",
-        "absolute": "Absolute temperature",
-        "potential": "Potential temperature"
+        "temp": "In situ",
+        "ctemp": "Conservative temperature",
+        "atemp": "Absolute temperature",
+        "ptemp": "Potential temperature",
     },
     parameter="variant",
-    description="Restrict checking to a given variant",
+    description="Restrict checking to a given variant(s)",
+    aliases={"temp": "insitu", "ptemp": "potential", "ctemp": "conservative", "atemp": "absolute"},
+    multi=True,
 )
+
+
+def _get_temp_variant_(variant):
+    variant = DENS_VARIANTS[variant]
+    if variant is None:
+        variant = ["temp", "ptemp", "ctemp"]
+    return variant
 
 
 @TEMP_VARIANTS.format_method_docstring
@@ -68,54 +77,57 @@ def is_temp(da, variant=None):
     ------
     bool
     """
-    cfspecs = xcf.get_cf_specs(da)
-    variant = TEMP_VARIANTS[variant]
-    cf_names = []
-    if variant is None or variant == "insitu":
-        cf_names.append("temp")
-    if variant is None or variant == "potential":
-        cf_names.append("ptemp")
-    if variant is None or variant == "conservative":
-        cf_names.append("ctemp")
-    for cf_name in cf_names:
-        if cfspecs.match_data_var(da, cf_name):
-            return True
-    return False
+    variant = _get_temp_variant_(variant)
+    return bool(xmeta.get_meta_specs(da).match_data_var(da, variant))
 
 
-@xmisc.ERRORS.format_function_docstring
+@TEMP_VARIANTS.format_method_docstring
 def get_temp(ds, variant=None, errors="warn"):
     """Search for temperature in a dataset
 
     Parameters
     ----------
-    da: xarray.Dataset
-    variant: None, str, list(str)
-        Variant of temperature or list of them. See :func:`is_temp`.
-    {errors}
+    ds: xarray.Dataset
+    {variant}
 
     Return
     ------
     xarray.DataArray, None
         If None or several arrays are found, a warning or an error may be raised
         depending on the `errors` parameter.
-        If several arrays are matching and `errors` is "warning", the first array is returned.
+        If several arrays are matching and `errors` is "warn", the first array is returned.
 
     """
-    return _get_array_(ds, is_temp, TEMP_VARIANTS, variant, errors, "temperature")
+    variant = _get_temp_variant_(variant)
+    return xmeta.get_meta_specs(ds).get(ds, variant, errors=errors)
+    # return _get_array_(ds, is_temp, TEMP_VARIANTS, variant, errors, "temperature")
 
 
 SAL_VARIANTS = xmisc.Choices(
     {
         None: "No restriction",
-        "insitu": "In situ salinity",
-        "absolute": "Absolute salinity",
-        "preformed": "Preformed salinity",
-        "practical": "Practical salinity",
+        "sal": "In situ salinity",
+        "asal": "Absolute salinity",
+        "pfsal": "Preformed salinity",
+        "psal": "Practical salinity",
     },
     parameter="variant",
-    description="Restrict checking to a given variant",
+    description="Restrict checking to a given variant(s)",
+    aliases={
+        "sal": "insitu",
+        "psal": "pratical",
+        "pfsal": "preformed",
+        "asal": "absolute salinity",
+    },
+    multi=True,
 )
+
+
+def _get_sal_variant_(variant):
+    variant = DENS_VARIANTS[variant]
+    if variant is None:
+        variant = ["sal", "psal", "pfsal", "asal"]
+    return variant
 
 
 @SAL_VARIANTS.format_method_docstring
@@ -131,51 +143,62 @@ def is_sal(da, variant=None):
     ------
     bool
     """
-    cfspecs = xcf.get_cf_specs(da)
-    cf_names = []
-    if variant is None or variant == "insitu":
-        cf_names.append("sal")
-    if variant is None or variant == "practical":
-        cf_names.append("psal")
-    if variant is None or variant == "preformed":
-        cf_names.append("pfsal")
-    if variant is None or variant == "absolute":
-        cf_names.append("asal")
-    for cf_name in cf_names:
-        if cfspecs.match_data_var(da, cf_name):
-            return True
-    return False
+    variant = _get_sal_variant_(variant)
+    return bool(xmeta.get_meta_specs(da).match_data_var(da, variant))
 
 
-@xmisc.ERRORS.format_function_docstring
+@SAL_VARIANTS.format_method_docstring
 def get_sal(ds, variant=None, errors="warn"):
     """Search for salinity in a dataset.
 
     Parameters
     ----------
     da: xarray.Dataset
-    variant: None, str, list(str)
-        Variant of salinity or list of them. See :func:`is_sal`.
-    {errors}
+    {variant}
 
     Return
     ------
     xarray.DataArray, None
         Return None if not found
     """
-    return _get_array_(ds, is_sal, SAL_VARIANTS, variant, errors, "salinity")
+    variant = _get_sal_variant_(variant)
+    return xmeta.get_meta_specs(ds).get(ds, variant, errors=errors)
+    # return _get_array_(ds, is_sal, SAL_VARIANTS, variant, errors, "salinity")
 
 
 DENS_VARIANTS = xmisc.Choices(
     {
         None: "No restriction",
-        "insitu": "In situ density",
-        "potential": "Potential density",
-        "neutral": "Neutral salinity",
+        "dens": "In situ density",
+        "pdens": "Potential density",
+        "ndens": "Neutral salinity",
     },
     parameter="variant",
-    description="Restrict checking to a given variant",
+    description="Restrict checking to a given variant(s)",
+    aliases={
+        "dens": ["insitu", "sigmat"],
+        "pdens": ["potential", "sigma0", "sigma1", "sigma2", "sigma3", "sigma4"],
+        "ndens": "neutral",
+    },
+    multi=True,
 )
+
+
+def _get_dens_variant_(variant):
+    variant = DENS_VARIANTS[variant]
+    if variant is None:
+        variant = [
+            "dens",
+            "sigmat",
+            "pdens",
+            "sigma0",
+            "sigma1",
+            "sigma2",
+            "sigma3",
+            "sigma4",
+            "ndens",
+        ]
+    return variant
 
 
 @DENS_VARIANTS.format_method_docstring
@@ -191,37 +214,39 @@ def is_dens(da, variant=None):
     ------
     bool
     """
-    cfspecs = xcf.get_cf_specs(da)
-    cf_names = []
-    if variant is None or variant == "insitu":
-        cf_names.extend(["dens", "sigmat"])
-    if variant is None or variant == "potential":
-        cf_names.extend(["pdens", "sigmatheta", "sigma0", "sigma1", "sigma2", "sigma3", "sigma4"])
-    if variant is None or variant == "neutral":
-        cf_names.append("ndens")
-    for cf_name in cf_names:
-        if cfspecs.match_data_var(da, cf_name):
-            return True
-    return False
+    meta_specs = xmeta.get_meta_specs(da)
+    variant = _get_dens_variant_(variant)
+    return bool(meta_specs.match_data_var(da, variant))
+    # meta_names = []
+    # if variant is None or variant == "insitu":
+    #     meta_names.extend(["dens", "sigmat"])
+    # if variant is None or variant == "potential":
+    #     meta_names.extend(["pdens", "sigmatheta", "sigma0", "sigma1", "sigma2", "sigma3", "sigma4"])
+    # if variant is None or variant == "neutral":
+    #     meta_names.append("ndens")
+    # for meta_name in meta_names:
+    #     if meta_specs.match_data_var(da, meta_name):
+    #         return True
+    # return False
 
 
-@xmisc.ERRORS.format_function_docstring
+@DENS_VARIANTS.format_method_docstring
 def get_dens(ds, variant=None, errors="warn"):
     """Search for density in a dataset.
 
     Parameters
     ----------
     da: xarray.Dataset
-    variant: None, str, list(str)
-        Variant of density or list of them. See :func:`is_dens`.
-    {errors}
+    {variant}
 
     Return
     ------
     xarray.DataArray, None
         Return None if not found
     """
-    return _get_array_(ds, is_dens, DENS_VARIANTS, variant, errors, "density")
+    variant = _get_dens_variant_(variant)
+    return xmeta.get_meta_specs(ds).get(ds, variant, errors=errors)
+    # return _get_array_(ds, is_dens, DENS_VARIANTS, variant, errors, "density")
 
 
 MLD_METHODS = xmisc.Choices(
@@ -293,16 +318,16 @@ def mixed_layer_depth(
     positive = xcoords.get_positive_attr(depth, zdim=zdim) or "up"
 
     # Method
-    cfspecs = xcf.get_cf_specs(da)
+    meta_specs = xmeta.get_meta_specs(da)
     if method is None:
         if is_temp(da):
             method = "deltatemp"
-        elif cfspecs.match_data_var(da, 'kz'):
+        elif meta_specs.match_data_var(da, 'kz'):
             method = "kzmax"
         elif is_dens(da):
             method = "deltadens"
         else:
-            raise XoaError(
+            raise exceptions.XoaThermdynError(
                 "Cannot infer mixed layer depth computation method from data array. "
                 "Please specify the `method` keyword."
             )
@@ -330,7 +355,7 @@ def mixed_layer_depth(
 
     # Format
     mld.attrs = {}
-    cfspecs.format_data_var(
+    meta_specs.format_data_var(
         mld, "mld", format_coords=False, rename_dims=False, copy=False, replace_attrs=True
     )
 
@@ -339,8 +364,8 @@ def mixed_layer_depth(
 
 # def get_mld(ds, methods=[None, "deltadens", "deltatemp", "kz"], **kwargs):
 #     """Get or compute the mixed layer depth from a dataset"""
-#     cfspecs = xcf.get_cf_specs(ds)
+#     meta_specs = xmeta.get_meta_specs(ds)
 #     for method in methods:
 #         if method is None:
-#             mld = cfspecs.search_data_var(ds, "mld", errors="ignore")
+#             mld = meta_specs.search_data_var(ds, "mld", errors="ignore")
 #             if mld is None:

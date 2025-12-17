@@ -5,7 +5,7 @@ or perform operations on a grid.
 
 For operations between different grids, please see :mod:`xoa.regrid`.
 """
-# Copyright 2020-2025 Shom
+# Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ For operations between different grids, please see :mod:`xoa.regrid`.
 import numpy as np
 import xarray as xr
 
-from .__init__ import XoaError, xoa_warn
+from . import exceptions
 from . import misc
-from . import cf
+from . import meta
 from . import coords as xcoords
 
 
@@ -81,7 +81,7 @@ def apply_along_dim(
     # Loop on dims
     if coord_func is None:
         coord_func = func
-    dim = cf.get_cf_specs(ds).parse_dims(dim, ds)
+    dim = meta.get_meta_specs(ds).parse_dims(dim, ds)
     dims = (dim,) if isinstance(dim, str) else dim
     for dim in dims:
         if dim not in dso.dims:
@@ -142,7 +142,7 @@ def apply_along_dim(
             coords[coord_name] = coord
         dso = dso.assign_coords(coords)
 
-    cf.assign_cf_specs(dso, ds)
+    meta.assign_meta_specs(dso, ds)
 
     return dso
 
@@ -214,7 +214,7 @@ def pad(
     apply_along_dim
     xarray.pad
     """
-    pad_width = cf.get_cf_specs(da).parse_dims(pad_width, da)
+    pad_width = meta.get_meta_specs(da).parse_dims(pad_width, da)
     return apply_along_dim(
         da,
         list(pad_width.keys()),
@@ -253,7 +253,7 @@ def get_centers(da, dim):
     get_edges
     apply_along_dim
     """
-    dim = cf.get_cf_specs(da).parse_dims(dim, da)
+    dim = meta.get_meta_specs(da).parse_dims(dim, da)
     return apply_along_dim(da, dim, _get_centers_)
 
 
@@ -283,7 +283,7 @@ def get_edges(da, dim, mode="edge", **kwargs):
     apply_along_dim
     """
     # Extrapolate
-    dim = cf.get_cf_specs(da).parse_dims(dim, da)
+    dim = meta.get_meta_specs(da).parse_dims(dim, da)
     dims = (dim,) if isinstance(dim, str) else dim
     pad_width = dict((dim, 1) for dim in dims)
     da = pad(da, pad_width=pad_width, mode=mode, **kwargs)
@@ -343,7 +343,7 @@ def shift(da, shift_dirs, mode="edge", **kwargs):
     get_edges
     get_centers
     """
-    shift_dirs = cf.get_cf_specs(da).parse_dims(shift_dirs, da)
+    shift_dirs = meta.get_meta_specs(da).parse_dims(shift_dirs, da)
 
     # Extrapolate
     pad_width = {}
@@ -424,7 +424,7 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
         a valid positive attribute.
     zdim: str
         Name of the vertical dimension.
-        If note set, it is infered with :func:`~xoa.coords.get_cf_dims`.
+        If note set, it is infered with :func:`~xoa.coords.get_meta_dims`.
     ref: xarray.DataArray
         Reference array converting layer thicknesses to depth:
 
@@ -469,17 +469,17 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
     if positive == "infer":
         positive = xcoords.get_positive_attr(dz, zdim)
         if positive is None:
-            raise XoaError("Can't infer positive attribute from data array/dataset")
+            raise exceptions.XoaGridError("Can't infer positive attribute from data array/dataset")
 
     # Integrate
     depth = dz.cumsum(dim=zdim)
     depth = pad(depth, {zdim: (1, 0)}, mode="constant", constant_values=0)
     ref_type = dz2depth_ref_types[ref_type].name
-    cfspecs = cf.get_cf_specs(dz)
+    meta_specs = meta.get_meta_specs(dz)
     if ref is None and ref_type == "infer":
-        if cfspecs.data_vars.match(ref, "bathy"):
+        if meta_specs.data_vars.match(ref, "bathy"):
             ref_type = "bottom"
-        elif cfspecs.data_vars.match(ref, "ssh"):
+        elif meta_specs.data_vars.match(ref, "ssh"):
             ref_type = "top"
         else:
             ref_type = "top" if positive == "down" else "bottom"
@@ -508,7 +508,7 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
 
     # Finalize
     depth.attrs["positive"] = positive
-    depth = cfspecs.format_coord(
+    depth = meta_specs.format_coord(
         depth, "depth", rename=True, format_coords=False, rename_dims=False
     )
 
@@ -519,11 +519,11 @@ dz2depth.__doc__ = dz2depth.__doc__.format(**locals())
 
 
 @misc.ERRORS.format_function_docstring
-def decode_cf_dz2depth(ds, errors="raise", **kwargs):
+def decode_dz2depth(ds, errors="raise", **kwargs):
     """Compute depth from layer thickness in a dataset
 
-    This makes use of the :meth:`~xoa.cf.CFSpecs` instance that is retreived
-    with :func:`xoa.cf.get_cf_specs` with ds as an argument in order to
+    This makes use of the :meth:`~xoa.meta.MetaSpecs` instance that is retreived
+    with :func:`xoa.meta.get_meta_specs` with ds as an argument in order to
     find needed variables.
 
     Parameters
@@ -542,30 +542,30 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
     See also
     --------
     dz2depth
-    xoa.cf.get_cf_specs
+    xoa.meta.get_meta_specs
     """
     ds = ds.copy()
     errors = misc.ERRORS[errors]
 
     # Find needed stuff
-    cfspecs = cf.get_cf_specs(ds)
-    dz = cfspecs.search(ds, "dz", errors=errors)
+    meta_specs = meta.get_meta_specs(ds)
+    dz = meta_specs.search(ds, "dz", errors=errors)
     if dz is None:
         return ds
-    zdim = xcoords.get_cf_dims(dz, "z", errors=errors)
+    zdim = xcoords.get_meta_dims(dz, "z", errors=errors)
     if zdim is None:
         return ds
-    positive = cfspecs["vertical"]["positive"]
+    positive = meta_specs["vertical"]["positive"]
     if positive is None:
         positive = xcoords.get_positive_attr(ds, zdim)
     if positive is None:
         msg = "Can't infer positive attribute from data dataset"
         if errors == "raise":
-            raise XoaError(msg)
-        xoa_warn(msg)
+            raise exceptions.XoaGridError(msg)
+        exceptions.xoa_warn(msg)
         return ds
-    ssh = cfspecs.search(ds, "ssh", errors="ignore")
-    bathy = cfspecs.search(ds, "bathy", errors="ignore")
+    ssh = meta_specs.search(ds, "ssh", errors="ignore")
+    bathy = meta_specs.search(ds, "bathy", errors="ignore")
 
     # Make choices
     if ssh is None and bathy is None:
@@ -587,6 +587,13 @@ def decode_cf_dz2depth(ds, errors="raise", **kwargs):
 
     # Assign to dataset
     return ds.assign_coords(depth=depth)
+
+
+def decode_cf_dz2depth(*args, **kwargs):
+    exceptions.xoa_warn(
+        "decode_cf_dz2depth is deprecated. Please use decode_dz2depth instead", "deprecation"
+    )
+    return decode_dz2depth(*args, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring
@@ -611,7 +618,7 @@ def to_rect(da, tol=1e-5, errors="warn"):
     # da = da.copy()
     new_coords = {}
     rename_args = {}
-    da = cf.infer_coords(da)
+    da = meta.infer_coords(da)
     errors = misc.ERRORS[errors]
     for name, coord in da.coords.items():
         if coord.ndim != 2:
@@ -638,9 +645,9 @@ def to_rect(da, tol=1e-5, errors="warn"):
                 f"'{name}' is not constant along one of its dimensions"
             )
             if errors == "raise":
-                raise XoaError(msg)
+                raise exceptions.XoaError(msg)
             elif errors == "warn":
-                xoa_warn(msg)
+                exceptions.xoa_warn(msg)
     if new_coords:
         return (
             da.reset_coords(list(new_coords), drop=True)

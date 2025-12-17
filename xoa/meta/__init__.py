@@ -5,21 +5,17 @@ import fnmatch
 
 from platformdirs import user_config_dir
 
-from ..__init__ import XoaError, xoa_warn
-from ..misc import ERRORS
-from ..meta_configs import META_CONFIGS
+from .. import exceptions
+from .. import misc
+from . import configs
 
 from . import general
-
-
-class XoaMetaError(XoaError):
-    pass
 
 
 _THISDIR = os.path.dirname(__file__)
 
 # Joint variables and coords config specification file
-_INI_FILE = os.path.join(_THISDIR, "meta.ini")
+INI_FILE = os.path.join(_THISDIR, "meta.ini")
 
 #: User Meta config file
 USER_META_FILE = os.path.join(user_config_dir("xoa"), "meta.cfg")
@@ -28,7 +24,8 @@ USER_META_FILE = os.path.join(user_config_dir("xoa"), "meta.cfg")
 _META_CACHE = {}
 
 
-def _get_cache_():
+def get_cache():
+    """Get the meta cache dict"""
     if not len(_META_CACHE):
         _META_CACHE.update(
             current=None,  # current active specs
@@ -37,55 +34,6 @@ def _get_cache_():
             registered=[],  # for registration and matching purpose
         )
     return _META_CACHE
-
-
-def _check_single_(errors, found, target_type, targets=None):
-    """Check that we found a single item"""
-
-    # Single one so its ok
-    if len(found) == 1:
-        return found[0]
-
-    if targets is not None:
-        if not isinstance(targets, str):
-            targets = ", ".join(targets)
-        suffix = f" matching '{targets}'"
-    errors = ERRORS[errors]
-
-    # Multiple
-    if len(found) > 1:
-        if errors != "ignore":
-            msg = f"Found multiple {target_type}s{suffix} instead of single one"
-            if errors == "raise":
-                raise XoaMetaError(msg)
-            msg += ". Returning the first item."
-            xoa_warn(msg, stacklevel=3)
-            return found[0]
-        else:
-            return found[0]
-
-    # No one
-    if errors != "ignore":
-        msg = f"No {target_type} found{suffix}"
-        if errors == "raise":
-            raise XoaMetaError(msg)
-        xoa_warn(msg, stacklevel=3)
-
-
-def _list_xr_names_(obj, data_vars=True, coords=True, dims=True):
-    """List the data vars, coords and dims names of a xarray dataset or data array"""
-    out = set()
-    if data_vars and hasattr(obj, "data_vars"):
-        out = out.union(list(obj))
-    if coords:
-        cnames = set(obj.coords)
-        for cname in cnames:  # multiindexes
-            if cname in obj.indexes and hasattr(obj.indexes[cname], "names"):
-                cnames = cnames.union(obj.indexes[cname].names)
-        out = out.union(cnames)
-    if dims:
-        out = out.union(obj.dims)
-    return out
 
 
 def get_matching_item_specs(da, loc="any"):
@@ -175,7 +123,7 @@ def search_similar(obj, da):
     is_similar
     get_matching_item_specs
     """
-    targets = _list_xr_names_(obj, dims=False)
+    targets = misc.list_xr_names(obj, dims=False)
     for name in targets:
         if are_similar(obj[name], da):
             return obj[name]
@@ -204,7 +152,7 @@ class set_meta_specs(object):
                 meta_source = meta_specs
         if not isinstance(meta_source, general.MetaSpecs):
             meta_source = general.MetaSpecs(meta_source)
-        self.meta_cache = _get_cache_()
+        self.meta_cache = get_cache()
         self.old_specs = self.meta_cache["current"]
         self.meta_cache["current"] = self.specs = meta_source
 
@@ -229,10 +177,11 @@ def reset_cache(memory=False, **kwargs):
         .. warning:: This may lead to unpredicted behaviors.
 
     """
+
     if "disk" in kwargs:
-        xoa_warn("Disk cachng is no longer supported", category="deprecation")
+        exceptions.xoa_warn("Disk cachng is no longer supported", category="deprecation")
     if memory:
-        meta_cache = _get_cache_()
+        meta_cache = get_cache()
         meta_cache["loaded_dicts"].clear()
         meta_cache["current"] = None
         meta_cache["default"] = None
@@ -241,10 +190,24 @@ def reset_cache(memory=False, **kwargs):
 
 def show_cache():
     """Show the meta specs cache file"""
-    xoa_warn("Disk cachng is no longer supported", category="deprecation")
+    exceptions.xoa_warn("Disk cachng is no longer supported", category="deprecation")
 
 
-@ERRORS.format_function_docstring
+def get_meta_config_file(name):
+    """Get the path of a meta config file given its short name"""
+    if name.endswith(".cfg"):
+        name = name[:-4]
+    if name not in configs.META_CONFIGS:
+
+        raise exceptions.XoaMetaError(
+            "fInvalid meta config name '{name}'.\n"
+            + "Please use on of: "
+            + ", ".join(configs.META_CONFIGS)
+        )
+    return configs.META_CONFIGS[name]
+
+
+@misc.ERRORS.format_function_docstring
 def get_meta_specs_from_name(name, errors="warn"):
     """Get a registered Meta specs instance from its name
 
@@ -258,25 +221,26 @@ def get_meta_specs_from_name(name, errors="warn"):
     MetaSpecs or None
         Issue a warning if not found
     """
+
     # Registered specs
-    meta_cache = _get_cache_()
+    meta_cache = get_cache()
     for meta_specs in meta_cache["registered"][::-1]:
         if meta_specs["register"]["name"] and meta_specs["register"]["name"] == name.lower():
             return meta_specs
 
     # Internal specs
-    if name in META_CONFIGS:
-        meta_specs = general.MetaSpecs(META_CONFIGS[name])
+    if name in configs.META_CONFIGS:
+        meta_specs = general.MetaSpecs(configs.META_CONFIGS[name])
         register_meta_specs(meta_specs)
         return meta_specs
 
     # Not found
-    errors = ERRORS[errors]
+    errors = misc.ERRORS[errors]
     msg = f"Unknown registration name for Meta specs: {name}"
     if errors == "raise":
-        raise XoaMetaError(msg)
+        raise exceptions.XoaMetaError(msg)
     elif errors == "warn":
-        xoa_warn(msg)
+        exceptions.xoa_warn(msg)
 
 
 def get_meta_specs_encoding(ds):
@@ -324,9 +288,10 @@ def get_meta_specs_from_encoding(ds):
 
 def get_default_meta_specs(**kwargs):
     """Get the default Meta specifications"""
+
     if "cache " in kwargs:
-        xoa_warn("Disk cachng is no longer supported", category="deprecation")
-    meta_cache = _get_cache_()
+        exceptions.xoa_warn("Disk cachng is no longer supported", category="deprecation")
+    meta_cache = get_cache()
     if meta_cache["default"] is not None:
         return meta_cache["default"]
 
@@ -351,7 +316,7 @@ def get_meta_specs(name=None, cache="rw"):
         that can be used to get the registration name if it set in the
         :attr:`meta_specs` attribute or encoding.
         When set, ``cache`` is ignored.
-        Raises a :class:`XoaMetaError` is case of invalid name.
+        Raises a :class:`XoaError` is case of invalid name.
     cache: str, bool, None
         Cache default specs on disk with pickling for fast loading.
         If ``None``, it defaults to boolean option :xoaoption:`meta.cache`.
@@ -366,7 +331,7 @@ def get_meta_specs(name=None, cache="rw"):
 
     Raise
     -----
-    XoaMetaError
+    XoaError
         When ``name`` is provided as a string and is invalid.
     """
     # Explicit request
@@ -382,7 +347,7 @@ def get_meta_specs(name=None, cache="rw"):
 
     # Not named => current or default specs
     if name == "current":
-        meta_cache = _get_cache_()
+        meta_cache = get_cache()
         if meta_cache.get("current") is None:
             meta_cache["current"] = get_default_meta_specs()
         meta_specs = meta_cache["current"]
@@ -404,7 +369,7 @@ def register_meta_specs(*args, **kwargs):
 
     # Update the cache
     for meta_specs in args:
-        meta_cache = _get_cache_()
+        meta_cache = get_cache()
         if not isinstance(meta_specs, general.MetaSpecs):
             meta_specs = general.MetaSpecs(meta_specs)
         if meta_specs not in meta_cache["registered"]:
@@ -435,7 +400,7 @@ def get_registered_meta_specs(current=True, reverse=True, named=False):
     --------
     register_meta_specs
     """
-    meta_cache = _get_cache_()
+    meta_cache = get_cache()
     metal = meta_cache["registered"]
     if reverse:
         metal = metal[::-1]
@@ -635,7 +600,7 @@ def assign_meta_specs(ds, name=None, register=False, set_encoding=True):
             return ds
     if not isinstance(name, str):
         if not name.name:
-            xoa_warn("MetaSpecs instance has no registration name")
+            exceptions.xoa_warn("MetaSpecs instance has no registration name")
             return ds
         if register and not is_registered_meta_specs(name):
             register_meta_specs(name)
@@ -643,7 +608,8 @@ def assign_meta_specs(ds, name=None, register=False, set_encoding=True):
 
     # Set as encoding
     if set_encoding:
-        targets = [ds] + [ds[name] for name in _list_xr_names_(ds, dims=False)]
+
+        targets = [ds] + [ds[name] for name in misc.list_xr_names(ds, dims=False)]
         for target in targets:
             target.encoding.update(meta_specs=name)
 
@@ -668,3 +634,22 @@ def infer_coords(ds):
 
 
 # infer_coords.__doc__ = MetaSpecs.infer_coords.__doc__
+
+
+@misc.ERRORS.format_function_docstring
+def get_variant(ds, variants, errors="ignore"):
+    """Try to find a unique generic data array in a dataset
+
+    Parameters
+    ----------
+    ds: xarraya.Dataset
+    variants: str, list(str)
+        A single or a list of meta names
+    {errors}
+
+    Returns
+    -------
+    xarray.DataArray, None
+    """
+    meta_specs = get_meta_specs(ds)
+    return meta_specs.get(ds, variants, errors=errors)

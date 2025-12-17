@@ -23,12 +23,52 @@ See the :ref:`uses.cf` section.
 # limitations under the License.
 
 
-from ..__init__ import XoaError, xoa_warn
-from ..misc import match_string, ERRORS
-from .__init__ import _list_xr_names_, XoaMetaError, _check_single_
+from .. import exceptions
+from .. import misc
 
 
-class _MetaCatSpecs_(object):
+class _MetaBase_:
+
+    @staticmethod
+    def _list_xr_names_(obj, data_vars=True, coords=True, dims=True):
+        """List the data vars, coords and dims names of a xarray dataset or data array"""
+        return misc.list_xr_names(obj, data_vars, coords, dims)
+
+    @staticmethod
+    def _check_single_(errors, found, target_type, targets=None):
+        """Check that we found a single item"""
+
+        # Single one so its ok
+        if len(found) == 1:
+            return found[0]
+
+        if targets is not None:
+            if not isinstance(targets, str):
+                targets = ", ".join(targets)
+            suffix = f" matching '{targets}'"
+        errors = misc.ERRORS[errors]
+
+        # Multiple
+        if len(found) > 1:
+            if errors != "ignore":
+                msg = f"Found multiple {target_type}s{suffix} instead of single one"
+                if errors == "raise":
+                    raise exceptions.XoaMetaError(msg)
+                msg += ". Returning the first item."
+                exceptions.xoa_warn(msg, stacklevel=3)
+                return found[0]
+            else:
+                return found[0]
+
+        # No one
+        if errors != "ignore":
+            msg = f"No {target_type} found{suffix}"
+            if errors == "raise":
+                raise exceptions.XoaMetaError(msg)
+            exceptions.xoa_warn(msg, stacklevel=3)
+
+
+class _MetaCatSpecs_(_MetaBase_):
     """Base class for loading data_vars and coords Meta specifications"""
 
     category = None
@@ -89,7 +129,7 @@ class _MetaCatSpecs_(object):
     def _assert_known_(self, name, errors="raise"):
         if name not in self._dict:
             if errors == "raise":
-                raise XoaMetaError(f"Invalid {self.category} Meta specs name: " + name)
+                raise exceptions.XoaMetaError(f"Invalid {self.category} specs name: " + name)
             return False
         return True
 
@@ -115,12 +155,12 @@ class _MetaCatSpecs_(object):
         ------
         dict or None
         """
-        errors = ERRORS[errors]
+        errors = misc.ERRORS[errors]
         if name not in self._dict:
             if errors == "raise":
-                raise XoaMetaError("Can't get meta specs from: " + name)
+                raise exceptions.XoaMetaError("Can't get meta specs from: " + name)
             if errors == "warn":
-                xoa_warn("Invalid meta name: " + str(name))
+                exceptions.xoa_warn("Invalid meta name: " + str(name))
             return
         return self._dict[name]
 
@@ -219,9 +259,11 @@ class _MetaCatSpecs_(object):
                 within = [within]
             for ot in within:
                 if ot not in ["coords", "data_vars"]:
-                    raise XoaMetaError("with parameter must one or a list of: coords, data_vars")
+                    raise exceptions.XoaMetaError(
+                        "with parameter must one or a list of: coords, data_vars"
+                    )
 
-        return _list_xr_names_(
+        return self._list_xr_names_(
             obj, dims=False, coords="coords" in within, data_vars="data_vars" in within
         )
 
@@ -320,8 +362,14 @@ class _MetaCatSpecs_(object):
         """
         if meta_name:
             if isinstance(meta_name, str):
-                self._assert_known_(meta_name)
-            names = [meta_name]
+                meta_name = [meta_name]
+            elif isinstance(meta_name, dict):
+                names = [meta_name]
+            else:
+                names = []
+                for name in meta_name:
+                    self._assert_known_(name)
+                    names.append(name)
         else:
             names = self.names
         for name_ in names:
@@ -340,7 +388,7 @@ class _MetaCatSpecs_(object):
                     if (
                         attr in self.sglocator.valid_attrs
                         and self.sglocator.match_attr(attr, value, ref, loc=loc)
-                    ) or match_string(value, ref, ignorecase=True):
+                    ) or misc.match_string(value, ref, ignorecase=True):
                         da.encoding["meta_name"] = name_
                         da.encoding["meta_category"] = self.category
                         return True if meta_name else name_
@@ -377,7 +425,7 @@ class _MetaCatSpecs_(object):
                     return meta_name if not explicit else True
         return None if not explicit else False
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def search(
         self, obj, meta_name=None, loc=None, get="obj", single=True, within=None, errors="raise"
     ):
@@ -422,9 +470,9 @@ class _MetaCatSpecs_(object):
         # Return result
         if not single:
             return found
-        return _check_single_(errors, found, "item", meta_name)
+        return self._check_single_(errors, found, "item", meta_name)
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def get(self, obj, meta_name, get="obj", errors="ignore"):
         """A shortcut to :meth:`search` with an explicit generic Meta name or a list of them
 
@@ -446,9 +494,9 @@ class _MetaCatSpecs_(object):
         found = []
         for meta_name in meta_names:
             found.extend(self.search(obj, meta_name, errors="ignore", single=False, get=get))
-        return _check_single_(errors, found, "item", meta_names)
+        return self._check_single_(errors, found, "item", meta_names)
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def get_attrs(
         self,
         meta_name,
@@ -899,7 +947,7 @@ class MetaCoordSpecs(_MetaCatSpecs_):
         if obj is not None:
             # Check dim validity
             if dim_loc not in obj.dims:
-                raise XoaMetaError(f"dimension '{dim}' does not belong to obj")
+                raise exceptions.XoaMetaError(f"dimension '{dim}' does not belong to obj")
 
             # Check axis from coords
             if dim in obj.indexes:
@@ -1039,7 +1087,7 @@ class MetaCoordSpecs(_MetaCatSpecs_):
                 return out, out
         return None, out
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def search_dim(self, obj, meta_arg=None, loc=None, single=True, errors="ignore"):
         """Search a dataarray/dataset for a dimension name according to its generic name or type
 
@@ -1092,10 +1140,10 @@ class MetaCoordSpecs(_MetaCatSpecs_):
 
         # Return result
         if single:
-            return _check_single_(errors, found, "dimension", meta_arg)
+            return self._check_single_(errors, found, "dimension", meta_arg)
         return found
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def search_from_dim(self, obj, dim, errors="ignore"):
         """Search a dataarray/dataset for a coordinate from a dimension name
 
@@ -1121,7 +1169,7 @@ class MetaCoordSpecs(_MetaCatSpecs_):
         get_dim_type
         """
         if dim not in obj.dims:
-            raise XoaError(f"Invalid dimension: {dim}")
+            raise exceptions.XoaMetaError(f"Invalid dimension: {dim}")
 
         # A coord with a different name
         coords = [coord for name, coord in obj.coords.items() if name != dim and dim in coord.dims]
@@ -1150,14 +1198,14 @@ class MetaCoordSpecs(_MetaCatSpecs_):
                         return coord
 
         # Nothing found
-        errors = ERRORS[errors]
+        errors = misc.ERRORS[errors]
         if errors != "ignore":
             msg = f"No dataarray coord found from dim: {dim}"
             if errors == "raise":
-                raise XoaMetaError(msg)
-            xoa_warn(msg)
+                raise exceptions.XoaMetaError(msg)
+            exceptions.xoa_warn(msg)
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def get_dims(
         self,
         obj,
@@ -1197,7 +1245,7 @@ class MetaCoordSpecs(_MetaCatSpecs_):
         get_dim_type
         """
         # Check shape
-        errors = ERRORS[errors]
+        errors = misc.ERRORS[errors]
         dims = list(obj.dims)
         ndim = len(dims)
         single_arg = isinstance(meta_args, str)
@@ -1208,9 +1256,9 @@ class MetaCoordSpecs(_MetaCatSpecs_):
                 len(meta_args)
             )
             if errors == "raise":
-                raise XoaError(msg)
+                raise exceptions.XoaMetaError(msg)
             if errors == "warn":
-                xoa_warn(msg)
+                exceptions.xoa_warn(msg)
 
         # Loop on args
         scanned = {}
@@ -1231,15 +1279,15 @@ class MetaCoordSpecs(_MetaCatSpecs_):
                     if errors != "ignore":
                         msg = f"No dimension found matching: {meta_arg}"
                         if errors == "raise":
-                            raise XoaError(msg)
-                        xoa_warn(msg)
+                            raise exceptions.XoaMetaError(msg)
+                        exceptions.xoa_warn(msg)
                     scanned[meta_arg] = None
                 else:
                     if len(dim) > 1 and errors != "ignore":
                         msg = f"Multiple candidates dimensions matching: {meta_arg}"
                         if errors == "raise":
-                            raise XoaMetaError(msg)
-                        xoa_warn(msg)
+                            raise exceptions.XoaMetaError(msg)
+                        exceptions.xoa_warn(msg)
                     scanned[meta_arg] = dim[0]
 
         values = tuple(scanned.values())
@@ -1320,7 +1368,7 @@ class MetaCoordSpecs(_MetaCatSpecs_):
                 return meta_arg
             dim = self.search_dim(obj, meta_arg)
             if not dim:
-                raise XoaMetaError(f"Invalid argument for dimension: {meta_arg}")
+                raise exceptions.XoaMetaError(f"Invalid argument for dimension: {meta_arg}")
             return dim
 
         if isinstance(dims, str):

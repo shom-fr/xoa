@@ -26,20 +26,11 @@ import os
 import pprint
 import copy
 
-from ..__init__ import xoa_warn, get_option
-from ..misc import dict_merge, ERRORS, Choices
-from ..meta_configs import META_CONFIGS, get_meta_config_file
-from .__init__ import (
-    XoaMetaError,
-    _list_xr_names_,
-    USER_META_FILE,
-    _get_cache_,
-    _INI_FILE,
-    _check_single_,
-    register_meta_specs,
-    is_registered_meta_specs,
-    assign_meta_specs,
-)
+from .. import exceptions
+from .. import options
+from .. import misc
+from . import configs
+
 from . import sglocator
 from . import categories
 
@@ -54,7 +45,7 @@ _META_DICT_MERGE_KWARGS = dict(
     unique=True,
 )
 
-ATTRS_PATCH_MODE = Choices(
+ATTRS_PATCH_MODE = misc.Choices(
     {
         "fill": "do not erase existing attributes, just fill missing ones",
         "replace": "replace existing attributes",
@@ -67,11 +58,14 @@ ATTRS_PATCH_MODE = Choices(
 def _get_cfgm_():
     """Get a :class:`~xoa.cfgm.ConfigManager` instance to manage
     coords and data_vars spécifications"""
-    meta_specs_cache = _get_cache_()
+    from . import get_cache
+
+    meta_specs_cache = get_cache()
     if "cfgm" not in meta_specs_cache:
         from ..cfgm import ConfigManager
+        from . import INI_FILE
 
-        meta_specs_cache["cfgm"] = ConfigManager(_INI_FILE)
+        meta_specs_cache["cfgm"] = ConfigManager(INI_FILE)
     return meta_specs_cache["cfgm"]
 
 
@@ -85,7 +79,7 @@ def _solve_rename_conflicts_(rename_args):
             continue
         if new_name in used:
             del rename_args[old_name]
-            xoa_warn(
+            exceptions.xoa_warn(
                 f"Cannot rename {old_name} to {new_name} since "
                 f"{used[new_name]} will also be renamed to {new_name}. Skipping..."
             )
@@ -94,7 +88,7 @@ def _solve_rename_conflicts_(rename_args):
     return rename_args
 
 
-class MetaSpecs(object):
+class MetaSpecs(categories._MetaBase_):
     """Manager for Meta specifications
 
     Meta specifications are defined here an extension of a subset of
@@ -163,12 +157,14 @@ class MetaSpecs(object):
             Use in-memory cache system?
 
         """
+        from . import get_cache
+
         # Config manager to get defaults and validation
         cfgm = _get_cfgm_()
 
         # Get it from cache if from str or MetaSpecs with registration name
         if cache is None:
-            cache = get_option("cf.cache")
+            cache = options.get_option("cf.cache")
         cache = cache and (
             (isinstance(cfg, str) and "\n" not in cfg)
             or (isinstance(cfg, dict) and "register" in cfg and cfg["register"]["name"])
@@ -179,7 +175,7 @@ class MetaSpecs(object):
                 cache_key = cfg
             elif isinstance(cfg, dict) and "register" in cfg and cfg["register"]["name"]:
                 cache_key = cfg["register"]["name"]
-            meta_cache = _get_cache_()
+            meta_cache = get_cache()
             if cache_key in meta_cache["loaded_dicts"]:
                 # a copy is needed because of the post processing
                 return copy.deepcopy(meta_cache["loaded_dicts"][cache_key])
@@ -189,8 +185,8 @@ class MetaSpecs(object):
             cfg = cfg.split("\n")
         elif isinstance(cfg, MetaSpecs):
             cfg = cfg._dict
-        elif isinstance(cfg, str) and cfg in META_CONFIGS:
-            cfg = META_CONFIGS[cfg]  # full path to internal config file
+        elif isinstance(cfg, str) and cfg in configs.META_CONFIGS:
+            cfg = configs.META_CONFIGS[cfg]  # full path to internal config file
 
         # Load, validate and convert to dict
         cfg_dict = cfgm.load(cfg).dict()
@@ -219,6 +215,8 @@ class MetaSpecs(object):
             Defaults to option boolean :xoaoption:`cf.cache`.
 
         """
+        from . import USER_META_FILE, get_meta_config_file
+
         # Get the list of validated configurations
         to_load = []
         if cfg:
@@ -236,7 +234,7 @@ class MetaSpecs(object):
         dicts = [self._load_cfg_as_dict_(cfg, cache) for cfg in to_load]
 
         # Merge them, except "register"
-        self._dict = dict_merge(*dicts, **_META_DICT_MERGE_KWARGS)
+        self._dict = misc.dict_merge(*dicts, **_META_DICT_MERGE_KWARGS)
         self._dict["register"] = dicts[0]["register"]
 
         # SG locator
@@ -419,7 +417,7 @@ class MetaSpecs(object):
                 yield item
 
             # Inherit with merging
-            entries[name] = specs = dict_merge(
+            entries[name] = specs = misc.dict_merge(
                 specs,
                 self._dict[from_cat][from_name],
                 cls=dict,
@@ -628,7 +626,7 @@ class MetaSpecs(object):
         for da in das:
             if locations.get(da.name) is True:
                 loc = None
-                for dim in _list_xr_names_(da):
+                for dim in self._list_xr_names_(da):
                     dim_loc = locations.get(dim)
                     if dim_loc is not None:
                         if loc is None:
@@ -718,7 +716,8 @@ class MetaSpecs(object):
         rename_args: dict
             Dictionary to collect rename arguments
         """
-        for cname in _list_xr_names_(obj, data_vars=False, dims=False):
+
+        for cname in self._list_xr_names_(obj, data_vars=False, dims=False):
             if cname in self.excluded_names:
                 continue
             cda = obj.coords[cname]
@@ -1097,6 +1096,8 @@ class MetaSpecs(object):
 
         # Assign meta specs
         if self.name:
+            from . import is_registered_meta_specs, register_meta_specs, assign_meta_specs
+
             if not is_registered_meta_specs(self.name):
                 register_meta_specs(self)
             obj = assign_meta_specs(obj, self.name, set_encoding=set_encoding)
@@ -1141,7 +1142,7 @@ class MetaSpecs(object):
         SGLocator.format_attr
         """
         rename_args = {}
-        names = _list_xr_names_(obj)
+        names = self._list_xr_names_(obj)
         if hasattr(obj, "name"):
             names = names.union({obj.name})
         for name in names:
@@ -1176,7 +1177,7 @@ class MetaSpecs(object):
         SGLocator.format_attr
         """
         rename_args = {}
-        names = _list_xr_names_(obj)
+        names = self._list_xr_names_(obj)
         for name in names:
             if name not in rename_args:
                 root_name, old_loc = self.sglocator.parse_attr("name", name)
@@ -1280,8 +1281,8 @@ class MetaSpecs(object):
         """
         return self.coords.match_from_name(dim, meta_name=meta_name, loc=loc)
 
-    @staticmethod
-    def get_category(da):
+    @classmethod
+    def get_category(cls, da):
         """Guess if a dataarray belongs to data_vars or coords
 
         It belongs to coords if one of its dimensions or
@@ -1295,7 +1296,7 @@ class MetaSpecs(object):
         -------
         str
         """
-        if da.name is not None and _list_xr_names_(da, data_vars=False):
+        if da.name is not None and misc.list_xr_names(da, data_vars=False):
             return "coords"
         return "data_vars"
 
@@ -1327,7 +1328,7 @@ class MetaSpecs(object):
                 return category, meta_name
         return None, None
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def search_coord(
         self,
         obj,
@@ -1390,7 +1391,7 @@ class MetaSpecs(object):
             errors=errors,
         )
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def search_dim(self, da, meta_arg=None, loc="any", errors="ignore"):
         """Search for a dimension from its type
 
@@ -1414,7 +1415,7 @@ class MetaSpecs(object):
         """
         return self.coords.search_dim(da, meta_arg=meta_arg, loc=loc, errors=errors)
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def search_coord_from_dim(self, da, dim, errors="ignore"):
         """Search a dataarray for a coordinate from a dimension name
 
@@ -1435,7 +1436,7 @@ class MetaSpecs(object):
         """
         return self.coords.search_from_dim(da, dim, errors=errors)
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def search_data_var(
         self,
         obj,
@@ -1500,7 +1501,7 @@ class MetaSpecs(object):
             errors=errors,
         )
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def search(
         self,
         obj,
@@ -1542,7 +1543,7 @@ class MetaSpecs(object):
             categories = [categories]
         else:
             categories = self.categories
-        errors = ERRORS[errors]
+        errors = misc.ERRORS[errors]
         if not single:
             found = []
         for category in categories:
@@ -1566,11 +1567,11 @@ class MetaSpecs(object):
             return found
         msg = "Search failed"
         if errors == "warn":
-            xoa_warn(msg)
+            exceptions.xoa_warn(msg)
         elif errors == "raise":
-            raise XoaMetaError(msg)
+            raise exceptions.XoaMetaError(msg)
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def get(self, obj, meta_name, get="obj", within=None, errors="ignore"):
         """A shortcut to :meth:`search` with an explicit generic meta name or a list of them
 
@@ -1598,9 +1599,9 @@ class MetaSpecs(object):
             found.extend(
                 self.search(obj, meta_name, errors="ignore", single=False, get=get, within=within)
             )
-        return _check_single_(errors, found, "item", meta_names)
+        return self._check_single_(errors, found, "item", meta_names)
 
-    @ERRORS.format_method_docstring
+    @misc.ERRORS.format_method_docstring
     def get_dims(
         self,
         da,

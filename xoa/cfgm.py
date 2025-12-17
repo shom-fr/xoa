@@ -41,7 +41,7 @@ except ImportError:
     import validate
 from configobj import ConfigObj, flatten_errors
 
-from .__init__ import XoaError, XoaWarning, xoa_warn
+from . import exceptions
 
 try:
     import numpy
@@ -49,11 +49,11 @@ except ImportError:
     numpy = None
 
 
-class VdtWarning(XoaWarning):
+class VdtWarning(exceptions.XoaWarning):
     pass
 
 
-class XoaValidateError(validate.ValidateError, XoaError):
+class XoaValidateError(validate.ValidateError, exceptions.XoaError):
     pass
 
 
@@ -781,7 +781,7 @@ class ConfigManager(object):
             else:
                 self._cfgfilter = None
             if not self._configspec and warn_empty_specs:
-                xoa_warn("Empty Config specifications after filtering")
+                exceptions.xoa_warn("Empty Config specifications after filtering")
         self._cfgfilter = cfgfilter
         self._cfgfilter_default = cfgfilter_default
         self._configspecfile = self._configspec.filename

@@ -26,9 +26,9 @@ import numpy as np
 import numba
 import xarray as xr
 
-from .__init__ import xoa_warn
+from . import exceptions
 from . import misc
-from . import cf
+from . import meta
 from . import coords as xcoords
 
 # %% Constants
@@ -56,10 +56,6 @@ SIGMA_COORDINATE_TYPES = (
     "ocean_s_coordinate_g1",
     "ocean_s_coordinate_g2",
 )
-
-
-class XoaSigmaError(cf.XoaCFError):
-    pass
 
 
 # %% Low level routines
@@ -119,12 +115,12 @@ def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask
     # Stetching curve
     if cs is None:
         if None in (thetas, thetab):
-            raise XoaSigmaError("thetas and thetab must be provided when cs is not")
+            raise exceptions.XoaSigmaError("thetas and thetab must be provided when cs is not")
         cs = get_cs(sig, thetas, thetab, cs_type)
 
     # Checks dims
     if np.ndim(hc) and set(hc.dims) != set(bathy.dims):
-        raise XoaSigmaError("Incompatible dimensions between bathy and hc")
+        raise exceptions.XoaSigmaError("Incompatible dimensions between bathy and hc")
 
     # Call core routine
     zdim = sig.dims[0]
@@ -143,7 +139,7 @@ def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask
     )
 
     # Format
-    return cf.get_cf_specs(sig).format_data_var(
+    return meta.get_meta_specs(sig).format_data_var(
         depth, "depth", format_coords=False, rename_dims=False
     )
 
@@ -187,7 +183,7 @@ def atmosphere_sigma_coordinate(sig, ps, ptop, dask="parallelized", cache=None):
     """
 
     if cache is not None:
-        xoa_warn("The `cache` parameter is currently not used.")
+        exceptions.xoa_warn("The `cache` parameter is currently not used.")
 
     # Call core routine
     zdim = sig.dims[0]
@@ -204,7 +200,9 @@ def atmosphere_sigma_coordinate(sig, ps, ptop, dask="parallelized", cache=None):
     )
 
     # Format
-    return cf.get_cf_specs(sig).format_data_var(p, "plev", format_coords=False, rename_dims=False)
+    return meta.get_meta_specs(sig).format_data_var(
+        p, "plev", format_coords=False, rename_dims=False
+    )
 
 
 def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
@@ -242,11 +240,11 @@ def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
         Negative depth below surface in m (:math:`z`)
     """
     if cache is not None:
-        xoa_warn("The `cache` parameter is currently not used.")
+        exceptions.xoa_warn("The `cache` parameter is currently not used.")
 
     # Compute
     if not set(bathy.dims) <= set(ssh.dims):
-        raise XoaSigmaError("Incompatible dimensions between bathy and ssh")
+        raise exceptions.XoaSigmaError("Incompatible dimensions between bathy and ssh")
 
     # Call core routine
     zdim = sig.dims[0]
@@ -263,7 +261,7 @@ def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
     )
 
     # Format
-    return cf.get_cf_specs(sig).format_data_var(
+    return meta.get_meta_specs(sig).format_data_var(
         depth, "depth", format_coords=False, rename_dims=False
     )
 
@@ -297,7 +295,9 @@ def get_cs(sig, thetas, thetab, cs_type=None):
     cs = cs + b * (np.tanh(a * (s + 0.5)) / (2 * np.tanh(0.5 * a)) - 0.5)
     if hasattr(cs, "coords"):
         cs.name = None
-        cs = cf.get_cf_specs(sig).format_data_var(cs, "cs", format_coords=False, rename_dims=False)
+        cs = meta.get_meta_specs(sig).format_data_var(
+            cs, "cs", format_coords=False, rename_dims=False
+        )
     return cs
 
 
@@ -363,7 +363,7 @@ def ocean_s_coordinate(
         Negative depth below surface in m (:math:`z`)
     """
     if cache is not None:
-        xoa_warn("The `cache` parameter is currently not used.")
+        exceptions.xoa_warn("The `cache` parameter is currently not used.")
 
     return _apply_ocean_s_(_ocean_s_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask)
 
@@ -436,7 +436,7 @@ def ocean_s_coordinate_g1(
         Negative depth below surface in m (:math:`z`)
     """
     if cache is not None:
-        xoa_warn("The `cache` parameter is currently not used.")
+        exceptions.xoa_warn("The `cache` parameter is currently not used.")
 
     return _apply_ocean_s_(_ocean_s_g1_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask)
 
@@ -507,7 +507,7 @@ def ocean_s_coordinate_g2(
         Negative depth below surface in m (:math:`z`)
     """
     if cache is not None:
-        xoa_warn("The `cache` parameter is currently not used.")
+        exceptions.xoa_warn("The `cache` parameter is currently not used.")
 
     return _apply_ocean_s_(_ocean_s_g2_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask)
 
@@ -568,7 +568,7 @@ def decode_formula_terms(attr):
     for item in _re_ft_split_terms(attr):
         item = _re_ft_split_item(item)
         if len(item) != 2:
-            raise XoaSigmaError("Malformed formula_terms attribute: " + attr)
+            raise exceptions.XoaSigmaError("Malformed formula_terms attribute: " + attr)
         terms[item[0]] = item[1]
     return terms
 
@@ -581,7 +581,7 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
     1. Search for the sigma variables.
     2. Parse their ``formula_terms`` attribute.
     3. Create a dict for each locations from names in datasets to
-       :mod:`xoa.cf` compliant names that are also used in conversion
+       :mod:`xoa.meta` compliant names that are also used in conversion
        functions.
 
     Parameters
@@ -598,7 +598,7 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
     dict, dict of dict, dict of dict of dict
         A dict is generated for a given sigma variable,
         whose keys are array names, like ``"sc_r"``,
-        and values are :mod:`~xoa.cf` names, like ``"sig"``.
+        and values are :mod:`~xoa.meta` names, like ``"sig"``.
         A special key is the ``"type"`` whose corresponding value
         is the ``standard_name``, stripped from its potential staggered grid
         location indicator.
@@ -609,37 +609,37 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
 
     Raises
     ------
-    xoa.sigma.XoaSigmaError
+    xoa.sigma.exceptions.XoaSigmaError
         In case of:
 
         - inconsistent staggered grid location in dataarrays
-          as checked by :meth:`xoa.cf.SGLocator.get_location`
+          as checked by :meth:`xoa.meta.SGLocator.get_location`
         - no standard_name in sigma/s variable
         - a malformed formula
         - a formula term variable that is not found in the dataset
         - an unknown formula term name
     """
     # Get sigma arrays
-    cfspecs = cf.get_cf_specs(ds)
+    meta_specs = meta.get_meta_specs(ds)
     vsingle = vloc not in ("any", None)
     hsingle = not isinstance(hlocs, list)
     if hsingle:
         hlocs = [hlocs]
-    sigs = cfspecs.search(ds, 'sig', loc=vloc, single=False)
+    sigs = meta_specs.search(ds, 'sig', loc=vloc, single=False)
     terms = {}
     for sig in sigs:
         # Check standard_name and get loc
         if "standard_name" not in sig.attrs:
-            raise XoaSigmaError(
+            raise exceptions.XoaSigmaError(
                 "No standard_name attribute found in sigma/s " "variable name: " + sig.name
             )
-        standard_name, loc = cfspecs.sglocator.parse_attr("standard_name", sig.standard_name)
+        standard_name, loc = meta_specs.sglocator.parse_attr("standard_name", sig.standard_name)
         # skip this one
         if standard_name not in SIGMA_COORDINATE_TYPES:
             continue
         # Get formula terms
         if "formula_terms" not in sig.attrs:
-            raise XoaSigmaError(
+            raise exceptions.XoaSigmaError(
                 f"Sigma/s type variable {sig.name} " "has no formula_term attribute"
             )
         formula_terms = decode_formula_terms(sig.formula_terms)
@@ -650,20 +650,20 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
             # Check terms
             subsubterms = subterms[hloc] = {sig.name: "sig", "type": standard_name}
             for fname, fvname in formula_terms.items():
-                # xoa.cf name
+                # xoa.meta name
                 # TODO: handle mising cs and fallback with thetas and thetab
                 if fname.lower() not in FORMULA_TERMS_TO_CF_NAMES:
-                    raise XoaSigmaError("Unknown formula term name: " + fname)
-                cf_name = FORMULA_TERMS_TO_CF_NAMES[fname.lower()]
+                    raise exceptions.XoaSigmaError("Unknown formula term name: " + fname)
+                meta_name = FORMULA_TERMS_TO_CF_NAMES[fname.lower()]
 
                 # Real name
-                if cf_name in HORIZONTAL_TERMS:
-                    fvname = cfspecs.sglocator.format_attr("name", fvname, hloc)
+                if meta_name in HORIZONTAL_TERMS:
+                    fvname = meta_specs.sglocator.format_attr("name", fvname, hloc)
                 vname = _ds_search_ci_(ds, fvname)
                 if vname is None:
-                    raise XoaSigmaError("Formula array not found: " + fvname)
+                    raise exceptions.XoaSigmaError("Formula array not found: " + fvname)
 
-                subsubterms[vname] = cf_name
+                subsubterms[vname] = meta_name
 
     if hsingle:
         for subterms in terms.values():
@@ -679,17 +679,17 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
     # for term_name, da_name_ in terms.items():
     #     da_name = _ds_search_ci_(ds, da_name_)
     #     if da_name is None:
-    #         xoa_warn("Formula term dataarray not found: " + da_name_)
+    #         exceptions.xoa_warn("Formula term dataarray not found: " + da_name_)
     #     ds = ds.rename({da_name: term_name})
     # return ds
 
 
 @misc.ERRORS.format_function_docstring
-def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
-    """Compute heights from sigma-like variable in a dataset
+def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
+    """Compute heights from sigma-like variable in a dataset using CF conventions
 
-    This makes use of the :meth:`~xoa.cf.CFSpecs` instance that is retreived
-    with :func:`xoa.cf.get_cf_specs` with ds as an argument in order to
+    This makes use of the :meth:`~xoa.meta.MetaSpecs` instance that is retreived
+    with :func:`xoa.meta.get_meta_specs` with ds as an argument in order to
     find needed variables.
     If the dataset is not found to have sigma-like coordinates,
     a simple copy is returned.
@@ -704,7 +704,7 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
         Dataset that contains everything needed to compute heights
     rename: bool
         Rename and format arrays ot make them compliant with
-        :mod:`xoa.cf`
+        :mod:`xoa.meta`
     hlocs: None, list of str
         Horizontal staggered grid locations to search for "bathy" and "ssh".
         By default, no location is assumed.
@@ -716,7 +716,7 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
     """
     # Init
     ds = ds.copy()
-    cfspecs = cf.get_cf_specs(ds)
+    meta_specs = meta.get_meta_specs(ds)
     errors = misc.ERRORS[errors]
 
     # Decode formula terms
@@ -724,11 +724,11 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
         all_terms = get_sigma_terms(ds, vloc=None, hlocs=hlocs)
         if all_terms is None:
             return ds
-    except XoaSigmaError as e:
+    except exceptions.XoaSigmaError as e:
         if errors == "raise":
             raise e
         if errors == "warn":
-            xoa_warn("Error while decoding sigma coords: {}. Skipping...".format(e))
+            exceptions.xoa_warn("Error while decoding sigma coords: {}. Skipping...".format(e))
         return ds
 
     # Loop on locations
@@ -741,15 +741,15 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
     for vloc, vterms in all_terms.items():
         for hloc in hlocs:
             terms = vterms if hsingle else vterms[hloc]
-            hloc = cfspecs.sglocator.parse_loc_arg(hloc)
+            hloc = meta_specs.sglocator.parse_loc_arg(hloc)
             sigma_type = terms.pop("type")
 
-            # Args: keys are cf names, values are dataarrays
+            # Args: keys are meta names, values are dataarrays
             kwargs = {}
-            for vname, cf_name in terms.items():
-                if cf_name in HORIZONTAL_TERMS:
-                    vname = cfspecs.sglocator.format_attr("name", vname, hloc)
-                kwargs[cf_name] = ds[vname]
+            for vname, meta_name in terms.items():
+                if meta_name in HORIZONTAL_TERMS:
+                    vname = meta_specs.sglocator.format_attr("name", vname, hloc)
+                kwargs[meta_name] = ds[vname]
 
             # Compute depth/altitude/pressure
             func = getattr(sigma_module, sigma_type)
@@ -759,7 +759,7 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
 
             # Format
             loc = (hloc or "") + (vloc or "")
-            height = cfspecs.sglocator.format_dataarray(height, loc)
+            height = meta_specs.sglocator.format_dataarray(height, loc)
 
             # Transpose if approriate and set as coordinate
             transposed = False
@@ -777,5 +777,12 @@ def decode_cf_sigma(ds, rename=False, hlocs=None, errors="raise"):
                 ds.coords[height.name] = height
 
     if sigma_type:
-        ds.encoding["cf_sigma_type"] = sigma_type
+        ds.encoding["xoa_sigma_type"] = sigma_type
     return ds
+
+
+def get_cf_dims(*args, **kwargs):
+    exceptions.exceptions.xoa_warn(
+        "decode_cf_sigma is deprecated. Please use decode_sigma instead.", "deprecation"
+    )
+    return decode_sigma(*args, **kwargs)

@@ -19,16 +19,14 @@ xarray-based ocean analysis library
 
 
 import os
-import re
 import warnings
-import platform
 
-from importlib.metadata import version as im_get_version
 
-from .cf_configs import CF_CONFIGS, get_cf_config_file  # noqa: F401
-from .data_samples import (
-    DATA_SAMPLES,  # noqa: F401
-    get_data_sample,
+from .exceptions import XoaError, XoaWarning, XoaDeprecationWarning, XoaConfigError  # noqa: F401
+from .meta import get_meta_config_file  # noqa: F401
+from .meta.configs import META_CONFIGS  # noqa: F401
+from .data_samples import (  # noqa: F401
+    get_data_sample,  # noqa: F401
     show_data_samples,  # noqa: F401
     open_data_sample,  # noqa: F401
 )
@@ -38,416 +36,51 @@ try:
 except ImportError:
     __version__ = "0.0.0"
 
+__all__ = [
+    "get_meta_config_file",
+    "get_data_sample",
+    "show_data_samples",
+    "open_data_sample",
+    "xoa_warn",
+    "XoaError",
+    "XoaWarning",
+    "get_default_user_config_file",
+    "load_options",
+    "get_option",
+    "set_options",
+    "show_versions",
+    "show_paths",
+    "show_info",
+    "register_accessors",
+]
 
-_RE_OPTION_MATCH = re.compile(r"^(\w+)\W(\w+)$").match
-
-#: Specifications of configuration options
-CONFIG_SPECS = """
-[cf] # cf module
-cache=boolean(default=False) # use the :mod:`~xoa.cf` in memory and file caches
-
-[plot] # plot parameters
-cmapdiv = string(default="cmo.balance") # defaut diverging colormap
-cmappos = string(default="cmo.amp")     # default positive colormap
-cmapneg = string(default="cmo.tempo_r") # default negative colormap
-cmapcyc = string(default="cmo.phase")   # default cyclic colormap
-
-"""
 
 # Directory of sample files
 _SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "_samples")
 
-_PACKAGES = [
-    "platformdirs",
-    "cartopy",
-    "cmocean",
-    "configobj",
-    "matplotlib",
-    "numpy",
-    "pandas",
-    "scipy",
-    "xarray",
-    "xesmf",
-]
-
 _XOA_CACHE = {}
 
 
-class XoaError(Exception):
-    pass
-
-
-class XoaConfigError(XoaError):
-    pass
-
-
-class XoaWarning(UserWarning):
-    pass
-
-
-class XoaDeprecationWarning(XoaWarning, DeprecationWarning):
-    pass
-
-
-def xoa_warn(message, stacklevel=2, category=None):
-    """Issue a :class:`XoaWarning` warning
-
-    Example
-    -------
-    .. ipython:: python
-        :okwarning:
-
-        @suppress
-        from xoa import xoa_warn
-        xoa_warn('Be careful!')
-    """
-    if category is None:
-        category = XoaWarning
-    elif category == "deprecation":
-        category = XoaDeprecationWarning
-    warnings.warn(message, category, stacklevel=stacklevel)
-
-
-def _get_cache_():
-    from . import _XOA_CACHE
-
-    return _XOA_CACHE
-
-
-def get_default_user_config_file():
-    """Get the default user config file name"""
-    try:
-        from platformdirs import user_config_dir
-    except ImportError:
-        from appdirs import user_config_dir
-
-        warnings.warn(
-            "appdirs is deprecated. Please install platformdirs.",
-            warnings.DeprecationWarning,
-        )
-    return os.path.join(user_config_dir("xoa"), "xoa.cfg")
-
-
-def load_options(cfgfile=None):
-    """Load specified options
-
-    Parameters
-    ----------
-    cfgfile: file, list(str), dict
-
-    Example
-    -------
-    .. ipython:: python
-
-        @suppress
-        from xoa import load_options
-        # Dict
-        load_options({'plot': {'cmappos': 'mycmap'}})
-
-        # Lines
-        optlines = "[plot]\\n cmappos=mycmap".split('\\n')
-        load_options(optlines)
-    """
-    import configobj
-    import validate
-
-    _get_cache_()
-    xoa_cache = _get_cache_()
-
-    if "cfgspecs" not in xoa_cache:
-        xoa_cache["cfgspecs"] = configobj.ConfigObj(
-            CONFIG_SPECS.split("\n"),
-            list_values=False,
-            interpolation=False,
-            raise_errors=True,
-            file_error=True,
-        )
-    if "options" not in xoa_cache:
-        default_user_config_file = get_default_user_config_file()
-        xoa_cache["options"] = configobj.ConfigObj(
-            (
-                default_user_config_file
-                if os.path.exists(default_user_config_file)
-                else None
-            ),
-            configspec=xoa_cache["cfgspecs"],
-            file_error=False,
-            raise_errors=True,
-            list_values=True,
-        )
-    if cfgfile:
-        xoa_cache["options"].merge(
-            configobj.ConfigObj(
-                cfgfile, file_error=True, raise_errors=True, list_values=True
-            )
-        )
-    xoa_cache["options"].validate(validate.Validator(), copy=True)
-
-
-def _get_options_():
-    xoa_cache = _get_cache_()
-    if "options" not in xoa_cache:
-        load_options()
-    return xoa_cache["options"]
-
-
-def get_option(section, option=None):
-    """Get a config option
-
-    Example
-    -------
-    .. ipython:: python
-
-        @suppress
-        from xoa import get_option
-        print(get_option('plot', 'cmapdiv'))
-        print(get_option('plot.cmapdiv'))
-    """
-    options = _get_options_()
-    if option is None:
-        m = _RE_OPTION_MATCH(section)
-        if m:
-            section, option = m.groups()
-        else:
-            raise XoaConfigError(
-                "You must provide an option name to get_option"
-            )
-    try:
-        value = options[section][option]
-    except Exception:
-        return XoaConfigError(f"Invalid section/option: {section}/{option}")
-    return value
-
-
-class set_options(object):
-    """Set configuration options
-
-    Parameters
-    ----------
-    section: str, None
-    **options: dict
-        If a key is in the format "<section>.<option>", then the section
-        is overwritten.
-
-
-    Example
-    -------
-    .. ipython:: python
-
-        @suppress
-        from xoa import set_options, get_option
-
-        # Classic: for the session
-        set_options('plot', cmapdiv='cmo.balance', cmappos='cmo.amp')
-
-        # With dict
-        opts = {"plot.cmapdiv": "cmo.balance"}
-        set_options(**opts)
-
-        # Context: temporary
-        with set_options('plot', cmapdiv='cmo.delta'):
-            print('within context:', get_option('plot.cmapdiv'))
-        print('after context:', get_option('plot.cmapdiv'))
-
-    """
-
-    def __init__(self, section=None, **options):
-        # Format before being ingested
-        self.xoa_cache = _get_cache_()
-        self.old_options = self.xoa_cache.get("options")
-        if "options" in self.xoa_cache:
-            del self.xoa_cache["options"]
-        opts = {}
-        for option, value in options.items():
-            m = _RE_OPTION_MATCH(option)
-            if m:
-                sec, option = m.groups()
-            else:
-                if section is None:
-                    raise XoaConfigError(
-                        "You must specify the section explicitly or through the option name"
-                    )
-                sec = section
-            opts.setdefault(sec, {})[option] = value
-
-        # Ingest options
-        load_options(opts)
-
-    def __enter__(self):
-        return self.xoa_cache["options"]
-
-    def __exit__(self, type, value, traceback):
-        if self.old_options:
-            self.xoa_cache["options"] = self.old_options
-        else:
-            del self.xoa_cache["options"]
-
-
-def set_option(option, value):
-    """Set a single option using the flat format, i.e ``section.option``
-
-    Parameters
-    ----------
-    option: str
-        Option name in the ``section.option`` format
-    value:
-        Value to set
-
-    Example
-    -------
-    .. ipython:: python
-
-        @suppress
-        from xoa import set_option
-        set_option('plot.cmapdiv', 'cmo.balance');
-    """
-    return set_options(None, **{option: value})
-
-
-def reset_options():
-    """Restore options to their default values in the current session
-
-    Example
-    -------
-    .. ipython:: python
-
-        @suppress
-        from xoa import get_option, set_options, reset_options
-        print(get_option('plot.cmapdiv'))
-        set_options('plot', cmapdiv='mycmap')
-        print(get_option('plot.cmapdiv'))
-        reset_options()
-        print(get_option('plot.cmapdiv'))
-    """
-    xoa_cache = _get_cache_()
-    del xoa_cache["options"]
-
-
-def show_options(specs=False):
-    """Print current xoa configuration
-
-    Parameters
-    ----------
-    specs: bool
-        Print option specifications instead
-
-    Example
-    -------
-    .. ipython:: python
-
-        @suppress
-        from xoa import show_options
-        show_options()
-        show_options(specs=True)
-    """
-    if specs:
-        print(CONFIG_SPECS.strip("\n"))
-    else:
-        print(
-            "\n".join(_get_options_().write()).strip("\n").replace("#", " #")
-        )
-
-
-def _parse_requirements_(reqfile):
-    re_match_specs_match = re.compile(r"^(\w+)(\W+.+)?$").match
-    reqs = {}
-    with open(reqfile) as f:
-        for line in f:
-            line = line.strip().strip("\n")
-            if line and not line.startswith("#"):
-                m = re_match_specs_match(line)
-                if m:
-                    reqs[m.group(1)] = m.group(2)
-    return reqs
-
-
-def show_versions():
-    """Print the versions of xoa and of some dependencies
-
-    Example
-    -------
-    .. ipython:: python
-        :okexcept:
-
-        @suppress
-        from xoa import show_versions
-        show_versions()
-    """
-    print("- python:", platform.python_version())
-    print("- xoa:", __version__)
-    for package in _PACKAGES:
-        try:
-            version = im_get_version(package)
-        except Exception:
-            version = "NOT INSTALLED or UKNOWN"
-        print(f"- {package}: {version}")
-
-
-def show_paths():
-    """Print some xoa paths
-
-    Example
-    -------
-    .. ipython:: python
-        :okexcept:
-
-        @suppress
-        from xoa import show_paths
-        show_paths()
-    """
-    print("- xoa library dir:", os.path.dirname(__file__))
-    from . import cf
-
-    asterix = False
-    default_user_config_file = get_default_user_config_file()
-    for label, path in [
-        ("user config file", default_user_config_file),
-        ("user CF specs file", cf.USER_CF_FILE),
-        ("user CF cache file", cf.USER_CF_CACHE_FILE),
-    ]:
-        if not os.path.exists(path):
-            asterix = True
-            path = path + " [*]"
-        print("-", label + ":", path)
-    print("- data samples:", " ".join(get_data_sample()))
-    if asterix:
-        print("*: file not present")
-
-
-def show_info(opt_specs=True):
-    """Print xoa related info
-
-    Example
-    -------
-    .. ipython:: python
-        :okexcept:
-
-        @suppress
-        from xoa import show_info
-        show_info()
-    """
-    print("# VERSIONS")
-    show_versions()
-    print("\n# FILES AND DIRECTORIES")
-    show_paths()
-    print("\n# OPTIONS")
-    show_options(specs=opt_specs)
-
-
-def register_accessors(xoa=True, xcf=False, decode_sigma=False):
+def register_accessors(xoa=True, xcf=False, xmeta=False, decode_sigma=False):
     """Register xarray accessors
 
     Parameters
     ----------
     xoa: bool, str
         Register the main accessors with
-        :func:`~xoa.cf.register_xoa_accessors`.
+        :func:`~xoa.meta.register_xoa_accessors`.
     xcf: bool, str
-        Register the :mod:`xoa.cf` module accessors with
-        :func:`~xoa.cf.register_cf_accessors`.
+        Register the :mod:`xoa.meta` module accessors with
+        :func:`~xoa.meta.register_meta_accessors` using the deprecated name "xcf".
+
+        .. deprecated::
+            Use ``xmeta`` instead.
+    xmeta: bool, str
+        Register the :mod:`xoa.meta` module accessors with
+        :func:`~xoa.meta.register_meta_accessors`.
     decode_sigma: bool, str
         Register the :mod:`xoa.sigma` module accessor with
-        :func:`~xoa.cf.register_sigma_accessor`.
+        :func:`~xoa.meta.register_sigma_accessor`.
 
     See also
     --------
@@ -459,10 +92,23 @@ def register_accessors(xoa=True, xcf=False, decode_sigma=False):
         kw = {"name": xoa} if isinstance(xoa, str) else {}
         register_xoa_accessors(**kw)
     if xcf:
-        from .accessors import register_cf_accessors
+        from .accessors import register_meta_accessors
 
+        warnings.warn(
+            "The 'xcf' parameter is deprecated. Use 'xmeta' instead.",
+            XoaDeprecationWarning,
+            stacklevel=2,
+        )
         kw = {"name": xcf} if isinstance(xcf, str) else {}
-        register_cf_accessors(**kw)
+        # Register with "xcf" name for backward compatibility
+        if not kw:
+            kw = {"name": "xcf"}
+        register_meta_accessors(**kw)
+    if xmeta:
+        from .accessors import register_meta_accessors
+
+        kw = {"name": xmeta} if isinstance(xmeta, str) else {}
+        register_meta_accessors(**kw)
     if decode_sigma:
         from .accessors import register_sigma_accessor
 

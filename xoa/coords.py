@@ -20,9 +20,9 @@ from collections.abc import Mapping
 
 import xarray as xr
 
-from .__init__ import XoaError, xoa_warn
+from . import exceptions
 from . import misc
-from . import cf as xcf
+from . import meta
 
 
 @misc.ERRORS.format_function_docstring
@@ -34,7 +34,7 @@ def get_lon(da, errors="raise", **kwargs):
     da: xarray.DataArray
     {errors}
     kwargs:
-        Extra parameters are passed to :meth:`xoa.cf.CFSpecs.search`
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
 
     Return
     ------
@@ -48,9 +48,9 @@ def get_lon(da, errors="raise", **kwargs):
     get_level
     get_vertical
     get_time
-    xoa.cf.CFSpecs.search
+    xoa.meta.MetaSpecs.search
     """
-    return xcf.get_cf_specs(da).search(da, 'lon', errors=errors, **kwargs)
+    return meta.get_meta_specs(da).search(da, 'lon', errors=errors, **kwargs)
 
 
 def is_lon(da, loc="any"):
@@ -71,9 +71,9 @@ def is_lon(da, loc="any"):
     is_altitude
     is_level
     is_time
-    xoa.cf.CFCoordSpecs.match
+    xoa.meta.MetaCoordSpecs.match
     """
-    return xcf.get_cf_specs(da).coords.match(da, "lon", loc=loc)
+    return meta.get_meta_specs(da).coords.match(da, "lon", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -84,7 +84,7 @@ def get_lat(da, errors="raise", **kwargs):
     ----------
     {errors}
     kwargs:
-        Extra parameters are passed to :meth:`xoa.cf.CFSpecs.search`
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
 
     Return
     ------
@@ -98,9 +98,9 @@ def get_lat(da, errors="raise", **kwargs):
     get_level
     get_vertical
     get_time
-    xoa.cf.CFSpecs.search
+    xoa.meta.MetaSpecs.search
     """
-    return xcf.get_cf_specs(da).search(da, 'lat', errors=errors, **kwargs)
+    return meta.get_meta_specs(da).search(da, 'lat', errors=errors, **kwargs)
 
 
 def is_lat(da, loc="any"):
@@ -121,9 +121,9 @@ def is_lat(da, loc="any"):
     is_altitude
     is_level
     is_time
-    xoa.cf.CFCoordSpecs.match
+    xoa.meta.MetaCoordSpecs.match
     """
-    return xcf.get_cf_specs(da).coords.match(da, "lat", loc=loc)
+    return meta.get_meta_specs(da).coords.match(da, "lat", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -137,7 +137,7 @@ def get_depth(da, errors="raise", **kwargs):
     ----------
     {errors}
     kwargs:
-        Extra parameters are passed to :meth:`xoa.cf.CFSpecs.search`
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
 
     Return
     ------
@@ -151,44 +151,44 @@ def get_depth(da, errors="raise", **kwargs):
     get_altitude
     get_level
     get_vertical
-    xoa.cf.CFSpecs.search
-    xoa.sigma.decode_cf_sigma
-    xoa.grid.decode_cf_dz2depth
+    xoa.meta.MetaSpecs.search
+    xoa.sigma.decode_meta_sigma
+    xoa.grid.decode_meta_dz2depth
     """
-    cfspecs = xcf.get_cf_specs(da)
+    metaspecs = meta.get_meta_specs(da)
     errors = misc.ERRORS[errors]
-    ztype = cfspecs["vertical"]["type"]
+    ztype = metaspecs["vertical"]["type"]
 
     # From variable
-    depth = cfspecs.search(da, 'depth', errors="ignore", **kwargs)
+    depth = metaspecs.search(da, 'depth', errors="ignore", **kwargs)
     if depth is not None:
         return depth
     if ztype == "z" or not hasattr(da, "data_vars"):  # explicitly
         msg = "No depth coordinate found"
         if errors == "raise":
-            raise XoaError(msg)
-        xoa_warn(msg)
+            raise exceptions.XoaCoordsError(msg)
+        exceptions.xoa_warn(msg)
         return
 
     # Decode the dataset
     if ztype == "sigma" or ztype is None:
         err = "ignore" if ztype is None else errors
-        from .sigma import decode_cf_sigma
+        from .sigma import decode_meta_sigma
 
-        da = decode_cf_sigma(da, errors=err)
+        da = decode_meta_sigma(da, errors=err)
         if "depth" in da:
             return da.depth
     if ztype == "dz2depth" or ztype is None:
         err = "ignore" if ztype is None else errors
-        from .grid import decode_cf_dz2depth
+        from .grid import decode_meta_dz2depth
 
-        da = decode_cf_dz2depth(da, errors=err)
+        da = decode_meta_dz2depth(da, errors=err)
         if "depth" in da:
             return da.depth
     msg = "Can't infer depth coordinate from dataset"
     if errors == "raise":
-        raise XoaError(msg)
-    xoa_warn(msg)
+        raise exceptions.XoaCoordsError(msg)
+    exceptions.xoa_warn(msg)
 
 
 def is_depth(da, loc="any"):
@@ -209,9 +209,9 @@ def is_depth(da, loc="any"):
     is_altitude
     is_level
     is_time
-    xoa.cf.CFCoordSpecs.match
+    xoa.meta.MetaCoordSpecs.match
     """
-    return xcf.get_cf_specs(da).coords.match(da, "depth", loc=loc)
+    return meta.get_meta_specs(da).coords.match(da, "depth", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -222,7 +222,7 @@ def get_altitude(da, errors="raise", **kwargs):
     ----------
     {errors}
     kwargs:
-        Extra parameters are passed to :meth:`xoa.cf.CFSpecs.search`
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
 
     Return
     ------
@@ -236,10 +236,10 @@ def get_altitude(da, errors="raise", **kwargs):
     get_level
     get_vertical
     get_time
-    xoa.cf.CFSpecs.search
+    xoa.meta.MetaSpecs.search
     """
-    da = xcf.infer_coords(da)
-    return xcf.get_cf_specs(da).search(da, 'altitude', errors=errors, **kwargs)
+    da = meta.infer_coords(da)
+    return meta.get_meta_specs(da).search(da, 'altitude', errors=errors, **kwargs)
 
 
 def is_altitude(da, loc="any"):
@@ -260,10 +260,10 @@ def is_altitude(da, loc="any"):
     is_depth
     is_level
     is_time
-    xoa.cf.CFCoordSpecs.match
+    xoa.meta.MetaCoordSpecs.match
     """
-    da = xcf.infer_coords(da)
-    return xcf.get_cf_specs(da).coords.match(da, "altitude", loc=loc)
+    da = meta.infer_coords(da)
+    return meta.get_meta_specs(da).coords.match(da, "altitude", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -274,7 +274,7 @@ def get_level(da, errors="raise", *kwargs):
     ----------
     {errors}
     kwargs:
-        Extra parameters are passed to :meth:`xoa.cf.CFSpecs.search`
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
 
     Return
     ------
@@ -287,9 +287,9 @@ def get_level(da, errors="raise", *kwargs):
     get_depth
     get_altitude
     get_time
-    xoa.cf.CFSpecs.search
+    xoa.meta.MetaSpecs.search
     """
-    return xcf.get_cf_specs(da).coords.search(da, 'level', errors=errors, **kwargs)
+    return meta.get_meta_specs(da).coords.search(da, 'level', errors=errors, **kwargs)
 
 
 def is_level(da, loc="any"):
@@ -310,9 +310,9 @@ def is_level(da, loc="any"):
     is_depth
     is_altitude
     is_time
-    xoa.cf.CFCoordSpecs.match
+    xoa.meta.MetaCoordSpecs.match
     """
-    return xcf.get_cf_specs(da).coords.match(da, "levels", loc=loc)
+    return meta.get_meta_specs(da).coords.match(da, "levels", loc=loc)
 
 
 @misc.ERRORS.format_function_docstring
@@ -323,7 +323,7 @@ def get_vertical(da, errors="raise", **kwargs):
     ----------
     {errors}
     kwargs:
-        Extra parameters are passed to :meth:`xoa.cf.CFSpecs.search`
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
 
     Return
     ------
@@ -337,19 +337,19 @@ def get_vertical(da, errors="raise", **kwargs):
     get_altitude
     get_level
     get_time
-    xoa.cf.CFSpecs.search
+    xoa.meta.MetaSpecs.search
     """
-    cfspecs = xcf.get_cf_specs()
-    height = cfspecs.search(da, 'depth', errors="ignore", **kwargs)
+    metaspecs = meta.get_meta_specs()
+    height = metaspecs.search(da, 'depth', errors="ignore", **kwargs)
     if height is None:
-        height = cfspecs.search(da, 'altitude', errors="ignore", **kwargs)
+        height = metaspecs.search(da, 'altitude', errors="ignore", **kwargs)
     if height is None:
         errors = misc.ERRORS[errors]
         msg = "No vertical coordinate found"
         if errors == "raise":
-            raise xcf.XoaCFError(msg)
+            raise meta.XoaCoordsError(msg)
         elif errors == "warn":
-            xoa_warn(msg)
+            exceptions.xoa_warn(msg)
     else:
         return height
 
@@ -362,7 +362,7 @@ def get_time(da, errors="raise", **kwargs):
     ----------
     {errors}
     kwargs:
-        Extra parameters are passed to :meth:`xoa.cf.CFSpecs.search`
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
 
     Return
     ------
@@ -376,9 +376,9 @@ def get_time(da, errors="raise", **kwargs):
     get_altitude
     get_level
     get_vertical
-    xoa.cf.CFSpecs.search
+    xoa.meta.MetaSpecs.search
     """
-    return xcf.get_cf_specs(da).coords.search(da, 'time', errors=errors, **kwargs)
+    return meta.get_meta_specs(da).coords.search(da, 'time', errors=errors, **kwargs)
 
 
 def is_time(da):
@@ -399,21 +399,21 @@ def is_time(da):
     is_depth
     is_altitude
     is_level
-    xoa.cf.CFCoordSpecs.match
+    xoa.meta.MetaCoordSpecs.match
     """
-    da = xcf.infer_coords(da)
-    return xcf.get_cf_specs(da).match(da, "time")
+    da = meta.infer_coords(da)
+    return meta.get_meta_specs(da).match(da, "time")
 
 
 @misc.ERRORS.format_function_docstring
-def get_cf_coords(da, coord_names, errors="raise", **kwargs):
+def get_meta_coords(da, coord_names, errors="raise", **kwargs):
     """Get several coordinates
 
     Parameters
     ----------
     {errors}
     kwargs:
-        Extra parameters are passed to :meth:`xoa.cf.CFSpecs.search`
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
 
     Return
     ------
@@ -421,24 +421,32 @@ def get_cf_coords(da, coord_names, errors="raise", **kwargs):
 
     See also
     --------
-    xoa.cf.CFSpecs.search_coord
+    xoa.meta.MetaSpecs.search_coord
     """
-    da = xcf.infer_coords(da)
-    cfspecs = xcf.get_cf_specs(da)
+    da = meta.infer_coords(da)
+    metaspecs = meta.get_meta_specs(da)
     return [
-        cfspecs.search_coord(da, coord_name, errors=errors, **kwargs) for coord_name in coord_names
+        metaspecs.search_coord(da, coord_name, errors=errors, **kwargs)
+        for coord_name in coord_names
     ]
 
 
+def get_cf_coords(*args, **kwargs):
+    exceptions.exceptions.xoa_warn(
+        "get_meta_coords is deprecated. Please use get_meta_coords instead.", "deprecation"
+    )
+    return get_meta_coords(*args, **kwargs)
+
+
 @misc.ERRORS.format_function_docstring
-def get_cf_dims(da, cf_args, allow_positional=False, positions='tzyx', errors="warn", **kwargs):
+def get_meta_dims(da, meta_args, allow_positional=False, positions='tzyx', errors="warn", **kwargs):
     """Get the data array dimensions names from their type
 
     Parameters
     ----------
     da: xarray.DataArray
         Array to scan
-    cf_args: str, list
+    meta_args: str, list
         Letters among "x", "y", "z", "t" and "f",
         or generic CF names.
     allow_positional: bool
@@ -447,7 +455,7 @@ def get_cf_dims(da, cf_args, allow_positional=False, positions='tzyx', errors="w
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :meth:`xoa.cf.CFSpecs.get_dims` in addition to
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.get_dims` in addition to
         the above parameters.
 
     Return
@@ -457,12 +465,24 @@ def get_cf_dims(da, cf_args, allow_positional=False, positions='tzyx', errors="w
 
     See also
     --------
-    xoa.cf.CFSpecs.get_dims
+    xoa.meta.MetaSpecs.get_dims
     """
-    da = xcf.infer_coords(da)
-    return xcf.get_cf_specs(da).get_dims(
-        da, cf_args, allow_positional=allow_positional, positions=positions, errors=errors, **kwargs
+    da = meta.infer_coords(da)
+    return meta.get_meta_specs(da).get_dims(
+        da,
+        meta_args,
+        allow_positional=allow_positional,
+        positions=positions,
+        errors=errors,
+        **kwargs,
     )
+
+
+def get_cf_dims(*args, **kwargs):
+    exceptions.exceptions.xoa_warn(
+        "get_meta_meta is deprecated. Please use get_meta_dims instead.", "deprecation"
+    )
+    return get_meta_dims(*args, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring
@@ -479,7 +499,7 @@ def get_xdim(da, errors="warn", **kwargs):
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :func:`get_cf_dims`
+        Extra parameters are passed to :func:`get_meta_dims`
 
     Return
     ------
@@ -490,7 +510,7 @@ def get_xdim(da, errors="warn", **kwargs):
     --------
     get_dims
     """
-    return get_cf_dims(da, "x", errors=errors, **kwargs)
+    return get_meta_dims(da, "x", errors=errors, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring
@@ -507,7 +527,7 @@ def get_ydim(da, errors="warn", **kwargs):
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :func:`get_cf_dims`
+        Extra parameters are passed to :func:`get_meta_dims`
 
     Return
     ------
@@ -518,7 +538,7 @@ def get_ydim(da, errors="warn", **kwargs):
     --------
     get_dims
     """
-    return get_cf_dims(da, "y", errors=errors, **kwargs)
+    return get_meta_dims(da, "y", errors=errors, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring
@@ -535,7 +555,7 @@ def get_zdim(da, errors="warn", **kwargs):
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :func:`get_cf_dims`
+        Extra parameters are passed to :func:`get_meta_dims`
 
     Return
     ------
@@ -544,9 +564,9 @@ def get_zdim(da, errors="warn", **kwargs):
 
     See also
     --------
-    get_cf_dims
+    get_meta_dims
     """
-    return get_cf_dims(da, "z", errors=errors, **kwargs)
+    return get_meta_dims(da, "z", errors=errors, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring
@@ -563,7 +583,7 @@ def get_tdim(da, errors="warn", **kwargs):
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :func:`get_cf_dims`
+        Extra parameters are passed to :func:`get_meta_dims`
 
     Return
     ------
@@ -572,9 +592,9 @@ def get_tdim(da, errors="warn", **kwargs):
 
     See also
     --------
-    get_cf_dims
+    get_meta_dims
     """
-    return get_cf_dims(da, "t", errors=errors, **kwargs)
+    return get_meta_dims(da, "t", errors=errors, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring
@@ -591,7 +611,7 @@ def get_fdim(da, errors="warn", **kwargs):
         Default position per type starting from the end.
     {errors}
     kwargs: dict
-        Extra parameters are passed to :func:`get_cf_dims`
+        Extra parameters are passed to :func:`get_meta_dims`
 
     Return
     ------
@@ -600,9 +620,9 @@ def get_fdim(da, errors="warn", **kwargs):
 
     See also
     --------
-    get_cf_dims
+    get_meta_dims
     """
-    return get_cf_dims(da, "f", errors=errors, **kwargs)
+    return get_meta_dims(da, "f", errors=errors, **kwargs)
 
 
 class transpose_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
@@ -698,7 +718,7 @@ def transpose(da, dims, mode='compat'):
             odims += (dim,)
         elif mode == "resize":
             if sizes is None or dim not in sizes:
-                xoa_warn(
+                exceptions.xoa_warn(
                     f"new dim '{dim}' in transposition is set to one"
                     " since no size is provided to it"
                 )
@@ -740,7 +760,7 @@ def get_dim_types(da, unknown=None, asdict=False):
     ------
     tuple
     """
-    return xcf.get_cf_specs(da).coords.get_dim_types(da, unknown=unknown, asdict=asdict)
+    return meta.get_meta_specs(da).coords.get_dim_types(da, unknown=unknown, asdict=asdict)
 
 
 def get_order(da):
@@ -783,7 +803,7 @@ def reorder(da, order):
                 to_dims = (dim,) + to_dims
                 break
         else:
-            raise XoaError(f"Coordinate type not found: {o}. Dims are: {da.dims}")
+            raise exceptions.XoaCoordsError(f"Coordinate type not found: {o}. Dims are: {da.dims}")
 
     # Final transpose
     return transpose(da, to_dims)
@@ -882,7 +902,7 @@ def get_positive_attr(da, zdim=None):
     """
     # Targets
     if zdim is None:
-        zdim = get_cf_dims(da, "z", errors="ignore")
+        zdim = get_meta_dims(da, "z", errors="ignore")
         if zdim:
             zdim = zdim[0]
     if zdim and zdim in da.coords:
@@ -898,9 +918,9 @@ def get_positive_attr(da, zdim=None):
             positive = target.attrs["positive"]
             return positive_attr[positive].name
 
-    # Fall back to current CFSpecs
-    cfspecs = xcf.get_cf_specs(da)
-    return cfspecs["vertical"]["positive"]
+    # Fall back to current MetaSpecs
+    metaspecs = meta.get_meta_specs(da)
+    return metaspecs["vertical"]["positive"]
 
 
 def get_binding_data_vars(ds, coord, as_names=False):
@@ -976,7 +996,7 @@ def geo_stack(
             lat = obj.lat
 
         else:
-            xoa_warn(
+            exceptions.xoa_warn(
                 "Cannot rename lon and lat coordinates since "
                 "they are component of a MultiIndex. "
                 "Pass reset_index=True to allow it."
