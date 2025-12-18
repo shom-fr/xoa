@@ -4,7 +4,7 @@
 xarray and pandas xoa accessors
 
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2026 Shom
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -779,7 +779,7 @@ def register_accessors(xoa=True, xcf=False, xmeta=False, decode_sigma=False):
     if xcf:
         from .accessors import register_meta_accessors
 
-        exceptions.woa_warn(
+        exceptions.xoa_warn(
             "The 'xcf' parameter is deprecated. Use 'xmeta' instead.",
             "deprecation",
             stacklevel=2,
