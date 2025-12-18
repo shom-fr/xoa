@@ -25,6 +25,7 @@ from . import exceptions
 from . import misc as xmisc
 from . import coords as xcoords
 from . import geo as xgeo
+from .core import geo as core_geo
 
 HOURLY_TIDAL_FILTERS_WEIGHTS = {
     "demerliac": [
@@ -1044,7 +1045,7 @@ def _get_decimate_arg_(lons, lats, radius):
 
     See also
     --------
-    xoa.geo.haversine
+    xoa.core.geo.haversine
     decimate
     """
     npts = lons.size
@@ -1052,7 +1053,7 @@ def _get_decimate_arg_(lons, lats, radius):
     for i in range(1, npts):
         for j in range(i):
             if keep[j]:
-                dist = xgeo._haversine_(lons[i], lats[i], lons[j], lats[j])
+                dist = core_geo.haversine(lons[i], lats[i], lons[j], lats[j])
                 if dist < radius:
                     keep[i] = False
                     break
@@ -1069,7 +1070,7 @@ def _decimate_by_average_(lons, lats, radius, keep, data):
     for i in numba.prange(npts):
         if keep[i]:
             for j in range(npts):
-                dist = xgeo._haversine_(lons[i], lats[i], lons[j], lats[j])
+                dist = core_geo.haversine(lons[i], lats[i], lons[j], lats[j])
                 if dist <= radius:
                     cdata[..., k] += data[..., j]
                     ccount[k] += 1.0
