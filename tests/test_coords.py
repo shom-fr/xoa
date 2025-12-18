@@ -37,44 +37,38 @@ class TestTranspose:
         assert dao.shape == outshape
 
 
-class TestCoordinateIdentification:
+def test_is_lon():
     """Test coordinate identification functions"""
+    x = xr.DataArray([5], dims="lon", name="lon")
+    y = xr.DataArray([5], dims="lat")
+    temp = xr.DataArray(np.ones((1, 1)), dims=('lat', 'lon'), coords={'lon': x, 'lat': y})
 
-    def test_is_lon(self):
-        x = xr.DataArray([5], dims="lon", name="lon")
-        y = xr.DataArray([5], dims="lat")
-        temp = xr.DataArray(np.ones((1, 1)), dims=('lat', 'lon'), coords={'lon': x, 'lat': y})
-
-        assert coords.is_lon(x)
-        assert coords.is_lon(temp.lon)
-        assert not coords.is_lon(temp.lat)
+    assert coords.is_lon(x)
+    assert coords.is_lon(temp.lon)
+    assert not coords.is_lon(temp.lat)
 
 
-class TestDepth:
+def test_get_depth_from_variable():
     """Test depth coordinate functions"""
-
-    def test_get_depth_from_variable(self):
-        da = xr.DataArray(
-            np.ones((2, 3)),
-            dims=("depth", "lon"),
-            coords={"depth": ("depth", [0, 1]), "lon": [1, 2, 3]},
-        )
-        depth = coords.get_depth(da)
-        assert depth is not None
-        np.testing.assert_allclose(depth.values, [0, 1])
+    da = xr.DataArray(
+        np.ones((2, 3)),
+        dims=("depth", "lon"),
+        coords={"depth": ("depth", [0, 1]), "lon": [1, 2, 3]},
+    )
+    depth = coords.get_depth(da)
+    assert depth is not None
+    np.testing.assert_allclose(depth.values, [0, 1])
 
 
-class TestStacking:
+def test_geo_stack():
     """Test coordinate stacking functions"""
+    ds = xr.Dataset(
+        {"temp": (("depth", "lat", "lon"), np.ones((2, 3, 4)))},
+        coords={"depth": [0, 1], "lat": [40, 41, 42], "lon": [-10, -9, -8, -7]},
+    )
+    dss = coords.geo_stack(ds, "npts")
+    assert dss.temp.dims == ("depth", "npts")
+    assert dss.temp.lon.shape == dss.temp.shape[1:]
 
-    def test_geo_stack(self):
-        ds = xr.Dataset(
-            {"temp": (("depth", "lat", "lon"), np.ones((2, 3, 4)))},
-            coords={"depth": [0, 1], "lat": [40, 41, 42], "lon": [-10, -9, -8, -7]},
-        )
-        dss = coords.geo_stack(ds, "npts")
-        assert dss.temp.dims == ("depth", "npts")
-        assert dss.temp.lon.shape == dss.temp.shape[1:]
-
-        tempc = coords.geo_stack(ds.temp, "npts")
-        xr.testing.assert_equal(tempc, dss.temp)
+    tempc = coords.geo_stack(ds.temp, "npts")
+    xr.testing.assert_equal(tempc, dss.temp)

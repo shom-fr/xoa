@@ -51,7 +51,7 @@ def _get_sea_level_variant_(variant):
     return variant
 
 
-@xmisc.ERRORS.format_function_docstring
+@SEA_LEVEL_VARIANTS.format_function_docstring
 def get_sea_level(ds, variant=None, errors="ignore"):
     """Try to find a unique sea level variable in a dataset
 

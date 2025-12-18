@@ -31,75 +31,67 @@ def get_da():
     return da
 
 
-class TestGridCenters:
+def test_get_centers():
     """Test grid center calculation"""
-
-    def test_get_centers(self):
-        da = get_da()
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", ".*cf.*")
-            dac = grid.get_centers(da, dim=("y", "x"))
-        assert dac.shape == (da.shape[0], da.shape[1] - 1, da.shape[2] - 1)
-        assert dac.x[0] == 0.5
-        assert dac.y[0] == 0.5
-        assert dac.lon[0, 0] == 1.0
-        assert dac.lat[0, 0] == 1.5
-        assert dac.dep[-1, 0, 0] == 250
-        assert dac[0, 0, 0] == 0.5
-        assert dac.name == 'sst'
-        assert dac.long_name == "SST"
-        assert dac.encoding["cfspecs"] == "croco"
+    da = get_da()
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        dac = grid.get_centers(da, dim=("y", "x"))
+    assert dac.shape == (da.shape[0], da.shape[1] - 1, da.shape[2] - 1)
+    assert dac.x[0] == 0.5
+    assert dac.y[0] == 0.5
+    assert dac.lon[0, 0] == 1.0
+    assert dac.lat[0, 0] == 1.5
+    assert dac.dep[-1, 0, 0] == 250
+    assert dac[0, 0, 0] == 0.5
+    assert dac.name == 'sst'
+    assert dac.long_name == "SST"
+    assert dac.encoding["cfspecs"] == "croco"
 
 
-class TestGridPadding:
+def test_pad():
     """Test grid padding operations"""
-
-    def test_pad(self):
-        da = get_da()
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", ".*cf.*")
-            warnings.filterwarnings("error", ".*ist-or-tuple.*")
-            dap = grid.pad(da, {"y": 1, "x": 1}, name_kwargs={'dep': {"mode": 'edge'}})
-        assert dap.shape == (da.shape[0], da.shape[1] + 2, da.shape[2] + 2)
-        assert dap.x[0] == -1
-        assert dap.x[-1] == da.sizes['x']
-        assert dap.y[0] == -1
-        assert dap.y[-1] == da.sizes['y']
-        assert dap.lon[0, 0] == -2
-        assert dap.lat[0, 0] == -3
-        assert dap.dep[-1, 0, 0] == da.dep[-1, 0, 0]
-        assert dap[-1, 0, 0] == da[-1, 0, 0]
-        assert dap.name == 'sst'
-        assert dap.long_name == "SST"
-        assert dap.encoding["cfspecs"] == "croco"
+    da = get_da()
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        warnings.filterwarnings("error", ".*ist-or-tuple.*")
+        dap = grid.pad(da, {"y": 1, "x": 1}, name_kwargs={'dep': {"mode": 'edge'}})
+    assert dap.shape == (da.shape[0], da.shape[1] + 2, da.shape[2] + 2)
+    assert dap.x[0] == -1
+    assert dap.x[-1] == da.sizes['x']
+    assert dap.y[0] == -1
+    assert dap.y[-1] == da.sizes['y']
+    assert dap.lon[0, 0] == -2
+    assert dap.lat[0, 0] == -3
+    assert dap.dep[-1, 0, 0] == da.dep[-1, 0, 0]
+    assert dap[-1, 0, 0] == da[-1, 0, 0]
+    assert dap.name == 'sst'
+    assert dap.long_name == "SST"
+    assert dap.encoding["cfspecs"] == "croco"
 
 
-class TestGridEdges:
+def test_get_edges():
     """Test grid edge operations"""
-
-    def test_get_edges(self):
-        da = get_da()
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", ".*cf.*")
-            dae = grid.get_edges(da, "y")
-        assert dae.shape == (da.shape[0], da.shape[1] + 1, da.shape[2])
-        np.testing.assert_allclose(dae.y[:2].values, da.y[:2] - 0.5)
-        np.testing.assert_allclose(dae.lat[:2, 0], da.lat[:2, 0] - 1.5)
-        assert dae[1, 0, 0] == da[1, 0, 0]
+    da = get_da()
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        dae = grid.get_edges(da, "y")
+    assert dae.shape == (da.shape[0], da.shape[1] + 1, da.shape[2])
+    np.testing.assert_allclose(dae.y[:2].values, da.y[:2] - 0.5)
+    np.testing.assert_allclose(dae.lat[:2, 0], da.lat[:2, 0] - 1.5)
+    assert dae[1, 0, 0] == da[1, 0, 0]
 
 
-class TestGridShift:
+def test_shift():
     """Test grid shifting operations"""
-
-    def test_shift(self):
-        da = get_da()
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", ".*cf.*")
-            dae = grid.shift(da, {"x": "left", "y": 1})
-        assert dae.shape == da.shape
-        np.testing.assert_allclose(dae.x.values, da.x - 0.5)
-        np.testing.assert_allclose(dae.y.values, da.y + 0.5)
-        assert dae[1, 0, 1] == float(da[1, :2, :2].mean())
+    da = get_da()
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        dae = grid.shift(da, {"x": "left", "y": 1})
+    assert dae.shape == da.shape
+    np.testing.assert_allclose(dae.x.values, da.x - 0.5)
+    np.testing.assert_allclose(dae.y.values, da.y + 0.5)
+    assert dae[1, 0, 1] == float(da[1, :2, :2].mean())
 
 
 class TestDepthConversion:
@@ -133,23 +125,21 @@ class TestDepthConversion:
         assert depth.z[0] == 0
 
 
-class TestGridConversion:
+def test_to_rect():
     """Test grid coordinate conversion"""
+    x = xr.DataArray(np.arange(4), dims='x')
+    y = xr.DataArray(np.arange(3), dims='y')
+    lon = xr.DataArray(np.ones((3, 4)), dims=('y', 'x'), coords={"y": y, "x": x})
+    lat = xr.DataArray(np.ones((3, 4)), dims=('y', 'x'), coords={"y": y, "x": x})
+    temp = xr.DataArray(
+        np.ones((2, 3, 4)), dims=('time', 'y', 'x'), coords={'lon': lon, 'lat': lat, "y": y, "x": x}
+    )
 
-    def test_to_rect(self):
-        x = xr.DataArray(np.arange(4), dims='x')
-        y = xr.DataArray(np.arange(3), dims='y')
-        lon = xr.DataArray(np.ones((3, 4)), dims=('y', 'x'), coords={"y": y, "x": x})
-        lat = xr.DataArray(np.ones((3, 4)), dims=('y', 'x'), coords={"y": y, "x": x})
-        temp = xr.DataArray(
-            np.ones((2, 3, 4)), dims=('time', 'y', 'x'), coords={'lon': lon, 'lat': lat, "y": y, "x": x}
-        )
+    tempr = grid.to_rect(temp)
+    assert tempr.dims == ('time', 'lat', 'lon')
+    assert tempr.lon.ndim == 1
+    np.testing.assert_allclose(tempr.lon.values, temp.lon[0].values)
 
-        tempr = grid.to_rect(temp)
-        assert tempr.dims == ('time', 'lat', 'lon')
-        assert tempr.lon.ndim == 1
-        np.testing.assert_allclose(tempr.lon.values, temp.lon[0].values)
-
-        ds = xr.Dataset({"temp": temp})
-        dsr = grid.to_rect(ds)
-        assert dsr.temp.dims == tempr.dims
+    ds = xr.Dataset({"temp": temp})
+    dsr = grid.to_rect(ds)
+    assert dsr.temp.dims == tempr.dims

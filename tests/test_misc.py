@@ -55,13 +55,11 @@ class TestStringMatching:
         assert misc.match_string(ss, checks) is expected
 
 
-class TestChoices:
+def test_choices():
     """Test Choices class"""
-
-    def test_choices(self):
-        choices = misc.Choices(['a', 'bb', 'c'])
-        assert choices['a'] == 'a'
-        assert choices['C'] == 'c'
+    choices = misc.Choices(['a', 'bb', 'c'])
+    assert choices['a'] == 'a'
+    assert choices['C'] == 'c'
 
 
 class TestDictOperations:
@@ -105,19 +103,17 @@ class TestDictOperations:
         assert dict01 == expected
 
 
-class TestEnums:
+def test_intenum_defaultenumeta():
     """Test enum utilities"""
+    class regrid_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
+        linear = 1
+        bilinear = 1
+        nearest = 0
+        cellave = -1
 
-    def test_intenum_defaultenumeta(self):
-        class regrid_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
-            linear = 1
-            bilinear = 1
-            nearest = 0
-            cellave = -1
-
-        assert regrid_methods().name == "linear"  # default method
-        assert regrid_methods(None).name == "linear"  # default method
-        assert regrid_methods(1).name == "linear"
-        assert regrid_methods[None].name == "linear"  # default method
-        assert regrid_methods['linear'].name == "linear"
-        assert regrid_methods['cellave'].name == "cellave"
+    assert regrid_methods().name == "linear"  # default method
+    assert regrid_methods(None).name == "linear"  # default method
+    assert regrid_methods(1).name == "linear"
+    assert regrid_methods[None].name == "linear"  # default method
+    assert regrid_methods['linear'].name == "linear"
+    assert regrid_methods['cellave'].name == "cellave"

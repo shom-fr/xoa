@@ -37,13 +37,11 @@ class TestDistance:
         assert ddc[0] == dd[1, 0]
 
 
-class TestClustering:
+def test_clusterize():
     """Test clustering functions"""
-
-    def test_clusterize(self):
-        x = [0, 1, 3, 4, 8, 9, 10.0]
-        y = x
-        ds = xr.Dataset(coords={"lon": ("npts", x), "lat": ("npts", y)})
-        clusters = geo.clusterize(ds, npmax=3, split=True)
-        assert len(clusters) == 3
-        assert set([c.sizes["npts"] for c in clusters]) == {2, 2, 3}
+    x = [0, 1, 3, 4, 8, 9, 10.0]
+    y = x
+    ds = xr.Dataset(coords={"lon": ("npts", x), "lat": ("npts", y)})
+    clusters = geo.clusterize(ds, npmax=3, split=True)
+    assert len(clusters) == 3
+    assert set([c.sizes["npts"] for c in clusters]) == {2, 2, 3}

@@ -361,9 +361,7 @@ class _MetaCatSpecs_(_MetaBase_):
             True or False if name is provided, else found name or None
         """
         if meta_name:
-            if isinstance(meta_name, str):
-                meta_name = [meta_name]
-            elif isinstance(meta_name, dict):
+            if isinstance(meta_name, (str, dict)):
                 names = [meta_name]
             else:
                 names = []

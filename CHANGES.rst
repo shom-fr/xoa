@@ -10,16 +10,16 @@ New features
 - Add the ``rename_args`` argument to formatting routing of :mod:`xoa.meta` to retreive renaming information [:pull:`102`].
 - Add the :func:`xoa.dyn.get_sea_level` function to get either SSH, ADT, SLA or MDT in a dataset [:pull:`102`].
 - Allow passing a list of "meta_name" to :meth:`xoa.cf.MetaSpecs.get` for enlarging a search [:pull:`102`].
-- The :mod:`xoa.data_samples` module now use Pooch to manage sample files.
-- Add the ``multi`` parameter to :class:`xoa.misc.Choices` to allow multiple choices.
+- The :mod:`xoa.data_samples` module now use Pooch to manage sample files [:pull:`111`].
+- Add the ``multi`` parameter to :class:`xoa.misc.Choices` to allow multiple choices [:pull:`111`].
 
 Breaking changes
 ----------------
 
 Deprecations
 ------------
-- The :mod:`xoa.cf` module is deprecated. Use :mod:`xoa.meta` instead. All references to "cf" must be converted to "meta" in modules, functions, classes, methods and accessors. A backward compatibility layer has been added.
-- The :mod:`xoa.cf_configs` module is deprecated in favour of module :mod:`xoa.meta.configs` 
+- The :mod:`xoa.cf` module is deprecated. Use :mod:`xoa.meta` instead. All references to "cf" must be converted to "meta" in modules, functions, classes, methods and accessors. A backward compatibility layer has been added [:pull:`111`].
+- The :mod:`xoa.cf_configs` module is deprecated in favour of module :mod:`xoa.meta.configs` [:pull:`111`].
 
 Bug fixes
 ---------

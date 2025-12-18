@@ -8,28 +8,24 @@ import xarray as xr
 from xoa import sigma
 
 
-class TestSigmaCoefficients:
+def test_get_cs():
     """Test sigma coordinate coefficient functions"""
-
-    def test_get_cs(self):
-        nz = 3
-        sig = xr.DataArray(np.linspace(-1, 0, nz), dims="sig")
-        thetas = 7.0
-        thetab = 2.0
-        cs = sigma.get_cs(sig, thetas, thetab, cs_type=None)
-        assert cs.dims == sig.dims
-        np.testing.assert_allclose(cs, [-1.0, -0.96983013, 0.0])
+    nz = 3
+    sig = xr.DataArray(np.linspace(-1, 0, nz), dims="sig")
+    thetas = 7.0
+    thetab = 2.0
+    cs = sigma.get_cs(sig, thetas, thetab, cs_type=None)
+    assert cs.dims == sig.dims
+    np.testing.assert_allclose(cs, [-1.0, -0.96983013, 0.0])
 
 
-class TestAtmosphereSigma:
+def test_atmosphere_sigma_coordinate():
     """Test atmosphere sigma coordinate functions"""
-
-    def test_atmosphere_sigma_coordinate(self):
-        nt, nz, nx = 2, 3, 5
-        sig = xr.DataArray(np.linspace(-1, 0, nz), dims="sig")
-        ptop = xr.DataArray(np.ones((nt, nx)), dims=("nt", "nx"))
-        ps = xr.DataArray(150 * np.ones(nx), dims="nx")
-        sigma.atmosphere_sigma_coordinate(sig, ptop, ps)
+    nt, nz, nx = 2, 3, 5
+    sig = xr.DataArray(np.linspace(-1, 0, nz), dims="sig")
+    ptop = xr.DataArray(np.ones((nt, nx)), dims=("nt", "nx"))
+    ps = xr.DataArray(150 * np.ones(nx), dims="nx")
+    sigma.atmosphere_sigma_coordinate(sig, ptop, ps)
 
 
 class TestOceanSigma:
