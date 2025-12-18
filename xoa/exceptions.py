@@ -67,7 +67,7 @@ class XoaDeprecationWarning(XoaWarning, DeprecationWarning):
     pass
 
 
-def xoa_warn(message, stacklevel=2, category=None):
+def xoa_warn(message, category=None, stacklevel=2):
     """Issue a :class:`XoaWarning` warning
 
     Example
