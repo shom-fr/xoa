@@ -21,7 +21,6 @@ import types
 from enum import IntEnum, EnumMeta
 
 import numpy as np
-import xarray as xr
 
 from . import exceptions
 

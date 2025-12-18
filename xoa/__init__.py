@@ -19,7 +19,6 @@ xarray-based ocean analysis library
 
 
 import os
-import warnings
 
 
 from .exceptions import XoaError, XoaWarning, XoaDeprecationWarning, XoaConfigError  # noqa: F401
@@ -30,6 +29,7 @@ from .data_samples import (  # noqa: F401
     show_data_samples,  # noqa: F401
     open_data_sample,  # noqa: F401
 )
+from .accessors import register_accessors
 
 try:
     from ._version import version as __version__
@@ -59,58 +59,3 @@ __all__ = [
 _SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "_samples")
 
 _XOA_CACHE = {}
-
-
-def register_accessors(xoa=True, xcf=False, xmeta=False, decode_sigma=False):
-    """Register xarray accessors
-
-    Parameters
-    ----------
-    xoa: bool, str
-        Register the main accessors with
-        :func:`~xoa.meta.register_xoa_accessors`.
-    xcf: bool, str
-        Register the :mod:`xoa.meta` module accessors with
-        :func:`~xoa.meta.register_meta_accessors` using the deprecated name "xcf".
-
-        .. deprecated::
-            Use ``xmeta`` instead.
-    xmeta: bool, str
-        Register the :mod:`xoa.meta` module accessors with
-        :func:`~xoa.meta.register_meta_accessors`.
-    decode_sigma: bool, str
-        Register the :mod:`xoa.sigma` module accessor with
-        :func:`~xoa.meta.register_sigma_accessor`.
-
-    See also
-    --------
-    xoa.accessors
-    """
-    if xoa:
-        from .accessors import register_xoa_accessors
-
-        kw = {"name": xoa} if isinstance(xoa, str) else {}
-        register_xoa_accessors(**kw)
-    if xcf:
-        from .accessors import register_meta_accessors
-
-        warnings.warn(
-            "The 'xcf' parameter is deprecated. Use 'xmeta' instead.",
-            XoaDeprecationWarning,
-            stacklevel=2,
-        )
-        kw = {"name": xcf} if isinstance(xcf, str) else {}
-        # Register with "xcf" name for backward compatibility
-        if not kw:
-            kw = {"name": "xcf"}
-        register_meta_accessors(**kw)
-    if xmeta:
-        from .accessors import register_meta_accessors
-
-        kw = {"name": xmeta} if isinstance(xmeta, str) else {}
-        register_meta_accessors(**kw)
-    if decode_sigma:
-        from .accessors import register_sigma_accessor
-
-        kw = {"name": decode_sigma} if isinstance(decode_sigma, str) else {}
-        register_sigma_accessor(**kw)
