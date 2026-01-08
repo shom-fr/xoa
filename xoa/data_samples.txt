@@ -1,0 +1,18 @@
+# A single float
+OBS/ARGO/argo-7900573.nc 59ad3f1c6638ce46f2bdd3e1fd41c71072e1b677f2dd986a5972f6386b115f9c
+
+# A subset of the CMEMS IBI run around the Argo float
+ibi-argo-7900573.nc 4920c066460efda8f224f06d062e07dff6777df14ae53d0e6fb2dad0dfbe0091
+
+# SubsetS of a south african run
+MODEL/CROCO/SOUT-AFRICA/croco.south-africa.meridional.nc 0193833138ea9e92b8e55d9751784222af72481405936b8770c77cca006a2efd
+MODEL/CROCO/SOUT-AFRICA/croco.south-africa.surf.nc 61d2c863f143c9c6298180be38b9d23ab6c80ee3c8721f3899c0c48c2944446d
+MODEL/CROCO/SOUT-AFRICA/croco.south-africa.zonal.nc 0193833138ea9e92b8e55d9751784222af72481405936b8770c77cca006a2efd
+
+# Three variables of an HyCOM run
+MODEL/HYCOM/hycom.gdp.h.nc 0c205cf6b8207e6b73a1cc97cdd4dbe63269d92e9230a7fb098a3fed87587c68
+MODEL/HYCOM/hycom.gdp.u.nc e5338a4ade98fd5ed5b7c48cabb03535b3c61a5b385d74473a8f75185deb70da
+MODEL/HYCOM/hycom.gdp.v.nc a7464d29342761cf74c6f91909c5a3555c94c33a2644779dce5ddd2eb2f82303
+
+# A single drifter of the GDP program
+OBS/DRIFTERS/gdp-6203641.csv 1c6f44491cfc20c39e73051fc1ac3e3b61d4d5c12f6937253aa67dbf98ef1e7b

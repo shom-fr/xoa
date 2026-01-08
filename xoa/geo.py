@@ -3,7 +3,7 @@
 """
 Geographic utilities
 """
-# Copyright 2020-2021 Shom
+# Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,46 +19,15 @@ Geographic utilities
 
 import math
 import numpy as np
-import numba
 import xarray as xr
 
 from . import misc
 from . import coords as xcoords
+from .core import geo as _geo
 
 
 #: Earth radius in meters
 EARTH_RADIUS = 6371e3
-
-
-@numba.vectorize(cache=True)
-def _haversine_(lon0, lat0, lon1, lat1):
-    """Haversine distance between two points on a **unit sphere**
-
-    Parameters
-    ----------
-    lon0: float, array_like
-        Longitude of the first point(s)
-    lat0: float, array_like
-        Latitude of the first point(s)
-    lon1: float, array_like
-        Longitude of the second point(s)
-    lat1: float, array_like
-        Latitude of the second point(s)
-
-    Return
-    ------
-    float, array_like
-        Distance(s)
-    """
-    deg2rad = math.pi / 180.0
-    dist = math.sin(deg2rad * (lat0 - lat1) * 0.5) ** 2
-    dist += (
-        math.cos(deg2rad * lat0)
-        * math.cos(deg2rad * lat1)
-        * math.sin(deg2rad * (lon0 - lon1) * 0.5) ** 2
-    )
-    dist = 2.0 * math.asin(math.sqrt(dist))
-    return dist
 
 
 def haversine(lon0, lat0, lon1, lat1, radius=EARTH_RADIUS):
@@ -82,7 +51,9 @@ def haversine(lon0, lat0, lon1, lat1, radius=EARTH_RADIUS):
     float, array_like
         Distance(s)
     """
-    return _haversine_(np.double(lon0), np.double(lat0), np.double(lon1), np.double(lat1)) * radius
+    return (
+        _geo.haversine(np.double(lon0), np.double(lat0), np.double(lon1), np.double(lat1)) * radius
+    )
 
 
 def bearing(lon0, lat0, lon1, lat1):
@@ -104,18 +75,7 @@ def bearing(lon0, lat0, lon1, lat1):
     float, array_like
         Angle(s)
     """
-    return _bearing_(np.double(lon0), np.double(lat0), np.double(lon1), np.double(lat1))
-
-
-@numba.vectorize
-def _bearing_(lon0, lat0, lon1, lat1):
-    deg2rad = math.pi / 180.0
-    a = math.atan2(
-        math.cos(deg2rad * lat0) * math.sin(deg2rad * lat1)
-        - math.sin(deg2rad * lat0) * math.cos(deg2rad * lat1) * math.cos(deg2rad * (lon1 - lon0)),
-        math.sin(deg2rad * (lon1 - lon0)) * math.cos(deg2rad * lat1),
-    )
-    return a * 180 / math.pi
+    return _geo.bearing(np.double(lon0), np.double(lat0), np.double(lon1), np.double(lat1))
 
 
 class distance_units(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):

@@ -21,6 +21,7 @@ dependencies:
   - xarray>=0.17
   - pip:
       - configobj
+      - pooch
       - seaborn
       - sphinx
       - sphinx-autosummary-accessors

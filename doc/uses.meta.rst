@@ -1,10 +1,10 @@
-.. _uses.cf:
+.. _uses.meta:
 
-Naming conventions with :mod:`xoa.cf`
-#####################################
+Naming conventions with :mod:`xoa.meta`
+#######################################
 
 .. warning::
-    Have a quick loop to the appendix :ref:`appendix.cf.default`
+    Have a quick loop to the appendix :ref:`appendix.meta.default`
     before going any further!
 
 Introduction
@@ -13,7 +13,7 @@ Introduction
 This module is an application and extension of a subset of the
 `CF conventions <http://cfconventions.org/>`_ in application
 to naming conventions.
-It has two intents:
+It has two main intents:
 
 * Searching :class:`xarray.DataArray` variables or coordinates with another
   :class:`xarray.DataArray` or a :class:`xarray.Dataset`,
@@ -26,7 +26,7 @@ The module offers capabilities for the user to extend and specialize
 default behaviors for user's special datasets.
 
 :mod:`xoa` provides **ready-to-use configurations** for decoding and encoding a few **standard dataset types**. 
-Look at :ref:`appendix.cf.specialized`.
+Look at :ref:`appendix.meta.specialized`.
 
 
 .. note:: This module shares common feature with the excellent and long
@@ -45,60 +45,60 @@ Look at :ref:`appendix.cf.specialized`.
 
 
 :mod:`xoa` make available **ready-to-use configurations** for decoding and encoding a few **standard dataset types**. 
-Looks at :ref:`appendix.cf.specialized`.
+Looks at :ref:`appendix.meta.specialized`.
 
 Accessing the current specifications
 ====================================
 
 Scanning and formatting actions are based on specifications,
 and this module natively includes a
-:ref:`default configuration <appendix.cf.default>`
+:ref:`default configuration <appendix.meta.default>`
 for various oceanographic, sea surface and atmospheric variables and coordinates.
 A distinction is made between
-data variables (:ref:`data_vars <appendix.cf.data_vars>`)
-and coordinates (:ref:`coords <appendix.cf.coords>`), like in :mod:`xarray`.
+data variables (:ref:`data_vars <appendix.meta.data_vars>`)
+and coordinates (:ref:`coords <appendix.meta.coords>`), like in :mod:`xarray`.
 
 Getting the current specifications for data variables and coordinates
-with the :func:`~xoa.cf.get_cf_specs` function:
+with the :func:`~xoa.meta.get_meta_specs` function:
 
 .. ipython:: python
 
-    from xoa import cf
-    cfspecs = cf.get_cf_specs()
-    cfspecs["data_vars"] is cfspecs.data_vars
-    cfspecs["data_vars"] is cfspecs.coords
-    cfspecs.data_vars.names[:3]
-    cfspecs.coords.names[:3]
+    from xoa import meta
+    meta_specs = meta.get_meta_specs()
+    meta_specs["data_vars"] is meta_specs.data_vars
+    meta_specs["data_vars"] is meta_specs.coords
+    meta_specs.data_vars.names[:3]
+    meta_specs.coords.names[:3]
 
-See the appendix :ref:`appendix.cf.default` for the
+See the appendix :ref:`appendix.meta.default` for the
 list of available default specifications.
 
-An instance of the :class:`CFSpecs` has other configuration
-:ref:`sections <appendix.cf.sections>`
+An instance of the :class:`MetaSpecs` has other configuration
+:ref:`sections <appendix.meta.sections>`
 than
-:cfgmsec:`data_vars <[data_vars]>`,
-:cfgmsec:`coords <[coords]>` and
-:cfgmsec:`dims <[dims]>`:
-:cfgmsec:`registration <[registration]>`,
-:cfgmsec:`sglocator <[sglocator]>`,
-:cfgmsec:`vertical <[vertical]>` and
-:cfgmsec:`accessors <[accessors]>`.
+:metasec:`data_vars <[data_vars]>`,
+:metasec:`coords <[coords]>` and
+:metasec:`dims <[dims]>`:
+:metasec:`registration <[registration]>`,
+:metasec:`sglocator <[sglocator]>`,
+:metasec:`vertical <[vertical]>` and
+:metasec:`accessors <[accessors]>`.
 
 
 Data variables
 --------------
 
-Here is the example of the :cfdatavar:`sst` data variable:
+Here is the example of the :metadatavar:`sst` data variable:
 
 .. ipython:: python
 
     from pprint import pprint
-    pprint(cfspecs.data_vars['sst'])
+    pprint(meta_specs.data_vars['sst'])
 
 
 Description of specification keys:
 
-.. list-table:: CF specs for :ref:`appendix.cf.data_vars`
+.. list-table:: meta specs for :ref:`appendix.meta.data_vars`
 
     * - Key
       - Type
@@ -144,23 +144,23 @@ Get the specialized name and the attributes only:
 
 .. ipython:: python
 
-    cfspecs.data_vars.get_name("sst")
-    cfspecs.data_vars.get_attrs("sst")
+    meta_specs.data_vars.get_name("sst")
+    meta_specs.data_vars.get_attrs("sst")
 
 
 Coordinates
 -----------
 
-Here is the example of the :cfdatavar:`lon` coordinate:
+Here is the example of the :metadatavar:`lon` coordinate:
 
 .. ipython:: python
 
     from pprint import pprint
-    pprint(cfspecs.coords['lon'])
+    pprint(meta_specs.coords['lon'])
 
 Description of specification keys:
 
-.. list-table:: CF specs for :ref:`appendix.cf.coords`
+.. list-table:: meta specs for :ref:`appendix.meta.coords`
 
     * - Key
       - Type
@@ -197,14 +197,14 @@ Get the specialized name and the attributes only:
 
 .. ipython:: python
 
-    cfspecs.coords.get_name("lon")
-    cfspecs.coords.get_attrs("lon")
+    meta_specs.coords.get_name("lon")
+    meta_specs.coords.get_attrs("lon")
 
 
 Dimensions
 ----------
 
-.. list-table:: CF specs for :ref:`appendix.cf.dims`
+.. list-table:: meta specs for :ref:`appendix.meta.dims`
 
     * - Key
       - Type
@@ -242,7 +242,7 @@ Here is the default content:
 
 .. ipython:: python
 
-    cfspecs.dims  # or cfspecs["dims"]
+    meta_specs.dims  # or meta_specs["dims"]
 
 
 Other sections
@@ -250,10 +250,10 @@ Other sections
 
 .. ipython:: python
 
-    cfspecs["register"]
-    cfspecs["sglocator"]
-    cfspecs["accessors"]
-    cfspecs["vertical"]
+    meta_specs["register"]
+    meta_specs["sglocator"]
+    meta_specs["accessors"]
+    meta_specs["vertical"]
 
 
 Searching within a :class:`~xarray.Dataset` or  :class:`~xarray.DataArray`
@@ -283,18 +283,18 @@ Check if they match known or explicit CF items:
 
 .. ipython:: python
 
-    cfspecs.coords.match(lon, "lon") # explicit
-    cfspecs.coords.match(lon, "lat") # explicit
-    cfspecs.coords.match(lon) # any known
-    cfspecs.data_vars.match(temp) # any known
-    cfspecs.data_vars.match(sal) # any known
+    meta_specs.coords.match(lon, "lon") # explicit
+    meta_specs.coords.match(lon, "lat") # explicit
+    meta_specs.coords.match(lon) # any known
+    meta_specs.data_vars.match(temp) # any known
+    meta_specs.data_vars.match(sal) # any known
 
 Search for known CF items:
 
 .. ipython:: python
 
-    mytemp = cfspecs.search(ds, "temp")
-    mylon = cfspecs.search(mytemp, "lon")
+    mytemp = meta_specs.search(ds, "temp")
+    mylon = meta_specs.search(mytemp, "lon")
 
 Datasets are searched for data variables ("data_vars") and
 data variables are searched for coordinates ("coords").
@@ -302,32 +302,32 @@ You can also search for coordinates in datasets, for instance like this:
 
 .. ipython:: python
 
-    cfspecs.coords.search(ds, "lon")
+    meta_specs.coords.search(ds, "lon")
 
 .. seealso::
-    - CF items:
-      :cfcoord:`lon` :cfcoord:`lat` :cfdatavar:`temp` :cfdatavar:`sal`
-    - Methods: :meth:`xoa.cf.CFCoordSpecs.match`
-      :meth:`xoa.cf.CFVarSpecs.match` :meth:`xoa.cf.CFSpecs.search`
-      :meth:`xoa.cf.CFCoordSpecs.search` :meth:`xoa.cf.CFVarSpecs.search`
+    - Meta items:
+      :metacoord:`lon` :metacoord:`lat` :metadatavar:`temp` :metadatavar:`sal`
+    - Methods: :meth:`xoa.meta.MetaCoordSpecs.match`
+      :meth:`xoa.meta.MetaVarSpecs.match` :meth:`xoa.meta.MetaSpecs.search`
+      :meth:`xoa.meta.MetaCoordSpecs.search` :meth:`xoa.meta.MetaVarSpecs.search`
 
 
-The staggered-grid locator :class:`~xoa.cf.SGLocator`
+The staggered-grid locator :class:`~xoa.meta.SGLocator`
 =====================================================
 
-A :class:`~xoa.cf.CFSpecs` instance comes with :class:`~xoa.cf.SGLocator`
-that is accessible through the :attr:`~xoa.cf.CFSpecs.sglocator` attribute.
-A :class:`~xoa.cf.SGLocator` helps parsing and formatting staggered grid
+A :class:`~xoa.meta.MetaSpecs` instance comes with :class:`~xoa.meta.SGLocator`
+that is accessible through the :attr:`~xoa.meta.MetaSpecs.sglocator` attribute.
+A :class:`~xoa.meta.SGLocator` helps parsing and formatting staggered grid
 location from :attr:`name`, :attr:`standard_name` and :attr:`long_name`
 data array attributes.
-It is configured at the :cfgmsec:`sglocator <[sglocator]>` section
+It is configured at the :metasec:`sglocator <[sglocator]>` section
 in which you can specify the
-format of the name (:cfgmopt:`name_format <[sglocator] name_format>` and
-the allowed location names :cfgmopt:`allowed_locations <[sglocator] allowed_locations>`.
+format of the name (:metaopt:`name_format <[sglocator] name_format>` and
+the allowed location names :metaopt:`allowed_locations <[sglocator] allowed_locations>`.
 
 .. ipython:: python
 
-    sglocator = cfspecs.sglocator
+    sglocator = meta_specs.sglocator
     sglocator.formats
     sglocator.format_attr("name", "lon", "rho")
     sglocator.format_attr("standard_name", "lon", "rho")
@@ -342,7 +342,7 @@ The idea
 Formatting means changing or setting names and attributes.
 It is possible to format, or even auto-format data variables and coordinates.
 
-During an auto-formatting, each array is matched against CF specs,
+During an auto-formatting, each array is matched against meta specs,
 and the array is formatted when a matching is successfull.
 If the array contains coordinates, the same process is applied on them,
 as soon as the ``format_coords`` keyword is ``True``.
@@ -354,23 +354,23 @@ like ``"lon"``.
 
 .. ipython:: python
 
-    cfspecs.format_coord(lon, "lon")
-    cfspecs.format_data_var(temp, "temp")
+    meta_specs.format_coord(lon, "lon")
+    meta_specs.format_data_var(temp, "temp")
 
 **Auto-formatting:**
 
 .. ipython:: python
 
-    ds2 = cfspecs.auto_format(ds)
+    ds2 = meta_specs.auto_format(ds)
     ds2.temp
     ds2.lon
 
 It can be applied to a data array or a full dataset.
 
 .. seealso::
-    :meth:`xoa.cf.CFSpecs.format_coord`
-    :meth:`xoa.cf.CFSpecs.format_data_var`
-    :meth:`xoa.cf.CFSpecs.auto_format`
+    :meth:`xoa.meta.MetaSpecs.format_coord`
+    :meth:`xoa.meta.MetaSpecs.format_data_var`
+    :meth:`xoa.meta.MetaSpecs.auto_format`
 
 Encoding and decoding
 ---------------------
@@ -379,45 +379,43 @@ By default, formatting renames known arrays to their generic name,
 like "temp" in the example above. We speak here of **encoding**.
 If the ``specialize`` keyword is set to ``True``, arrays are
 renamed with their specialized name if set in the specs with the
-:cfgmopt:`name <[data_vars] [__many__] name>` option.
+:metaopt:`name <[data_vars] [__many__] name>` option.
 We speak here of **decoding**.
 Two shortcut methods exists for these tasks:
 
-- Decoding: :meth:`~xoa.cf.CFSpecs.decode`
-- Encoding: :meth:`~xoa.cf.CFSpecs.encode`
+- Decoding: :meth:`~xoa.meta.MetaSpecs.decode`
+- Encoding: :meth:`~xoa.meta.MetaSpecs.encode`
 
 Chaining the two methods should lead to the initial dataset or data array.
 See the last section of this page for an exemple:
-:ref:`uses.cf.croco`.
+:ref:`uses.meta.croco`.
 
 
 .. seealso::
-    :meth:`xoa.cf.CFSpecs.decode`
-    :meth:`xoa.cf.CFSpecs.encode`
+    :meth:`xoa.meta.MetaSpecs.decode`
+    :meth:`xoa.meta.MetaSpecs.encode`
 
 Using the accessors
 ===================
 
 Accessors for :class:`xarray.Dataset` and :class:`xarray.DataArray`
-can be registered with the :func:`xoa.cf.register_cf_accessors`:
+can be registered with the :func:`xoa.meta.register_meta_specs_accessors`:
 
 .. ipython:: python
 
     import xoa
-    xoa.register_accessors(xcf=True)
+    xoa.register_accessors(xmeta=True)
 
-The accessor is named here :class:`xcf <xoa.accessors.CFDatasetAccessor>`
-to not conflict with the :class:`cf` accessor of
-`cf-xarray <https://cf-xarray.readthedocs.io/en/latest/>`_.
+The accessor is named here :class:`xmeta <xoa.accessors.CFDatasetAccessor>`.
 
 
 .. note:: All xoa accessors can be be registered with
     :func:`xoa.register_accessors`. Note also that all functionalities
-    of the :class:`xcf <xoa.accessors.CFDatasetAccessor>`
+    of the :class:`xmeta <xoa.accessors.CFDatasetAccessor>`
     accessor are also available with the more global
     :class:`xoa <xoa.accessors.XoaDatasetAccessor>` accessor.
 
-These accessors make it easy to use some of the :class:`xoa.cf.CFSpecs`
+These accessors make it easy to use some of the :class:`xoa.meta.MetaSpecs`
 capabilities.
 Here are examples of use:
 
@@ -425,44 +423,44 @@ Here are examples of use:
     :okwarning:
 
     temp
-    temp.xcf.get("lon") # access by .get
-    ds.xcf.get("temp") # access by .get
-    ds.xcf.lon # access by attribute
-    ds.xcf.coords.lon  # specific search = ds.cf.coords.get("lon")
-    ds.xcf.temp # access by attribute
-    ds.xcf["temp"].name # access by item
-    ds.xcf.data_vars.temp.name  # specific search = ds.cf.coords.get("temp")
-    ds.xcf.data_vars.bathy is None # returns None when not found
-    ds.xcf.temp.xcf.lon.name  # chaining
-    ds.xcf.temp.xcf.name # CF name, not real name
-    ds.xcf.temp.xcf.attrs # attributes, merged with CF attrs
-    ds.xcf.temp.xcf.standard_name # single attribute
-    ds.mytemp.xcf.auto_format() # or ds.temp.xcf()
-    ds.xcf.auto_format() # or ds.xcf()
+    temp.xmeta.get("lon") # access by .get
+    ds.xmeta.get("temp") # access by .get
+    ds.xmeta.lon # access by attribute
+    ds.xmeta.coords.lon  # specific search = ds.meta.coords.get("lon")
+    ds.xmeta.temp # access by attribute
+    ds.xmeta["temp"].name # access by item
+    ds.xmeta.data_vars.temp.name  # specific search = ds.meta.coords.get("temp")
+    ds.xmeta.data_vars.bathy is None # returns None when not found
+    ds.xmeta.temp.xmeta.lon.name  # chaining
+    ds.xmeta.temp.xmeta.name # CF name, not real name
+    ds.xmeta.temp.xmeta.attrs # attributes, merged with CF attrs
+    ds.xmeta.temp.xmeta.standard_name # single attribute
+    ds.mytemp.xmeta.auto_format() # or ds.temp.xmeta()
+    ds.xmeta.auto_format() # or ds.xmeta()
 
 As you can see, accessing an accessor attribute or item make an
-implicit call to :class:`~xoa.cf.DataArrayCFAccessor.get`.
+implicit call to :class:`~xoa.meta.DataArrayCFAccessor.get`.
 The root accessor :attr:`cf` give access to
-two sub-accessors, :attr:`~xoa.cf.DatasetCFAccessor.data_vars`
-and :attr:`~xoa.cf.DatasetCFAccessor.coords`,
+two sub-accessors, :attr:`~xoa.meta.DatasetCFAccessor.data_vars`
+and :attr:`~xoa.meta.DatasetCFAccessor.coords`,
 for being able to specialize the searches.
 
 .. seealso::
-    :class:`xoa.cf.DataArrayCFAccessor`
-    :class:`xoa.cf.DatasetCFAccessor`
+    :class:`xoa.meta.DataArrayCFAccessor`
+    :class:`xoa.meta.DatasetCFAccessor`
 
-Changing the CF specs
+Changing the meta specs
 =====================
 
 Default user file
 -----------------
 
-The :mod:`xoa.cf` module has internal defaults as shown
-in appendix :ref:`appendix.cf.default`.
+The :mod:`xoa.meta` module has internal defaults as shown
+in appendix :ref:`appendix.meta.default`.
 
 You can extend these defaults with a user file,
 whose location is printable with the following command,
-at the line containing "user CF specs file":
+at the line containing "user meta specs file":
 
 .. command-output:: xoa info paths
 
@@ -475,11 +473,11 @@ From a well **structured dictionary**:
 
 .. ipython:: python
 
-    cfspecs.load_cfg({"data_vars": {"banana": {"standard_name": "banana"}}})
-    cfspecs.data_vars["banana"]
+    meta_specs.load_cfg({"data_vars": {"banana": {"standard_name": "banana"}}})
+    meta_specs.data_vars["banana"]
 
 From a **configuration file**: instead of the dictionary as an argument
-to :meth:`~xoa.cf.CFSpecs.load_cfg` method, you can give either a
+to :meth:`~xoa.meta.MetaSpecs.load_cfg` method, you can give either a
 file name or a **multi-line string** with the same content as
 the file.
 Following the previous example:
@@ -490,28 +488,28 @@ Following the previous example:
         [[banana]]
             standard_name: banana
 
-If you only want to update a :attr:`~xoa.cf.CFSpecs.category`,
-you can use such method (here :meth:`~xoa.cf.CFVarSpecs.set_specs`):
+If you only want to update a :attr:`~xoa.meta.MetaSpecs.category`,
+you can use such method (here :meth:`~xoa.meta.CFVarSpecs.set_specs`):
 
 .. ipython:: python
 
-    cfspecs.data_vars.set_specs("banana", name="bonono")
-    cfspecs.data_vars["banana"]["name"]
+    meta_specs.data_vars.set_specs("banana", name="bonono")
+    meta_specs.data_vars["banana"]["name"]
 
-Alternatively, a :class:`xoa.cf.CFSpecs` instance can be loaded
-with the :meth:`~xoa.cf.CfSpecs.load_cfg` method, as explained below.
+Alternatively, a :class:`xoa.meta.MetaSpecs` instance can be loaded
+with the :meth:`~xoa.meta.CfSpecs.load_cfg` method, as explained below.
 
 Create new specs from scratch
 -----------------------------
 
-To create new specs, you must instantiate the :class:`xoa.cf.CFSpecs` class,
+To create new specs, you must instantiate the :class:`xoa.meta.MetaSpecs` class,
 with an input type as those presented above:
 
 - A config file name.
 - A Multi-line string in the format of a config file.
 - A dictionary.
 - A :class:`configobj.ConfigObj` instance.
-- Another :class:`~xoa.cf.CFSpecs` instance.
+- Another :class:`~xoa.meta.MetaSpecs` instance.
 - A list of them, with the having priority over the lasts.
 
 The initialization also accepts two options:
@@ -524,62 +522,62 @@ An config created **from default and user configs**:
 .. ipython:: python
 
     banana_specs = {"data_vars": {"banana": {"attrs": {"standard_name": "banana"}}}}
-    mycfspecs = cf.CFSpecs(banana_specs)
-    mycfspecs["data_vars"]["sst"]["attrs"]["standard_name"]
-    mycfspecs["data_vars"]["banana"]["attrs"]["standard_name"]
+    mymeta_specs = meta.MetaSpecs(banana_specs)
+    mymeta_specs["data_vars"]["sst"]["attrs"]["standard_name"]
+    mymeta_specs["data_vars"]["banana"]["attrs"]["standard_name"]
 
 An config created **from scratch**:
 
 .. ipython:: python
 
-    mycfspecs = cf.CFSpecs(banana_specs, default=False, user=False)
-    mycfspecs.pprint(depth=2)
+    mymeta_specs = meta.MetaSpecs(banana_specs, default=False, user=False)
+    mymeta_specs.pprint(depth=2)
 
 An config created **from two other configs**:
 
 .. ipython:: python
 
-    cfspecs_banana = cf.CFSpecs(banana_specs, default=False, user=False)
+    meta_specs_banana = meta.MetaSpecs(banana_specs, default=False, user=False)
     apple_specs = {"data_vars": {"apple": {"attrs": {"long_name": "Big apple"}}}}
-    cfspecs_apple = cf.CFSpecs(apple_specs, default=False, user=False)
-    cfspecs_fruits = cf.CFSpecs((cfspecs_apple, cfspecs_banana),
+    meta_specs_apple = meta.MetaSpecs(apple_specs, default=False, user=False)
+    meta_specs_fruits = meta.MetaSpecs((meta_specs_apple, meta_specs_banana),
         default=False, user=False)
-    cfspecs_fruits.data_vars.names
+    meta_specs_fruits.data_vars.names
 
-Replacing the currents CF specs
+Replacing the currents meta specs
 -------------------------------
 
-As shown before, the currents CF specs are accessible with the
-:func:`xoa.cf.get_cf_specs` function.
-You can replace them with the :class:`xoa.cf.set_cf_specs` class,
+As shown before, the currents meta specs are accessible with the
+:func:`xoa.meta.get_meta_specs` function.
+You can replace them with the :class:`xoa.meta.set_meta_specs` class,
 to be used as a fonction.
 
 .. ipython:: python
 
-    cfspecs_old = cf.get_cf_specs()
-    cf.set_cf_specs(cfspecs_banana)
-    cf.get_cf_specs() is cfspecs_banana
-    cf.set_cf_specs(cfspecs_old)
-    cf.get_cf_specs() is cfspecs_old
+    meta_specs_old = meta.get_meta_specs()
+    meta.set_meta_specs(meta_specs_banana)
+    meta.get_meta_specs() is meta_specs_banana
+    meta.set_meta_specs(meta_specs_old)
+    meta.get_meta_specs() is meta_specs_old
 
 
-In case of a temporary change, you can used :class:`~xoa.cf.set_cf_specs`
+In case of a temporary change, you can used :class:`~xoa.meta.set_meta_specs`
 in a context statement:
 
 .. ipython:: python
 
-    with cf.set_cf_specs(cfspecs_banana) as myspecs:
-        print('inside', cf.get_cf_specs() is cfspecs_banana)
-        print('inside', myspecs is cf.get_cf_specs())
-    print('outside', cf.get_cf_specs() is cfspecs_old)
+    with meta.set_meta_specs(meta_specs_banana) as myspecs:
+        print('inside', meta.get_meta_specs() is meta_specs_banana)
+        print('inside', myspecs is meta.get_meta_specs())
+    print('outside', meta.get_meta_specs() is meta_specs_old)
 
 For convience, you can set specs directly with a dictionary:
 
  .. ipython:: python
 
-    with cf.set_cf_specs({"data_vars": {"apple": {}}}) as myspecs:
-        print("apple" in cf.get_cf_specs())
-    print("apple" in cf.get_cf_specs())
+    with meta.set_meta_specs({"data_vars": {"apple": {}}}) as myspecs:
+        print("apple" in meta.get_meta_specs())
+    print("apple" in meta.get_meta_specs())
 
 Application with an accessor usage:
 
@@ -588,10 +586,10 @@ Application with an accessor usage:
 
     data = xr.DataArray([5], attrs={'standard_name': 'sea_surface_banana'})
     ds = xr.Dataset({'toto': data})
-    mycfspecs = cf.CFSpecs({"data_vars": {"ssb":
+    mymeta_specs = meta.MetaSpecs({"data_vars": {"ssb":
         {"standard_name": "sea_surface_banana"}}})
-    with cf.set_cf_specs(mycfspecs):
-        print(ds.xcf.get("ssb"))
+    with meta.set_meta_specs(mymeta_specs):
+        print(ds.xmeta.get("ssb"))
 
 
 Working with registered specs
@@ -600,8 +598,8 @@ Working with registered specs
 Registering and accessing new specs
 -----------------------------------
 
-It is possible to register specialized :class:`~xoa.cf.CFSpecs` instances
-with :func:`~xoa.cf.register_cf_specs` for future access.
+It is possible to register specialized :class:`~xoa.meta.MetaSpecs` instances
+with :func:`~xoa.meta.register_meta_specs` for future access.
 
 Here we register new specs with a internal registration name ``"mycroco"``:
 
@@ -622,25 +620,24 @@ Here we register new specs with a internal registration name ``"mycroco"``:
             }
         }
     }
-    mycfspecs = cf.CFSpecs(content)
-    cf.register_cf_specs(mycfspecs)
+    mymeta_specs = meta.MetaSpecs(content)
+    meta.register_meta_specs(mymeta_specs)
 
-We can now access with it the :func:`~xoa.cf.get_cf_specs` function:
+We can now access with it the :func:`~xoa.meta.get_meta_specs` function:
 
 .. ipython:: python
 
-    these_cfspecs = cf.get_cf_specs('mycroco')
-    these_cfspecs is mycfspecs
+    these_meta_specs = meta.get_meta_specs('mycroco')
+    these_meta_specs is mymeta_specs
 
 Inferring the best specs for my dataset
 ---------------------------------------
 
-If you set the :attr:`cfspecs` attribute or encoding of a dataset
-to the name of a registered :class:`~xoa.cf.CFSpecs` instance, you can
-get it automatically with the :func:`~xoa.cf.get_cf_specs` or
-:func:`~xoa.cf.infer_cf_specs` functions.
+If you set the :attr:`meta_specs` attribute or encoding of a dataset
+to the name of a registered :class:`~xoa.meta.MetaSpecs` instance, you can
+get it automatically with the :func:`~xoa.meta.get_meta_specs` function.
 
-Let's register another :class:`~xoa.cf.CFSpecs` instance:
+Let's register another :class:`~xoa.meta.MetaSpecs` instance:
 
 .. ipython:: python
 
@@ -654,8 +651,8 @@ Let's register another :class:`~xoa.cf.CFSpecs` instance:
             }
         },
     }
-    mycfspecs2 = cf.CFSpecs(content)
-    cf.register_cf_specs(mycfspecs2)
+    mymeta_specs2 = meta.MetaSpecs(content)
+    meta.register_meta_specs(mymeta_specs2)
 
 Let's create a dataset:
 
@@ -669,11 +666,11 @@ Now find the best registered specs instance which has either the name
 
 .. ipython:: python
 
-    cf_specs_auto = cf.infer_cf_specs(ds)
-    print(cf_specs_auto.name)
-    ds_decoded = cf_specs_auto.decode(ds)
+    meta_specs_auto = meta.infer_meta_specs(ds)
+    print(meta_specs_auto.name)
+    ds_decoded = meta_specs_auto.decode(ds)
     ds_decoded
-    cf_specs_auto.encode(ds)
+    meta_specs_auto.encode(ds)
 
 It is ``mycroco`` as expected.
 
@@ -684,40 +681,40 @@ Assigning registered specs to a dataset or data array
 All xoa routines that needs to access specific coordinates
 or variables try to infer the approriate specs, which default
 to the current specs.
-When the :attr:`cfspecs` **attribute** or **encoding** is set,
-:meth:`~xoa.cf.get_cf_specs` uses it to search within
+When the :attr:`meta_specs` **attribute** or **encoding** is set,
+:meth:`~xoa.meta.get_meta_specs` uses it to search within
 registered specs.
 
 .. ipython:: python
 
-    ds.encoding.update(cfspecs="mycroco")
-    cfspecs = cf.get_cf_specs(ds)
-    cfspecs.encode(ds)
+    ds.encoding.update(meta_specs="mycroco")
+    meta_specs = meta.get_meta_specs(ds)
+    meta_specs.encode(ds)
 
-The :attr:`cfspecs` encoding is set at the dataset level,
+The :attr:`meta_specs` encoding is set at the dataset level,
 not at the data array level:
 
 .. ipython:: python
 
-    cf.get_cf_specs(ds.supertemp) is cfspecs
+    meta.get_meta_specs(ds.supertemp) is meta_specs
 
-To propagate to all the data arrays, use :func:`~xoa.cf.assign_cf_specs`:
+To propagate to all the data arrays, use :func:`~xoa.meta.assign_meta_specs`:
 
 .. ipython:: python
 
-    cf.assign_cf_specs(ds, "mycroco")
+    meta.assign_meta_specs(ds, "mycroco")
     ds.mylon.encoding
-    cf.get_cf_specs(ds.supertemp) is cfspecs
+    meta.get_meta_specs(ds.supertemp) is meta_specs
 
 
-.. _uses.cf.croco:
+.. _uses.meta.croco:
 
 Example: decoding/encoding Croco model outputs
 ==============================================
 
 Here are the specs for Croco:
 
-.. literalinclude:: ../xoa/cf_configs/croco.cfg
+.. literalinclude:: ../xoa/meta/configs/croco.cfg
     :language: ini
 
 Register them:
@@ -725,11 +722,11 @@ Register them:
 .. ipython:: python
 
     @suppress
-    import xoa, xoa.cf
-    cf_config_file = xoa.get_cf_config_file("croco")
+    import xoa, xoa.meta, xoa.meta.configs
+    cf_config_file = xoa.meta.configs.get_meta_config_file("croco")
     print(cf_config_file)
-    xoa.cf.register_cf_specs(cf_config_file) # xoa.cf.register_cf_specs("croco")
-    xoa.cf.is_registered_cf_specs("croco")
+    xoa.meta.register_meta_specs(cf_config_file) # xoa.meta.register_meta_specs("croco")
+    xoa.meta.is_registered_meta_specs("croco")
 
 
 Register the :class:`xoa <~xoa.accessors.XoaDatasetAccessor>` accessor:
@@ -761,7 +758,7 @@ Let's **re-encode** it!
 
 Et voilà !
 
-.. _uses.cf.hycom:
+.. _uses.meta.hycom:
 
 Example: decoding and merging Hycom splitted outputs
 ====================================================
@@ -775,7 +772,7 @@ staggered variables are renamed to indicate their location.
 
 Here are the specs to take care of the staggered grid indicators in the names:
 
-.. literalinclude:: ../xoa/cf_configs/hycom.cfg
+.. literalinclude:: ../xoa/meta/configs/hycom.cfg
     :language: ini
 
 Note the ``add_coords_loc`` sections.
@@ -788,8 +785,8 @@ Register them:
 
     @suppress
     import xoa, xoa.cf
-    xoa.cf.register_cf_specs("hycom")
-    xoa.cf.is_registered_cf_specs("hycom")
+    xoa.meta.register_cf_specs("hycom")
+    xoa.meta.is_registered_cf_specs("hycom")
 
 Overview of the U dataset:
 

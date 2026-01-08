@@ -27,6 +27,7 @@ dependencies = [
     "gsw",
     "netCDF4",
     "numba",
+    "pooch",
     "scipy",
     "xarray>=0.17"
 ]

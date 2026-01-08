@@ -11,5 +11,6 @@ dependencies:
   - matplotlib-base
   - numba
   - python>=3.10
+  - pooch
   - scipy
   - xarray>=0.17

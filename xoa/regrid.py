@@ -20,16 +20,12 @@ Regridding utilities
 import numpy as np
 import xarray as xr
 
-from .__init__ import XoaError
+from . import exceptions
 from . import misc
-from . import cf as xcf
+from . import meta
 from . import coords as xcoords
 from . import grid as xgrid
-from . import interp
-
-
-class XoaRegridError(XoaError):
-    pass
+from .core import interp
 
 
 # %% 1D
@@ -207,8 +203,8 @@ def regrid1d(
     if not isinstance(dim, (tuple, list)):
         dim = (dim, dim)
     dim_in, dim_out = dim
-    cfspecs_in = xcf.get_cf_specs(da)
-    cfspecs_out = xcf.get_cf_specs(coord)
+    cfspecs_in = meta.get_meta_specs(da)
+    cfspecs_out = meta.get_meta_specs(coord)
     # - dim out
     if dim_out is None:  # get dim_out from coord_out
         dim_dict = cfspecs_out.search_dim(coord, errors="raise")
@@ -265,7 +261,7 @@ def regrid1d(
     # Interpolation function name and arguments
     func_name = str(method) + "1d"
     if method == regrid1d_methods.cellerr and not (coord_in.ndim == coord.ndim == 1):
-        raise XoaRegridError(
+        raise exceptions.XoaRegridError(
             "cellerr regrid method works only with 1D input and output coordinates"
         )
     # func = getattr(interp, func_name)
@@ -275,7 +271,7 @@ def regrid1d(
         func_kwargs.update(bias=bias, tension=tension)
     if drop_na:
         if method == "cellave" or method == "cellerr":
-            raise XoaRegridError(
+            raise exceptions.XoaRegridError(
                 "cellerr and cellave regrid method still not support the drop_na paramater"
             )
         func_kwargs.update(drop_na=drop_na, maxgap=maxgap)

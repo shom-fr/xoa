@@ -27,7 +27,7 @@ import cmocean
 import xoa
 import xoa.grid as xgrid
 import xoa.regrid as xregrid
-import xoa.cf as xcf
+import xoa.meta as xmeta
 import xoa.coords as xcoords
 import xoa.geo as xgeo
 import xoa.plot as xplot
@@ -43,8 +43,8 @@ xoa.register_accessors()
 # Register the Mercator and ARGO naming specifications
 mercator_cfg = xoa.get_cf_config_file("mercator")
 argo_cfg = xoa.get_cf_config_file("argo")
-xcf.register_cf_specs(mercator_cfg)
-xcf.register_cf_specs(argo_cfg)
+xmeta.register_meta_specs(mercator_cfg)
+xmeta.register_meta_specs(argo_cfg)
 
 # %%
 # Here is what these CF specifications contain

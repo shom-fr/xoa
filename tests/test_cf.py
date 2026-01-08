@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Test the :mod:`xoa.cf` module
+Test the :mod:`xoa.meta` module
 """
 
 # from unittest.mock import Mock
@@ -12,7 +12,7 @@ import numpy as np
 import xarray as xr
 
 import xoa
-from xoa import cf
+from xoa import meta
 
 
 @pytest.mark.parametrize(
@@ -26,7 +26,7 @@ from xoa import cf
     ],
 )
 def test_cf_sglocator_parse_attr(name_format, attr, value, expected):
-    assert cf.SGLocator(name_format=name_format).parse_attr(attr, value) == expected
+    assert meta.SGLocator(name_format=name_format).parse_attr(attr, value) == expected
 
 
 @pytest.mark.parametrize(
@@ -42,7 +42,7 @@ def test_cf_sglocator_parse_attr(name_format, attr, value, expected):
 )
 def test_cf_sglocator_parse_attr_with_valid_locations(name_format, attr, value, expected):
     assert (
-        cf.SGLocator(
+        meta.SGLocator(
             name_format=name_format,
             valid_locations=['u', 'rho'],
         ).parse_attr(attr, value)
@@ -71,7 +71,7 @@ def test_cf_sglocator_get_loc_from_da(name, standard_name, long_name, loc):
     if long_name:
         da.attrs["long_name"] = long_name
 
-    parsed_loc = cf.SGLocator(name_format="{root}_{loc}").get_loc_from_da(da)
+    parsed_loc = meta.SGLocator(name_format="{root}_{loc}").get_loc_from_da(da)
     assert parsed_loc == loc
 
 
@@ -94,8 +94,8 @@ def test_cf_sglocator_get_loc_from_da_error(name, standard_name, long_name):
     if long_name:
         da.attrs["long_name"] = long_name
 
-    sgl = cf.SGLocator(name_format="{root}_{loc}")
-    with pytest.raises(cf.XoaCFError):
+    sgl = meta.SGLocator(name_format="{root}_{loc}")
+    with pytest.raises(meta.XoaMetaError):
         sgl.get_loc_from_da(da, errors="raise")
 
     sgl.get_loc_from_da(da, errors="ignore")
@@ -121,7 +121,7 @@ def test_cf_sglocator_match_attr(attr, root, loc, expected):
         long_name="My var at T location",
         name="myvar_t",
     )[attr]
-    assert cf.SGLocator(name_format="{root}_{loc}").match_attr(attr, value, root, loc) is expected
+    assert meta.SGLocator(name_format="{root}_{loc}").match_attr(attr, value, root, loc) is expected
 
 
 @pytest.mark.parametrize(
@@ -135,12 +135,12 @@ def test_cf_sglocator_match_attr(attr, root, loc, expected):
     ],
 )
 def test_cf_sglocator_format_attr(name_format, attr, root, loc, expected):
-    assert cf.SGLocator(name_format=name_format).format_attr(attr, root, loc) == expected
+    assert meta.SGLocator(name_format=name_format).format_attr(attr, root, loc) == expected
 
 
 def test_cf_sglocator_format_attr_valid_locations():
-    with pytest.raises(cf.XoaCFError) as excinfo:
-        cf.SGLocator(valid_locations="x").format_attr("name", "banana", "y")
+    with pytest.raises(meta.XoaMetaError) as excinfo:
+        meta.SGLocator(valid_locations="x").format_attr("name", "banana", "y")
     assert str(excinfo.value) == ('Location "y" is invalid. Valid locations are: x')
 
 
@@ -153,7 +153,7 @@ def test_cf_sglocator_format_attrs_no_loc():
         "str_attr": "good",
     }
 
-    fmt_attrs = cf.SGLocator(name_format="{root}_{loc}").format_attrs(attrs, loc='')
+    fmt_attrs = meta.SGLocator(name_format="{root}_{loc}").format_attrs(attrs, loc='')
     assert fmt_attrs["name"] == "u_u"
     assert fmt_attrs["standard_name"] == "banana"
     assert fmt_attrs["long_name"] == "Banana"
@@ -170,7 +170,7 @@ def test_cf_sglocator_format_attrs_with_loc():
         "str_attr": "good",
     }
 
-    fmt_attrs = cf.SGLocator(name_format="{root}_{loc}").format_attrs(attrs, loc="f")
+    fmt_attrs = meta.SGLocator(name_format="{root}_{loc}").format_attrs(attrs, loc="f")
     assert fmt_attrs["name"] == "u_u"
     assert fmt_attrs["standard_name"] == "banana_at_f_location"
     assert fmt_attrs["long_name"] == "Banana at F location"
@@ -193,7 +193,7 @@ def test_cf_sglocator_format_attrs_with_loc():
     ],
 )
 def test_cf_sglocator_merge_attr(value0, value1, loc, value):
-    out = cf.SGLocator(name_format="{root}_{loc}").merge_attr("name", value0, value1, loc)
+    out = meta.SGLocator(name_format="{root}_{loc}").merge_attr("name", value0, value1, loc)
     assert out == value
 
 
@@ -221,7 +221,7 @@ def test_cf_sglocator_patch_attrs(isn, psn, osn, loc, replace):
     if psn:
         patch["standard_name"] = psn
 
-    oattrs = cf.SGLocator(name_format="{root}_{loc}").patch_attrs(
+    oattrs = meta.SGLocator(name_format="{root}_{loc}").patch_attrs(
         iattrs, patch, loc=loc, replace=replace
     )
 
@@ -266,7 +266,7 @@ def test_cf_sglocator_format_dataarray(
         name="banana_t",
         attrs={"standard_name": "banana", "taste": "good"},
     )
-    banana_fmt = cf.SGLocator(name_format="{root}_{loc}").format_dataarray(
+    banana_fmt = meta.SGLocator(name_format="{root}_{loc}").format_dataarray(
         banana, loc=floc, name=fname, attrs=fattrs, replace_attrs=replace_attrs
     )
     assert banana_fmt.name == out_name
@@ -276,7 +276,7 @@ def test_cf_sglocator_format_dataarray(
 
 def test_cf_sglocator_format_dataarray_no_copy_no_rename():
     banana = xr.DataArray(1, name="banana_t", attrs={"standard_name": "banana"})
-    banana_fmt = cf.SGLocator(name_format="{root}_{loc}").format_dataarray(
+    banana_fmt = meta.SGLocator(name_format="{root}_{loc}").format_dataarray(
         banana, "p", copy=False, rename=False
     )
     assert banana_fmt is banana
@@ -286,34 +286,34 @@ def test_cf_sglocator_format_dataarray_no_copy_no_rename():
 
 @pytest.mark.parametrize("cache", ["ignore", "write", "rw", "read", "ignore", "clean", "rw"])
 def test_cf_get_cfg_specs(cache):
-    assert isinstance(cf.get_cf_specs(cache=cache), cf.CFSpecs)
+    assert isinstance(meta.get_meta_specs(cache=cache), meta.MetaSpecs)
 
 
 def test_cf_get_cfg_specs_var():
-    specs = cf.get_cf_specs().data_vars["temp"]
+    specs = meta.get_meta_specs().data_vars["temp"]
     assert specs["alt_names"][0] == "temperature"
     assert specs["attrs"]["standard_name"][0] == "sea_water_temperature"
     assert specs["cmap"] == "cmo.thermal"
-    new_specs = cf.get_cf_specs()["temp"]
+    new_specs = meta.get_meta_specs()["temp"]
     assert new_specs is specs
 
 
 def test_cf_get_cfg_specs_var_inherit():
-    specs = cf.get_cf_specs().data_vars["sst"]
+    specs = meta.get_meta_specs().data_vars["sst"]
     assert specs["attrs"]["standard_name"][0] == "sea_surface_temperature"
     assert specs["attrs"]["units"][0] == "degrees_celsius"
 
 
 def test_cf_get_cfg_specs_coord():
-    specs = cf.get_cf_specs().coords["lon"]
+    specs = meta.get_meta_specs().coords["lon"]
     assert specs["alt_names"][0] == "longitude"
     assert "longitude" in specs["alt_names"]
-    new_specs = cf.get_cf_specs()["lon"]
+    new_specs = meta.get_meta_specs()["lon"]
     assert new_specs is specs
 
 
 def test_cf_get_cfg_specs_coord_inherit():
-    specs = cf.get_cf_specs().coords["depth"]
+    specs = meta.get_meta_specs().coords["depth"]
     assert specs["alt_names"][0] == "dep"
     assert specs["attrs"]["long_name"][0] == "Depth"
 
@@ -326,13 +326,13 @@ def test_cf_get_cfg_specs_coord_inherit():
     ],
 )
 def test_cf_cfspecs_load_cfg(cfg, key, name):
-    cfspecs = cf.get_cf_specs()
+    cfspecs = meta.get_meta_specs()
     cfspecs.load_cfg(cfg)
     assert name in cfspecs["data_vars"][key]["alt_names"]
 
 
 def test_cf_cfspecs_copy():
-    cfspecs0 = cf.get_cf_specs()
+    cfspecs0 = meta.get_meta_specs()
     cfspecs1 = cfspecs0.copy()
     assert id(cfspecs0._dict) != id(cfspecs1._dict)
     assert sorted(list(cfspecs0._dict["data_vars"])) == sorted(list(cfspecs1._dict["data_vars"]))
@@ -342,32 +342,32 @@ def test_cf_cfspecs_copy():
     assert "temperature" in cfspecs1["data_vars"]["temp"]["alt_names"]
 
 
-def test_cf_set_cf_specs():
-    cfspecs = cf.get_cf_specs()
-    cf.set_cf_specs(cfspecs)
-    cf_cache = cf._get_cache_()
+def test_cf_set_meta_specs():
+    cfspecs = meta.get_meta_specs()
+    meta.set_meta_specs(cfspecs)
+    cf_cache = meta._get_cache_()
     assert cf_cache["current"] is cfspecs
-    assert cf.get_cf_specs() is cfspecs
+    assert meta.get_meta_specs() is cfspecs
 
 
-def test_cf_set_cf_specs_context():
-    cfspecs0 = cf.get_cf_specs()
-    cfspecs1 = cf.CFSpecs({"data_vars": {"temp": {"alt_names": "tempouille"}}})
-    assert cf.get_cf_specs() is cfspecs0
-    with cf.set_cf_specs(cfspecs1) as cfspecs:
+def test_cf_set_meta_specs_context():
+    cfspecs0 = meta.get_meta_specs()
+    cfspecs1 = meta.MetaSpecs({"data_vars": {"temp": {"alt_names": "tempouille"}}})
+    assert meta.get_meta_specs() is cfspecs0
+    with meta.set_meta_specs(cfspecs1) as cfspecs:
         assert cfspecs is cfspecs1
-        assert cf.get_cf_specs() is cfspecs1
-    assert cf.get_cf_specs() is cfspecs0
+        assert meta.get_meta_specs() is cfspecs1
+    assert meta.get_meta_specs() is cfspecs0
 
 
 @pytest.mark.parametrize("specialize,expected", [(False, "temp"), (True, "temperature")])
 def test_cf_cfspecs_get_name(specialize, expected):
-    cfspecs = cf.CFSpecs({"data_vars": {"temp": {"name": "temperature"}}})
+    cfspecs = meta.MetaSpecs({"data_vars": {"temp": {"name": "temperature"}}})
     assert cfspecs.data_vars.get_name("temp", specialize=specialize) == expected
 
 
 def test_cf_cfspecs_get_attrs():
-    cfspecs = cf.get_cf_specs()
+    cfspecs = meta.get_meta_specs()
     attrs = cfspecs.data_vars.get_attrs("temp", other="ok")
     assert attrs["long_name"] == "Sea water in situ temperature"
     assert attrs["other"] == "ok"
@@ -388,7 +388,7 @@ def test_cf_cfspecs_get_loc_mapping():
             "bathy": {"add_loc": True},
         },
     }
-    cf_specs0 = cf.CFSpecs(cf_dict0)
+    cf_specs0 = meta.MetaSpecs(cf_dict0)
 
     ds0 = xr.Dataset(
         {"u": (("time", "y", "x"), np.ones((1, 2, 3))), "bathy": (("y", "x"), np.ones((2, 3)))},
@@ -417,7 +417,7 @@ def test_cf_cfspecs_get_loc_mapping():
 def test_cf_cfspecs_match_coord(cf_name, in_name, in_attrs):
 
     lon = xr.DataArray(range(5), dims=in_name, name=in_name, attrs=in_attrs)
-    res = cf.get_cf_specs().match_coord(lon, cf_name)
+    res = meta.get_meta_specs().match_coord(lon, cf_name)
     if cf_name is None:
         assert res == 'lon'
     else:
@@ -438,7 +438,7 @@ def test_cf_cfspecs_search_coord(cf_name, in_name, in_attrs):
 
     lon = xr.DataArray(range(5), dims=in_name, name=in_name, attrs=in_attrs)
     temp = xr.DataArray(range(20, 25), dims=in_name, coords={in_name: lon}, name='temp')
-    res = cf.get_cf_specs().search_coord(temp, cf_name, get="cf_name")
+    res = meta.get_meta_specs().search_coord(temp, cf_name, get="cf_name")
     assert res == 'lon'
 
 
@@ -451,7 +451,7 @@ def test_cf_cfspecs_search_coord_with_stacking():
         }
     ).stack(npts=("lat", "lon"))
 
-    res = cf.get_cf_specs().search_coord(ds, "lon", get="obj")
+    res = meta.get_meta_specs().search_coord(ds, "lon", get="obj")
     assert res is not None
     assert res.shape == (20,)
     assert res.name == "lon"
@@ -471,7 +471,7 @@ def test_cf_cfspecs_match_data_var(cf_name, in_name, in_attrs):
     temp = xr.DataArray(
         range(20, 25), dims='lon', coords={'lon': lon}, name=in_name, attrs=in_attrs
     )
-    res = cf.get_cf_specs().match_data_var(temp, cf_name)
+    res = meta.get_meta_specs().match_data_var(temp, cf_name)
     if cf_name is None:
         assert res == 'temp'
     else:
@@ -493,14 +493,14 @@ def test_cf_cfspecs_search_data_var(cf_name, in_name, in_attrs):
         range(20, 25), dims='lon', coords={'lon': lon}, name=in_name, attrs=in_attrs
     )
     ds = temp.to_dataset()
-    assert cf.get_cf_specs().search_data_var(ds, cf_name, get="cf_name") == 'temp'
+    assert meta.get_meta_specs().search_data_var(ds, cf_name, get="cf_name") == 'temp'
 
 
 def test_cf_cfspecs_get():
 
     ds = xr.Dataset({"xtemp": ("x", [0], {"standard_name": "sea_water_temperature"}), "psal": 1})
 
-    cfspecs = cf.get_cf_specs()
+    cfspecs = meta.get_meta_specs()
     assert cfspecs.get(ds, "temp").name == "xtemp"
     assert cfspecs.get(ds, ["temp", "psal"]).name == "xtemp"
     assert cfspecs.get(ds, "depth") is None
@@ -523,7 +523,7 @@ def test_cf_cfspecs_cats_get_loc_arg():
             },
         },
     }
-    cf_specs0 = cf.CFSpecs(cf_dict0)
+    cf_specs0 = meta.MetaSpecs(cf_dict0)
 
     ds0 = xr.Dataset(
         {"u": (("time", "y", "x"), np.ones((1, 2, 3))), "bathy": (("y", "x"), np.ones((2, 3)))},
@@ -543,7 +543,7 @@ def test_cf_cfspecs_cats_get_loc_arg():
 
     cf_dict1 = cf_dict0.copy()
     cf_dict1["data_vars"]["u"]["add_coords_loc"]["lon"] = "v"
-    cf_specs1 = cf.CFSpecs(cf_dict1)
+    cf_specs1 = meta.MetaSpecs(cf_dict1)
     locations1 = cf_specs1.get_loc_mapping(ds0)
     assert cf_specs1.coords.get_loc_arg(ds0["lon"], locations=locations1) == "v"
 
@@ -560,7 +560,7 @@ def test_cf_cfspecs_cats_get_loc_arg():
 def test_cf_cfspecs_cats_format_dataarray(cf_name, in_name, in_attrs):
 
     lon = xr.DataArray(range(5), dims=in_name, name=in_name, attrs=in_attrs)
-    lon = cf.get_cf_specs().coords.format_dataarray(lon, cf_name)
+    lon = meta.get_meta_specs().coords.format_dataarray(lon, cf_name)
     assert lon.name == "lon"
     assert lon.standard_name == "longitude"
     assert lon.long_name == "Longitude"
@@ -569,7 +569,7 @@ def test_cf_cfspecs_cats_format_dataarray(cf_name, in_name, in_attrs):
 
 def test_cf_cfspecs_cats_format_dataarray_unknown():
     coord = xr.DataArray(range(5), name='foo')
-    cfspecs = cf.get_cf_specs()
+    cfspecs = meta.get_meta_specs()
 
     coord_fmt = cfspecs.coords.format_dataarray(coord, rename=False)
     assert coord_fmt is None
@@ -580,7 +580,7 @@ def test_cf_cfspecs_cats_format_dataarray_unknown():
 
 def test_cf_cfspecs_cats_get_allowed_names():
     cfg = {"data_vars": {"banana": {"name": "bonono", "alt_names": ["binini", "bununu"]}}}
-    cfspecs = cf.CFSpecs(cfg)
+    cfspecs = meta.MetaSpecs(cfg)
     assert cfspecs.data_vars.get_allowed_names("banana") == ['bonono', 'binini', 'bununu', 'banana']
 
 
@@ -600,7 +600,7 @@ def test_cf_cfspecs_format_obj_with_loc():
             "bathy": {"add_loc": True},
         },
     }
-    cf_specs0 = cf.CFSpecs(cf_dict0)
+    cf_specs0 = meta.MetaSpecs(cf_dict0)
 
     ds0 = xr.Dataset(
         {"u": (("time", "y", "x"), np.ones((1, 2, 3))), "bathy": (("y", "x"), np.ones((2, 3)))},
@@ -631,7 +631,7 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
     temp = xr.DataArray(
         range(20, 25), dims='xxx', coords={'xxx': lon}, name=in_name, attrs=in_attrs
     )
-    temp = cf.get_cf_specs().format_data_var(temp, cf_name)
+    temp = meta.get_meta_specs().format_data_var(temp, cf_name)
     assert temp.name == "temp"
     assert temp.standard_name == "sea_water_temperature"
     assert temp.long_name == "Sea water in situ temperature"
@@ -641,12 +641,12 @@ def test_cf_cfspecs_format_data_var(cf_name, in_name, in_attrs):
 
 def test_cf_cfspecs_format_data_var_coord():
     da = xr.DataArray(0, attrs={'standard_name': 'longitude_at_u_location'})
-    da = cf.get_cf_specs().format_data_var(da)
+    da = meta.get_meta_specs().format_data_var(da)
 
 
 def test_cf_cfspecs_format_data_var_specialize():
     da = xr.DataArray(1, name="salinity")
-    cfspecs = cf.CFSpecs({'data_vars': {'sal': {'name': 'supersal'}}})
+    cfspecs = meta.MetaSpecs({'data_vars': {'sal': {'name': 'supersal'}}})
     da = cfspecs.format_data_var(da, specialize=True)
     assert da.name == "supersal"
     assert da.standard_name == "sea_water_salinity"
@@ -660,7 +660,7 @@ def test_cf_cfspecs_format_data_var_loc():
             "name_format": "{root}_{loc}",
         },
     }
-    cfspecs0 = cf.CFSpecs(cf_dict0)
+    cfspecs0 = meta.MetaSpecs(cf_dict0)
 
     temp_fmt = cfspecs0.format_data_var(temp, "temp", format_coords=False, replace_attrs=True)
     assert temp_fmt.name == "temp"
@@ -672,14 +672,14 @@ def test_cf_cfspecs_format_data_var_loc():
         },
         "data_vars": {"temp": {"add_loc": True}},
     }
-    cfspecs1 = cf.CFSpecs(cf_dict1)
+    cfspecs1 = meta.MetaSpecs(cf_dict1)
     temp_fmt = cfspecs1.format_data_var(temp, "temp", format_coords=False, replace_attrs=True)
     assert temp_fmt.name == "temp_x"
 
 
 def test_cf_cfspecs_format_data_var_unkown():
     da = xr.DataArray(range(5), name='foo')
-    cfspecs = cf.get_cf_specs()
+    cfspecs = meta.get_meta_specs()
 
     da_fmt = cfspecs.format_data_var(da, rename=False)
     assert da_fmt.name == "foo"
@@ -691,7 +691,7 @@ def test_cf_cfspecs_format_data_var_unkown():
 def test_cf_cfspecs_exclude_data_var():
     ds = xr.Dataset({"temperature": ("nx", [1, 2])})
     ds.temperature.attrs["standard_name"] = "sea_water_potential_temperature"
-    cfspecs = cf.CFSpecs(
+    cfspecs = meta.MetaSpecs(
         {"data_vars": {"temp": {"name": "temperature"}, "ptemp": {"exclude": True}}}
     )
     ds = cfspecs.decode(ds)
@@ -707,7 +707,7 @@ def test_cf_cfspecs_to_loc():
             "time": ("time", [1]),
         },
     )
-    cfspecs = cf.CFSpecs({"sglocator": {"name_format": "{root}_{loc}"}})
+    cfspecs = meta.MetaSpecs({"sglocator": {"name_format": "{root}_{loc}"}})
     dso = cfspecs.to_loc(ds, x=False, y='v', u=None)
     assert "x" in dso.dims
     assert "y_v" in dso.dims
@@ -724,7 +724,7 @@ def test_cf_cfspecs_reloc():
             "time": ("time", [1]),
         },
     )
-    cfspecs = cf.CFSpecs({"sglocator": {"name_format": "{root}_{loc}"}})
+    cfspecs = meta.MetaSpecs({"sglocator": {"name_format": "{root}_{loc}"}})
     dso = cfspecs.reloc(ds, u=False, t='u')
     assert "x" in dso.dims
     assert "u_u" in dso
@@ -732,7 +732,7 @@ def test_cf_cfspecs_reloc():
 
 
 def test_cf_cfspecs_coords_get_axis():
-    cfspecs = cf.get_cf_specs().coords
+    cfspecs = meta.get_meta_specs().coords
 
     # from attrs
     depth = xr.DataArray([1], dims='aa', attrs={'axis': 'z'})
@@ -744,7 +744,7 @@ def test_cf_cfspecs_coords_get_axis():
 
 
 def test_cf_cfspecs_coords_get_dim_type():
-    cfspecs = cf.get_cf_specs().coords
+    cfspecs = meta.get_meta_specs().coords
 
     # from name
     assert cfspecs.get_dim_type('aa') is None
@@ -757,7 +757,7 @@ def test_cf_cfspecs_coords_get_dim_type():
 
 
 def test_cf_cfspecs_coords_get_dim_types():
-    cfspecs = cf.get_cf_specs().coords
+    cfspecs = meta.get_meta_specs().coords
 
     aa = xr.DataArray([0, 1], dims="aa", attrs={"standard_name": "latitude"})
     da = xr.DataArray(np.ones((2, 2, 2)), dims=('foo', 'aa', 'xi'), coords={'aa': aa})
@@ -768,7 +768,7 @@ def test_cf_cfspecs_coords_get_dim_types():
 
 
 def test_cf_cfspecs_coords_search_dim():
-    cfspecs = cf.get_cf_specs().coords
+    cfspecs = meta.get_meta_specs().coords
 
     # from name
     temp = xr.DataArray(np.arange(2 * 3).reshape(1, 2, 3), dims=('aa', 'ny', 'x'))
@@ -822,7 +822,7 @@ def test_cf_cfspecs_coords_search_from_dim():
         coords={'mem': mem, 'aa': level, 'lon': lon},
     )
 
-    cfspecs = cf.get_cf_specs().coords
+    cfspecs = meta.get_meta_specs().coords
 
     # Direct coordinate
     assert cfspecs.search_from_dim(temp, 'aa').name == 'aa'
@@ -856,7 +856,7 @@ def test_cf_cfspecs_coords_get_dims():
         np.ones((2, 2, 2, 2)), dims=('r', 'level', 'yy', 'xi'), coords={'level': depth, 'yy': lat}
     )
 
-    cfspecs = cf.get_cf_specs().coords
+    cfspecs = meta.get_meta_specs().coords
     dims = cfspecs.get_dims(da, ['x', 'y', 'z', 't'], allow_positional=True)
     assert dims == ('xi', 'yy', 'level', 'r')
     dims = cfspecs.get_dims(da, 'f', errors="ignore")
@@ -865,13 +865,13 @@ def test_cf_cfspecs_coords_get_dims():
 
 def test_cf_cfspecs_infer_coords():
     ds = xr.Dataset({"temp": ("nx", [1, 2]), "lon": ("nx", [4, 5])})
-    ds = cf.get_cf_specs().infer_coords(ds)
+    ds = meta.get_meta_specs().infer_coords(ds)
     assert "lon" in ds.coords
 
 
 def test_cf_cfspecs_decode_encode():
     ds = xr.open_dataset(xoa.get_data_sample("croco.south-africa.meridional.nc"))
-    cfspecs = cf.CFSpecs("croco")
+    cfspecs = meta.MetaSpecs("croco")
 
     dsc = cfspecs.decode(ds)
     assert list(dsc) == [
@@ -933,9 +933,9 @@ def test_cf_dataarraycfaccessor():
     lon = xr.DataArray(range(5), dims='xxx', name='xxx', attrs={'standard_name': 'longitude'})
     temp = xr.DataArray(range(20, 25), dims='xxx', coords={'xxx': lon}, name='temp')
 
-    assert temp.xcf.lon.name == 'xxx'
-    assert temp.xcf.lat is None
-    assert temp.xcf.lon.xcf.name == "lon"
+    assert temp.xmeta.lon.name == 'xxx'
+    assert temp.xmeta.lat is None
+    assert temp.xmeta.lon.xmeta.name == "lon"
 
 
 def test_cf_datasetcfaccessor():
@@ -955,13 +955,13 @@ def test_cf_datasetcfaccessor():
     )
 
     ds = temp.to_dataset()
-    assert ds.xcf.temp.name == 'yoyo'
-    assert ds.xcf.sal is None
+    assert ds.xmeta.temp.name == 'yoyo'
+    assert ds.xmeta.sal is None
 
 
-def test_cf_register_cf_specs():
+def test_cf_register_meta_specs():
 
-    cf_cache = cf._get_cache_()
+    cf_cache = meta._get_cache_()
     cf_cache["registered"].clear()
 
     content = """
@@ -973,21 +973,21 @@ def test_cf_register_cf_specs():
             name=mytemp
         """
 
-    cf_specs = cf.CFSpecs(content)
+    cf_specs = meta.MetaSpecs(content)
     assert cf_specs.name == "myname"
 
-    cf.register_cf_specs(cf_specs)
+    meta.register_meta_specs(cf_specs)
     assert cf_specs in cf_cache["registered"]
     assert cf_specs.name == "myname"
 
-    cf.register_cf_specs(myothername=cf_specs)
+    meta.register_meta_specs(myothername=cf_specs)
     assert cf_specs in cf_cache["registered"]
     assert cf_specs.name == "myothername"
 
 
-def test_cf_get_cf_specs_registered():
+def test_cf_get_meta_specs_registered():
 
-    cf_cache = cf._get_cache_()
+    cf_cache = meta._get_cache_()
     cf_cache["registered"].clear()
     content = """
         [register]
@@ -997,16 +997,16 @@ def test_cf_get_cf_specs_registered():
             [[temp]]
             name=mytemp
         """
-    cf_specs_in = cf.CFSpecs(content)
-    cf.register_cf_specs(cf_specs_in)
+    cf_specs_in = meta.MetaSpecs(content)
+    meta.register_meta_specs(cf_specs_in)
 
-    cf_specs_out = cf.get_cf_specs(name='myname')
+    cf_specs_out = meta.get_meta_specs(name='myname')
     assert cf_specs_out is cf_specs_in
 
 
-def test_cf_get_cf_specs_from_encoding():
+def test_cf_get_meta_specs_from_encoding():
 
-    cf_cache = cf._get_cache_()
+    cf_cache = meta._get_cache_()
     cf_cache["registered"].clear()
     content = """
         [register]
@@ -1016,8 +1016,8 @@ def test_cf_get_cf_specs_from_encoding():
             [[temp]]
             name=mytemp
         """
-    cf_specs_in = cf.CFSpecs(content)
-    cf.register_cf_specs(cf_specs_in)
+    cf_specs_in = meta.MetaSpecs(content)
+    meta.register_meta_specs(cf_specs_in)
 
     ds = xr.Dataset(
         {
@@ -1028,20 +1028,20 @@ def test_cf_get_cf_specs_from_encoding():
     )
 
     ds.encoding.update(cf_specs="mynam234")
-    assert cf.get_cf_specs_from_encoding(ds) is cf_specs_in
+    assert meta.get_meta_specs_from_encoding(ds) is cf_specs_in
 
     ds.mytemp.encoding.update(cf_specs="mynam234")
-    assert cf.get_cf_specs_from_encoding(ds.mytemp) is cf_specs_in
+    assert meta.get_meta_specs_from_encoding(ds.mytemp) is cf_specs_in
 
     ds.mylon.encoding.update(cf_specs="mynam234")
-    assert cf.get_cf_specs_from_encoding(ds.mylon) is cf_specs_in
+    assert meta.get_meta_specs_from_encoding(ds.mylon) is cf_specs_in
 
-    assert cf.get_cf_specs_from_encoding(ds.mylat) is None
+    assert meta.get_meta_specs_from_encoding(ds.mylat) is None
 
 
-def test_cf_set_cf_specs_registered():
+def test_cf_set_meta_specs_registered():
 
-    cf_cache = cf._get_cache_()
+    cf_cache = meta._get_cache_()
     cf_cache["registered"].clear()
     content = """
         [register]
@@ -1051,21 +1051,21 @@ def test_cf_set_cf_specs_registered():
             [[temp]]
             name=mytemp
         """
-    cf_specs_in = cf.CFSpecs(content)
-    cf.register_cf_specs(cf_specs_in)
+    cf_specs_in = meta.MetaSpecs(content)
+    meta.register_meta_specs(cf_specs_in)
 
-    with cf.set_cf_specs("myname2") as cfspecs:
+    with meta.set_meta_specs("myname2") as cfspecs:
         assert cfspecs is cf_specs_in
 
 
-def test_cf_get_cf_specs_matching_score():
+def test_cf_get_meta_specs_matching_score():
 
     cf_content0 = """
         [data_vars]
             [[temp]]
             name=mytemp
         """
-    cf_specs0 = cf.CFSpecs(cf_content0)
+    cf_specs0 = meta.MetaSpecs(cf_content0)
     cf_content1 = """
         [data_vars]
             [[temp]]
@@ -1076,7 +1076,7 @@ def test_cf_get_cf_specs_matching_score():
             [[lon]]
             name=mylon
         """
-    cf_specs1 = cf.CFSpecs(cf_content1)
+    cf_specs1 = meta.MetaSpecs(cf_content1)
     cf_content2 = """
         [data_vars]
             [[temp]]
@@ -1084,7 +1084,7 @@ def test_cf_get_cf_specs_matching_score():
             [[sal]]
             name=mysal
         """
-    cf_specs2 = cf.CFSpecs(cf_content2)
+    cf_specs2 = meta.MetaSpecs(cf_content2)
 
     ds = xr.Dataset(
         {
@@ -1095,10 +1095,10 @@ def test_cf_get_cf_specs_matching_score():
     )
 
     for cf_specs, score in [(cf_specs0, 25), (cf_specs1, 75), (cf_specs2, 50)]:
-        assert cf.get_cf_specs_matching_score(ds, cf_specs) == score
+        assert meta.get_meta_specs_matching_score(ds, cf_specs) == score
 
 
-def test_cf_infer_cf_specs():
+def test_cf_infer_meta_specs():
 
     cf_content0 = """
         [register]
@@ -1109,7 +1109,7 @@ def test_cf_infer_cf_specs():
             [[temp]]
             name=mytemp
         """
-    cf_specs0 = cf.CFSpecs(cf_content0)
+    cf_specs0 = meta.MetaSpecs(cf_content0)
     cf_content1 = """
         [data_vars]
             [[temp]]
@@ -1120,7 +1120,7 @@ def test_cf_infer_cf_specs():
             [[lon]]
             name=mylon
         """
-    cf_specs1 = cf.CFSpecs(cf_content1)
+    cf_specs1 = meta.MetaSpecs(cf_content1)
     cf_content2 = """
         [register]
         name=hycom3d
@@ -1131,21 +1131,21 @@ def test_cf_infer_cf_specs():
             [[sal]]
             name=mysal
         """
-    cf_specs2 = cf.CFSpecs(cf_content2)
+    cf_specs2 = meta.MetaSpecs(cf_content2)
 
-    cf_cache = cf._get_cache_()
+    cf_cache = meta._get_cache_()
     cf_cache["registered"].clear()
-    cf.register_cf_specs(cf_specs0, cf_specs1, cf_specs2)
+    meta.register_meta_specs(cf_specs0, cf_specs1, cf_specs2)
 
     temp = xr.DataArray([1], dims="mylon")
     sal = xr.DataArray([1], dims="mylon")
     lon = xr.DataArray([1], dims="mylon")
 
     ds = xr.Dataset({"mytemp": temp, "mysal": sal}, coords={"mylon": lon})
-    assert cf.infer_cf_specs(ds, from_score=True) is cf_specs1
+    assert meta.infer_meta_specs(ds, from_score=True) is cf_specs1
 
     ds.attrs.update(source="my hycom3d!")
-    assert cf.infer_cf_specs(ds, from_score=True) is cf_specs0
+    assert meta.infer_meta_specs(ds, from_score=True) is cf_specs0
 
     ds.attrs.update(cf_specs="hycom3d")
-    assert cf.infer_cf_specs(ds, from_score=True) is cf_specs2
+    assert meta.infer_meta_specs(ds, from_score=True) is cf_specs2

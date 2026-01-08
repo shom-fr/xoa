@@ -8,7 +8,7 @@ import xarray as xr
 import pytest
 
 from xoa import regrid
-from test_interp import get_grid2locs_coords, vfunc, get_interp1d_data
+from test_core_interp import get_grid2locs_coords, vfunc, get_interp1d_data
 
 
 def test_regrid_regrid1d():

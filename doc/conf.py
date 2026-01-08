@@ -28,7 +28,7 @@ author = 'Shom'
 import xoa
 
 release = xoa.__version__
-xoa.register_accessors(xoa=True, xcf=True, decode_sigma=True)
+xoa.register_accessors(xoa=True, xmeta=True, decode_sigma=True)
 
 
 # %% General configuration
@@ -48,7 +48,7 @@ extensions = [
     "IPython.sphinxext.ipython_directive",
     "IPython.sphinxext.ipython_console_highlighting",
     'genoptions',
-    'gencfspecs',
+    'genmetaspecs',
     'genlogos',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput',
@@ -125,8 +125,8 @@ genoptions_table = 'genoptions/table.txt'
 genoptions_declarations = 'genoptions/declarations.txt'
 
 # %% Cfgm
-cfgm_get_cfgm_func = "xoa.cf._get_cfgm_"
-cfgm_rst_file = "cf.txt"
+cfgm_get_cfgm_func = "xoa.meta.general._get_cfgm_"
+cfgm_rst_file = "meta.txt"
 
 # %% Extlinks
 extlinks = {

@@ -25,7 +25,7 @@ import cartopy.crs as ccrs
 import xoa
 from xoa.grid import dz2depth, shift
 from xoa.regrid import grid2loc, regrid1d
-import xoa.cf as xcf
+import xoa.meta as xmeta
 import xoa.geo as xgeo
 from xoa.plot import plot_flow, plot_double_minimap
 
@@ -40,12 +40,12 @@ xoa.register_accessors()
 # Set the internal Hycom naming specifications as the current ones
 hycom_cfg_file = xoa.get_cf_config_file("hycom")
 print(hycom_cfg_file)
-xcf.set_cf_specs(hycom_cfg_file)
+xmeta.set_meta_specs(hycom_cfg_file)
 
 # %%
 # Note that, since this file is internal, you can do it simply with::
 #
-#        xcf.set_cf_specs("hycom")
+#        xmeta.set_meta_specs("hycom")
 #
 # Here is what these CF specifications contain
 
@@ -95,7 +95,7 @@ hycom.coords["depth"] = dz2depth(hycom.dz, centered=True)
 # %%
 # Then we interpolate the velocity components to the T location with
 # the :func:`xoa.grid.shift` function.
-# The call to :meth:`reloc <xoa.cf.CFSpecs.reloc>` helps removing the
+# The call to :meth:`reloc <xoa.meta.MetaSpecs.reloc>` helps removing the
 # staggered grid location prefixes.
 
 ut_hycom = shift(u_hycom, {"x": "left", "y": "left"}).xoa.reloc(u=False)
@@ -127,7 +127,7 @@ drifter = drifter.resample("3h").mean()
 # %%
 # We switch to default naming conventions for the drifter.
 
-xcf.set_cf_specs("default")
+xmeta.set_meta_specs("default")
 
 
 # %%

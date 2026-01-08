@@ -11,7 +11,7 @@ import warnings
 import numpy as np
 import xarray as xr
 
-from .__init__ import XoaError, xoa_warn
+from . import exceptions
 from . import misc
 from . import geo as xgeo
 from . import coords as xcoords
@@ -50,14 +50,10 @@ def _syminv_(a):
     if isinstance(res, tuple):
         info = res[1]
         if info:
-            raise KrigingError(f'Error during call to Lapack DPPTRI (info={info})')
+            raise exceptions.KrigingError(f'Error during call to Lapack DPPTRI (info={info})')
         return res[0]
     else:
         return res
-
-
-class KrigingError(XoaError):
-    pass
 
 
 def get_xyz(obj):
@@ -250,7 +246,7 @@ def get_variogram_model_func(mtype, n, s, r, nrelmax=0.2):
         return lambda h: n + (s - n) * (1 - np.exp(-3 * h / r))
 
     if mtype.name == 'gaussian':
-        return lambda h: n + (s - n) * (1 - np.exp(-3 * h ** 2 / r ** 2))
+        return lambda h: n + (s - n) * (1 - np.exp(-3 * h**2 / r**2))
 
     if mtype.name == 'spherical':
         return lambda h: n + (s - n) * ((1.5 * h / r - 0.5 * (h / r) ** 3) * (h <= r) + 1 * (h > r))
@@ -373,7 +369,7 @@ class VariogramModel(object):
             Returns None if the parameter is not frozen and has not been estimated yet.
         """
         if name not in self.param_names:
-            raise KrigingError(
+            raise exceptions.KrigingError(
                 f"Invalid param name: {name}. Please use one of: " + ", ".join(self.param_names)
             )
         if name in self._frozen_params:
@@ -391,7 +387,7 @@ class VariogramModel(object):
         """
         pp = list(self.estimated_params.values())
         if None in pp:
-            raise VariogramModelError(
+            raise exceptions.XoaKrigingError(
                 "Not all parameters are estimated: {}".format(self.estimated_params)
             )
         return np.array(pp)
@@ -432,7 +428,7 @@ class VariogramModel(object):
         else:
             params = self.get_params()
             if None in list(params.values()):
-                raise VariogramModelError(
+                raise exceptions.XoaKrigingError(
                     "Not all parameters are estimated: {}".format(self.estimated_params)
                 )
         return get_variogram_model_func(self.mtype, **params)
@@ -444,12 +440,12 @@ class VariogramModel(object):
             if len(da) == 1:
                 da = da[list(da)[0]]
             elif len(da) > 1:
-                xoa_warn(
+                exceptions.exceptions.xoa_warn(
                     "Multiple candidate variables found in the dataset for estimating "
                     "the variogram parameters. Keeping only the first one."
                 )
             elif len(da) == 0:
-                raise KrigingError(
+                raise exceptions.KrigingError(
                     "No variable found in the dataset for estimating the variogram parameters."
                 )
 
@@ -460,7 +456,7 @@ class VariogramModel(object):
                 and da.dist.attrs["units"] in xgeo.distance_units
                 and xgeo.distance_units[da.dist.attrs["units"]] != self._dist_units
             ):
-                xoa_warn(
+                exceptions.exceptions.xoa_warn(
                     "Incompatible distance units: {} vs {}".format(
                         self._dist_units, da.dist.attrs["units"]
                     )
@@ -549,10 +545,6 @@ class VariogramModel(object):
         return p
 
 
-class VariogramModelError(KrigingError):
-    pass
-
-
 class kriging_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     """Supported kriging of variograms"""
 
@@ -607,7 +599,7 @@ class Kriger(object):
 
     def __init__(
         self,
-        da: xr.DataArray,
+        da,
         krigtype,
         variogram_func,
         npmax=None,
@@ -630,7 +622,7 @@ class Kriger(object):
             else:
                 dist_units = xgeo.distance_units[dist_units]
             if dist_units != variogram_func.dist_units:
-                xoa_warn(
+                exceptions.xoa_warn(
                     f"Incompatible distance units: {dist_units} vs {variogram_func.dist_units}"
                 )
             variogram_func.fit(da)
@@ -819,7 +811,7 @@ class Kriger(object):
             del W, B
 
             # Weigthed contribution based on errors
-            w = 1 / e ** 2
+            w = 1 / e**2
             if self.nclust > 1:
                 z[:] *= w
             wo += w

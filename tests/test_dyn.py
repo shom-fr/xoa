@@ -9,8 +9,8 @@ import xarray as xr
 from xoa import dyn
 
 
-def test_dyn_flow2d():
-
+def test_flow2d():
+    """Test flow2d function"""
     lon = xr.DataArray(np.arange(4), dims='lon')
     lat = xr.DataArray(np.arange(3), dims='lat')
     u = xr.DataArray(lat*lon/3, dims=('lat', 'lon'), coords={'lon': lon, 'lat': lat})

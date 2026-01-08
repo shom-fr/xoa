@@ -10,22 +10,31 @@ Package API
 
     xoa
     xoa.accessors
-    xoa.cf
-    xoa.cf_configs
     xoa.cfgm
     xoa.cli
     xoa.color
     xoa.coords
+    xoa.core
+    xoa.core.geo
+    xoa.core.interp
+    xoa.core.num
     xoa.data_samples
     xoa.dyn
     xoa.filter
     xoa.geo
     xoa.grid
-    xoa.interp
     xoa.krig
+    xoa.meta
     xoa.misc
-    xoa.num
     xoa.plot
     xoa.regrid
     xoa.thermdyn
     xoa.sigma
+
+Deprecated modules
+------------------
+
+.. autosummary::
+    :toctree: api
+
+    xoa.cf

@@ -6,7 +6,7 @@ Filters are adapted from https://matplotlib.org/stable/gallery/misc/demo_agg_fil
 and http://vacumm.github.io/vacumm/library/misc.core_plot.html
 
 """
-# Copyright 2020-2022 Shom
+# Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import xarray as xr
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
-from .__init__ import xoa_warn
+from . import exceptions
 from . import misc as xmisc
 from . import geo as xgeo
 from . import cf as xcf
@@ -316,7 +316,7 @@ def plot_ts(
         attrs = temp.attrs
         temp = gsw.pt0_from_t(sal_abs, temp, pres)
         temp.attrs.update(attrs)
-        cfspecs.format_data_var(temp, cf_name="ptemp", copy=False, replace_attrs=True)
+        cfspecs.format_data_var(temp, meta_name="ptemp", copy=False, replace_attrs=True)
 
     # Init plot
     axes = kwargs.get("ax", axes)
@@ -894,7 +894,7 @@ def add_shadow(
         gauss = DropShadowFilter(width, offsets=(xoffset, yoffset), alpha=alpha, color=color)
         return add_agg_filter(objs, gauss, zorder=zorder, ax=ax, add=add)
     except:
-        xoa_warn('Cannot plot shadows using agg filters')
+        exceptions.xoa_warn('Cannot plot shadows using agg filters')
 
 
 def add_glow(objs, width=3, zorder=None, color='w', ax=None, alpha=1.0, add=True):
@@ -920,7 +920,7 @@ def add_glow(objs, width=3, zorder=None, color='w', ax=None, alpha=1.0, add=True
         white_glows = GrowFilter(width, color=color, alpha=alpha)
         return add_agg_filter(objs, white_glows, zorder=zorder, ax=ax, add=add)
     except:
-        xoa_warn('Cannot add glow effect using agg filters')
+        exceptions.xoa_warn('Cannot add glow effect using agg filters')
 
 
 def add_lightshading(objs, width=7, fraction=0.5, zorder=None, ax=None, add=True, **kwargs):
@@ -948,4 +948,4 @@ def add_lightshading(objs, width=7, fraction=0.5, zorder=None, ax=None, add=True
         lf = LightFilter(width, fraction=fraction, **kwargs)
         return add_agg_filter(objs, lf, zorder=zorder, add=add, ax=ax)
     except:
-        xoa_warn('Cannot add light shading effect using agg filters')
+        exceptions.xoa_warn('Cannot add light shading effect using agg filters')

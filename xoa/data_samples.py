@@ -7,55 +7,54 @@ Available data files that are used by :mod:`xoa` examples.
 
 """
 import os
-import glob
 
 _THIS_DIR = os.path.dirname(__file__)
 
-#: Dictionary that contains the basename and full path of data sample files used by xoa examples
-DATA_SAMPLES = dict(
-    (os.path.basename(path), path)
-    for path in glob.glob(os.path.join(_THIS_DIR, "*"))
-    if not path.endswith(".py")
+
+import os
+import pooch
+
+pooch.get_logger().setLevel("DEBUG")
+
+POOCH = pooch.create(
+    path=pooch.os_cache("xoa"),
+    base_url="https://raw.githubusercontent.com/shom-fr/data-samples/main/OCEANO/",
+    # version_dev="main",
+    env="SHOM_DATA_SAMPLES",
 )
 
+#: Registry of data sampples
+REGISTRY_FILE = os.path.join(os.path.dirname(__file__), "data_samples.txt")
 
-def get_data_sample(filename=None):
-    """Get the absolute path to a sample file
+POOCH.load_registry(REGISTRY_FILE)
+
+
+def get_data_sample(sample_name=None):
+    """Fetch sample data file
+
+    Downloads sample file from repository if needed and returns local path.
 
     Parameters
     ----------
-    filename: str, None
-        Name of the sample. If ommited, a list of available samples
-        name is returned.
+    sample_name : str
+        Sample file name (e.g., "MODELS/CROCO/SOUTH-AFRICAN/croco.south-africa.surf.nc").
 
     Returns
     -------
-    str OR list(str)
-
-    Example
-    -------
-    .. .ipython:: python
-
-        @suppress
-        from xoa import get_data_sample
-        get_data_sample("croco.south-africa.surf.nc")
-        get_data_sample()
-
-    See also
-    --------
-    show_data_samples
+    str
+        Absolute path to cached sample file.
     """
-    if filename is None:
-        return list(DATA_SAMPLES.keys())
-    if filename not in DATA_SAMPLES:
-        from ..__init__ import XoaError
+    if sample_name is None:
+        file_names = []
+        with open(REGISTRY_FILE) as f:
+            for line in f:
+                file_names.append(line.split()[0])
+        return file_names
+    return POOCH.fetch(sample_name)
 
-        raise XoaError(
-            f"Invalid data sample: '{filename}'.\n"
-            + "Please use one of: "
-            + ", ".join(DATA_SAMPLES)
-        )
-    return DATA_SAMPLES[filename]
+
+#: DEPRECATED! Dictionary that contains the basename and full path of data sample files used by xoa examples
+DATA_SAMPLES = {}
 
 
 def open_data_sample(filename, **kwargs):
@@ -78,7 +77,7 @@ def open_data_sample(filename, **kwargs):
 
         @suppress
         from xoa import open_data_sample
-        open_data_sample("croco.south-africa.nc")
+        open_data_sample("MODELS/CROCO/SOUTH-AFRICAN/croco.south-africa.surf.nc")
 
 
     See also
@@ -131,7 +130,5 @@ def show_data_samples(full_paths=False):
     """
     paths = get_data_sample()
     if full_paths:
-        paths = list(DATA_SAMPLES.values())
-    else:
-        paths = list(DATA_SAMPLES)
+        paths = [os.path.join(POOCH.abspath, path) for path in paths]
     print(' '.join(paths))
