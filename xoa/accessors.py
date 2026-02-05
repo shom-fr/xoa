@@ -781,7 +781,7 @@ def register_accessors(xoa=True, xcf=False, xmeta=False, decode_sigma=False):
 
         exceptions.xoa_warn(
             "The 'xcf' parameter is deprecated. Use 'xmeta' instead.",
-            "deprecation",
+            category="deprecation",
             stacklevel=2,
         )
         kw = {"name": xcf} if isinstance(xcf, str) else {}
