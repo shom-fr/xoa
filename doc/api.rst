@@ -24,7 +24,6 @@ Package API
     xoa.filter
     xoa.geo
     xoa.grid
-    xoa.interp
     xoa.krig
     xoa.meta
     xoa.misc
