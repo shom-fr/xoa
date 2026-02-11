@@ -23,10 +23,12 @@ import xarray as xr
 from . import exceptions
 from . import misc
 from . import meta
-from . import coords as xcoords
 from . import grid as xgrid
-from .core import interp
+from .core import num
+from .core import regrid
 
+# Backward compat
+from .interp import grid2loc, isoslice  # noqa
 
 # %% 1D
 
@@ -81,17 +83,6 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     true = 2
 
 
-def _asfloat_(arr):
-    """We need arrays that are at least 1D and that are not dates, booleans or integers"""
-    arr = np.asarray(arr)
-    arr = np.atleast_1d(arr)
-    if arr.dtype.type is np.datetime64:
-        arr = (arr - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
-    elif arr.dtype.char in 'il?':
-        arr = arr.astype("d")
-    return arr
-
-
 def _wrapper1d_(vari, *args, func_name, **kwargs):
     """To make sure arrays have a 2D shape
 
@@ -99,7 +90,7 @@ def _wrapper1d_(vari, *args, func_name, **kwargs):
     """
 
     # The function to call
-    func = getattr(interp, func_name)
+    func = getattr(regrid, func_name)
 
     # To 2D
     args = [vari] + list(args)
@@ -110,7 +101,7 @@ def _wrapper1d_(vari, *args, func_name, **kwargs):
             eshape = [1] * (len(eshapes[-1]) - len(eshape)) + eshape
         eshapes.append(eshape)
     eshapes = np.array(eshapes, dtype='l')
-    args = [_asfloat_(arr).reshape(-1, arr.shape[-1]) for arr in args]
+    args = [num.as_float_array(arr).reshape(-1, arr.shape[-1]) for arr in args]
     func_code = getattr(func, "func_code", getattr(func, "__code__"))
     if "eshapes" in func_code.co_varnames[: func_code.co_argcount]:
         args = args + [eshapes]
@@ -144,7 +135,7 @@ def regrid1d(
     ocean models.
     Since it uses func:`xarray.apply_ufunc`, it support dask features.
     The core computation is performed by the numba-accelerated routines
-    of :mod:`xoa.interp`.
+    of :mod:`xoa.core.regrid`.
 
     Parameters
     ----------
@@ -191,12 +182,12 @@ def regrid1d(
 
     See Also
     --------
-    xoa.interp.nearest1d
-    xoa.interp.linear2d
-    xoa.interp.cubic2d
-    xoa.interp.hermit1d
-    xoa.interp.cellave1d
-    xoa.interp.extrap1d
+    xoa.core.regrid.nearest1d
+    xoa.core.regrid.linear2d
+    xoa.core.regrid.cubic2d
+    xoa.core.regrid.hermit1d
+    xoa.core.regrid.cellave1d
+    xoa.core.regrid.extrap1d
     xarray.apply_ufunc
     """
     # Get the working dimensions
@@ -334,7 +325,7 @@ def extrap1d(da, dim, mode, dask='parallelized'):
 
     See also
     --------
-    xoa.interp.extrap1d
+    xoa.regrid.extrap1d
     xarray.apply_ufunc
     """
     da_out = xr.apply_ufunc(
@@ -356,194 +347,3 @@ def extrap1d(da, dim, mode, dask='parallelized'):
 
 
 extrap1d.__doc__ = extrap1d.__doc__.format(**locals())
-
-
-def isoslice(da, values, isoval, dim, reverse=False, dask='parallelized', **kwargs):
-    """Extract data from var where values==isoval
-
-    Parameters
-    -----------
-    da: xarray.DataArray
-          array from which the data are extracted
-    values: array_like
-          array on which a research of isoval is made
-    isoval: float
-          value of interest on which we perform research in values array
-    dim: str
-          dimension shared by da and values on which the slice is made
-    dask: str
-        See :func:`xarray.apply_ufunc`.
-
-    Return
-    ------
-    isovar : array_like
-            Sliced array based on data where values==isoval
-
-    Example
-    -------
-
-    Let's define depth and temperature variables both in 3 dimensions (i,j,k)
-    where i and j are horizontal dimension and k the vertical one::
-
-        dep_at_t20 = isoslice(dep, temp, 20, "z")   # depth at temperature=20°C
-        temp_at_z15 = isoslice(temp, dep, -15, "z") # temperature at depth=-15m
-
-    See Also
-    --------
-    xoa.interp.isoslice
-    xarray.apply_ufunc
-    """
-
-    assert dim in da.dims
-    assert dim in values.dims
-
-    da_out = xr.apply_ufunc(
-        interp.isoslice,
-        da,
-        values,
-        isoval,
-        reverse,
-        join="override",
-        input_core_dims=[[dim], [dim], [], []],
-        exclude_dims={dim},
-        dask=dask,
-        **kwargs,
-    )
-    da_out.attrs.update(da.attrs)
-    da_out.encoding.update(da.encoding)
-    return da_out
-
-
-# %% 2D
-
-
-def grid2loc(da, loc, compat="warn"):
-    """Interpolate a gridded data array to random locations
-
-    ``da`` and ``loc`` must comply with CF conventions.
-
-    Parameters
-    ----------
-    da: xarray.DataArray
-        A data array with at least an horizontal rectilinear or
-        a curvilinear grid.
-    loc: xarray.Dataset, xarray.DataArray, pandas.DataFrame
-        A dataset or data array with coordinates as 1d arrays
-        that share the same dimension.
-        For example, such dataset may be initialized as follows::
-
-            loc = xr.Dataset(coords={
-                'lon': ('npts', [5, 6]),
-                'lat': ('npts', [4, 5]),
-                'depth': ('npts',  [-10, -20])
-                })
-
-    compat: {"ignore", "warn"}
-        In case a requested coordinate is not found in the input dataset.
-
-    Return
-    ------
-    xarray.dataArray
-        The interpolated data array.
-
-    See Also
-    --------
-    xoa.interp.grid2locs
-    xoa.interp.grid2relloc
-    xoa.interp.grid2rellocs
-    xoa.interp.cell2relloc
-    """
-
-    # Get coordinates
-    if hasattr(loc, "to_xarray"):
-        loc = loc.to_xarray()
-    # - horizontal
-    order = "yx"
-    lons = xcoords.get_lon(loc)
-    lats = xcoords.get_lat(loc)
-    xo = np.atleast_1d(lons.values)
-    yo = np.atleast_1d(lats.values)
-    # - vertical
-    deps = xcoords.get_vertical(loc, errors="ignore")
-    if deps is not None:
-        gdep = xcoords.get_vertical(da, errors=compat)
-        if gdep is not None:
-            order = "z" + order
-    # - temporal
-    times = xcoords.get_time(loc, errors="ignore")
-    if times is not None:
-        gtime = xcoords.get_time(da, errors=compat)
-        if gtime is not None:
-            order = "t" + order
-
-    # Transpose following the tzyx order
-    glon = xcoords.get_lon(da)  # before to_rect
-    glat = xcoords.get_lat(da)  # before to_rect
-    dims_in = set(glon.dims).union(glat.dims)
-    da_tmp = xgrid.to_rect(da, errors="ignore")
-    da_tmp = xcoords.reorder(da_tmp, order)
-
-    # To numpy with singletons
-    # - data
-    vi = da_tmp.values
-    for axis_type, axis in (("z", -3), ("t", -4)):
-        if axis_type not in order:
-            vi = np.expand_dims(vi, axis)
-    vi = vi.reshape((-1,) + vi.shape[-4:])
-    # - xy
-    glon = xcoords.get_lon(da_tmp)  # after to_rect
-    glat = xcoords.get_lat(da_tmp)  # after to_rect
-    xi = glon.values
-    yi = glat.values
-    coords_out = [lons, lats]
-    if xi.ndim == 1:
-        xi = xi.reshape(1, -1)
-    if yi.ndim == 1:
-        yi = yi.reshape(-1, 1)
-    # - z
-    if "z" in order:
-        gdep_order = xcoords.get_order(da_tmp[gdep.name])
-        dims_in.update(gdep.dims)
-        zi = da_tmp[gdep.name].values
-        for axis_type, axis in (("x", -1), ("y", -2), ("t", -4)):
-            if axis_type not in gdep_order:
-                zi = np.expand_dims(zi, axis)
-        zo = deps.data
-        coords_out.append(deps)
-    else:
-        zi = np.zeros((1, 1, 1, 1))
-        zo = np.zeros_like(xo)
-    zi = zi.reshape((-1,) + zi.shape[-4:])
-    # - t
-    if "t" in order:
-        # numeric times
-        ti = _asfloat_(gtime.values)
-        to = _asfloat_(times.values)
-        to = np.atleast_1d(to)
-        dims_in.update(gtime.dims)
-        coords_out.append(times)
-    else:
-        ti = np.zeros(1)
-        to = np.zeros(xo.shape)
-
-    # Interpolate
-    vo = interp.grid2locs(xi, yi, zi, ti, vi, xo, yo, zo, to)
-
-    # As data array
-    dims_out = [dim for dim in da.dims if dim not in dims_in]
-    sizes_out = [size for dim, size in da.sizes.items() if dim in dims_out]
-    dims_out.extend(loc.dims)
-    sizes_out.extend(lons.shape)
-    coords_out = coords_out + xcoords.get_coords_compat_with_dims(da, exclude_dims=dims_in)
-    da_out = xr.DataArray(
-        vo.reshape(sizes_out),
-        dims=dims_out,
-        coords=dict((coord.name, coord) for coord in coords_out),
-        attrs=da.attrs,
-        name=da.name,
-    )
-
-    # Transpose
-    da_out = xcoords.transpose(da_out, da.dims, mode="compat")
-
-    return da_out

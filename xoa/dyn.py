@@ -41,6 +41,7 @@ SEA_LEVEL_VARIANTS = xmisc.Choices(
     },
     parameter="variant",
     description="Restrict checking to a given variant(s)",
+    multi=True,
 )
 
 

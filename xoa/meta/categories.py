@@ -38,8 +38,16 @@ class _MetaBase_:
     def _check_single_(errors, found, target_type, targets=None):
         """Check that we found a single item"""
 
+        singletons = []
+        for item in found:
+            if hasattr(item, "name"):
+                item = item.name
+            if item not in singletons:
+                singletons.append(item)
+        nitems = len(singletons)
+
         # Single one so its ok
-        if len(found) == 1:
+        if nitems == 1:
             return found[0]
 
         if targets is not None:
@@ -49,7 +57,7 @@ class _MetaBase_:
         errors = misc.ERRORS[errors]
 
         # Multiple
-        if len(found) > 1:
+        if nitems > 1:
             if errors != "ignore":
                 msg = f"Found multiple {target_type}s{suffix} instead of single one"
                 if errors == "raise":

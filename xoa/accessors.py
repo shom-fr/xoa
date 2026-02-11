@@ -25,32 +25,32 @@ from .misc import ERRORS
 
 
 class _BasicMetaAccessor_(object):
-    def __init__(self, obj, metaspecs=None):
+    def __init__(self, obj, meta_specs=None):
         from . import meta
 
-        if metaspecs is None:
-            metaspecs = meta.infer_meta_specs(obj)
+        if meta_specs is None:
+            meta_specs = meta.infer_meta_specs(obj)
         self._obj = obj
-        self.set_meta_specs(metaspecs)
+        self.set_meta_specs(meta_specs)
 
     def _assign_meta_specs_(self):
         from . import meta
 
-        if self._metaspecs.name:
-            self._obj = meta.assign_meta_specs(self._obj, self._metaspecs, register=True)
+        if self._meta_specs.name:
+            self._obj = meta.assign_meta_specs(self._obj, self._meta_specs, register=True)
 
-    def set_meta_specs(self, metaspecs):
+    def set_meta_specs(self, meta_specs):
         """Set the internal :class:`~xoa.meta.MetaSpecs` used by this accessor
 
         If the specs object has a :metasec:`registration name <register>`,
         it is assigned to
         the current object and its children with function
-        :func:`~xoa.meta.assign_meta_specs`. This set the "metaspecs" encoding
+        :func:`~xoa.meta.assign_meta_specs`. This set the "meta_specs" encoding
         to the name.
 
         Parameters
         ----------
-        metaspecs: xoa.meta.MetaSpecs
+        meta_specs: xoa.meta.MetaSpecs
 
         See also
         --------
@@ -58,8 +58,8 @@ class _BasicMetaAccessor_(object):
         """
         from .meta.general import MetaSpecs
 
-        assert isinstance(metaspecs, MetaSpecs)
-        self._metaspecs = metaspecs
+        assert isinstance(meta_specs, MetaSpecs)
+        self._meta_specs = meta_specs
         self._assign_meta_specs_()
 
     def get_meta_specs(self):
@@ -75,9 +75,9 @@ class _BasicMetaAccessor_(object):
         --------
         :ref:`uses.meta`
         """
-        return self._metaspecs
+        return self._meta_specs
 
-    metaspecs = property(fget=get_meta_specs, fset=set_meta_specs, doc="The MetaSpecs instance")
+    meta_specs = property(fget=get_meta_specs, fset=set_meta_specs, doc="The MetaSpecs instance")
 
     # Backward compatibility
     def set_cf_specs(self, cfspecs):
@@ -99,15 +99,15 @@ class _BasicMetaAccessor_(object):
         return self.get_meta_specs()
 
     cfspecs = property(
-        fget=get_cf_specs, fset=set_cf_specs, doc="Deprecated: use metaspecs instead"
+        fget=get_cf_specs, fset=set_cf_specs, doc="Deprecated: use meta_specs instead"
     )
 
 
 class _MetaAccessor_(_BasicMetaAccessor_):
     _search_category = None
 
-    def __init__(self, obj, metaspecs=None):
-        _BasicMetaAccessor_.__init__(self, obj, metaspecs)
+    def __init__(self, obj, meta_specs=None):
+        _BasicMetaAccessor_.__init__(self, obj, meta_specs)
         self._coords = None
         self._data_vars = None
         self._cache = {}
@@ -140,8 +140,8 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         """
         kwargs = dict(loc=loc, get="obj", single=single, errors=errors)
         if self._search_category is None:
-            return self._metaspecs.search(self._obj, meta_name, **kwargs)
-        return self._metaspecs[self._search_category].search(self._obj, meta_name, **kwargs)
+            return self._meta_specs.search(self._obj, meta_name, **kwargs)
+        return self._meta_specs[self._search_category].search(self._obj, meta_name, **kwargs)
 
     @ERRORS.format_method_docstring
     def get_coord(self, meta_name, loc="any", single=True, errors="ignore"):
@@ -167,7 +167,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         :meth:`xoa.meta.MetaCoordSpecs.search`
         :meth:`xoa.meta.MetaVarSpecs.search`
         """
-        return self._metaspecs.search_coord(
+        return self._meta_specs.search_coord(
             self._obj, meta_name, loc=loc, get="obj", single=single, errors="ignore"
         )
 
@@ -194,7 +194,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         :meth:`xoa.meta.MetaSpecs.auto_format`
         :ref:`uses.meta`
         """
-        return self._metaspecs.auto_format(self._obj, **kwargs)
+        return self._meta_specs.auto_format(self._obj, **kwargs)
 
     def fill_attrs(self, **kwargs):
         """Fill missing attributes
@@ -211,7 +211,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         :meth:`xoa.meta.MetaSpecs.fill_attrs`
         :ref:`uses.meta`
         """
-        return self._metaspecs.fill_attrs(self._obj, **kwargs)
+        return self._meta_specs.fill_attrs(self._obj, **kwargs)
 
     def to_loc(self, **locs):
         """Set the staggered grid location for specified names
@@ -231,7 +231,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         :meth:`xoa.meta.MetaSpecs.to_loc`
         reloc
         """
-        return self._metaspecs.to_loc(self._obj, **locs)
+        return self._meta_specs.to_loc(self._obj, **locs)
 
     def reloc(self, **locs):
         """Convert given staggered grid locations to other locations
@@ -251,7 +251,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         :meth:`xoa.meta.MetaSpecs.reloc`
         to_loc
         """
-        return self._metaspecs.reloc(self._obj, **locs)
+        return self._meta_specs.reloc(self._obj, **locs)
 
     def infer_coords(self, **kwargs):
         """Infer coordinates and set them as coordinates
@@ -268,7 +268,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         :meth:`xoa.meta.MetaSpecs.infer_coords`
         :ref:`uses.meta`
         """
-        return self.cfspecs.infer_coords(self._obj, **kwargs)
+        return self.meta_specs.infer_coords(self._obj, **kwargs)
 
     def decode(self, **kwargs):
         """Rename variables and coordinates to generic names
@@ -286,7 +286,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         :meth:`xoa.meta.MetaSpecs.encode`
         :ref:`uses.meta`
         """
-        return self.cfspecs.decode(self._obj, **kwargs)
+        return self.meta_specs.decode(self._obj, **kwargs)
 
     def encode(self, **kwargs):
         """Rename variables and coordinates to specialized names
@@ -305,7 +305,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         :meth:`xoa.meta.MetaSpecs.decode`
         :ref:`uses.meta`
         """
-        return self.cfspecs.encode(self._obj, **kwargs)
+        return self.meta_specs.encode(self._obj, **kwargs)
 
     @ERRORS.format_method_docstring
     def get_depth(self, errors="ignore"):
@@ -337,14 +337,14 @@ class _MetaAccessor_(_BasicMetaAccessor_):
     def coords(self):
         """Sub-accessor for coords only"""
         if self._coords is None:
-            self._coords = _MetaCoordAccessor_(self._obj, self._metaspecs)
+            self._coords = _MetaCoordAccessor_(self._obj, self._meta_specs)
         return self._coords
 
     @property
     def data_vars(self):
         """Sub-accessor for data_vars only"""
         if self._data_vars is None:
-            self._data_vars = _MetaDataVarAccessor_(self._obj, self._metaspecs)
+            self._data_vars = _MetaDataVarAccessor_(self._obj, self._meta_specs)
         return self._data_vars
 
 
@@ -356,7 +356,7 @@ class _MetaCoordAccessor_(_MetaAccessor_):
         from .cf import XoaError
 
         try:
-            return self._metaspecs.coords.search_dim(self._obj)[0]
+            return self._meta_specs.coords.search_dim(self._obj)[0]
         except XoaError:
             return
 
@@ -387,7 +387,7 @@ class _MetaCoordAccessor_(_MetaAccessor_):
         if not hasattr(self, '_dims'):
             self._dims = {}
             if cf_arg not in self._dims:
-                self._dims[cf_arg] = self._metaspecs.coords.search_dim(self._obj, cf_arg, loc=loc)
+                self._dims[cf_arg] = self._meta_specs.coords.search_dim(self._obj, cf_arg, loc=loc)
         return self._dims[cf_arg]
 
     @property
@@ -494,7 +494,7 @@ class MetaDataArrayAccessor(_MetaCoordAccessor_):
         :meth:`xoa.meta.MetaSpecs.match`
         """
         if 'name' not in self._cache:
-            category, name = self._metaspecs.match(self._obj)
+            category, name = self._meta_specs.match(self._obj)
             self._cache["category"] = category
             self._cache["name"] = name
         return self._cache["name"]
@@ -516,10 +516,10 @@ class MetaDataArrayAccessor(_MetaCoordAccessor_):
         """
         if "attrs" not in self._cache:
             if self.name:
-                cf_attrs = self._metaspecs[self._cache["category"]].get_attrs(
+                cf_attrs = self._meta_specs[self._cache["category"]].get_attrs(
                     self._cache["name"], multi=True
                 )
-                self._cache["attrs"] = self._metaspecs.sglocator.patch_attrs(
+                self._cache["attrs"] = self._meta_specs.sglocator.patch_attrs(
                     self._obj.attrs, cf_attrs
                 )
             else:
@@ -543,9 +543,9 @@ class SigmaAccessor(_BasicMetaAccessor_):
     >>> ds = ds.decode_sigma()
     """
 
-    def __init__(self, ds, cfspecs=None):
+    def __init__(self, ds, meta_specs=None):
         assert hasattr(ds, "data_vars"), "ds must be a xarray.Dataset"
-        _BasicMetaAccessor_.__init__(self, ds, cfspecs)
+        _BasicMetaAccessor_.__init__(self, ds, meta_specs)
         self._ds = self._obj
 
     @ERRORS.format_method_docstring
@@ -700,7 +700,7 @@ def _register_xarray_accessors_(dataarrays=None, datasets=None):
                 xr.register_dataset_accessor(name)(cls)
 
 
-def register_meta_accessors(name='xmeta'):
+def register_meta_accessors(name='meta'):
     """Register the meta accessors"""
     _register_xarray_accessors_(
         dataarrays={name: MetaDataArrayAccessor},
@@ -746,7 +746,7 @@ def register_xoa_accessors(name='xoa'):
     )
 
 
-def register_accessors(xoa=True, xcf=False, xmeta=False, decode_sigma=False):
+def register_accessors(xoa=True, xcf=False, meta=False, decode_sigma=False):
     """Register xarray accessors
 
     Parameters
@@ -759,8 +759,8 @@ def register_accessors(xoa=True, xcf=False, xmeta=False, decode_sigma=False):
         :func:`~xoa.meta.register_meta_accessors` using the deprecated name "xcf".
 
         .. deprecated::
-            Use ``xmeta`` instead.
-    xmeta: bool, str
+            Use ``meta`` instead.
+    meta: bool, str
         Register the :mod:`xoa.meta` module accessors with
         :func:`~xoa.meta.register_meta_accessors`.
     decode_sigma: bool, str
@@ -780,8 +780,8 @@ def register_accessors(xoa=True, xcf=False, xmeta=False, decode_sigma=False):
         from .accessors import register_meta_accessors
 
         exceptions.xoa_warn(
-            "The 'xcf' parameter is deprecated. Use 'xmeta' instead.",
-            "deprecation",
+            "The 'xcf' parameter is deprecated. Use 'meta' instead.",
+            category="deprecation",
             stacklevel=2,
         )
         kw = {"name": xcf} if isinstance(xcf, str) else {}
@@ -789,10 +789,10 @@ def register_accessors(xoa=True, xcf=False, xmeta=False, decode_sigma=False):
         if not kw:
             kw = {"name": "xcf"}
         register_meta_accessors(**kw)
-    if xmeta:
+    if meta:
         from .accessors import register_meta_accessors
 
-        kw = {"name": xmeta} if isinstance(xmeta, str) else {}
+        kw = {"name": meta} if isinstance(meta, str) else {}
         register_meta_accessors(**kw)
     if decode_sigma:
         from .accessors import register_sigma_accessor
