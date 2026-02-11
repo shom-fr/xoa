@@ -41,8 +41,8 @@ xoa.register_accessors()
 
 # %%
 # Register the Mercator and ARGO naming specifications
-mercator_cfg = xoa.get_cf_config_file("mercator")
-argo_cfg = xoa.get_cf_config_file("argo")
+mercator_cfg = xoa.get_meta_config_file("mercator")
+argo_cfg = xoa.get_meta_config_file("argo")
 xmeta.register_meta_specs(mercator_cfg)
 xmeta.register_meta_specs(argo_cfg)
 

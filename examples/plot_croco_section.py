@@ -41,7 +41,7 @@ xoa.register_accessors(decode_sigma=True)
 # %%
 # Register the internal CROCO naming specifications
 
-croco_cfg_file = xoa.get_cf_config_file("croco")
+croco_cfg_file = xoa.get_meta_config_file("croco")
 print(croco_cfg_file)
 xmeta.register_meta_specs(croco_cfg_file)
 
@@ -51,7 +51,7 @@ xmeta.register_meta_specs(croco_cfg_file)
 # In this way, the :mod:`xoa.meta` module will recognise the
 # CROCO netcdf names.
 # It would be equivalent to force loading name specs with
-# `xoa.meta.set_meta_specs(xoa.get_cf_config_file("croco"))`.
+# `xoa.meta.set_meta_specs(xoa.get_meta_config_file("croco"))`.
 
 # %%
 # Read the model

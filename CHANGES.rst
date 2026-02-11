@@ -27,6 +27,8 @@ Bug fixes
 - Fix :func:`xoa.interp.linear1d` extraplation [:pull:`107`]
 - Fix :func:`xoa.grid.to_rect` warnings.
 - Fix :meth:`xoa.meta.MetaSpecs.get_dim_types`.
+- Fix ``test_accessors.py`` to use ``meta`` accessor instead of deprecated ``xmeta`` and ``meta_specs`` property instead of ``metaspecs``.
+- Fix examples to use :func:`xoa.get_meta_config_file` instead of deprecated ``get_cf_config_file``.
 
 Documentation
 -------------

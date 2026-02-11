@@ -38,7 +38,7 @@ xoa.register_accessors()
 
 # %%
 # Set the internal Hycom naming specifications as the current ones
-hycom_cfg_file = xoa.get_cf_config_file("hycom")
+hycom_cfg_file = xoa.get_meta_config_file("hycom")
 print(hycom_cfg_file)
 xmeta.set_meta_specs(hycom_cfg_file)
 
