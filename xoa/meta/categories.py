@@ -38,7 +38,13 @@ class _MetaBase_:
     def _check_single_(errors, found, target_type, targets=None):
         """Check that we found a single item"""
 
-        nitems = len(set(a.name for a in found))
+        singletons = []
+        for item in found:
+            if hasattr(item, "name"):
+                item = item.name
+            if item not in singletons:
+                singletons.append(item)
+        nitems = len(singletons)
 
         # Single one so its ok
         if nitems == 1:

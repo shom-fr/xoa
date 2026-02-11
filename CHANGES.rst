@@ -20,6 +20,7 @@ Deprecations
 ------------
 - The :mod:`xoa.cf` module is deprecated. Use :mod:`xoa.meta` instead. All references to "cf" must be converted to "meta" in modules, functions, classes, methods and accessors. A backward compatibility layer has been added [:pull:`111`].
 - The :mod:`xoa.cf_configs` module is deprecated in favour of module :mod:`xoa.meta.configs` [:pull:`111`].
+- Pure core regridding 1D function of the :mod:`xoa.core.interp` module are moved to :mod:`xoa.core.regrid` module.
 
 Bug fixes
 ---------

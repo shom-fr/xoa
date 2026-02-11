@@ -82,3 +82,24 @@ def ravel_index(ii, shape):
         # print(ii[o], base)
         ir += ii[o] * base
     return ir
+
+
+def as_float_array(arr):
+    """Convert input to at least 1D float array, useful for numba accelerated fonctions
+
+    Parameter
+    ---------
+    arr: boolean, int, float, datetime64, dask.array
+
+    Returns
+    -------
+    array
+        Array of floats
+    """
+    arr = np.asarray(arr)
+    arr = np.atleast_1d(arr)
+    if arr.dtype.type is np.datetime64:
+        arr = (arr - np.datetime64("1950-01-01", "us")) / np.timedelta64(1, "us")
+    elif arr.dtype.char in 'il?':
+        arr = arr.astype("d")
+    return arr

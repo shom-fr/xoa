@@ -17,16 +17,16 @@ class TestAccessorRegistration:
     """Tests for accessor registration functions"""
 
     def test_register_meta_accessors(self):
-        """Test that register_meta_accessors creates xmeta accessor"""
-        accessors.register_meta_accessors(name='xmeta')
+        """Test that register_meta_accessors creates meta accessor"""
+        accessors.register_meta_accessors(name='meta')
 
         # Create a simple dataset
         ds = xr.Dataset({
             'temperature': (['x', 'y'], np.random.rand(3, 4)),
         })
 
-        # Check that xmeta accessor is available
-        assert hasattr(ds, 'xmeta')
+        # Check that meta accessor is available
+        assert hasattr(ds, 'meta')
 
     def test_register_cf_accessors_deprecated(self):
         """Test that register_cf_accessors issues deprecation warning"""
@@ -69,7 +69,7 @@ class TestMetaAccessorMethods:
     def setup_method(self):
         """Set up test fixtures"""
         # Register accessors
-        accessors.register_meta_accessors(name='xmeta')
+        accessors.register_meta_accessors(name='meta')
 
         # Create test dataset with CF-like names
         self.ds = xr.Dataset({
@@ -91,28 +91,28 @@ class TestMetaAccessorMethods:
         })
 
     def test_metaspecs_property(self):
-        """Test that metaspecs property works"""
-        assert hasattr(self.ds.xmeta, 'metaspecs')
-        assert self.ds.xmeta.metaspecs is not None
+        """Test that meta_specs property works"""
+        assert hasattr(self.ds.meta, 'meta_specs')
+        assert self.ds.meta.meta_specs is not None
 
     def test_set_meta_specs(self):
         """Test setting meta specs"""
         from xoa import meta
 
         new_specs = meta.get_meta_specs()
-        self.ds.xmeta.set_meta_specs(new_specs)
-        assert self.ds.xmeta.get_meta_specs() is new_specs
+        self.ds.meta.set_meta_specs(new_specs)
+        assert self.ds.meta.get_meta_specs() is new_specs
 
     def test_get_meta_specs(self):
         """Test getting meta specs"""
-        specs = self.ds.xmeta.get_meta_specs()
+        specs = self.ds.meta.get_meta_specs()
         assert specs is not None
 
     def test_deprecated_cfspecs_property(self):
         """Test that cfspecs property issues deprecation warning"""
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            _ = self.ds.xmeta.cfspecs
+            _ = self.ds.meta.cfspecs
 
             # Check warning was issued
             assert len(w) >= 1
@@ -125,7 +125,7 @@ class TestMetaAccessorMethods:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             specs = meta.get_meta_specs()
-            self.ds.xmeta.set_cf_specs(specs)
+            self.ds.meta.set_cf_specs(specs)
 
             # Check warning was issued
             assert len(w) >= 1
@@ -135,7 +135,7 @@ class TestMetaAccessorMethods:
         """Test that get_cf_specs issues deprecation warning"""
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            _ = self.ds.xmeta.get_cf_specs()
+            _ = self.ds.meta.get_cf_specs()
 
             # Check warning was issued
             assert len(w) >= 1
@@ -148,7 +148,7 @@ class TestXoaAccessorSubaccessors:
     def setup_method(self):
         """Set up test fixtures"""
         # Register accessors
-        xoa.register_accessors(xoa=True, xmeta=True)
+        xoa.register_accessors(xoa=True, meta=True)
 
         self.ds = xr.Dataset({
             'temp': (['x'], np.array([20, 21, 22])),
@@ -184,12 +184,12 @@ class TestXoaAccessorSubaccessors:
 class TestRegisterAccessorsFunction:
     """Tests for the main register_accessors function in xoa.__init__"""
 
-    def test_register_with_xmeta(self):
-        """Test register_accessors with xmeta=True"""
-        xoa.register_accessors(xoa=False, xmeta=True)
+    def test_register_with_meta(self):
+        """Test register_accessors with meta=True"""
+        xoa.register_accessors(xoa=False, meta=True)
 
         ds = xr.Dataset({'data': (['x'], [1, 2, 3])})
-        assert hasattr(ds, 'xmeta')
+        assert hasattr(ds, 'meta')
 
     def test_register_with_xcf_deprecated(self):
         """Test register_accessors with xcf=True issues warning"""
@@ -202,14 +202,14 @@ class TestRegisterAccessorsFunction:
             assert any(issubclass(warn.category, (DeprecationWarning, xoa.XoaDeprecationWarning))
                       for warn in w)
 
-    def test_register_both_xmeta_and_xcf(self):
-        """Test that both xmeta and xcf can be registered (for compatibility)"""
+    def test_register_both_meta_and_xcf(self):
+        """Test that both meta and xcf can be registered (for compatibility)"""
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            xoa.register_accessors(xoa=False, xmeta=True, xcf=True)
+            xoa.register_accessors(xoa=False, meta=True, xcf=True)
 
         ds = xr.Dataset({'data': (['x'], [1, 2, 3])})
-        assert hasattr(ds, 'xmeta')
+        assert hasattr(ds, 'meta')
         assert hasattr(ds, 'xcf')
 
 
