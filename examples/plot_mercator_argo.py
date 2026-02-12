@@ -70,7 +70,7 @@ with open(argo_cfg) as f:
 #     ds.to_netcdf("argo-7900573.nc")
 #
 # Here is the web page of this float: https://fleetmonitoring.euro-argo.eu/float/7900573
-ds_argo = xoa.open_data_sample("argo-7900573.nc")
+ds_argo = xoa.open_data_sample("OBS/ARGO/argo-7900573.nc")
 
 # %%
 # We decode the names to make them more generic thanks to the CF specifications
@@ -117,7 +117,7 @@ ds_argo_prof = ds_argo.isel(time=-1).squeeze(drop=True)
 # https://resources.marine.copernicus.eu/product-detail/IBI_ANALYSISFORECAST_PHY_005_001/INFORMATION
 # The dataset has been undersampled by a factor 3 in longitude and latitude
 # to limit disk usage.
-ds_merc = xoa.open_data_sample("ibi-argo-7900573.nc").xoa.decode()
+ds_merc = xoa.open_data_sample("MODELS/CMEMS-IBI/ibi-argo-7900573.nc").xoa.decode()
 ds_merc = ds_merc.isel(depth=slice(None, None, -1))
 ds_merc = ds_merc.assign_coords(depth=-ds_merc.depth)
 print(ds_merc)

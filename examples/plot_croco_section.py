@@ -57,7 +57,7 @@ xmeta.register_meta_specs(croco_cfg_file)
 # Read the model
 # --------------
 # This sample is a meridional extraction of a full 3D CROCO output.
-sample_file = xoa.get_data_sample("croco.south-africa.meridional.nc")
+sample_file = xoa.get_data_sample("MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.meridional.nc")
 print(sample_file)
 ds = xr.open_dataset(sample_file)
 print(ds)

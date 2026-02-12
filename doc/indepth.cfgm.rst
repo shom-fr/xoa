@@ -1,4 +1,4 @@
-.. _uses.cfgm:
+.. _indepth.cfgm:
 
 Config management with  :mod:`xoa.cfgm`
 #######################################
@@ -187,7 +187,7 @@ for documentation purpose.
 
 The result is the following.
 
-.. include:: uses.cfgm.cfg2rst.txt
+.. include:: indepth.cfgm.cfg2rst.txt
 
 These above sphinx declarations need two objet types to be declared::
 

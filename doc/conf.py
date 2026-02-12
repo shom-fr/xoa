@@ -21,14 +21,14 @@ sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ext
 # %% Project information
 
 project = 'xoa'
-copyright = '2020-2024, Shom'
+copyright = '2020-2026, Shom'
 author = 'Shom'
 
 # The full version, including alpha/beta/rc tags
 import xoa
 
 release = xoa.__version__
-xoa.register_accessors(xoa=True, xmeta=True, decode_sigma=True)
+xoa.register_accessors(xoa=True, meta=True, decode_sigma=True)
 
 
 # %% General configuration
@@ -104,12 +104,12 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/fr/3/', None),
     'cmocean': ('https://matplotlib.org/cmocean/', None),
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None),
-    'matplotlib': ('https://matplotlib.org/', None),
+    'matplotlib': ('https://matplotlib.org/stable/', None),
     'numba:': ('https://numba.readthedocs.io/en/stable/', None),
     'numpy': ("https://numpy.org/doc/stable/", None),
     'pandas': ('https://pandas.pydata.org/docs/', None),
-    'scipy': ('https://docs.scipy.org/doc/scipy/reference/', None),
-    'xarray': ('http://xarray.pydata.org/en/stable/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+    'xarray': ('https://docs.xarray.dev/en/stable/', None),
     'gsw': ('https://teos-10.github.io/GSW-Python', None),
     # 'xesmf': ("https://xesmf.readthedocs.io/en/latest/", None)
 }

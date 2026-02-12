@@ -73,16 +73,16 @@ with open(hycom_cfg_file) as f:
 
 # %%
 # U velocity component
-u_hycom = xoa.open_data_sample("hycom.gdp.u.nc").xoa.decode().u.squeeze(drop=True)
+u_hycom = xoa.open_data_sample("MODELS/HYCOM/hycom.gdp.u.nc").xoa.decode().u.squeeze(drop=True)
 print(u_hycom)
 
 # %%
 # V velocity component
-v_hycom = xoa.open_data_sample("hycom.gdp.v.nc").xoa.decode().v.squeeze(drop=True)
+v_hycom = xoa.open_data_sample("MODELS/HYCOM/hycom.gdp.v.nc").xoa.decode().v.squeeze(drop=True)
 
 # %%
 # Layer thicknesses dataset
-hycom = xoa.open_data_sample("hycom.gdp.h.nc").xoa.decode().squeeze(drop=True)
+hycom = xoa.open_data_sample("MODELS/HYCOM/hycom.gdp.h.nc").xoa.decode().squeeze(drop=True)
 print(hycom)
 
 # %%
@@ -114,7 +114,7 @@ print(hycom)
 #
 # The drifter comes as a `csv` file and we read it as :class:`pandas.DataFrame` instance.
 
-csv_name = xoa.get_data_sample("gdp-6203641.csv")
+csv_name = xoa.get_data_sample("OBS/DRIFTERS/gdp-6203641.csv")
 drifter = pd.read_csv(
     csv_name, header=0, skiprows=[1], parse_dates=[0], index_col=0, usecols=[2, 3, 4, 5, 6, 7]
 )

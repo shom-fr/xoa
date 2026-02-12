@@ -6,7 +6,7 @@ import logging
 from configobj import ConfigObj
 from validate import Validator
 
-import xoa
+import xoa.options
 
 
 decl_format = """.. xoaoption:: {optname}
@@ -44,8 +44,7 @@ def genrst(app):
     srcdir = app.env.srcdir
 
     file_table = os.path.join(srcdir, app.config.genoptions_table)
-    file_declarations = os.path.join(
-        srcdir, app.config.genoptions_declarations)
+    file_declarations = os.path.join(srcdir, app.config.genoptions_declarations)
 
     for ff in file_table, file_declarations:
         fd = os.path.dirname(ff)
@@ -53,7 +52,7 @@ def genrst(app):
             os.makedirs(fd)
 
     cfgspecs = ConfigObj(
-        xoa.CONFIG_SPECS.split("\n"),
+        xoa.options.CONFIG_SPECS.split("\n"),
         list_values=False,
         interpolation=False,
         raise_errors=True,
@@ -69,8 +68,7 @@ def genrst(app):
     for sec in cfgspecs.sections:
         for optname, optspecs in cfgspecs[sec].items():
 
-            opttype, fun_args, fun_kwargs, optdef = validator._parse_check(
-                optspecs)
+            opttype, fun_args, fun_kwargs, optdef = validator._parse_check(optspecs)
             optdesc = cfgspecs[sec].inline_comments[optname].strip("# ")
             optdesc = optdesc.capitalize()
             optname = f"{sec}.{optname}"
@@ -85,14 +83,14 @@ def genrst(app):
 def setup(app):
 
     app.add_object_type(
-        'xoaoption', 'xoaoption',
+        'xoaoption',
+        'xoaoption',
         objname='xoa flat configuration option',
-        indextemplate='pair: %s; xoa flat configuration option')
+        indextemplate='pair: %s; xoa flat configuration option',
+    )
 
-    app.add_config_value('genoptions_table',
-                         'genoptions/table.txt', 'html')
-    app.add_config_value('genoptions_declarations',
-                         'genoptions/declarations.txt', 'html')
+    app.add_config_value('genoptions_table', 'genoptions/table.txt', 'html')
+    app.add_config_value('genoptions_declarations', 'genoptions/declarations.txt', 'html')
 
     app.connect('builder-inited', genrst)
 

@@ -23,7 +23,7 @@ from . import options
 
 
 def get_parser(formatter_class=argparse.ArgumentDefaultsHelpFormatter):
-
+    """Create the argument parser for the xoa CLI"""
     parser = argparse.ArgumentParser(description="xoa interface", formatter_class=formatter_class)
     subparsers = parser.add_subparsers(help='sub-command help')
 
@@ -44,13 +44,14 @@ def get_parser(formatter_class=argparse.ArgumentDefaultsHelpFormatter):
 
 
 def main(argv=None, formatter_class=argparse.ArgumentDefaultsHelpFormatter):
-
+    """Entry point for the xoa CLI"""
     parser = get_parser(formatter_class=formatter_class)
     args = parser.parse_args(argv)
     args.func(parser, args)
 
 
 def main_info(parser, args):
+    """Handle the ``info`` subcommand"""
     if args.category == "all":
         options.show_info()
     elif args.category == "versions":
@@ -62,6 +63,7 @@ def main_info(parser, args):
 
 
 def main_reset_cf_cache(parser, args):
+    """Handle the ``reset_cf_cache`` subcommand"""
     from . import cf
 
     cf.reset_cache(disk=True)

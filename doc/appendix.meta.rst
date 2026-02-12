@@ -6,7 +6,7 @@ Default and specialized meta specs
 This appendix refers to the searching and formatting specifications
 for data variables and coordinates, and related tools,
 available in the :mod:`xoa.meta` module.
-Their usage is introduced in the :ref:`uses.meta` section.
+Their usage is introduced in the :ref:`indepth.meta` section.
 
 .. _appendix.meta.specialized:
 
@@ -38,7 +38,7 @@ The default configuration
 -------------------------
 
 .. note:: You can define you own specifications for each of your datasets.
-    Have a look to the :ref:`uses.meta` section and to the :ref:`examples`.
+    Have a look to the :ref:`indepth.meta` section and to the :ref:`examples`.
 
 As a :file:`.cfg` file
 ^^^^^^^^^^^^^^^^^^^^^^

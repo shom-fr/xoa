@@ -8,7 +8,7 @@
 
    install
    configure
-   howtostart
+   quickstart
 
 .. toctree::
    :caption: User Guide
@@ -16,7 +16,7 @@
    :hidden:
 
    examples/index
-   uses
+   indepth
    cli
 
 .. toctree::

@@ -18,7 +18,7 @@ pooch.get_logger().setLevel("DEBUG")
 
 POOCH = pooch.create(
     path=pooch.os_cache("xoa"),
-    base_url="https://raw.githubusercontent.com/shom-fr/data-samples/main/OCEANO/",
+    base_url="https://github.com/shom-fr/data-samples/raw/refs/heads/main/OCEANO/",
     # version_dev="main",
     env="SHOM_DATA_SAMPLES",
 )
@@ -85,7 +85,7 @@ def open_data_sample(filename, **kwargs):
     get_data_sample
     show_data_samples
     """
-    from ..__init__ import XoaError, xoa_warn
+    from xoa import XoaError, xoa_warn
 
     try:
         path = get_data_sample(filename)

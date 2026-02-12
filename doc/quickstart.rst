@@ -1,7 +1,7 @@
-.. _howtostart:
+.. _quickstart:
 
-How to get started
-==================
+Quick start guide
+=================
 
 
 Read the documentation
@@ -12,7 +12,7 @@ This collection of examples will gradually be completed
 to cover almost all features of the library.
 
 Some of the modules that are special or of particular interest
-are described in the :ref:`uses` section.
+are described in the :ref:`indepth` section.
 
 
 Using the library

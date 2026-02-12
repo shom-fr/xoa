@@ -19,6 +19,7 @@ Package API
     xoa.core.interp
     xoa.core.num
     xoa.core.regrid
+    xoa.core.sigma
     xoa.data_samples
     xoa.dyn
     xoa.filter

@@ -21,13 +21,19 @@ xarray-based ocean analysis library
 import os
 
 
-from .exceptions import XoaError, XoaWarning, XoaDeprecationWarning, XoaConfigError  # noqa: F401
+from .exceptions import (  # noqa: F401
+    XoaError,
+    XoaWarning,
+    XoaDeprecationWarning,
+    XoaConfigError,
+    xoa_warn,
+)
 from .meta import get_meta_config_file  # noqa: F401
 from .meta.configs import META_CONFIGS  # noqa: F401
 from .data_samples import (  # noqa: F401
-    get_data_sample,  # noqa: F401
-    show_data_samples,  # noqa: F401
-    open_data_sample,  # noqa: F401
+    get_data_sample,
+    show_data_samples,
+    open_data_sample,
 )
 from .accessors import register_accessors
 

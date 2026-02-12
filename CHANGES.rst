@@ -33,6 +33,9 @@ Bug fixes
 
 Documentation
 -------------
+- Rename "Using the modules" section to "In-depth guides".
+- Added in the in-depth guide to metadata mentions of :mod:`xoa.coords`, :mod:`xoa.dyn` and :mod:`xoa.thermdyn` helper function to access coordinates and physical variables like lon or temp.
+- Added in-depth guides about sigma-like coordinates, grids and regridding, and filtering.
 
 
 0.8.0 (2025-05-12)

@@ -25,6 +25,8 @@ from .misc import ERRORS
 
 
 class _BasicMetaAccessor_(object):
+    """Base class for meta-aware xarray accessors"""
+
     def __init__(self, obj, meta_specs=None):
         from . import meta
 
@@ -104,6 +106,8 @@ class _BasicMetaAccessor_(object):
 
 
 class _MetaAccessor_(_BasicMetaAccessor_):
+    """Meta accessor with search and formatting capabilities"""
+
     _search_category = None
 
     def __init__(self, obj, meta_specs=None):
@@ -325,8 +329,8 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         See also
         --------
         :func:`xoa.coords.get_depth`
-        :func:`xoa.grid.decode_cf_dz2depth`
-        :func:`xoa.sigma.decode_cf_sigma`
+        :func:`xoa.grid.decode_dz2depth`
+        :func:`xoa.sigma.decode_sigma`
         :ref:`uses.meta`
         """
         from .coords import get_depth
@@ -349,6 +353,8 @@ class _MetaAccessor_(_BasicMetaAccessor_):
 
 
 class _MetaCoordAccessor_(_MetaAccessor_):
+    """Meta accessor specialized for coordinates"""
+
     _search_category = 'coords'
 
     @property
@@ -467,16 +473,22 @@ class _MetaCoordAccessor_(_MetaAccessor_):
 
 
 class _MetaDataVarAccessor_(_MetaAccessor_):
+    """Meta accessor specialized for data variables"""
+
     _search_category = "data_vars"
 
 
 class MetaDatasetAccessor(_MetaAccessor_):
+    """Meta accessor registered on :class:`xarray.Dataset`"""
+
     @property
     def ds(self):
         return self._obj
 
 
 class MetaDataArrayAccessor(_MetaCoordAccessor_):
+    """Meta accessor registered on :class:`xarray.DataArray`"""
+
     @property
     def da(self):
         return self._obj
@@ -565,11 +577,11 @@ class SigmaAccessor(_BasicMetaAccessor_):
 
         See also
         --------
-        :func:`xoa.sigma.decode_cf_sigma`
+        :func:`xoa.sigma.decode_sigma`
         """
-        from .sigma import decode_cf_sigma
+        from .sigma import decode_sigma
 
-        return decode_cf_sigma(self._ds, rename=rename, errors=errors)
+        return decode_sigma(self._ds, rename=rename, errors=errors)
 
     def __call__(self):
         """Shortcut to :meth:`decode`"""
@@ -630,6 +642,8 @@ class SigmaAccessor(_BasicMetaAccessor_):
 
 
 class XoaDataArrayAccessor(MetaDataArrayAccessor):
+    """Main xoa accessor registered on :class:`xarray.DataArray`"""
+
     @property
     def meta(self):
         """The :class:`MetaDataArrayAccessor` subaccessor
@@ -655,6 +669,8 @@ class XoaDataArrayAccessor(MetaDataArrayAccessor):
 
 
 class XoaDatasetAccessor(MetaDatasetAccessor):
+    """Main xoa accessor registered on :class:`xarray.Dataset`"""
+
     @property
     def meta(self):
         """The :class:`~xoa.accessors.MetaDatasetAccessor` subaccessor
@@ -746,7 +762,7 @@ def register_xoa_accessors(name='xoa'):
     )
 
 
-def register_accessors(xoa=True, xcf=False, meta=False, decode_sigma=False):
+def register_accessors(xoa=True, xcf=False, meta=True, decode_sigma=True):
     """Register xarray accessors
 
     Parameters

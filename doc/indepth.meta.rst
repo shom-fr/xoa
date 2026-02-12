@@ -1,7 +1,7 @@
-.. _uses.meta:
+.. _indepth.meta:
 
-Naming conventions with :mod:`xoa.meta`
-#######################################
+Metadata, CF and naming conventions
+###################################
 
 .. warning::
     Have a quick loop to the appendix :ref:`appendix.meta.default`
@@ -10,7 +10,7 @@ Naming conventions with :mod:`xoa.meta`
 Introduction
 ============
 
-This module is an application and extension of a subset of the
+The :mod:`xoa.meta` subpackage is an application and extension of a subset of the
 `CF conventions <http://cfconventions.org/>`_ in application
 to naming conventions.
 It has two main intents:
@@ -388,7 +388,7 @@ Two shortcut methods exists for these tasks:
 
 Chaining the two methods should lead to the initial dataset or data array.
 See the last section of this page for an exemple:
-:ref:`uses.meta.croco`.
+:ref:`indepth.meta.croco`.
 
 
 .. seealso::
@@ -707,7 +707,151 @@ To propagate to all the data arrays, use :func:`~xoa.meta.assign_meta_specs`:
     meta.get_meta_specs(ds.supertemp) is meta_specs
 
 
-.. _uses.meta.croco:
+Specialized helper modules
+===========================
+
+The :mod:`xoa.meta` module provides the foundation for finding and identifying
+variables and coordinates. Building on this foundation, xoa provides specialized
+modules with convenient functions for common oceanographic and atmospheric variables.
+
+Finding coordinates with :mod:`xoa.coords`
+-------------------------------------------
+
+The :mod:`xoa.coords` module provides high-level functions to find specific
+coordinates in a dataset or data array. These functions use the meta specs
+under the hood.
+
+Available coordinate finder functions:
+
+- :func:`~xoa.coords.get_lon` / :func:`~xoa.coords.is_lon`: Longitude coordinate
+- :func:`~xoa.coords.get_lat` / :func:`~xoa.coords.is_lat`: Latitude coordinate
+- :func:`~xoa.coords.get_depth` / :func:`~xoa.coords.is_depth`: Depth coordinate
+- :func:`~xoa.coords.get_altitude` / :func:`~xoa.coords.is_altitude`: Altitude coordinate
+- :func:`~xoa.coords.get_level` / :func:`~xoa.coords.is_level`: Generic vertical level
+- :func:`~xoa.coords.get_vertical`: Any vertical coordinate (depth, altitude, or level)
+- :func:`~xoa.coords.get_time` / :func:`~xoa.coords.is_time`: Time coordinate
+
+Example usage:
+
+.. ipython:: python
+
+    import xoa.coords
+
+    # Get longitude coordinate from a data array
+    lon = xoa.coords.get_lon(temp)
+    print(lon.name)
+
+    # Check if a coordinate is latitude
+    print(xoa.coords.is_lat(lon))
+
+**Dimension finder functions:**
+
+The module also provides functions to find dimension names:
+
+- :func:`~xoa.coords.get_xdim`: X dimension name
+- :func:`~xoa.coords.get_ydim`: Y dimension name
+- :func:`~xoa.coords.get_zdim`: Z dimension name
+- :func:`~xoa.coords.get_tdim`: Time dimension name
+- :func:`~xoa.coords.get_fdim`: Forecast dimension name
+
+Finding thermodynamic variables with :mod:`xoa.thermdyn`
+---------------------------------------------------------
+
+The :mod:`xoa.thermdyn` module provides functions to find thermodynamic variables
+like temperature, salinity, and density in datasets. These functions support
+different variants of each variable.
+
+**Temperature functions:**
+
+- :func:`~xoa.thermdyn.get_temp`: Find temperature variable in a dataset
+- :func:`~xoa.thermdyn.is_temp`: Check if a DataArray is temperature-like
+
+Supported temperature variants:
+
+- **temp** (or **insitu**): In situ temperature
+- **ptemp** (or **potential**): Potential temperature
+- **ctemp** (or **conservative**): Conservative temperature
+- **atemp** (or **absolute**): Absolute temperature
+
+.. ipython:: python
+
+    import xoa.thermdyn
+
+    # Find any temperature variable in a dataset
+    temp = xoa.thermdyn.get_temp(ds)
+
+    # Find specifically potential temperature
+    # ptemp = xoa.thermdyn.get_temp(ds, variant="ptemp")
+
+    # Check if a variable is temperature-like
+    print(xoa.thermdyn.is_temp(temp))
+
+**Salinity functions:**
+
+- :func:`~xoa.thermdyn.get_sal`: Find salinity variable in a dataset
+- :func:`~xoa.thermdyn.is_sal`: Check if a DataArray is salinity-like
+
+Supported salinity variants:
+
+- **sal** (or **insitu**): In situ salinity
+- **psal** (or **practical**): Practical salinity
+- **asal** (or **absolute**): Absolute salinity
+- **pfsal** (or **preformed**): Preformed salinity
+
+.. ipython:: python
+
+    # Find salinity variable
+    sal = xoa.thermdyn.get_sal(ds)
+    print(sal.name if sal else "No salinity found")
+
+    # Check if it's salinity
+    if sal:
+        print(xoa.thermdyn.is_sal(sal))
+
+**Density functions:**
+
+- :func:`~xoa.thermdyn.get_dens`: Find density variable in a dataset
+- :func:`~xoa.thermdyn.is_dens`: Check if a DataArray is density-like
+
+Finding dynamical variables with :mod:`xoa.dyn`
+------------------------------------------------
+
+The :mod:`xoa.dyn` module provides functions for ocean dynamics variables,
+particularly sea level variables.
+
+**Sea level functions:**
+
+- :func:`~xoa.dyn.get_sea_level`: Find sea level variable in a dataset
+
+Supported sea level variants:
+
+- **ssh**: Sea surface height
+- **adt**: Absolute dynamic topography
+- **sla**: Sea level anomaly
+- **mdt**: Mean dynamic topography
+- **mss**: Mean sea surface
+
+.. ipython:: python
+
+    import xoa.dyn
+
+    # Try to find any sea level variable
+    # sea_level = xoa.dyn.get_sea_level(ds)
+
+    # Find specifically SSH
+    # ssh = xoa.dyn.get_sea_level(ds, variant="ssh")
+
+These helper modules make it easy to work with oceanographic and atmospheric
+datasets without worrying about the exact variable names or conventions used
+in different model outputs or observation datasets.
+
+.. seealso::
+    - :mod:`xoa.coords`: Coordinate utilities
+    - :mod:`xoa.thermdyn`: Thermodynamics utilities
+    - :mod:`xoa.dyn`: Ocean dynamics utilities
+
+
+.. _indepth.meta.croco:
 
 Example: decoding/encoding Croco model outputs
 ==============================================
@@ -758,7 +902,7 @@ Let's **re-encode** it!
 
 Et voilà !
 
-.. _uses.meta.hycom:
+.. _indepth.meta.hycom:
 
 Example: decoding and merging Hycom splitted outputs
 ====================================================

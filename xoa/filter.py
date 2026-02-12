@@ -775,6 +775,7 @@ def convolve(data, kernel, normalize=False, na_thres=0, kernel_kwargs=None, **kw
 
 
 def _get_xydims_(data, xdim, ydim):
+    """Resolve x and y dimension names from data"""
     if xdim is None:
         xdim = xcoords.get_xdims(data, 'x', allow_positional=False, errors="raise")
     else:
@@ -787,6 +788,7 @@ def _get_xydims_(data, xdim, ydim):
 
 
 def _reduce_mask_(data, excluded_dims):
+    """Reduce the NaN mask along all dims except excluded ones"""
     rmask = data.isnull()
     for dim in set(data.dims) - set(excluded_dims):
         rmask = rmask.any(dim=dim)
@@ -794,6 +796,7 @@ def _reduce_mask_(data, excluded_dims):
 
 
 def _convolve_and_fill_(data, kernel):
+    """Convolve and fill NaNs with the smoothed result"""
     return data.fillna(convolve(data, kernel, normalize=True, na_thres=1))
 
 
@@ -1062,6 +1065,7 @@ def _get_decimate_arg_(lons, lats, radius):
 
 @numba.njit(cache=True)
 def _decimate_by_average_(lons, lats, radius, keep, data):
+    """Average data at kept points within a radius"""
     npts = lons.size
     nkept = keep.sum()
     cdata = np.zeros(data.shape[:-1] + (nkept,), data.dtype)
@@ -1081,7 +1085,7 @@ def _decimate_by_average_(lons, lats, radius, keep, data):
 
 
 class decimation_methods(xmisc.IntEnumChoices, metaclass=xmisc.DefaultEnumMeta):
-    """Supported :func:`regrid1d` methods"""
+    """Supported :func:`decimate` methods"""
 
     #: Average (default)
     average = 1

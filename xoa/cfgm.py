@@ -50,10 +50,14 @@ except ImportError:
 
 
 class VdtWarning(exceptions.XoaWarning):
+    """Validation warning"""
+
     pass
 
 
 class XoaValidateError(validate.ValidateError, exceptions.XoaError):
+    """Validation error"""
+
     pass
 
 
@@ -1589,6 +1593,8 @@ def _cfg2optname_(name, nested=None):
 
 
 class _attdict_(dict):
+    """A dict subclass that supports attribute-style access"""
+
     def __getattr__(self, name):
         if name in self.__dict__:
             return object.__getattribute__(self, name)

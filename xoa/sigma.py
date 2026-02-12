@@ -30,6 +30,7 @@ from . import exceptions
 from . import misc
 from . import meta
 from . import coords as xcoords
+from .core import sigma as core_sigma
 
 # %% Constants
 
@@ -59,56 +60,15 @@ SIGMA_COORDINATE_TYPES = (
 
 
 # %% Low level routines
+#
+# Core computation functions are now guvectorized functions imported from xoa.core.sigma
+# These are universal functions that work efficiently with xarray.apply_ufunc
 
-
-@numba.njit(cache=True)
-def _atmosphere_sigma_(sigma, ps, ptop):
-    p = np.zeros(ps.shape + sigma.shape)
-    for k in numba.prange(sigma.shape[0]):
-        p[..., k] = ptop
-        p[..., k] = p[..., k] + sigma[k] * (ps - ptop)
-    return p
-
-
-@numba.njit(cache=True)
-def _ocean_sigma_(sigma, eta, depth):
-    z = np.zeros(eta.shape + sigma.shape)
-    for k in numba.prange(sigma.shape[0]):
-        z[..., k] = eta
-        z[..., k] = z[..., k] + sigma[k] * (eta + depth)
-    return z
-
-
-@numba.njit(cache=True)
-def _ocean_s_(s, eta, depth, depth_c, C):
-    z = np.zeros(eta.shape + s.shape)
-    for k in numba.prange(s.shape[0]):
-        z[..., k] = eta * (1 + s[k])
-        z[..., k] = z[..., k] + depth_c * s[k]
-        z[..., k] = z[..., k] + (depth - depth_c) * C[k]
-    return z
-
-
-@numba.njit(cache=True)
-def _ocean_s_g1_(s, eta, depth, depth_c, C):
-    z = np.zeros(eta.shape + s.shape)
-    for k in numba.prange(s.shape[0]):
-        S = depth_c * s[k]
-        S = S + (depth - depth_c) * C[k]
-        z[..., k] = S
-        z[..., k] = z[..., k] + eta * (1.0 + S / depth)
-    return z
-
-
-@numba.njit(cache=True)
-def _ocean_s_g2_(s, eta, depth, depth_c, C):
-    z = np.zeros(eta.shape + s.shape)
-    for k in numba.prange(s.shape[0]):
-        S = depth_c * s[k] + depth * C[k]
-        S = S / (depth + depth_c)
-        z[..., k] = S * (depth + eta)
-        z[..., k] = z[..., k] + eta
-    return z
+_atmosphere_sigma_ = core_sigma.atmosphere_sigma
+_ocean_sigma_ = core_sigma.ocean_sigma
+_ocean_s_ = core_sigma.ocean_s
+_ocean_s_g1_ = core_sigma.ocean_s_g1
+_ocean_s_g2_ = core_sigma.ocean_s_g2
 
 
 def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask):
@@ -781,7 +741,7 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
     return ds
 
 
-def get_cf_dims(*args, **kwargs):
+def decode_cf_sigma(*args, **kwargs):
     exceptions.exceptions.xoa_warn(
         "decode_cf_sigma is deprecated. Please use decode_sigma instead.", "deprecation"
     )

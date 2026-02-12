@@ -20,50 +20,74 @@ import warnings
 
 
 class XoaError(Exception):
+    """Base exception for xoa"""
+
     pass
 
 
 class XoaConfigError(XoaError):
+    """Configuration error"""
+
     pass
 
 
 class XoaCoordsError(XoaError):
+    """Coordinates error"""
+
     pass
 
 
 class XoaGridError(XoaError):
+    """Grid error"""
+
     pass
 
 
 class XoaDynError(XoaError):
+    """Ocean dynamics error"""
+
     pass
 
 
 class XoaKrigingError(XoaError):
+    """Kriging error"""
+
     pass
 
 
 class XoaMetaError(XoaError):
+    """Metadata error"""
+
     pass
 
 
 class XoaRegridError(XoaError):
+    """Regridding error"""
+
     pass
 
 
 class XoaSigmaError(XoaError):
+    """Sigma coordinates error"""
+
     pass
 
 
 class XoaThermdynError(XoaError):
+    """Thermodynamics error"""
+
     pass
 
 
 class XoaWarning(UserWarning):
+    """Base warning for xoa"""
+
     pass
 
 
 class XoaDeprecationWarning(XoaWarning, DeprecationWarning):
+    """Deprecation warning for xoa"""
+
     pass
 
 
