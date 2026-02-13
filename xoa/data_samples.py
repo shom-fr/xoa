@@ -48,7 +48,8 @@ def get_data_sample(sample_name=None):
         file_names = []
         with open(REGISTRY_FILE) as f:
             for line in f:
-                file_names.append(line.split()[0])
+                if len(line) > 1 and not line.startswith("#"):
+                    file_names.append(line.split()[0])
         return file_names
     return POOCH.fetch(sample_name)
 

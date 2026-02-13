@@ -17,7 +17,7 @@ To this end, the library relies on the following libraries, among others:
     All numerical vectors are by default supposed to be of
     :class:`xarray.DataArray` type, i.e. with numerical values, attributes and
     potentially multi-dimensional coordinates.
-    The library adds some :ref:`CF support <uses.cf>`
+    The library adds some :ref:`metadata support <indepth.meta>`
     to identify known data arrays and coordinates in datasets.
 `matplotlib <https://matplotlib.org>`_ and `cartopy <https://scitools.org.uk/cartopy/docs/latest/>`_
     All plots are made with them, with an extra layer that

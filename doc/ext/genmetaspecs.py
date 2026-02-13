@@ -180,6 +180,12 @@ def setup(app):
         objname='xoa.meta MetaSpecs section',
         indextemplate='pair: %s; xoa.meta MetaSpec section',
     )
+    app.add_object_type(
+        'metaopt',
+        'metaopt',
+        objname='xoa.meta MetaSpecs option',
+        indextemplate='pair: %s; xoa.meta MetaSpec option',
+    )
 
     app.connect('builder-inited', genrst)
 

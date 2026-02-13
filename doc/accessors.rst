@@ -36,8 +36,8 @@ Methods
     :toctree: accessors
     :template: autosummary/accessor_method.rst
 
-    DataArray.xoa.set_cf_specs
-    DataArray.xoa.get_cf_specs
+    DataArray.xoa.set_meta_specs
+    DataArray.xoa.get_meta_specs
     DataArray.xoa.decode
     DataArray.xoa.encode
     DataArray.xoa.auto_format
@@ -73,8 +73,8 @@ Methods
     :toctree: accessors
     :template: autosummary/accessor_method.rst
 
-    Dataset.xoa.set_cf_specs
-    Dataset.xoa.get_cf_specs
+    Dataset.xoa.set_meta_specs
+    Dataset.xoa.get_meta_specs
     Dataset.xoa.decode
     Dataset.xoa.encode
     Dataset.xoa.auto_format

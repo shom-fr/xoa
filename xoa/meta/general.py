@@ -5,7 +5,7 @@ Naming convention tools for reading and formatting variables
 
 .. rubric:: How to use it
 
-See the :ref:`uses.meta` section.
+See the :ref:`indepth.meta` section.
 
 """
 # Copyright 2020-2026 Shom
@@ -97,7 +97,7 @@ class MetaSpecs(categories._MetaBase_):
     and attributes like standard_name, long_name, axis.
 
     Have a look to the :ref:`default specifications <appendix.meta_specs.default>`
-    and to the :ref:`uses.meta_specs` section.
+    and to the :ref:`indepth.meta` section.
 
 
     Parameters
@@ -122,7 +122,7 @@ class MetaSpecs(categories._MetaBase_):
     MetaCoordSpecs
     MetaVarSpecs
     SGLocator
-    :ref:`uses.meta_specs`
+    :ref:`indepth.meta`
     :ref:`appendix.meta_specs.default`
     """
 
@@ -294,8 +294,13 @@ class MetaSpecs(categories._MetaBase_):
                 return self._metas[cat][section]
         return self._dict[section]
 
-    def __contains__(self, category):
-        return category in self.categories
+    def __contains__(self, item):
+        if item in self.categories:
+            return True
+        for cat in self.categories:
+            if item in self._metas[cat]:
+                return True
+        return item in self._dict
 
     def __getattr__(self, name):
         if "_metas" in self.__dict__ and name in self.__dict__["_metas"]:
@@ -399,6 +404,20 @@ class MetaSpecs(categories._MetaBase_):
         if hasattr(entries[name], "dict"):
             entries[name] = entries[name].dict()
         specs = entries[name]
+
+        # Move shorthand attrs to the attrs dict
+        for attr_key in ("standard_name", "long_name", "units"):
+            if attr_key in specs and not isinstance(specs[attr_key], dict):
+                val = specs.pop(attr_key)
+                if val:
+                    if isinstance(val, str):
+                        val = [val]
+                    if not specs["attrs"][attr_key]:
+                        specs["attrs"][attr_key] = val
+                    else:
+                        specs["attrs"][attr_key].extend(
+                            v for v in val if v not in specs["attrs"][attr_key]
+                        )
 
         # Inherits from other specs (merge specs with dict_merge)
         if "inherit" in specs and specs["inherit"]:

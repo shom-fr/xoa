@@ -5,10 +5,10 @@ Naming convention tools for reading and formatting variables
 
 .. rubric:: How to use it
 
-See the :ref:`uses.cf` section.
+See the :ref:`indepth.meta` section.
 
 """
-# Copyright 2020-2025 Shom
+# Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

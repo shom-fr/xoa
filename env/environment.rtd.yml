@@ -24,7 +24,6 @@ dependencies:
       - pooch
       - seaborn
       - sphinx
-      - sphinx-autosummary-accessors
       - sphinx-book-theme
       - sphinx-argparse
       - sphinx-gallery

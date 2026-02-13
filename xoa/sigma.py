@@ -6,7 +6,7 @@ This follows the CF conventions for
 `Parametric Vertical Coordinates <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#parametric-v-coord>`_.
 
 """
-# Copyright 2020-2024 Shom
+# Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ This follows the CF conventions for
 import re
 
 import numpy as np
-import numba
 import xarray as xr
 
 from . import exceptions
@@ -49,26 +48,20 @@ FORMULA_TERMS_TO_CF_NAMES = {
 #: CF names that are known to have horizontal dimensions
 HORIZONTAL_TERMS = ["ssh", "bathy", "hc"]
 
-#: Supported sigma coordinates
-SIGMA_COORDINATE_TYPES = (
-    "atmosphere_sigma_coordinate",
-    "ocean_sigma_coordinate",
-    "ocean_s_coordinate",
-    "ocean_s_coordinate_g1",
-    "ocean_s_coordinate_g2",
-)
-
 
 # %% Low level routines
 #
 # Core computation functions are now guvectorized functions imported from xoa.core.sigma
 # These are universal functions that work efficiently with xarray.apply_ufunc
 
-_atmosphere_sigma_ = core_sigma.atmosphere_sigma
-_ocean_sigma_ = core_sigma.ocean_sigma
-_ocean_s_ = core_sigma.ocean_s
-_ocean_s_g1_ = core_sigma.ocean_s_g1
-_ocean_s_g2_ = core_sigma.ocean_s_g2
+_atmosphere_sigma_ = core_sigma.atmosphere_sigma_coordinate
+_ocean_sigma_ = core_sigma.ocean_sigma_coordinate
+_ocean_s_ = core_sigma.ocean_s_coordinate
+_ocean_s_g1_ = core_sigma.ocean_s_coordinate_g1
+_ocean_s_g2_ = core_sigma.ocean_s_coordinate_g2
+
+
+# %% Wrapper
 
 
 def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask):
@@ -472,6 +465,16 @@ def ocean_s_coordinate_g2(
     return _apply_ocean_s_(_ocean_s_g2_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask)
 
 
+#: Supported sigma coordinates
+SIGMA_COORDINATE_FUNCTIONS = {
+    "atmosphere_sigma_coordinate": atmosphere_sigma_coordinate,
+    "ocean_sigma_coordinate": ocean_sigma_coordinate,
+    "ocean_s_coordinate": ocean_s_coordinate,
+    "ocean_s_coordinate_g1": ocean_s_coordinate_g1,
+    "ocean_s_coordinate_g2": ocean_s_coordinate_g2,
+}
+
+
 # %% File decoding
 
 
@@ -595,7 +598,7 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
             )
         standard_name, loc = meta_specs.sglocator.parse_attr("standard_name", sig.standard_name)
         # skip this one
-        if standard_name not in SIGMA_COORDINATE_TYPES:
+        if standard_name not in SIGMA_COORDINATE_FUNCTIONS:
             continue
         # Get formula terms
         if "formula_terms" not in sig.attrs:
@@ -692,8 +695,6 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
         return ds
 
     # Loop on locations
-    from . import sigma as sigma_module
-
     sigma_type = None
     hsingle = not isinstance(hlocs, (list, tuple))
     if hsingle:
@@ -712,7 +713,7 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
                 kwargs[meta_name] = ds[vname]
 
             # Compute depth/altitude/pressure
-            func = getattr(sigma_module, sigma_type)
+            func = SIGMA_COORDINATE_FUNCTIONS[sigma_type]
             # cache = {}
             # kwargs['cache'] = cache
             height = func(**kwargs)
@@ -742,7 +743,7 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
 
 
 def decode_cf_sigma(*args, **kwargs):
-    exceptions.exceptions.xoa_warn(
+    exceptions.xoa_warn(
         "decode_cf_sigma is deprecated. Please use decode_sigma instead.", "deprecation"
     )
     return decode_sigma(*args, **kwargs)

@@ -5,7 +5,7 @@ Naming convention tools for reading and formatting variables
 
 .. rubric:: How to use it
 
-See the :ref:`uses.cf` section.
+See the :ref:`indepth.meta` section.
 
 """
 # Copyright 2020-2026 Shom

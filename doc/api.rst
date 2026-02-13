@@ -9,7 +9,6 @@ Package API
     :toctree: api
 
     xoa
-    xoa.accessors
     xoa.cfgm
     xoa.cli
     xoa.color

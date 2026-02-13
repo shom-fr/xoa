@@ -8,7 +8,6 @@ from platformdirs import user_config_dir
 from .. import exceptions
 from .. import misc
 from . import configs
-
 from . import general
 
 
@@ -470,7 +469,7 @@ def get_meta_specs_matching_score(ds, meta_specs):
     return 100 * hit / total
 
 
-def infer_meta_specs(ds, named=False, from_attrs=True, from_score=False):
+def infer_meta_specs(ds, named=False, from_attrs=True, from_score=True):
     """Get the registered MetaSpecs that are best matching this dataset
 
     This accomplished with some heurestics.

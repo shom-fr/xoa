@@ -3,7 +3,7 @@
 
 .. rubric:: Usage
 
-See the :ref:`uses.cfgm` section.
+See the :ref:`indepth.cfgm` section.
 
 """
 # Copyright 2020-2021 Shom

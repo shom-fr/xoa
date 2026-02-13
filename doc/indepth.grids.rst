@@ -287,7 +287,7 @@ and sigma coordinates using CROCO model output:
     import matplotlib.pyplot as plt
 
     # Load CROCO sample data
-    ds = xoa.open_data_sample("croco.south-africa.meridional.nc")
+    ds = xoa.open_data_sample("MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.meridional.nc")
 
     # Decode the dataset (handles sigma coordinates automatically)
     ds_decoded = ds.xoa.decode()

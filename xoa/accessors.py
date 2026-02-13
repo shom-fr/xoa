@@ -56,7 +56,7 @@ class _BasicMetaAccessor_(object):
 
         See also
         --------
-        :ref:`uses.meta`
+        :ref:`indepth.meta`
         """
         from .meta.general import MetaSpecs
 
@@ -75,7 +75,7 @@ class _BasicMetaAccessor_(object):
 
         See also
         --------
-        :ref:`uses.meta`
+        :ref:`indepth.meta`
         """
         return self._meta_specs
 
@@ -196,7 +196,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         See also
         --------
         :meth:`xoa.meta.MetaSpecs.auto_format`
-        :ref:`uses.meta`
+        :ref:`indepth.meta`
         """
         return self._meta_specs.auto_format(self._obj, **kwargs)
 
@@ -213,7 +213,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         See also
         --------
         :meth:`xoa.meta.MetaSpecs.fill_attrs`
-        :ref:`uses.meta`
+        :ref:`indepth.meta`
         """
         return self._meta_specs.fill_attrs(self._obj, **kwargs)
 
@@ -270,7 +270,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         See also
         --------
         :meth:`xoa.meta.MetaSpecs.infer_coords`
-        :ref:`uses.meta`
+        :ref:`indepth.meta`
         """
         return self.meta_specs.infer_coords(self._obj, **kwargs)
 
@@ -288,7 +288,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         --------
         :meth:`xoa.meta.MetaSpecs.decode`
         :meth:`xoa.meta.MetaSpecs.encode`
-        :ref:`uses.meta`
+        :ref:`indepth.meta`
         """
         return self.meta_specs.decode(self._obj, **kwargs)
 
@@ -307,7 +307,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         --------
         :meth:`xoa.meta.MetaSpecs.encode`
         :meth:`xoa.meta.MetaSpecs.decode`
-        :ref:`uses.meta`
+        :ref:`indepth.meta`
         """
         return self.meta_specs.encode(self._obj, **kwargs)
 
@@ -331,7 +331,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         :func:`xoa.coords.get_depth`
         :func:`xoa.grid.decode_dz2depth`
         :func:`xoa.sigma.decode_sigma`
-        :ref:`uses.meta`
+        :ref:`indepth.meta`
         """
         from .coords import get_depth
 

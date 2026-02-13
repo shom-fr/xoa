@@ -235,7 +235,7 @@ Bug fixes
 
 Documentation
 -------------
-- The :ref:`uses.cf` section and :ref:`sphx_glr_examples_plot_hycom_gdp.py` example are adapted to reflect changes.
+- The :ref:`indepth.meta` section and :ref:`sphx_glr_examples_plot_hycom_gdp.py` example are adapted to reflect changes.
 
 
 v0.3.1 (2021-05-21)

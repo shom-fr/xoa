@@ -329,15 +329,14 @@ def show_paths():
         show_paths()
     """
     print("- xoa library dir:", os.path.dirname(__file__))
-    from . import cf
-    from data_samples import get_data_sample
+    from . import meta
+    from .data_samples import get_data_sample
 
     asterix = False
     default_user_config_file = get_default_user_config_file()
     for label, path in [
         ("user config file", default_user_config_file),
-        ("user CF specs file", cf.USER_CF_FILE),
-        ("user CF cache file", cf.USER_CF_XOA_CACHE_FILE),
+        ("user CF specs file", meta.USER_META_FILE),
     ]:
         if not os.path.exists(path):
             asterix = True

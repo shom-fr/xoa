@@ -1,22 +1,30 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Core terrain-folowing coordinate functions.
 
 These functions use numba's guvectorize decorator to create
 universal functions (ufuncs) that work efficiently with xarray.apply_ufunc.
 """
-import numpy as np
+
+# Copyright 2020-2026 Shom
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 import numba
 
 
 @numba.guvectorize(
-    ['void(float64[:], float64, float64, float64[:])'],
-    '(k),(),()->(k)',
-    nopython=True,
-    cache=True
+    ['void(float64[:], float64, float64, float64[:])'], '(k),(),()->(k)', nopython=True, cache=True
 )
-def atmosphere_sigma(sigma, ps, ptop, p):
+def atmosphere_sigma_coordinate(sigma, ps, ptop, p):
     """Convert from sigma to pressure in an atmospheric model
 
     Parameters
@@ -35,12 +43,9 @@ def atmosphere_sigma(sigma, ps, ptop, p):
 
 
 @numba.guvectorize(
-    ['void(float64[:], float64, float64, float64[:])'],
-    '(k),(),()->(k)',
-    nopython=True,
-    cache=True
+    ['void(float64[:], float64, float64, float64[:])'], '(k),(),()->(k)', nopython=True, cache=True
 )
-def ocean_sigma(sigma, eta, depth, z):
+def ocean_sigma_coordinate(sigma, eta, depth, z):
     """Convert from sigma to depth in an ocean model
 
     Parameters
@@ -62,9 +67,9 @@ def ocean_sigma(sigma, eta, depth, z):
     ['void(float64[:], float64, float64, float64, float64[:], float64[:])'],
     '(k),(),(),(),( k)->(k)',
     nopython=True,
-    cache=True
+    cache=True,
 )
-def ocean_s(s, eta, depth, depth_c, C, z):
+def ocean_s_coordinate(s, eta, depth, depth_c, C, z):
     """Convert from s-coordinate to depth in an ocean model
 
     Parameters
@@ -93,9 +98,9 @@ def ocean_s(s, eta, depth, depth_c, C, z):
     ['void(float64[:], float64, float64, float64, float64[:], float64[:])'],
     '(k),(),(),(),( k)->(k)',
     nopython=True,
-    cache=True
+    cache=True,
 )
-def ocean_s_g1(s, eta, depth, depth_c, C, z):
+def ocean_s_coordinate_g1(s, eta, depth, depth_c, C, z):
     """Convert from s-coordinate (generic form 1) to depth in an ocean model
 
     Parameters
@@ -126,9 +131,9 @@ def ocean_s_g1(s, eta, depth, depth_c, C, z):
     ['void(float64[:], float64, float64, float64, float64[:], float64[:])'],
     '(k),(),(),(),( k)->(k)',
     nopython=True,
-    cache=True
+    cache=True,
 )
-def ocean_s_g2(s, eta, depth, depth_c, C, z):
+def ocean_s_coordinate_g2(s, eta, depth, depth_c, C, z):
     """Convert from s-coordinate (generic form 2) to depth in an ocean model
 
     Parameters
