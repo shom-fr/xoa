@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Thermodynamics utilities
+Thermodynamics utilities.
+
+Provides functions to identify and retrieve temperature, salinity and
+density variables from datasets, and to compute the mixed layer depth.
 """
 import numpy as np
 import xarray as xr
@@ -66,7 +69,7 @@ def _get_temp_variant_(variant):
 
 @TEMP_VARIANTS.format_method_docstring
 def is_temp(da, variant=None):
-    """Check if `da` is a temperature-like array
+    """Check if ``da`` is a temperature-like array
 
     Parameters
     ----------
@@ -76,6 +79,20 @@ def is_temp(da, variant=None):
     Return
     ------
     bool
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> da = xr.DataArray([15, 16], dims="z", name="temp")
+        >>> is_temp(da)
+        True
+
+    See also
+    --------
+    get_temp
+    is_sal
+    is_dens
     """
     variant = _get_temp_variant_(variant)
     return bool(xmeta.get_meta_specs(da).match_data_var(da, variant))
@@ -83,20 +100,27 @@ def is_temp(da, variant=None):
 
 @TEMP_VARIANTS.format_method_docstring
 def get_temp(ds, variant=None, errors="warn"):
-    """Search for temperature in a dataset
+    """Search for a temperature variable in a dataset
 
     Parameters
     ----------
     ds: xarray.Dataset
     {variant}
+    errors: str
+        Error handling: ``"ignore"``, ``"warn"`` or ``"raise"``.
 
     Return
     ------
     xarray.DataArray, None
-        If None or several arrays are found, a warning or an error may be raised
-        depending on the `errors` parameter.
-        If several arrays are matching and `errors` is "warn", the first array is returned.
+        The temperature array, or None if not found.
+        If several arrays match and ``errors`` is ``"warn"``,
+        the first one is returned.
 
+    See also
+    --------
+    is_temp
+    get_sal
+    get_dens
     """
     variant = _get_temp_variant_(variant)
     return xmeta.get_meta_specs(ds).get(ds, variant, errors=errors)
@@ -115,7 +139,7 @@ SAL_VARIANTS = xmisc.Choices(
     description="Restrict checking to a given variant(s)",
     aliases={
         "sal": "insitu",
-        "psal": "pratical",
+        "psal": "practical",
         "pfsal": "preformed",
         "asal": "absolute salinity",
     },
@@ -132,7 +156,7 @@ def _get_sal_variant_(variant):
 
 @SAL_VARIANTS.format_method_docstring
 def is_sal(da, variant=None):
-    """Check if `da` is a salinity-like array.
+    """Check if ``da`` is a salinity-like array
 
     Parameters
     ----------
@@ -142,6 +166,12 @@ def is_sal(da, variant=None):
     Return
     ------
     bool
+
+    See also
+    --------
+    get_sal
+    is_temp
+    is_dens
     """
     variant = _get_sal_variant_(variant)
     return bool(xmeta.get_meta_specs(da).match_data_var(da, variant))
@@ -149,17 +179,25 @@ def is_sal(da, variant=None):
 
 @SAL_VARIANTS.format_method_docstring
 def get_sal(ds, variant=None, errors="warn"):
-    """Search for salinity in a dataset.
+    """Search for a salinity variable in a dataset
 
     Parameters
     ----------
-    da: xarray.Dataset
+    ds: xarray.Dataset
     {variant}
+    errors: str
+        Error handling: ``"ignore"``, ``"warn"`` or ``"raise"``.
 
     Return
     ------
     xarray.DataArray, None
-        Return None if not found
+        The salinity array, or None if not found.
+
+    See also
+    --------
+    is_sal
+    get_temp
+    get_dens
     """
     variant = _get_sal_variant_(variant)
     return xmeta.get_meta_specs(ds).get(ds, variant, errors=errors)
@@ -171,7 +209,7 @@ DENS_VARIANTS = xmisc.Choices(
         None: "No restriction",
         "dens": "In situ density",
         "pdens": "Potential density",
-        "ndens": "Neutral salinity",
+        "ndens": "Neutral density",
     },
     parameter="variant",
     description="Restrict checking to a given variant(s)",
@@ -203,7 +241,7 @@ def _get_dens_variant_(variant):
 
 @DENS_VARIANTS.format_method_docstring
 def is_dens(da, variant=None):
-    """Check if `da` is a density-like array.
+    """Check if ``da`` is a density-like array
 
     Parameters
     ----------
@@ -213,6 +251,12 @@ def is_dens(da, variant=None):
     Return
     ------
     bool
+
+    See also
+    --------
+    get_dens
+    is_temp
+    is_sal
     """
     meta_specs = xmeta.get_meta_specs(da)
     variant = _get_dens_variant_(variant)
@@ -232,17 +276,25 @@ def is_dens(da, variant=None):
 
 @DENS_VARIANTS.format_method_docstring
 def get_dens(ds, variant=None, errors="warn"):
-    """Search for density in a dataset.
+    """Search for a density variable in a dataset
 
     Parameters
     ----------
-    da: xarray.Dataset
+    ds: xarray.Dataset
     {variant}
+    errors: str
+        Error handling: ``"ignore"``, ``"warn"`` or ``"raise"``.
 
     Return
     ------
     xarray.DataArray, None
-        Return None if not found
+        The density array, or None if not found.
+
+    See also
+    --------
+    is_dens
+    get_temp
+    get_sal
     """
     variant = _get_dens_variant_(variant)
     return xmeta.get_meta_specs(ds).get(ds, variant, errors=errors)
@@ -252,7 +304,7 @@ def get_dens(ds, variant=None, errors="warn"):
 MLD_METHODS = xmisc.Choices(
     {
         "deltatemp": (
-            "depth at which the potential temperature is `deltadtemp` "
+            "depth at which the potential temperature is ``deltatemp`` "
             "lower than the surface temperature"
         ),
         "deltadens": (
@@ -277,34 +329,53 @@ def mixed_layer_depth(
     dask="parallelized",
     **kwargs,
 ):
-    """Compute the mixed layer depth with different methods.
+    """Compute the mixed layer depth with different methods
 
     Parameters
     ----------
     da: xarray.DataArray
-        A data array that contains either the potential temperature, the potential density or
-        the vertical tracer diffisivity.
-        Note that this array **must contain a depth coordinate**, which optimally contains
-        the `positive` attribute.
+        A data array that contains either the potential temperature,
+        the potential density or the vertical tracer diffusivity.
+        This array **must contain a depth coordinate**, which should have
+        a ``positive`` attribute.
     {method}
     zref: float
-        Reference depth (in meters) from which the MLD_METHODS are applied
+        Reference depth (in meters) from which the method criterion
+        is applied. Defaults to the surface (0).
+    deltatemp: float
+        Temperature threshold for the ``"deltatemp"`` method (in K or degC).
+    deltadens: float
+        Density threshold for the ``"deltadens"`` method (in kg/m3).
+    kzmax: float
+        Diffusivity threshold for the ``"kzmax"`` method (in m2/s).
+    zdim: str, None
+        Name of the vertical dimension. Inferred by default.
+    dask: str
+        See :func:`xarray.apply_ufunc`.
     kwargs: dict
-        Extra keywords are passed to :func:`xoa.regrid.isoslice`.
+        Extra keywords are passed to :func:`xoa.interp.isoslice`.
 
-    Raise
-    -----
-    XoaError:
-        When `method` is `None` and cannot be inferred from `da`.
+    Raises
+    ------
+    XoaThermdynError
+        When ``method`` is ``None`` and cannot be inferred from ``da``.
 
     Return
     ------
     xarray.DataArray
-        Mixed layer depth
+        Mixed layer depth as a positive value.
+
+    Example
+    -------
+    Compute the MLD from a temperature profile::
+
+        mld = mixed_layer_depth(temp, method="deltatemp")
 
     See Also
     --------
-    xoa.regrid.isoslice
+    xoa.interp.isoslice
+    is_temp
+    is_dens
     """
     # Vertical dimension
     if zdim is None:

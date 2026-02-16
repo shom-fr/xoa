@@ -41,7 +41,7 @@ def apply_along_dim(
     """Apply an operator on data array or dataset dimensions
 
     The operator may potentially change size of the array.
-    It is is applied on the data array with the data_kwargs
+    It is applied on the data array with the data_kwargs
     arguments and the coordinate arrays with the coord_kwargs arguments.
 
     Parameters
@@ -53,7 +53,7 @@ def apply_along_dim(
         It is applied to both data and coordinates, unless
         ``coord_func`` is provided.
     coord_func: callable, None
-        Fonction to apply to coordinates specifically, which defaults
+        Function to apply to coordinates specifically, which defaults
         to ``func``
     data_kwargs: None, dict
         Parameters passed to func for the data array
@@ -198,7 +198,7 @@ def pad(
     coord_mode: str
         Extrapolation mode for the coordinates
     name_kwargs: dict(dict)
-        Keys are coordinates names and valkues are parameters to pass
+        Keys are coordinates names and values are parameters to pass
         to :func:`xarray.pad` for this coordinate array
     kwargs:
         Extra arguments are passed to :func:`xarray.pad`
@@ -406,14 +406,14 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
 
     The output depths are the depths at the bottom of the layers and the top
     is at a depth of zero. Thus, the output array has the same dimensions
-    as the input array of layer thinknesses.
+    as the input array of layer thicknesses.
 
     Parameters
     ----------
     dz: xarray.DataArray
-        Layer thinknesses
+        Layer thicknesses
     positive: str, int, None
-        Direction over wich coordinates are increasing:
+        Direction over which coordinates are increasing:
         {xcoords.positive_attr.rst_with_links}
         When "up", the first level is supposed to be the bottom
         and the output coordinates are negative.
@@ -424,11 +424,11 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
         a valid positive attribute.
     zdim: str
         Name of the vertical dimension.
-        If note set, it is infered with :func:`~xoa.coords.get_meta_dims`.
+        If not set, it is inferred with :func:`~xoa.coords.get_meta_dims`.
     ref: xarray.DataArray
         Reference array converting layer thicknesses to depth:
 
-        - If **positive up**, it is expected to be the **SSH** (sea surface heigth)
+        - If **positive up**, it is expected to be the **SSH** (sea surface height)
           by default
         - If **positive down**, it is expected to be by default the depth of ground
           also known as **bathymetry**, which should be positive.
@@ -437,7 +437,7 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
         Type of `ref`:
         {dz2depth_ref_types.rst_with_links}
     centered: bool
-        Get depth a the middle of layers instead at their edge
+        Get depth at the middle of layers instead of at their edge
 
     Return
     ------
@@ -522,7 +522,7 @@ dz2depth.__doc__ = dz2depth.__doc__.format(**locals())
 def decode_dz2depth(ds, errors="raise", **kwargs):
     """Compute depth from layer thickness in a dataset
 
-    This makes use of the :meth:`~xoa.meta.MetaSpecs` instance that is retreived
+    This makes use of the :meth:`~xoa.meta.MetaSpecs` instance that is retrieved
     with :func:`xoa.meta.get_meta_specs` with ds as an argument in order to
     find needed variables.
 
@@ -606,7 +606,7 @@ def to_rect(da, tol=1e-5, errors="warn"):
     ----------
     da: xarray.DataArray, xarray.Dataset
         In case of a dataset, it must contain longitudes and latitudes.
-    to: float
+    tol: float
         Absolute tolerance of the variability of a coordinate along its constant dimension
         to consider it as a 1D axis coordinate.
     {errors}
@@ -641,7 +641,7 @@ def to_rect(da, tol=1e-5, errors="warn"):
                 break
         else:
             msg = (
-                "Cannot convert to curvilinear to rectangular grid since since coordinate "
+                "Cannot convert curvilinear to rectangular grid since coordinate "
                 f"'{name}' is not constant along one of its dimensions"
             )
             if errors == "raise":

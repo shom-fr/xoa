@@ -23,7 +23,7 @@ POOCH = pooch.create(
     env="SHOM_DATA_SAMPLES",
 )
 
-#: Registry of data sampples
+#: Registry of data samples
 REGISTRY_FILE = os.path.join(os.path.dirname(__file__), "data_samples.txt")
 
 POOCH.load_registry(REGISTRY_FILE)
@@ -106,7 +106,7 @@ def open_data_sample(filename, **kwargs):
         import pandas as pd
 
         return pd.read_csv(path, **kwargs)
-    raise XoaError("Don't know haw to open this file")
+    raise XoaError("Don't know how to open this file")
 
 
 def show_data_samples(full_paths=False):

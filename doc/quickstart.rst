@@ -18,7 +18,7 @@ are described in the :ref:`indepth` section.
 Using the library
 -----------------
 
-Like most xarray-based projects, xoa provides not only a
-a :ref:`library <api>` but also :ref:`accessors <accessors>` for convenient access to part of the
+Like most xarray-based projects, xoa provides not only
+a :ref:`library <api>` but also :ref:`accessors <accessors>` for convenient
 access to part of the functionality.
 Both uses are demonstrated in the practical examples.

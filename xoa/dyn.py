@@ -1,5 +1,8 @@
 """
-Routines related to the ocean dynamics.
+Routines related to ocean dynamics.
+
+Provides :func:`get_sea_level` for identifying sea level variables
+and :func:`flow2d` for 2D Lagrangian particle advection.
 """
 
 # Copyright 2020-2026 Shom
@@ -54,7 +57,10 @@ def _get_sea_level_variant_(variant):
 
 @SEA_LEVEL_VARIANTS.format_function_docstring
 def get_sea_level(ds, variant=None, errors="ignore"):
-    """Try to find a unique sea level variable in a dataset
+    """Search for a sea level variable in a dataset
+
+    Looks for SSH, ADT, SLA, MDT or MSS variables using the
+    :mod:`xoa.meta` specifications.
 
     See: https://help.marine.copernicus.eu/en/articles/6025269-what-are-the-differences-between-the-ssh-and-sla-variables
 
@@ -62,10 +68,21 @@ def get_sea_level(ds, variant=None, errors="ignore"):
     ----------
     ds: xarray.Dataset
     {variant}
+    errors: str
+        Error handling: ``"ignore"``, ``"warn"`` or ``"raise"``.
 
     Return
     ------
     xarray.DataArray, None
+        The sea level array, or None if not found.
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> ds = xr.Dataset(dict(ssh=(("lat", "lon"), data)))
+        >>> get_sea_level(ds)
+        <xarray.DataArray 'ssh' ...>
 
     """
     variant = _get_sea_level_variant_(variant)
@@ -123,7 +140,7 @@ def _integrate_(xy, f, t0, t1, dt, **kwargs):
         if dtf:
             dts.append(dtf)
 
-    # Interative integration
+    # Iterative integration
     t = t0
     tt = [t0]
     xxyy = [xy]
@@ -138,36 +155,54 @@ def _integrate_(xy, f, t0, t1, dt, **kwargs):
 
 
 def flow2d(u, v, xy0, duration, step, date=None):
-    """Integrate gridded 2D velocities from random positions
+    """Integrate gridded 2D velocities from initial positions
+
+    Uses a 4th-order Runge-Kutta scheme to advect particles
+    in a 2D velocity field.
 
     Parameters
     ----------
     u: xarray.DataArray
-        Gridded zonal velocity
+        Gridded zonal velocity (must be 2D after squeezing).
     v: xarray.DataArray
-        Gridded meridional velocity
+        Gridded meridional velocity (must be 2D after squeezing).
+    xy0: tuple, int, xarray.Dataset
+        Initial positions. Either:
+
+        - a ``(x_array, y_array)`` tuple of longitudes and latitudes,
+        - an ``int`` for randomly placed particles,
+        - a :class:`xarray.Dataset` with longitude and latitude coordinates.
     duration: int, numpy.timedelta64
-        Total integration time in seconds
+        Total integration time in seconds.
     step: int, numpy.timedelta64
-        Integratiin step in seconds
-    xy0: int, xarray.Dataset, tuple
-        Either a number of particles or a dataset of initial positions
-        with longitude and latitude coordinates
+        Integration time step in seconds.
     date: None, numpy.datetime64
-        A reference date for the time integration
+        A reference date for the output time coordinate.
 
     Return
     ------
     xarray.Dataset
-        Output positions with ``lon`` and ``lat`` coordinates that vary with time.
+        Output positions with ``lon`` and ``lat`` coordinates
+        varying along ``time`` and ``particles`` dimensions.
 
+    Example
+    -------
+    Advect two particles for 3 hours with a 2-hour time step::
+
+        ff = flow2d(u, v, ([1., 2.], [1., 1.5]),
+                    np.timedelta64(3, "h"), np.timedelta64(2, "h"),
+                    date="2000-01-01")
+
+    See Also
+    --------
+    xoa.interp.grid2loc
     """
     # Gridded field
     time0 = xcoords.get_time(u, errors="ignore")
     u = u.squeeze(drop=True)
     v = v.squeeze(drop=True)
     if u.ndim != 2 or v.ndim != 2:
-        raise exceptions.XoaError("The velocity field must 2D")
+        raise exceptions.XoaError("The velocity field must be 2D")
     u = xgrid.to_rect(u)
     gx = xcoords.get_lon(u).values
     gy = xcoords.get_lat(u).values

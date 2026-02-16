@@ -15,6 +15,38 @@ da2d = xr.DataArray(np.random.normal(size=(50, 50)), dims=('ny', 'nx'))
 da3d = xr.DataArray(np.random.normal(size=(30, 50, 50)), dims=('nt', 'ny', 'nx'))
 
 
+def test_filter_get_window_func():
+    # From numpy name
+    func = xfilter.get_window_func("bartlett")
+    w = func(5)
+    np.testing.assert_allclose(w, [0., 0.5, 1., 0.5, 0.])
+
+    # From list
+    func = xfilter.get_window_func([1, 2, 1])
+    w = func(5)
+    assert w.shape == (5,)
+    assert w[0] == 1.
+    assert w[-1] == 1.
+
+    # From callable
+    func = xfilter.get_window_func(np.ones)
+    np.testing.assert_allclose(func(3), [1., 1., 1.])
+
+
+def test_filter_generate_isotropic_kernel():
+    kernel = xfilter.generate_isotropic_kernel((5, 5), "bartlett")
+    assert kernel.shape == (5, 5)
+    # Center should have max value
+    assert kernel[2, 2] == kernel.max()
+    # Should be symmetric
+    np.testing.assert_allclose(kernel, kernel[::-1])
+    np.testing.assert_allclose(kernel, kernel[:, ::-1])
+
+    # With fill_value
+    kernel = xfilter.generate_isotropic_kernel((5, 5), "bartlett", fill_value=np.nan)
+    assert np.isnan(kernel[0, 0])
+
+
 def test_filter_generate_orthogonal_kernel():
     kernel = xfilter.generate_orthogonal_kernel((3, 5), "bartlett")
     assert kernel.shape == (3, 5)
@@ -45,6 +77,18 @@ def test_filter_generate_kernel(kernel, data, oshape, odims, osum):
     np.testing.assert_allclose(okernel.data.sum(), osum)
 
 
+def test_filter_shapiro_kernel():
+    k1d = xfilter.shapiro_kernel('nx')
+    assert k1d.dims == ('nx',)
+    assert k1d.shape == (3,)
+
+    k2d = xfilter.shapiro_kernel(('ny', 'nx'))
+    assert k2d.dims == ('ny', 'nx')
+    assert k2d.shape == (3, 3)
+    # Center should be max
+    assert float(k2d[1, 1]) == float(k2d.max())
+
+
 def test_filter_convolve():
 
     da = xr.DataArray(np.ones((5, 5)), dims=('ny', 'nx'))
@@ -58,6 +102,15 @@ def test_filter_convolve():
 
     dac = xfilter.convolve(da, 3, normalize=False, na_thres=1)
     assert dac.sum() == 160
+
+
+def test_filter_smooth():
+    da = xr.DataArray(np.random.normal(size=(10, 10)), dims=('ny', 'nx'))
+    das = xfilter.smooth(da, 3, na_thres=1)
+    assert das.shape == da.shape
+    assert das.dims == da.dims
+    # Smoothed data should have less variance
+    assert float(das.std()) <= float(da.std())
 
 
 def test_filter_erode_mask():
@@ -88,52 +141,54 @@ def test_filter_erode_coast():
         np_out[1, 1, 1], 0.25 * (np_in[1, 0, 1] + np_in[1, 2, 1] + np_in[1, 1, 0] + np_in[1, 1, 2])
     )
 
-def test_filter_dermerliac():
 
-    times = np.arange("2000-01-01", "2000-01-10", dtype="M8[h]")
-    nt = len(times)
-    data = np.cos(np.arange(nt) * np.pi / 12.2)
-    data = np.resize(data, (3, 4, nt)).T
-    da_in = xr.DataArray(data, dims=('time', 'ny', 'nx'), coords={"time": times})
+class TestTidalFilter:
 
-    da_out = xfilter.demerliac(da_in, na_thres=0)
-    assert da_out.dims == da_in.dims
-    assert da_out.shape == da_in.shape
-    assert da_out.min() > -1e-4
-    assert da_out.max() < 1e-4
+    def test_demerliac(self):
+        times = np.arange("2000-01-01", "2000-01-10", dtype="M8[h]").astype("M8[ns]")
+        nt = len(times)
+        data = np.cos(np.arange(nt) * np.pi / 12.2)
+        data = np.resize(data, (3, 4, nt)).T
+        da_in = xr.DataArray(data, dims=('time', 'ny', 'nx'), coords={"time": times})
 
-    da_out = xfilter.demerliac(da_in, na_thres=1)
-    assert abs(da_out.mean()) < 0.1
+        da_out = xfilter.demerliac(da_in, na_thres=0)
+        assert da_out.dims == da_in.dims
+        assert da_out.shape == da_in.shape
+        assert da_out.min() > -1e-4
+        assert da_out.max() < 1e-4
 
+        da_out = xfilter.demerliac(da_in, na_thres=1)
+        assert abs(da_out.mean()) < 0.1
 
-def test_filter_tide():
+    @pytest.mark.parametrize("filter_name", ["demerliac", "godin", "mean"])
+    def test_filter_names(self, filter_name):
+        times = np.arange("2000-01-01", "2000-01-10", dtype="M8[h]").astype("M8[ns]")
+        nt = len(times)
+        data = np.cos(np.arange(nt) * np.pi / 12.5)
+        data = np.resize(data, (3, 4, nt)).T
+        da_in = xr.DataArray(data, dims=('time', 'ny', 'nx'), coords={"time": times})
 
-    times = np.arange("2000-01-01", "2000-01-10", dtype="M8[h]")
-    nt = len(times)
-    data = np.cos(np.arange(nt) * np.pi / 12.5)
-    data = np.resize(data, (3, 4, nt)).T
-    da_in = xr.DataArray(data, dims=('time', 'ny', 'nx'), coords={"time": times})
+        da_out = xfilter.tidal_filter(da_in, filter_name, na_thres=0)
+        assert da_out.dims == da_in.dims
+        assert da_out.shape == da_in.shape
+        assert da_out.min() > -1e-4
+        assert da_out.max() < 1e-4
 
-    da_out = xfilter.tidal_filter(da_in, "demerliac", na_thres=0)
-    assert da_out.dims == da_in.dims
-    assert da_out.shape == da_in.shape
-    assert da_out.min() > -1e-4
-    assert da_out.max() < 1e-4
+    def test_na_thres(self):
+        times = np.arange("2000-01-01", "2000-01-10", dtype="M8[h]").astype("M8[ns]")
+        nt = len(times)
+        data = np.cos(np.arange(nt) * np.pi / 12.5)
+        data = np.resize(data, (3, 4, nt)).T
+        da_in = xr.DataArray(data, dims=('time', 'ny', 'nx'), coords={"time": times})
 
-    da_out = xfilter.tidal_filter(da_in, "godin", na_thres=0)
-    assert da_out.dims == da_in.dims
-    assert da_out.shape == da_in.shape
-    assert da_out.min() > -1e-4
-    assert da_out.max() < 1e-4
-    
-    da_out = xfilter.tidal_filter(da_in, "mean", na_thres=0)
-    assert da_out.dims == da_in.dims
-    assert da_out.shape == da_in.shape
-    assert da_out.min() > -1e-4
-    assert da_out.max() < 1e-4
+        da_out = xfilter.tidal_filter(da_in, "demerliac", na_thres=1)
+        assert abs(da_out.mean()) < 0.1
 
-    da_out = xfilter.tidal_filter(da_in, "demerliac", na_thres=1)
-    assert abs(da_out.mean()) < 0.1
+    def test_invalid_filter_name(self):
+        times = np.arange("2000-01-01", "2000-01-03", dtype="M8[h]").astype("M8[ns]")
+        da_in = xr.DataArray(np.ones(len(times)), dims='time', coords={"time": times})
+        with pytest.raises(Exception):
+            xfilter.tidal_filter(da_in, "invalid_filter")
 
 
 @pytest.mark.parametrize(

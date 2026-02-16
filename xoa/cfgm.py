@@ -70,7 +70,7 @@ class VdtSizeError(XoaValidateError):
 def _valwrap_(validator):
     """
     Wrap a validation function to allow extraneous named arguments in specfile,
-    this is usefull when getting specification with
+    this is useful when getting specification with
     validator._parse_with_caching(configspec[section][option])
     """
     # Already wrapped
@@ -554,7 +554,7 @@ def is_dict(value, default={}, vtype=None):
     raise validate.VdtTypeError(value)
 
 
-# Define additionnal specifications
+# Define additional specifications
 # Value should be dict for internal use of this module (iterable, opttype, ...)
 # If value is not a dict, it is supposed to be the validator function
 
@@ -1090,7 +1090,7 @@ class ConfigManager(object):
         exc: optional, list
             List of keys to be excluded from parsing.
         parse: optional, bool
-            If ``True``, parse commande line options and arguments
+            If ``True``, parse command line options and arguments
         args: optional
             List of arguments to parse instead of default sys.argv[1:]
         getparser: optional, bool
@@ -1102,7 +1102,7 @@ class ConfigManager(object):
             Used if parse is True.
             Can take the following values:
 
-            - a :class:`bool` value indicating wheter to apply
+            - a :class:`bool` value indicating whether to apply
               defaults on the returned config
               before applying the command line config
             - a :class:`ConfigObj` instance to apply on the returned config
@@ -1124,8 +1124,8 @@ class ConfigManager(object):
 
         nested: str
             Name of a section whose defines the configuration.
-            It must be used when the configuration in nested in more g
-            eneral configuration.
+            It must be used when the configuration is nested in a more
+            general configuration.
         extraopts: dict
             Extra options to declare in the form
             ``[(args1, kwargs1), ((args2, kwargs2), ...]``
@@ -1194,7 +1194,7 @@ class ConfigManager(object):
             parser.add_argument(
                 *cfgfileopt,
                 dest="cfgfile",
-                help="user configuration file that overrides defauts",
+                help="user configuration file that overrides defaults",
                 default=cfgfile,
             )
 
@@ -1622,7 +1622,7 @@ def get_spec(spec, validator=None):
         type:
             same as funcname
         args:
-            the positionnal arguments
+            the positional arguments
         kwargs:
             the named arguments
         default:
@@ -1650,7 +1650,7 @@ def get_spec(spec, validator=None):
         'opttype': 'int', 'argtype': int,
         'func':is_integer, 'iterable': None}
 
-    This can be usefull when you added extraneous named arguments into your
+    This can be useful when you added extraneous named arguments into your
     specification file for your own use.
 
     """

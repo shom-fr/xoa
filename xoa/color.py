@@ -29,7 +29,7 @@ def crop_cmap(cmapin, vmin, vmax, pivot=0):
 
     Parameters
     ----------
-    cmap: colormap
+    cmapin: colormap
         Compatible with :func:`matplotlib.pyplot.get_cmap`.
     vmin: float
         Min data value
@@ -37,7 +37,7 @@ def crop_cmap(cmapin, vmin, vmax, pivot=0):
         Max data value
     pivot: float
         The colormap will be centered on this value.
-        Should be lower than vmax et greater than vmin.
+        Should be lower than vmax and greater than vmin.
     """
     cmapin = plt.get_cmap(cmapin)
     return cmocean.tools.crop(cmapin, vmin, vmax, pivot)
@@ -105,7 +105,7 @@ class CmapAdapter(object):
         """Get the adapted colormap"""
         if self.specs[0] == "pivot":
             if self.vmin is None or self.vmax is None:
-                exceptions.xoa_warn("cmap not adapted since vmin and vmin are not set")
+                exceptions.xoa_warn("cmap not adapted since vmin and vmax are not set")
                 return self.cmap
             return crop_cmap(self.cmap, self.vmin, self.vmax, self.specs[1])
 

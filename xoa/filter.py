@@ -1,5 +1,8 @@
 """
-Filtering utilities
+Filtering utilities.
+
+Provides spatial and temporal filters including convolution-based smoothing,
+tidal filters (Demerliac, Godin), mask erosion and point decimation.
 """
 
 # Copyright 2020-2026 Shom
@@ -224,7 +227,7 @@ def get_window_func(window, **kwargs):
     Return
     ------
     callable
-        A function that only a ``size`` argument
+        A function that takes only a ``size`` argument
 
     Example
     -------
@@ -295,7 +298,7 @@ def get_window_func(window, **kwargs):
 
 
 def generate_isotropic_kernel(shape, window_func, fill_value=0, npt=None):
-    """Generate an nD istropic kernel given a shape and a window function
+    """Generate an nD isotropic kernel given a shape and a window function
 
     Parameters
     ----------
@@ -307,8 +310,8 @@ def generate_isotropic_kernel(shape, window_func, fill_value=0, npt=None):
     fill_value: float
         Value to set when outside window bounds, near the corners
     npt: int, None
-        Number of interpolation point to get the window value
-        at all positions. It is infered from shape if not given.
+        Number of interpolation points to get the window value
+        at all positions. It is inferred from shape if not given.
 
     Return
     ------
@@ -467,7 +470,7 @@ def generate_kernel(
 
     Parameters
     ----------
-    kernel: xarray.DataArray, np.ndarray, int, list, dictorthokernels
+    kernel: xarray.DataArray, np.ndarray, int, list, dict
         Ready to use kernel or specs to generate it.
 
         - If an int, the kernel built with ones with a size
@@ -698,7 +701,7 @@ def _convolve_(data, kernel, normalize, na_thres, axis=None):
     weights = convolve_func((~bad).astype('d'), kernel, cval=0, **kwc)
     # weights = np.clip(weights, 0, kernel.sum())
 
-    # Weigthing and masking
+    # Weighting and masking
     bad = weights <= kernel.sum() * np.clip(1e-6, 1 - na_thres, 1 - 1e-6)
     if normalize:
         weights = np.where(bad, 1, weights)
@@ -720,7 +723,7 @@ def convolve(data, kernel, normalize=False, na_thres=0, kernel_kwargs=None, **kw
         The result is then a weighted average.
     na_thres: float
         A float between 0 and 1 that defines the allowed level a NaN contamination.
-        Examples of the behavioir at a single location:
+        Examples of the behavior at a single location:
 
             - `0`: Output is masked if a single NaN is found.
             - `0.5`: Output is masked only more than 50% of the input data are masked.
@@ -801,7 +804,7 @@ def _convolve_and_fill_(data, kernel):
 
 
 def smooth(data, kernel, **kwargs):
-    """A short to ``convolve(data, kernel, normalize=True)``
+    """A shortcut to ``convolve(data, kernel, normalize=True)``
 
     See :func:`convolve` for the complete list of options.
 
@@ -828,7 +831,7 @@ def erode_mask(data, until=1, kernel=None):
 
         - Erode a fixed number of times.
         - Erode the data mask until there is no missing value where
-          a given horirizontal mask is False.
+          a given horizontal mask is False.
 
     Parameters
     ----------
@@ -851,7 +854,7 @@ def erode_mask(data, until=1, kernel=None):
     See also
     --------
     erode_coast
-    sharpiro_kernel
+    shapiro_kernel
     """
     # Kernel
     if kernel is None:
@@ -899,21 +902,21 @@ def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
         Defaults to a :func:`shapiro <shapiro_kernel>` kernel.
         In this case, ``xdim`` and ``ydim`` can be set to the
         horizontal dimensions, otherwise they are inferred.
-    xdim: None
-        Name of the X dimension, which is infered by default.
-    ydim: None
-        Name of the Y dimension, which is infered by default.
+    xdim: str, None
+        Name of the X dimension, which is inferred by default.
+    ydim: str, None
+        Name of the Y dimension, which is inferred by default.
 
     Return
     ------
     xarray.DataArray
-        Data array similar to input array, with its eroded
+        Data array similar to input array, with its mask eroded
         along x and y dimensions.
 
     See also
     --------
     erode_mask
-    sharpiro_kernel
+    shapiro_kernel
     """
     # We must have X and Y dimensions
     if xdim is None:
@@ -942,10 +945,9 @@ def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
 
 
 def demerliac(da, na_thres=0, dt_tol=0.01):
-    """Apply a dermerliac filter on a data array
+    """Apply a Demerliac filter on a data array
 
-    Note that the demerliac function is a shortcut of the :func:`tidal_filter` function with `filter_name`
-    set to `demerliac`.
+    This is a shortcut to ``tidal_filter(da, "demerliac", ...)``.
 
     Parameters
     ----------
@@ -966,26 +968,36 @@ def demerliac(da, na_thres=0, dt_tol=0.01):
 def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
     """Apply a tidal filter on a data array
 
-    Note that the data array must have a valid time dimension.
-    When the time step is less than an hour, an interpolation is made on the weights
-    since they are made for hourly time series.
+    The data array must have a valid time dimension.
+    When the time step is less than an hour, the filter weights are interpolated
+    since they are designed for hourly time series.
     An error is raised when the time step is too variable or above one hour.
 
     Parameters
     ----------
     da: xarray.DataArray
+        Data array with a time dimension.
     filter_name: str
-        Type of tidal filter (demerliac, godin, mean))
+        Type of tidal filter: ``"demerliac"``, ``"godin"`` or ``"mean"``.
     dt_tol: float
-        Relative tolerance for the time step variability
+        Relative tolerance for the time step variability.
     na_thres: float
-        A float between 0 and 1 that defines the allowed level a NaN contamination.
+        A float between 0 and 1 that defines the allowed level of NaN contamination.
         See :func:`convolve`.
 
     Return
     ------
     xarray.DataArray
+        Filtered data array with the tidal signal removed.
+
+    See also
+    --------
+    demerliac
+    convolve
     """
+    # Ensure nanosecond precision for datetime coordinates
+    da = xcoords.ensure_ns_datetime(da)
+
     # Get time dimension
     tdim = xcoords.get_tdim(da, errors="ignore")
     if tdim is None:
@@ -1034,9 +1046,9 @@ def _get_decimate_arg_(lons, lats, radius):
 
     Parameters
     ----------
-    x: numpy.array
+    lons: numpy.ndarray
         1D array of longitudes
-    y: numpy.array
+    lats: numpy.ndarray
         1D array of latitudes
     radius: float
         Radius relative to the sphere radius

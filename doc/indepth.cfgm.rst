@@ -1,6 +1,6 @@
 .. _indepth.cfgm:
 
-Config management with  :mod:`xoa.cfgm`
+Config management with :mod:`xoa.cfgm`
 #######################################
 
 
@@ -12,7 +12,7 @@ provided by the excellent
 `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_
 configuration file reader and validator package.
 It makes global usage a little easier and adds support for
-plurals forms and for exporting the specifications
+plural forms and for exporting the specifications
 to commandline options and rst declarations.
 
 
@@ -28,7 +28,7 @@ Let's define the configuration specifications:
     print("\n".join(cfgspecs_lines))
 
 .. note:: Note that the built-in `float` validation function has been
-    used here in its plurals form.
+    used here in its plural form.
 
 Let's set the user configuration:
 
@@ -66,9 +66,9 @@ Get the default values:
 Extending the validation capabilities
 =====================================
 
-One can add user validation fonctions to the default ones.
+One can add user validation functions to the default ones.
 
-Use the :func:`~xoa.cfgm.print_validation_fonctions` function to print
+Use the :func:`~xoa.cfgm.print_validation_functions` function to print
 the list of validation functions.
 In the following example, only those matching ``*datetime*`` are printed:
 
@@ -77,7 +77,7 @@ In the following example, only those matching ``*datetime*`` are printed:
     cfgm.print_validation_functions("*time*") # use a pattern to restrict search
 
 To define a new validation function, use the
-:func:`~xoa.cfgm.register_validation_fonctions`  function.
+:func:`~xoa.cfgm.register_validation_functions` function.
 Here we define and register a validation function that converts
 an entry to an angle in degrees within [0, 360):
 
@@ -86,7 +86,7 @@ an entry to an angle in degrees within [0, 360):
     # Define
     from validate import VdtTypeError
     def is_angle(value, radians=False):
-        """Validate an angle with optional convertion to radians"""
+        """Validate an angle with optional conversion to radians"""
         try:
             value = float(value) % 360.
         except Exception:
@@ -166,7 +166,7 @@ and add arguments that reflect the configuration specifications:
 
 
 The :class:`~xoa.cfgm.ConfigManager.arg_parse` method makes also available
-the ``--short-help`` and ``--long--help`` in addition to the
+the ``--short-help`` and ``--long-help`` in addition to the
 ``--help`` option.
 
 .. note:: The previous example can be compacted using the
@@ -189,7 +189,7 @@ The result is the following.
 
 .. include:: indepth.cfgm.cfg2rst.txt
 
-These above sphinx declarations need two objet types to be declared::
+These above sphinx declarations need two object types to be declared::
 
     app.add_object_type('confopt', 'confopt',
                         objname='configuration option',

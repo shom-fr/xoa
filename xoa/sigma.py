@@ -65,7 +65,7 @@ _ocean_s_g2_ = core_sigma.ocean_s_coordinate_g2
 
 
 def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask):
-    # Stetching curve
+    # Stretching curve
     if cs is None:
         if None in (thetas, thetab):
             raise exceptions.XoaSigmaError("thetas and thetab must be provided when cs is not")
@@ -101,7 +101,7 @@ def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask
 
 
 def atmosphere_sigma_coordinate(sig, ps, ptop, dask="parallelized", cache=None):
-    """Convert from sigma [0, 1] to pressure in an atmopsheric model
+    """Convert from sigma [0, 1] to pressure in an atmospheric model
 
     .. note:: This function is dask-aware since it delegates the core computation to
         :func:`xarray.apply_ufunc`.
@@ -181,9 +181,9 @@ def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
     Parameters
     ----------
     sig: xarray.DataArray
-        Sigma coordinates range from 0 to 1 (:math:`\\sigma` | ``sigma``)
+        Sigma coordinates ranging from -1 to 0 (:math:`\\sigma` | ``sigma``)
     ssh: xarray.DataArray
-        Surface air pressure (:math:`\\eta` | ``eta``)
+        Sea surface height (:math:`\\eta` | ``eta``)
     bathy: xarray.DataArray
         Positive sea floor depth (:math:`h` | ``depth``)
 
@@ -242,6 +242,19 @@ def get_cs(sig, thetas, thetab, cs_type=None):
     -------
     xarray.DataArray
         Stretching curve (:math:`C` | ``C``)
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> sig = xr.DataArray(np.linspace(-1, 0, 10), dims="sig")
+        >>> cs = get_cs(sig, thetas=7.0, thetab=2.0)
+
+    See also
+    --------
+    ocean_s_coordinate
+    ocean_s_coordinate_g1
+    ocean_s_coordinate_g2
     """
     s, a, b = sig, thetas, thetab
     cs = np.sinh(s * a) * (1 - b) / np.sinh(a)
@@ -290,25 +303,26 @@ def ocean_s_coordinate(
     Parameters
     ----------
     sig: xarray.DataArray
-        Sigma coordinates range from -1 to 0 (:math:`s` | ``s``)
+        Sigma coordinates ranging from -1 to 0 (:math:`s` | ``s``)
     ssh: xarray.DataArray
-        Surface air pressure (:math:`\\eta` | ``eta``)
+        Sea surface height (:math:`\\eta` | ``eta``)
     bathy: xarray.DataArray
         Positive sea floor depth (:math:`h` | ``depth``)
     hc: xarray.DataArray, float
         Positive critical depth (:math:`h_c` | ``depth_c``)
-    thetas: xarray.DataArray
-        Surface control parameter (:math:`a` | ``a``)
-    thetab: xarray.DataArray
-        Bottom control parameter (:math:`b` | ``b``)
+    thetas: xarray.DataArray, None
+        Surface control parameter (:math:`a` | ``a``).
+        Required if ``cs`` is not provided.
+    thetab: xarray.DataArray, None
+        Bottom control parameter (:math:`b` | ``b``).
+        Required if ``cs`` is not provided.
     cs: xarray.DataArray, None
         Stretching curve, which defaults to the formula above
         computed by :func:`get_cs` (:math:`C` | ``C``)
     cs_type: str, None
         Stretching type (see :func:`get_cs`)
     cache: dict
-        Dict variable that stores intermediate results to be used
-        from call to call.
+        Deprecated, currently unused.
 
     Returns
     -------
@@ -353,7 +367,7 @@ def ocean_s_coordinate_g1(
 
 
     Sigma standard name:
-        ``ocean_s_coordinate_g2``
+        ``ocean_s_coordinate_g1``
 
     Formula terms:
         ``s: var1 C: var2 eta: var3 depth: var4 depth_c: var5``
@@ -361,27 +375,26 @@ def ocean_s_coordinate_g1(
     Parameters
     ----------
     sig: xarray.DataArray
-        Sigma coordinates range from -1 to 0 (:math:`s` | ``s``)
+        Sigma coordinates ranging from -1 to 0 (:math:`s` | ``s``)
     ssh: xarray.DataArray
-        Surface air pressure (:math:`\\eta` | ``eta``)
+        Sea surface height (:math:`\\eta` | ``eta``)
     bathy: xarray.DataArray
         Positive sea floor depth (:math:`h` | ``depth``)
     hc: xarray.DataArray, float
         Positive critical depth (:math:`h_c` | ``depth_c``)
-    thetas: xarray.DataArray
-        Surface control parameter (:math:`a` | ``a``)
-        Optional if `cs` is provided.
-    thetab: xarray.DataArray
-        Bottom control parameter (:math:`b` | ``b``)
-        Optional if `cs` is provided.
+    thetas: xarray.DataArray, None
+        Surface control parameter (:math:`a` | ``a``).
+        Optional if ``cs`` is provided.
+    thetab: xarray.DataArray, None
+        Bottom control parameter (:math:`b` | ``b``).
+        Optional if ``cs`` is provided.
     cs: xarray.DataArray, None
         Stretching curve, which defaults to the formula above
         computed by :func:`get_cs` (:math:`C` | ``C``)
     cs_type: str, None
         Stretching type (see :func:`get_cs`)
     cache: dict
-        Dict variable that stores intermediate results to be used
-        from call to call.
+        Deprecated, currently unused.
 
     Returns
     -------
@@ -432,27 +445,26 @@ def ocean_s_coordinate_g2(
     Parameters
     ----------
     sig: xarray.DataArray
-        Sigma coordinates range from -1 to 0 (:math:`s` | ``s``)
+        Sigma coordinates ranging from -1 to 0 (:math:`s` | ``s``)
     ssh: xarray.DataArray
-        Surface air pressure (:math:`\\eta` | ``eta``)
+        Sea surface height (:math:`\\eta` | ``eta``)
     bathy: xarray.DataArray
         Positive sea floor depth (:math:`h` | ``depth``)
     hc: xarray.DataArray, float
         Positive critical depth (:math:`h_c` | ``depth_c``)
-    thetas: xarray.DataArray
+    thetas: xarray.DataArray, None
         Surface control parameter (:math:`a` | ``a``).
-        Optional if `cs` is provided.
-    thetab: xarray.DataArray
-        Bottom control parameter (:math:`b` | ``b``)
-        Optional if `cs` is provided.
+        Optional if ``cs`` is provided.
+    thetab: xarray.DataArray, None
+        Bottom control parameter (:math:`b` | ``b``).
+        Optional if ``cs`` is provided.
     cs: xarray.DataArray, None
         Stretching curve, which defaults to the formula above
         computed by :func:`get_cs` (:math:`C` | ``C``)
     cs_type: str, None
         Stretching type (see :func:`get_cs`)
     cache: dict
-        Dict variable that stores intermediate results to be used
-        from call to call.
+        Deprecated, currently unused.
 
     Returns
     -------
@@ -651,22 +663,22 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
 def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
     """Compute heights from sigma-like variable in a dataset using CF conventions
 
-    This makes use of the :meth:`~xoa.meta.MetaSpecs` instance that is retreived
-    with :func:`xoa.meta.get_meta_specs` with ds as an argument in order to
+    This makes use of the :class:`~xoa.meta.MetaSpecs` instance that is retrieved
+    with :func:`xoa.meta.get_meta_specs` with ``ds`` as an argument in order to
     find needed variables.
     If the dataset is not found to have sigma-like coordinates,
     a simple copy is returned.
 
-    When a data variable that have the same dimensions is found, the
+    When a data variable that has the same dimensions is found,
     the computed coordinate is transposed properly and assigned
-    to the variable as a a coordinate array.
+    to the variable as a coordinate array.
 
     Parameters
     ----------
     ds: xarray.Dataset
         Dataset that contains everything needed to compute heights
     rename: bool
-        Rename and format arrays ot make them compliant with
+        Rename and format arrays to make them compliant with
         :mod:`xoa.meta`
     hlocs: None, list of str
         Horizontal staggered grid locations to search for "bathy" and "ssh".
@@ -722,7 +734,7 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
             loc = (hloc or "") + (vloc or "")
             height = meta_specs.sglocator.format_dataarray(height, loc)
 
-            # Transpose if approriate and set as coordinate
+            # Transpose if appropriate and set as coordinate
             transposed = False
             as_coord = False
             for da in ds.data_vars.values():

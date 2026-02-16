@@ -104,7 +104,7 @@ def empirical_variogram(
     Parameters
     ----------
 
-    da: xarray.dataArray
+    da: xarray.DataArray
         Data array with lon and lat coordinates.
     nmax: optional
         Above this number, size of the sample is reduced by a crude undersampling.
@@ -223,7 +223,7 @@ class variogram_model_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta)
     exponential = 1
     #: Linear
     linear = 0
-    #: Gausian
+    #: Gaussian
     gaussian = 2
     #: Spherical
     spherical = 3
@@ -260,7 +260,7 @@ class VariogramModel(object):
     mtype: int, str, variogram_model_types
     dist_units: int, str, xoa.geo.distance_units
     **frozen_params:
-        Varigram paramaters that must be frozen.
+        Variogram parameters that must be frozen.
 
     """
 
@@ -313,7 +313,7 @@ class VariogramModel(object):
         )
 
     def set_estimated_params(self, overwrite=True, **params):
-        """Set the value to no frozen paramters"""
+        """Set the value of non-frozen parameters"""
         params_update = dict(
             (name, params[name])
             for name in self.param_names
@@ -324,7 +324,7 @@ class VariogramModel(object):
         self._estimated_params.update(params_update)
 
     estimated_params = property(
-        get_estimated_params, set_estimated_params, doc='Estimated paramaters as :class:`dict`'
+        get_estimated_params, set_estimated_params, doc='Estimated parameters as :class:`dict`'
     )
 
     def set_params(self, **params):
@@ -546,11 +546,11 @@ class VariogramModel(object):
 
 
 class kriging_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
-    """Supported kriging of variograms"""
+    """Supported kriging types"""
 
-    #: Exponential (default)
+    #: Ordinary kriging (default)
     ordinary = 1
-    #: Linear
+    #: Simple kriging
     simple = 0
 
 
@@ -578,14 +578,14 @@ class Kriger(object):
     ----------
 
     da: xarray.DataArray, xarray.Dataset
-        Input positions and optionaly data.
+        Input positions and optionally data.
     krigtype: optional
         Kriging type: {kriging_types.rst_with_links}.
     variogram_func: callable, VariogramModel, optional
         Callable to be used as a variogram function.
         It is either a function or an instance of :class:`VariogramModel`.
     npmax: optional
-        Maximal number of points to be used simultanously for kriging.
+        Maximal number of points to be used simultaneously for kriging.
         When the number of input points is greater than this value,
         clusterization is applied.
     nproc: optional
@@ -743,7 +743,7 @@ class Kriger(object):
         Return
         ------
         xarray.Dataset
-            A dataset that contains the interpolated values and associated erreors
+            A dataset that contains the interpolated values and associated errors
 
         """
 
@@ -810,7 +810,7 @@ class Kriger(object):
             e = (W * B).sum(axis=0)
             del W, B
 
-            # Weigthed contribution based on errors
+            # Weighted contribution based on errors
             w = 1 / e**2
             if self.nclust > 1:
                 z[:] *= w

@@ -37,7 +37,7 @@ You can access the associated `.cfg` file with :func:`xoa.meta_configs.get_meta_
 The default configuration
 -------------------------
 
-.. note:: You can define you own specifications for each of your datasets.
+.. note:: You can define your own specifications for each of your datasets.
     Have a look to the :ref:`indepth.meta` section and to the :ref:`examples`.
 
 As a :file:`.cfg` file

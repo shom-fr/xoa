@@ -67,7 +67,7 @@ class _BasicMetaAccessor_(object):
     def get_meta_specs(self):
         """Get the internal :class:`~xoa.meta.MetaSpecs` instance used by this accessor
 
-        If not provided at the initialization, it is infered with :func:`xoa.meta.infer_meta_specs`.
+        If not provided at the initialization, it is inferred with :func:`xoa.meta.infer_meta_specs`.
 
         Return
         ------
@@ -316,7 +316,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         """Get the depth as computed or recognized by the :meth:`~xoa.meta.MetaSpecs`
 
         If a depth variable cannot be found, it tries to compute either
-        from sigma-like coordinates or from layer thinknesses.
+        from sigma-like coordinates or from layer thicknesses.
 
         Parameters
         ----------
@@ -547,7 +547,7 @@ class MetaDataArrayAccessor(_MetaCoordAccessor_):
 class SigmaAccessor(_BasicMetaAccessor_):
     """Dataset accessor to compute depths from sigma-like coordinates
 
-    This follows the CF cnventions.
+    This follows the CF conventions.
 
     Example
     -------
@@ -567,7 +567,7 @@ class SigmaAccessor(_BasicMetaAccessor_):
         Parameters
         ----------
         rename: bool
-            Rename and format arrays ot make them compliant with
+            Rename and format arrays to make them compliant with
             :mod:`xoa.meta`
         {errors}
 

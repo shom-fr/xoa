@@ -80,18 +80,16 @@ def plot_flow(
     color:
         Single color for the track.
     autolim: None, bool
-        Wether to auto-update the data limits.
+        Whether to auto-update the data limits.
         A value of None sets autolim to True if "axes" is not provided,
         else to None. See :meth:`matplotlib.axes.Axes.add_collection`.
 
     Return
     ------
-    Return
-    ------
     dict
         With the following keys:
         `axes`, `linecollection`, `step`, `duration`.
-        `linecollection` refere to the :class:`matplotlib.collections.LineCollection` instance.
+        `linecollection` refers to the :class:`matplotlib.collections.LineCollection` instance.
         The duration and step are also stored in the output.
 
     Example
@@ -127,7 +125,7 @@ def plot_flow(
     # Infer parameters
     if duration is None or step is None:
 
-        # Default duration based on a the fraction of the area crossing time
+        # Default duration based on a fraction of the area crossing time
         if duration is None:
             xmin, xmax, ymin, ymax = xgeo.get_extent(u)
             dist = xgeo.haversine(xmin, ymin, xmax, ymax)
@@ -219,7 +217,7 @@ def plot_ts(
     temp: xarray.DataArray
         Temperature. If not potential, it will be converted into potential
         if `potential=None` or `potential=False`.
-        Note that if temp is not potential and **contain a depth coordinate**, depth values must be negative
+        Note that if temp is not potential and **contains a depth coordinate**, depth values must be negative
         (to compute pres with `gsw.p_from_z` if necessary)
     sal: xarray.DataArray
         Salinity (practical or absolute). If not absolute, it will be converted into absolute salinity
@@ -443,8 +441,8 @@ def plot_minimap(
     ----------
     obj: xarray.DataArray, xarray.Dataset, tuple
         Object that contains lon and lat coordinates.
-        The object must contains unique and identifiable geographic coordinates
-        that can be retrieved xith :func:`xoa.coords.get_lon` and func:`xoa.coords.get_lat`.
+        The object must contain unique and identifiable geographic coordinates
+        that can be retrieved with :func:`xoa.coords.get_lon` and :func:`xoa.coords.get_lat`.
         In case of a tuple, it should a couple of `(lon, lat)` :class:`xarray.DataArray`.
     ax: list, cartopy.mpl.geoaxes.GeoAxes
         A matplotlib axes instance or a list that defines the bounding box of the axes to be
@@ -453,7 +451,7 @@ def plot_minimap(
         Figure instance
     extent: str, float
         Either ``"global"`` for a global minimap, or the margin added to the coordinates
-        bounding box expressed relative to the coordinates extent: a velue of 1.0 means
+        bounding box expressed relative to the coordinates extent: a value of 1.0 means
         a margin equal to the extent.
     min_extent: None, float, (float, float)
         Minimal extent in degrees. See :func:`xoa.geo.get_extent`
@@ -597,7 +595,7 @@ def plot_minimap(
 def plot_double_minimap(obj, regional_ax="below", **kwargs):
     """Plot a global minimap and a regional minimap
 
-    It consists in two calls to :func:`plot_minimap` with the first one whith a "global" extent.
+    It consists in two calls to :func:`plot_minimap` with the first one with a "global" extent.
     By default, the coordinates are plotted as single point on the global minimap, and the
     regional minimap is placed below the global one.
 
@@ -615,7 +613,7 @@ def plot_double_minimap(obj, regional_ax="below", **kwargs):
     Returns
     -------
     cartopy.mpl.geoaxes.GeoAxes, cartopy.mpl.geoaxes.GeoAxes
-        A tuple of `(global_ax, regiona_ax)`
+        A tuple of `(global_ax, regional_ax)`
 
     Example
     -------

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Regridding utilities
+Regridding utilities.
+
+Provides :func:`regrid1d` for 1D regridding along a single dimension
+(e.g. vertical interpolation) and :func:`extrap1d` for 1D extrapolation.
+The core computation is performed by numba-accelerated routines
+from :mod:`xoa.core.regrid`.
 """
 # Copyright 2020-2026 Shom
 #
@@ -23,6 +28,7 @@ import xarray as xr
 from . import exceptions
 from . import misc
 from . import meta
+from . import coords as xcoords
 from . import grid as xgrid
 from .core import num
 from .core import regrid
@@ -38,7 +44,7 @@ class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
 
     #: Linear interpolation (default)
     linear = 1
-    #: Linear iterpolation (default)
+    #: Linear interpolation (default)
     interp = 1  # compat
     #: Nearest interpolation
     nearest = 0
@@ -46,7 +52,7 @@ class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     cubic = 2
     #: Hermitian interpolation
     hermit = 3
-    #: Hermitian iterpolation
+    #: Hermitian interpolation
     hermitian = 3
     #: Cell-averaging or conservative regridding
     cellave = -1
@@ -86,7 +92,7 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
 def _wrapper1d_(vari, *args, func_name, **kwargs):
     """To make sure arrays have a 2D shape
 
-    Output array is reshaped back accordindly
+    Output array is reshaped back accordingly.
     """
 
     # The function to call
@@ -133,16 +139,16 @@ def regrid1d(
     The input and output coordinates may vary along other dimensions,
     which useful for instance for vertical interpolation in coastal
     ocean models.
-    Since it uses func:`xarray.apply_ufunc`, it support dask features.
+    Since it uses :func:`xarray.apply_ufunc`, it supports dask arrays.
     The core computation is performed by the numba-accelerated routines
     of :mod:`xoa.core.regrid`.
 
     Parameters
     ----------
     da: xarray.DataArray
-        Array to interpolate
+        Array to regrid.
     coord: xarray.DataArray
-        Output coordinate
+        Output coordinate.
     method: str, int
         Regridding method as one of the following:
         {regrid1d_methods.rst_with_links}
@@ -153,7 +159,7 @@ def regrid1d(
         It is inferred by default from output coordinate et input data array.
     coord_in_name: str, None
         Name of the input coordinate array, which must be known of ``da``.
-        It is inferred from the input dara array and dimension name
+        It is inferred from the input data array and dimension name
         by default.
     edges: dict, None
         Grid edge coordinates along the interpolation dimension,
@@ -170,8 +176,8 @@ def regrid1d(
         Drop input inner NaNs during interpolation. Note that outer NaNs are
         always ignored. ``cellave`` and ``cellerr`` methods don't support the parameter.
     maxgap: int
-        Max size for a gap to be interpolated when `drop_name is True.
-        Size is not checked when `maxgap` is zero.
+        Max size for a gap to be interpolated when ``drop_na`` is True.
+        Size is not checked when ``maxgap`` is zero.
     dask: str
         See :func:`xarray.apply_ufunc`.
 
@@ -179,17 +185,32 @@ def regrid1d(
     -------
     xarray.DataArray
         Regridded array with ``coord`` as new coordinate array.
+        Name and attributes are preserved from ``da``.
+
+    Example
+    -------
+    Linear interpolation from 4 depth levels to 7::
+
+        zi = xr.DataArray(np.arange(4.), dims="z")
+        vi = xr.DataArray(np.arange(4.), dims="z", coords=dict(z=zi))
+        zo = xr.DataArray(np.linspace(0, 3, 7), dims="z")
+        vo = regrid1d(vi, zo, method="linear")
 
     See Also
     --------
+    extrap1d
     xoa.core.regrid.nearest1d
-    xoa.core.regrid.linear2d
-    xoa.core.regrid.cubic2d
+    xoa.core.regrid.linear1d
+    xoa.core.regrid.cubic1d
     xoa.core.regrid.hermit1d
     xoa.core.regrid.cellave1d
     xoa.core.regrid.extrap1d
     xarray.apply_ufunc
     """
+    # Ensure nanosecond precision for datetime coordinates
+    da = xcoords.ensure_ns_datetime(da)
+    coord = xcoords.ensure_ns_datetime(coord)
+
     # Get the working dimensions
     if not isinstance(dim, (tuple, list)):
         dim = (dim, dim)
@@ -247,7 +268,7 @@ def regrid1d(
     output_core_dims = [[dim_out]]
     for cname in coord.coords:
         if cname != coord.name:
-            coord = coord.drop(cname)
+            coord = coord.drop_vars(cname)
 
     # Interpolation function name and arguments
     func_name = str(method) + "1d"
@@ -291,7 +312,7 @@ def regrid1d(
     coord_out_name = coord_out.name if coord_out.name else coord_in.name
     for cname in coord_out.coords:
         if cname != coord_out.name:
-            coord_out = coord_out.drop(cname)
+            coord_out = coord_out.drop_vars(cname)
     da_out = da_out.assign_coords({coord_out_name: coord_out})
     da_out.name = da.name
     da_out.attrs = da.attrs
@@ -305,13 +326,15 @@ regrid1d.__doc__ = regrid1d.__doc__.format(**locals())
 def extrap1d(da, dim, mode, dask='parallelized'):
     """Extrapolate along a single dimension
 
+    Fills NaN values at the edges of ``dim`` by nearest-neighbor
+    extrapolation. Name, attributes and coordinates are preserved.
 
     Parameters
     ----------
     da: xarray.DataArray
-        Array to interpolate
-    dim:  str
-        Dimension on which to operate.
+        Array to extrapolate.
+    dim: str
+        Dimension along which to extrapolate.
     mode: str, int
         Extrapolation mode as one of the following:
         {extrap_modes.rst_with_links}
@@ -323,9 +346,16 @@ def extrap1d(da, dim, mode, dask='parallelized'):
     xarray.DataArray
         Extrapolated array.
 
+    Example
+    -------
+    Fill NaN values at both ends along the ``"y"`` dimension::
+
+        vo = extrap1d(vi, "y", mode="both")
+
     See also
     --------
-    xoa.regrid.extrap1d
+    regrid1d
+    xoa.core.regrid.extrap1d
     xarray.apply_ufunc
     """
     da_out = xr.apply_ufunc(

@@ -70,6 +70,6 @@ ATTRS_PATCH_MODE = Choices(
 )
 
 warnings.warn(
-    "The 'xoa.cf' module is deprecated. Pease use 'xoa.meta' instead"
+    "The 'xoa.cf' module is deprecated. Please use 'xoa.meta' instead"
     " and replace all 'cf' by 'meta' in functions and classes"
 )

@@ -21,7 +21,7 @@ Permanent settings
 ------------------
 
 You can permanently change default settings by editing
-the xoa user configuration file, which is typicall here on linux:
+the xoa user configuration file, which is typically here on linux:
 :file:`~/.local/share/xoa/xoa.cfg`.
 Use the following command to see where this is located:
 

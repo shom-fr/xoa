@@ -9,6 +9,38 @@ import xarray as xr
 from xoa import dyn
 
 
+def test_get_sea_level():
+    """Test get_sea_level function"""
+    data = np.random.randn(3, 4)
+
+    # Found by variable name
+    ds = xr.Dataset({"ssh": (("lat", "lon"), data)})
+    result = dyn.get_sea_level(ds)
+    assert result is not None
+    assert result.name == "ssh"
+
+    # Found by standard_name attribute
+    ds = xr.Dataset({"my_var": (("lat", "lon"), data,
+                                {"standard_name": "sea_surface_height"})})
+    result = dyn.get_sea_level(ds)
+    assert result is not None
+    assert result.name == "my_var"
+
+    # Found with variant filter
+    ds = xr.Dataset({
+        "ssh": (("lat", "lon"), data),
+        "sla": (("lat", "lon"), data),
+    })
+    result = dyn.get_sea_level(ds, variant="sla")
+    assert result is not None
+    assert result.name == "sla"
+
+    # Not found
+    ds = xr.Dataset({"temperature": (("lat", "lon"), data)})
+    result = dyn.get_sea_level(ds)
+    assert result is None
+
+
 def test_flow2d():
     """Test flow2d function"""
     lon = xr.DataArray(np.arange(4), dims='lon')

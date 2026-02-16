@@ -111,6 +111,7 @@ def get_distances(da0, da1=None, radius=EARTH_RADIUS, units="m"):
     ------
     xarray.DataArray
         An array with dims `(npts0, npts1)`
+
     See also
     --------
     haversine
@@ -175,8 +176,8 @@ def cdist(XA, XB, radius=EARTH_RADIUS, **kwargs):
     --------
     haversine
     pdist
-    scipy.sparial.distances.cdist
-    scipy.sparial.distances.pdist
+    scipy.spatial.distance.cdist
+    scipy.spatial.distance.pdist
     """
     lons0 = XA[:, 0]
     lats0 = XA[:, 1]
@@ -210,9 +211,9 @@ def pdist(X, compact=False, radius=EARTH_RADIUS, **kwargs):
     haversine
     cdist
     numpy.triu
-    scipy.sparial.distances.pdist
-    scipy.sparial.distances.cdist
-    scipy.sparial.distances.squareform
+    scipy.spatial.distance.pdist
+    scipy.spatial.distance.cdist
+    scipy.spatial.distance.squareform
     """
     dd = cdist(X, X, radius=radius)
     if compact:
@@ -237,7 +238,7 @@ def _adapative_pdist_(X, method="haversine", **kwargs):
 
 
 class ScipyDistContext(object):
-    """Context to switch the :func:`scipy.spatial.distance.cdist` fonction to :func:`cdist`
+    """Context to switch the :func:`scipy.spatial.distance.cdist` function to :func:`cdist`
 
     Parameters
     ----------

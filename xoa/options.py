@@ -32,7 +32,7 @@ CONFIG_SPECS = """
 cache=boolean(default=False) # use the :mod:`~xoa.cf` in memory and file caches
 
 [plot] # plot parameters
-cmapdiv = string(default="cmo.balance") # defaut diverging colormap
+cmapdiv = string(default="cmo.balance") # default diverging colormap
 cmappos = string(default="cmo.amp")     # default positive colormap
 cmapneg = string(default="cmo.tempo_r") # default negative colormap
 cmapcyc = string(default="cmo.phase")   # default cyclic colormap
@@ -312,7 +312,7 @@ def show_versions():
         try:
             version = im_get_version(package)
         except Exception:
-            version = "NOT INSTALLED or UKNOWN"
+            version = "NOT INSTALLED or UNKNOWN"
         print(f"- {package}: {version}")
 
 

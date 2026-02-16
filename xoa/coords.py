@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Coordinates and dimensions utilities
+Utilities for working with coordinates and dimensions.
+
+This module provides functions to identify, retrieve and manipulate
+coordinates (longitude, latitude, depth, time, etc.) and dimensions
+from :mod:`xarray` data arrays and datasets, based on the
+:mod:`xoa.meta` metadata specifications.
 """
 # Copyright 2020-2026 Shom
 #
@@ -18,11 +23,43 @@ Coordinates and dimensions utilities
 
 from collections.abc import Mapping
 
+import numpy as np
 import xarray as xr
 
 from . import exceptions
 from . import misc
 from . import meta
+
+
+def ensure_ns_datetime(da):
+    """Convert datetime coordinates to nanosecond precision
+
+    This avoids warnings from xarray when datetime coordinates
+    use a different resolution (e.g. microseconds or hours).
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+
+    Return
+    ------
+    xarray.DataArray or xarray.Dataset
+        Copy with datetime coordinates converted to ``datetime64[ns]``.
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> times = xr.DataArray(np.array(["2000-01-01"], dtype="M8[us]"), dims="time")
+        >>> da = xr.DataArray([1.0], coords={"time": times})
+        >>> da = ensure_ns_datetime(da)
+        >>> da.time.dtype
+        dtype('<M8[ns]')
+    """
+    for name, coord in da.coords.items():
+        if coord.dtype.kind == "M" and coord.dtype != np.dtype("datetime64[ns]"):
+            da = da.assign_coords({name: coord.values.astype("datetime64[ns]")})
+    return da
 
 
 @misc.ERRORS.format_function_docstring
@@ -31,7 +68,7 @@ def get_lon(da, errors="raise", **kwargs):
 
     Parameters
     ----------
-    da: xarray.DataArray
+    da: xarray.DataArray, xarray.Dataset
     {errors}
     kwargs:
         Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
@@ -39,6 +76,15 @@ def get_lon(da, errors="raise", **kwargs):
     Return
     ------
     xarray.DataArray or None
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> da = xr.DataArray([1, 2], dims="lon",
+        ...     coords=dict(lon=[10., 20.]))
+        >>> get_lon(da)
+        <xarray.DataArray 'lon' (lon: 2)> ...
 
     See also
     --------
@@ -59,6 +105,8 @@ def is_lon(da, loc="any"):
     Parameters
     ----------
     da: xarray.DataArray
+    loc: str
+        Staggered grid location
 
     Return
     ------
@@ -82,6 +130,7 @@ def get_lat(da, errors="raise", **kwargs):
 
     Parameters
     ----------
+    da: xarray.DataArray, xarray.Dataset
     {errors}
     kwargs:
         Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
@@ -109,6 +158,8 @@ def is_lat(da, loc="any"):
     Parameters
     ----------
     da: xarray.DataArray
+    loc: str
+        Staggered grid location
 
     Return
     ------
@@ -131,10 +182,11 @@ def get_depth(da, errors="raise", **kwargs):
     """Get or compute the depth coordinate
 
     If a depth variable cannot be found, it tries to compute either
-    from sigma-like coordinates or from layer thinknesses.
+    from sigma-like coordinates or from layer thicknesses.
 
     Parameters
     ----------
+    da: xarray.DataArray, xarray.Dataset
     {errors}
     kwargs:
         Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
@@ -197,6 +249,8 @@ def is_depth(da, loc="any"):
     Parameters
     ----------
     da: xarray.DataArray
+    loc: str
+        Staggered grid location
 
     Return
     ------
@@ -220,6 +274,7 @@ def get_altitude(da, errors="raise", **kwargs):
 
     Parameters
     ----------
+    da: xarray.DataArray, xarray.Dataset
     {errors}
     kwargs:
         Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
@@ -248,6 +303,8 @@ def is_altitude(da, loc="any"):
     Parameters
     ----------
     da: xarray.DataArray
+    loc: str
+        Staggered grid location
 
     Return
     ------
@@ -272,6 +329,7 @@ def get_level(da, errors="raise", *kwargs):
 
     Parameters
     ----------
+    da: xarray.DataArray, xarray.Dataset
     {errors}
     kwargs:
         Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
@@ -298,6 +356,8 @@ def is_level(da, loc="any"):
     Parameters
     ----------
     da: xarray.DataArray
+    loc: str
+        Staggered grid location
 
     Return
     ------
@@ -319,8 +379,11 @@ def is_level(da, loc="any"):
 def get_vertical(da, errors="raise", **kwargs):
     """Get either depth or altitude
 
+    Tries to find a depth coordinate first, then falls back to altitude.
+
     Parameters
     ----------
+    da: xarray.DataArray, xarray.Dataset
     {errors}
     kwargs:
         Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
@@ -360,6 +423,7 @@ def get_time(da, errors="raise", **kwargs):
 
     Parameters
     ----------
+    da: xarray.DataArray, xarray.Dataset
     {errors}
     kwargs:
         Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
@@ -407,10 +471,13 @@ def is_time(da):
 
 @misc.ERRORS.format_function_docstring
 def get_meta_coords(da, coord_names, errors="raise", **kwargs):
-    """Get several coordinates
+    """Get several coordinates at once
 
     Parameters
     ----------
+    da: xarray.DataArray, xarray.Dataset
+    coord_names: list(str)
+        List of coordinate names to search for (e.g. ``["lon", "lat"]``).
     {errors}
     kwargs:
         Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
@@ -418,6 +485,12 @@ def get_meta_coords(da, coord_names, errors="raise", **kwargs):
     Return
     ------
     list(xarray.DataArray)
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> lon, lat = get_meta_coords(ds, ["lon", "lat"])
 
     See also
     --------
@@ -754,17 +827,52 @@ def get_dim_types(da, unknown=None, asdict=False):
     unknown:
         Value to assign to unknown types
     asdict: bool
-        Get the result as dictionary
+        Get the result as a dictionary mapping dimension names to types
 
     Return
     ------
-    tuple
+    tuple or dict
+        Dimension types as single-letter strings ("x", "y", "z", "t", "f")
+        or ``unknown`` for unrecognized dimensions.
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> da = xr.DataArray(np.ones((3, 4)), dims=("lat", "lon"))
+        >>> get_dim_types(da, unknown="-")
+        ('y', 'x')
+        >>> get_dim_types(da, asdict=True)
+        {'lat': 'y', 'lon': 'x'}
     """
     return meta.get_meta_specs(da).coords.get_dim_types(da, unknown=unknown, asdict=asdict)
 
 
 def get_order(da):
-    """Like :func:`get_dim_types` but returning a string"""
+    """Get the dimension order as a string like ``"tzy-x"``
+
+    Unknown dimensions are represented by ``"-"``.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+
+    Return
+    ------
+    str
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> da = xr.DataArray(np.ones((2, 3, 4)), dims=("time", "lat", "lon"))
+        >>> get_order(da)
+        'tyx'
+
+    See also
+    --------
+    get_dim_types
+    """
     return "".join(get_dim_types(da, unknown="-", asdict=False))
 
 
@@ -820,7 +928,7 @@ def get_coords_compat_with_dims(da, include_dims=None, exclude_dims=None):
         If provided, the coordinates must have at least one of these
         dimensions
     exclude_dims: set(str)
-        If provided, the coordinates must not have one of these dimnesions
+        If provided, the coordinates must not have one of these dimensions
 
     Return
     ------
@@ -870,7 +978,18 @@ def change_index(da, dim, values):
 
 
 def drop_dim_coords(da, dim):
-    """Drop coords that have a particular dim"""
+    """Drop all coordinates that depend on a given dimension
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+    dim: str
+        Dimension name
+
+    Return
+    ------
+    xarray.DataArray or xarray.Dataset
+    """
     return da.drop([c.name for c in da.coords.values() if dim in c.dims])
 
 
@@ -887,18 +1006,32 @@ class positive_attr(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
 
 
 def get_positive_attr(da, zdim=None):
-    """Get the positive attribute of a dataset
+    """Get the positive attribute of a dataset or data array
+
+    Searches for the ``positive`` attribute in the vertical coordinate
+    or falls back to the current meta specs default.
 
     Parameters
     ----------
     da: xarray.Dataset, xarray.DataArray
     zdim: None, str
         The index coordinate name that is supposed to have this attribute,
-        which is usually the vertical dimension
+        which is usually the vertical dimension.
 
     Return
     ------
     None, "up" or "down"
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> depth = xr.DataArray([-100., -50., 0.], dims="z",
+        ...     attrs={"positive": "up"})
+        >>> da = xr.DataArray([1, 2, 3], dims="z",
+        ...     coords={"depth": depth})
+        >>> get_positive_attr(da)
+        'up'
     """
     # Targets
     if zdim is None:
@@ -924,17 +1057,20 @@ def get_positive_attr(da, zdim=None):
 
 
 def get_binding_data_vars(ds, coord, as_names=False):
-    """Get the data_vars that have this coordinate
+    """Get the data_vars that have a given coordinate
 
     Parameters
     ----------
     ds: xarray.Dataset
-    coord_name: str
+    coord: str, xarray.DataArray
+        Coordinate name or data array (its ``name`` attribute is used).
+    as_names: bool
+        If True, return variable names instead of data arrays.
 
     Return
     ------
     list
-        List of data_var names
+        List of :class:`xarray.DataArray` or of names if ``as_names`` is True.
     """
     if not isinstance(coord, str):
         coord = coord.name

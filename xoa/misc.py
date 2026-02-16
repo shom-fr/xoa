@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Miscellaneaous low level utilities
+Miscellaneous low level utilities
 """
 # Copyright 2020-2026 Shom
 #
@@ -26,13 +26,13 @@ from . import exceptions
 
 
 class XEnumMeta(EnumMeta):
-    """Exented version of num meta-class
+    """Extended version of Enum meta-class
 
     This version supports:
 
     - :meth:`__contains__` (``in``) with strings
     - a better :meth:`__str__` (``str()``) method
-    - a :meth:`get_rst` methods and :attr`str` and
+    - a :meth:`get_rst` method and :attr:`str` and
       :attr:`rst_with_links` properties.
 
     Example
@@ -180,7 +180,7 @@ class Choices(object):
         Allowed choices. When a dict, values are considered as the
         description of choices.
     case_insensitive: bool
-        Wether the treatment of string type choice should be case
+        Whether the treatment of string type choice should be case
         sensitive or not.
     parameter: None, str
         Parameter name, which defaults to the lower case class name
@@ -324,8 +324,8 @@ def get_axis_slices(ndim, axis, **kwargs):
     Return
     ------
     A dictionary of tuples of slices. All tuples have a
-        length of ndim, and can be used has a slice for the array
-        (see exedges =ample).
+        length of ndim, and can be used as a slice for the array
+        (see example).
 
         - ``"all"``: Select everything.
         - ``"first"``/``"last"``: First and last.
@@ -474,11 +474,11 @@ def dict_filter(
     Parameters
     ----------
     kwargs:
-        Dictionnary to filter.
+        Dictionary to filter.
     filters:
         Single or list of prefixes.
     defaults:
-        dictionnary of default values for output fictionnary.
+        Dictionary of default values for output dictionary.
     copy:
         Simply copy items, do not remove them from kwargs.
     short:
@@ -748,7 +748,7 @@ def match_attrs(obj, checks, ignorecase=True, transform=None):
 
 
 def gunique(seq):
-    """Create a generator that yields unique item whlist preserving the order
+    """Create a generator that yields unique items whilst preserving the order
 
     Parameters
     ----------

@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-High level interpolation routines
+High level interpolation routines.
 
-.. warning::
-    Tis module provides also backward compatibility by importing 
+Provides :func:`grid2loc` for interpolating gridded data to random
+locations and :func:`isoslice` for extracting iso-surfaces.
+
+.. note::
+    This module also provides backward compatibility by re-importing
     core routines from the :mod:`xoa.core.interp` and
-    :mod:`xoa.core.interp` modules.
+    :mod:`xoa.core.regrid` modules.
 """
 # Copyright 2020-2026 Shom
 #
@@ -76,8 +79,21 @@ def grid2loc(da, loc, compat="warn"):
 
     Return
     ------
-    xarray.dataArray
-        The interpolated data array.
+    xarray.DataArray
+        The interpolated data array, with the location dimension(s)
+        replacing the grid dimensions.
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> vi = xr.DataArray(
+        ...     np.ones((4, 5)), dims=("lat", "lon"),
+        ...     coords=dict(lon=np.arange(5.), lat=np.arange(4.)))
+        >>> loc = xr.Dataset(coords=dict(
+        ...     lon=("npts", [1.5, 3.5]),
+        ...     lat=("npts", [1.5, 2.5])))
+        >>> grid2loc(vi, loc)
 
     See Also
     --------
@@ -87,9 +103,11 @@ def grid2loc(da, loc, compat="warn"):
     xoa.core.interp.cell2relloc
     """
 
-    # Get coordinates
+    # Ensure nanosecond precision for datetime coordinates
+    da = xcoords.ensure_ns_datetime(da)
     if hasattr(loc, "to_xarray"):
         loc = loc.to_xarray()
+    loc = xcoords.ensure_ns_datetime(loc)
     # - horizontal
     order = "yx"
     lons = xcoords.get_lon(loc)
@@ -186,38 +204,45 @@ def grid2loc(da, loc, compat="warn"):
 
 
 def isoslice(da, values, isoval, dim, reverse=False, dask='parallelized', **kwargs):
-    """Extract data from var where values==isoval
+    """Extract a slice of ``da`` where ``values`` equals ``isoval``
+
+    Interpolates ``da`` along ``dim`` at the position where ``values``
+    crosses ``isoval``.
 
     Parameters
     -----------
     da: xarray.DataArray
-          array from which the data are extracted
-    values: array_like
-          array on which a research of isoval is made
-    isoval: float
-          value of interest on which we perform research in values array
+        Array from which the data are extracted.
+    values: xarray.DataArray
+        Array in which ``isoval`` is searched for.
+    isoval: float, xarray.DataArray
+        Target value to locate in ``values``.
     dim: str
-          dimension shared by da and values on which the slice is made
+        Dimension shared by ``da`` and ``values`` along which the
+        slice is performed.
+    reverse: bool
+        If True, search from the end of the ``dim`` axis instead
+        of from the beginning.
     dask: str
         See :func:`xarray.apply_ufunc`.
+    kwargs: dict
+        Extra keyword arguments passed to :func:`xarray.apply_ufunc`.
 
     Return
     ------
-    isovar : array_like
-            Sliced array based on data where values==isoval
+    xarray.DataArray
+        Sliced array with ``dim`` removed.
 
     Example
     -------
+    Extract depth at a given temperature and temperature at a given depth::
 
-    Let's define depth and temperature variables both in 3 dimensions (i,j,k)
-    where i and j are horizontal dimension and k the vertical one::
-
-        dep_at_t20 = isoslice(dep, temp, 20, "z")   # depth at temperature=20°C
-        temp_at_z15 = isoslice(temp, dep, -15, "z") # temperature at depth=-15m
+        dep_at_t20 = isoslice(dep, temp, 20, "z")   # depth at temperature=20
+        temp_at_z15 = isoslice(temp, dep, -15, "z")  # temperature at depth=-15m
 
     See Also
     --------
-    xoa.interp.isoslice
+    xoa.core.interp.isoslice
     xarray.apply_ufunc
     """
 
