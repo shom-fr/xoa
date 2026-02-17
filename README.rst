@@ -9,7 +9,7 @@ xoa - xarray-based ocean analysis library
     :target: https://anaconda.org/conda-forge/xoa/
 .. image:: https://img.shields.io/pypi/v/xoa.svg
     :alt: Available on pypi
-    :target: ttps://pypi.python.org/pypi/xoa/
+    :target: https://pypi.python.org/pypi/xoa/
 .. image:: https://img.shields.io/pypi/dm/xoa
     :alt: PyPI - Downloads
     :target: https://pypi.org/project/xoa

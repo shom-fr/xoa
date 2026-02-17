@@ -18,7 +18,7 @@ You can use them at your own risk.
 
 .. highlight:: python
 
-For instance, load the croco specs with directly::
+For instance, load the croco specs directly with::
 
     import xoa.meta
     xoa.meta.set_meta_specs("croco")
@@ -27,7 +27,7 @@ Register it with::
 
     xoa.meta.register_meta_specs("croco")
 
-You can access the associated `.cfg` file with :func:`xoa.meta_configs.get_meta_config_file`.
+You can access the associated `.cfg` file with :func:`xoa.meta.get_meta_config_file`.
 
 
 .. include:: genmetaspecs/specialized.txt
@@ -51,7 +51,7 @@ Look at :ref:`appendix.meta.specialized.default`.
 The configuration syntax specifications
 ---------------------------------------
 
-The syntax of all configurations are validated with these specifications.
+The syntax of all configurations is validated with these specifications.
 
 See `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_.
 

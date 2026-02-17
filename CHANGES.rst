@@ -7,7 +7,7 @@ Develop
 New features
 ------------
 - Add the ``within`` parameter to :mod:`xoa.cf` search methods.
-- Add the ``rename_args`` argument to formatting routing of :mod:`xoa.meta` to retreive renaming information [:pull:`102`].
+- Add the ``rename_args`` argument to formatting routing of :mod:`xoa.meta` to retrieve renaming information [:pull:`102`].
 - Add the :func:`xoa.dyn.get_sea_level` function to get either SSH, ADT, SLA or MDT in a dataset [:pull:`102`].
 - Allow passing a list of "meta_name" to :meth:`xoa.cf.MetaSpecs.get` for enlarging a search [:pull:`102`].
 - The :mod:`xoa.data_samples` module now use Pooch to manage sample files [:pull:`111`].
@@ -25,7 +25,7 @@ Deprecations
 Bug fixes
 ---------
 - Fix :func:`xoa.coords.get_time` that was returning None.
-- Fix :func:`xoa.interp.linear1d` extraplation [:pull:`107`]
+- Fix :func:`xoa.interp.linear1d` extrapolation [:pull:`107`]
 - Fix :func:`xoa.grid.to_rect` warnings.
 - Fix :meth:`xoa.meta.MetaSpecs.get_dim_types`.
 - Fix ``test_accessors.py`` to use ``meta`` accessor instead of deprecated ``xmeta`` and ``meta_specs`` property instead of ``metaspecs``.
@@ -47,9 +47,9 @@ New features
 - :class:`xoa.cf.CFSpecs`, :func:`xoa.cf.register_cf_specs`, :func:`xoa.cf.get_cf_specs` and :class:`xoa.cf.set_cf_specs` now accepts short names of internal CF config like "croco" or "argo".
 - Add `absolute` option for salinity and the `ref_dens` option to enable using different formulae for density to :func:`xoa.plot.plot_ts`.
 - Add the `exclude_names` option to :mod:`xoa.cf` configurations to ignore data array names.
-- Call :func:`xoa.cf.infer_cf_specs` from :func:`xoa.cf.get_cf_specs`  when an data arrray or dataset is passed [:pull:`96`].
+- Call :func:`xoa.cf.infer_cf_specs` from :func:`xoa.cf.get_cf_specs`  when a data array or dataset is passed [:pull:`96`].
 - Add the `drop_na` and `maxgap` parameters to the :func:`xoa.regrid.regrid1d` function to fill gaps [:pull:`92`].
-- Add the :func:`xoa.filter.tidal_filter` function to apply a tidal filter to time serie [:pull:`87`].
+- Add the :func:`xoa.filter.tidal_filter` function to apply a tidal filter to a time series [:pull:`87`].
 
 Breaking changes
 ----------------
@@ -140,12 +140,12 @@ New features
 - Add a warning to :func:`xoa.open_data_sample` that is emitted when the requested file is not an internal data sample [:pull:`47`].
 - Add the :func:`xoa.plot.add_shadow`, :func:`xoa.plot.add_glow` and :func:`xoa.plot.add_lightshading` function to add path effects to plots [:pull:`44`].
 - Add the :func:`xoa.plot.plot_ts` function to make T-S diagrams [:pull:`43`].
-- Add the :func:`xoa.filter.demerliac` function to apply a Dermerliac filter to time serie [:pull:`41`].
+- Add the :func:`xoa.filter.demerliac` function to apply a Demerliac filter to a time series [:pull:`41`].
 - Add support for fine tuning masking in :func:`xoa.filter.convolve` through the `na_thres` parameter [:pull:`41`].
 - Add the :func:`xoa.geo.cdist` and :func:`xoa.geo.pdist` functions to compute haversine distances respectively between two dataset and with a dataset  [:pull:`40`].
 - Add the :func:`xoa.coords.geo_stack` function to stack longitudes and latitudes into another dimension, in a dataset or data array  [:pull:`40`].
 - Add the :func:`xoa.filter.decimate` function to crudely undersample a geographic dataset or data array with a radius of proximity [:pull:`40`].
-- Add the :func:`xoa.geo.get_distances` to compute the Haversine distances between locations inside a single dataset or between txo datasets [:pull:`40`].
+- Add the :func:`xoa.geo.get_distances` to compute the Haversine distances between locations inside a single dataset or between two datasets [:pull:`40`].
 - Add the :func:`xoa.krig.empirical_variogram` function to estimate variogram parameters.
 - Add the :class:`xoa.krig.VariogramModel` to manage a variogram model [:pull:`40`].
 - Add the :class:`xoa.krig.Kriger` and :func:`xoa.krig.krig` to perform kriging [:pull:`40`].
@@ -183,7 +183,7 @@ New features
 
 Bug fixes
 ---------
-- Fix :meth:`xoa.cf.CFSpecs.to_loc` that which failing with dataset [:pull:`23`].
+- Fix :meth:`xoa.cf.CFSpecs.to_loc` that was failing with dataset [:pull:`23`].
 
 
 0.5.0 (2021-10-12)
@@ -268,7 +268,7 @@ v0.3.0 (2021-05-12)
 New features
 ------------
 - Add the :func:`xoa.plot.plot_flow` function [:pull:`9`].
-- Improve :func:`xoa.coords.get_depth` so that it can compute depth from sigma coordinates or layer thinknesses [:pull:`8`].
+- Improve :func:`xoa.coords.get_depth` so that it can compute depth from sigma coordinates or layer thicknesses [:pull:`8`].
 - Add the :func:`xoa.dyn.flow2d` function [:pull:`7`].
 - Add the :func:`xoa.regrid.extrap1d` function.
 - Add the :func:`xoa.filter.erode_coast` function which is specialized version of the :func:`xoa.filter.erode_mask` for horizontal data.

@@ -75,7 +75,7 @@ Let's set up a sample dataset and register the accessors:
     xoa.register_accessors()
 
 All these arrays are CF compliant according to their
-``standard_name`` attribute, despite their name is not really explicit.
+``standard_name`` attribute, despite their names not being very explicit.
 The accessors make it easy to find, format and chain operations:
 
 .. ipython:: python
@@ -195,7 +195,7 @@ If the ``specialize`` keyword is set to ``True``, arrays are
 renamed with their specialized name if set in the specs with the
 :metaopt:`name <[data_vars] [__many__] name>` option.
 We speak here of **decoding**.
-Two shortcut methods exists for these tasks:
+Two shortcut methods exist for these tasks:
 
 - Decoding: :meth:`~xoa.meta.general.MetaSpecs.decode`
 - Encoding: :meth:`~xoa.meta.general.MetaSpecs.encode`
@@ -501,7 +501,7 @@ with an input type as those presented above:
 - A dictionary.
 - A :class:`configobj.ConfigObj` instance.
 - Another :class:`~xoa.meta.general.MetaSpecs` instance.
-- A list of them, with the first having priority over the lasts.
+- A list of them, with the first having priority over the last.
 
 The initialization also accepts two options:
 
@@ -848,10 +848,10 @@ Et voilà !
 
 .. _indepth.meta.hycom:
 
-Example: decoding and merging Hycom splitted outputs
+Example: decoding and merging Hycom split outputs
 ====================================================
 
-At Shom, the Hycom model outputs are splitted into separate files, one for each variable.
+At Shom, the Hycom model outputs are split into separate files, one for each variable.
 Conflicts may occur when using variables that are not at the same staggered grid location,
 since all variables are stored with dimensions ``(y, x)`` and ``lon`` and ``lat``
 coordinates, all with the same name.

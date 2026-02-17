@@ -23,7 +23,8 @@ dependencies:
       - configobj
       - pooch
       - seaborn
-      - sphinx
+      - sphinx<9
+      - sphinx_autosummary_accessors
       - sphinx-book-theme
       - sphinx-argparse
       - sphinx-gallery

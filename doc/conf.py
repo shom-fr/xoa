@@ -52,7 +52,7 @@ extensions = [
     'genlogos',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput',
-    # 'sphinx_autosummary_accessors',
+    'sphinx_autosummary_accessors',
     'sphinx_gallery.gen_gallery',
     'xoa.cfgm',
 ]

@@ -41,16 +41,16 @@ The :mod:`xoa.grid` module offers various functions to manipulate grids:
     x_edges = xr.DataArray(np.arange(0, 5), dims='x', name='x')
 
     # Get centers from edges
-    x_centers = xgrid.get_centers(x_edges)
+    x_centers = xgrid.get_centers(x_edges, "x")
     print(x_centers.values)
 
     # Get edges from centers
-    x_back = xgrid.get_edges(x_centers)
+    x_back = xgrid.get_edges(x_centers, "x", mode="linear_extrap")
     print(x_back.values)
 
 **Applying operations along dimensions:**
 
-The :func:`~xoa.grid.apply_along_dim` function allows you to apply an operator
+The :func:`~xoa.grid.apply_along_dim` function allows you to apply an xarray operator
 on data array or dataset dimensions, potentially changing the size of the array.
 
 .. ipython:: python
@@ -63,8 +63,8 @@ on data array or dataset dimensions, potentially changing the size of the array.
         'y': np.arange(3)
     })
 
-    # Apply mean operation along x dimension
-    ds_mean = xgrid.apply_along_dim(ds, 'x', np.mean)
+    # Interpolate between grid points
+    ds_mean = xgrid.apply_along_dim(ds, 'x', xgrid.get_centers)
 
 
 Staggered grids
@@ -178,8 +178,8 @@ The module supports the following CF-compliant sigma coordinate types:
 
 .. ipython:: python
 
-    from xoa.sigma import SIGMA_COORDINATE_TYPES
-    for coord_type in SIGMA_COORDINATE_TYPES:
+    from xoa.sigma import SIGMA_COORDINATE_FUNCTIONS
+    for coord_type in SIGMA_COORDINATE_FUNCTIONS:
         print(f"- {coord_type}")
 
 These include:
@@ -229,8 +229,9 @@ depend on:
     # Decode sigma to depths using the sigma module
     # The decode_cf_sigma function will automatically detect
     # the coordinate type and apply the correct formula
-    from xoa.sigma import decode_cf_sigma
-    depths = decode_cf_sigma(ds.s_rho, ds)
+    from xoa.sigma import decode_sigma
+    dsz = decode_sigma(ds)
+    print(dsz.depth)
 
 Atmosphere sigma coordinates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -283,30 +284,32 @@ and sigma coordinates using CROCO model output:
 
 .. ipython:: python
 
+    @suppress
+    import xarray as xr
     import xoa
-    import matplotlib.pyplot as plt
-
+    import xoa.meta
+    import xoa.regrid
+    import numpy as np
+    
+    # To have 'xoa' and 'decode_sigma' accessors
+    xoa.register_accessors()
+    
     # Load CROCO sample data
     ds = xoa.open_data_sample("MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.meridional.nc")
-
-    # Decode the dataset (handles sigma coordinates automatically)
-    ds_decoded = ds.xoa.decode()
-
+    
+    # Set internal croco decoding rules and decode s-coordinate and dataset names
+    xoa.meta.set_meta_specs('croco')
+    ds_decoded = ds.decode_sigma().xoa.decode()
+    
     # The sigma coordinate has been converted to depths
     # You can now regrid to regular depth levels if needed
-    from xoa import regrid
-
+    
     # Define regular depth levels
-    import numpy as np
-    regular_depths = xr.DataArray(
-        np.linspace(0, -100, 20),
-        dims='depth',
-        attrs={'units': 'm', 'positive': 'up'}
-    )
-
+    regular_depths = xr.DataArray(np.linspace(-100, 0, 20), dims='depth', attrs={'units': 'm', 'positive': 'up'})
+    
     # Regrid temperature to regular depths
-    # (this would require the actual depth coordinate from the decoded dataset)
-    # temp_regular = regrid.regrid1d(ds_decoded.temp, regular_depths, dim='z')
+    temp_regular = xoa.regrid.regrid1d(ds_decoded.ptemp, regular_depths, extrap="top")
+    print(temp_regular[0, :, 0, 0])
 
 See also
 ========

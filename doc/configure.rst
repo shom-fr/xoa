@@ -36,7 +36,7 @@ Inline settings
 ---------------
 
 You can change options from python with
-the :class:`xoa.set_option` function and the :class:`xoa.set_options` class::
+the :func:`xoa.set_option` function and the :class:`xoa.set_options` class::
 
     xoa.set_option("plot.cmapdiv", "cmo.balance")  # single option
     xoa.set_options("plot", cmapdiv="cmo.balance", cmappos="cmo.amp")  # several options
