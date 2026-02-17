@@ -46,7 +46,7 @@ Now, initialize the config manager:
 
 .. note:: To configure a library, the `cfgspecs_lines` argument is typically the name
     of a static file placed in the same directory as the module, which will
-    initialize an instance of the :class:`~xoa.cfg.ConfigManager` class.
+    initialize an instance of the :class:`~xoa.cfgm.ConfigManager` class.
 
 And finally, load and validate the user configuration:
 
@@ -118,11 +118,11 @@ for the user that use it from an executable script that parses the
 commandline:
 
 * Default values are internally defined in the config specifications.
-* The user optionally alter these value with its configuration file.
-* The user optionally alter its own configuration using the
+* The user can optionally alter these values with a configuration file.
+* The user can optionally alter the configuration using the
   commandline options, which are set to None by default.
 
-In other word, the commandline arguments take precedence over
+In other words, the commandline arguments take precedence over
 the user configuration, which takes precedence over the default
 internal configuration.
 

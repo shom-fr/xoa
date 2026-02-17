@@ -64,4 +64,4 @@ Clone the repository::
 Run the installation command::
 
     $ cd xoa
-    $ python setup.py install
+    $ pip install .

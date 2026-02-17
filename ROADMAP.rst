@@ -35,10 +35,10 @@ To this end, the library relies on the following libraries, among others:
     The interpolation routines are accelerated with :mod:`numba`.
 
 For those who know `vacumm <https://github.com/VACUMM/vacumm>`_,
-xoa a light weight, faster and more flexible version,
+xoa is a lightweight, faster and more flexible version,
 now in python 3, and based on the xarray data model instead of
 CDAT.
-vacumm provide alot of facilities that are now available in other packages,
+vacumm provided a lot of facilities that are now available in other packages,
 thus no longer needed.
 
 
@@ -64,7 +64,7 @@ Interpolations
 --------------
 
 The :mod:`low level interpolation routines <xoa.interp>` are
-accelarated with numba.
+accelerated with numba.
 They are designed to provide efficient and pure numeric routines
 to perform interpolations that are not provided by other packages
 because of the complex ocean coordinates.

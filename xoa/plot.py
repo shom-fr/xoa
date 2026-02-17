@@ -275,7 +275,7 @@ def plot_ts(
         xoa.register_accessors()
 
         # Load the Mercator data
-        file_name = xoa.get_data_sample("ibi-argo-7900573.nc")
+        file_name = xoa.get_data_sample("MODELS/CMEMS-IBI/ibi-argo-7900573.nc")
         ds = xr.open_dataset(file_name)
         temp = ds.thetao
         sal = ds.so

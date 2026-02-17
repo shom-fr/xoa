@@ -36,7 +36,7 @@ xoa.register_accessors(decode_sigma=True)
 
 # %%
 # The :ref:`xoa <accessors>` accessor is also registered by default, and give access
-# to most of the fonctionalities of the other accessors.
+# to most of the functionalities of the other accessors.
 
 # %%
 # Register the internal CROCO naming specifications
@@ -85,7 +85,7 @@ print(ds.depth)
 # The `depth` was assigned as coordinates at the previous stage.
 # We use the :ref:`xoa <accessors.dataset>` accessor to easily access the temperature, latitude and depth arrays.
 # The default configuration exposes shortcuts for some variables and coordinates
-# as shown in :cfsec:`accessors`.
+# as shown in :metasec:`accessors`.
 
 temp = ds.xoa.temp.squeeze()
 temp = temp.where(temp != 0)  # convert zeros to nans

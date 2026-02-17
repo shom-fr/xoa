@@ -33,7 +33,7 @@ Basic convolution
 
     import xarray as xr
     import numpy as np
-    from xoa import filter as xfilter
+    import xoa.filter
 
     # Create sample data with some noise
     np.random.seed(42)
@@ -47,7 +47,7 @@ Basic convolution
     data.values[10:20, 10:20] = np.nan
 
     # Apply spatial smoothing with a simple box kernel
-    smoothed = xfilter.convolve(data, kernel=5, normalize=True, na_thres=0.5)
+    smoothed = xoa.filter.convolve(data, kernel=5, normalize=True, na_thres=0.5)
 
 The ``convolve`` function has important parameters:
 
@@ -63,7 +63,7 @@ sets ``normalize=True``:
 .. ipython:: python
 
     # Equivalent to convolve with normalize=True
-    smoothed = xfilter.smooth(data, kernel=5, na_thres=0.5)
+    smoothed = xoa.filter.smooth(data, kernel=5, na_thres=0.5)
 
 Window functions
 ----------------
@@ -74,13 +74,13 @@ window functions from NumPy and SciPy:
 .. ipython:: python
 
     # Get a Gaussian window function
-    gaussian_func = xfilter.get_window_func("gaussian", std=0.2)
+    gaussian_func = xoa.filter.get_window_func("gaussian", std=0.2)
 
     # Get a Hamming window
-    hamming_func = xfilter.get_window_func("hamming")
+    hamming_func = xoa.filter.get_window_func("hamming")
 
     # Create custom window from array
-    custom_func = xfilter.get_window_func([1, 2, 5, 2, 1])
+    custom_func = xoa.filter.get_window_func([1, 2, 5, 2, 1])
 
 Available window types include:
 
@@ -98,7 +98,7 @@ Kernels can be specified in multiple ways:
 .. ipython:: python
 
     # 5x5 box kernel
-    smoothed = xfilter.smooth(data, kernel=5)
+    smoothed = xoa.filter.smooth(data, kernel=5)
 
 **2. Dictionary for anisotropic kernels:**
 
@@ -106,15 +106,16 @@ Kernels can be specified in multiple ways:
 
     # Different sizes along different dimensions
     kernel_spec = {'x': 7, 'y': 3}
-    smoothed = xfilter.smooth(data, kernel=kernel_spec)
+    smoothed = xoa.filter.smooth(data, kernel=kernel_spec)
 
-**3. Dictionary with window functions:**
+**3. Dictionary with a window function:**
 
 .. ipython:: python
 
-    # Gaussian along x, triangular along y
-    kernel_spec = {'x': ('gaussian', 9), 'y': ('bartlett', 5)}
-    smoothed = xfilter.smooth(data, kernel=kernel_spec)
+    # Gaussian window along both dimensions
+    kernel_spec = {'x': 9, 'y': 5}
+    smoothed = xoa.filter.smooth(data, kernel=kernel_spec,
+        kernel_kwargs=dict(window_func='gaussian'))
 
 **4. Explicit arrays:**
 
@@ -122,7 +123,7 @@ Kernels can be specified in multiple ways:
 
     # Custom 1D weights
     kernel_spec = {'x': [1, 2, 5, 2, 1], 'y': [1, 2, 1]}
-    smoothed = xfilter.smooth(data, kernel=kernel_spec)
+    smoothed = xoa.filter.smooth(data, kernel=kernel_spec)
 
 Isotropic kernels
 ^^^^^^^^^^^^^^^^^
@@ -132,7 +133,7 @@ For isotropic (radially symmetric) kernels, use :func:`~xoa.filter.generate_isot
 .. ipython:: python
 
     # Create 2D isotropic Gaussian kernel
-    iso_kernel = xfilter.generate_isotropic_kernel(
+    iso_kernel = xoa.filter.generate_isotropic_kernel(
         shape=(15, 15),
         window_func='gaussian'
     )
@@ -147,11 +148,11 @@ models for smoothing:
 .. ipython:: python
 
     # 2D Shapiro kernel
-    shapiro = xfilter.shapiro_kernel(('y', 'x'))
+    shapiro = xoa.filter.shapiro_kernel(('y', 'x'))
     print(shapiro.values)
 
     # Apply Shapiro smoothing
-    smoothed = xfilter.smooth(data, kernel=shapiro)
+    smoothed = xoa.filter.smooth(data, kernel=shapiro)
 
 
 .. _indepth.filtering.temporal:
@@ -171,7 +172,8 @@ components while preserving lower-frequency signals:
 .. ipython:: python
 
     # Create hourly time series with tidal signal
-    time = xr.cftime_range('2020-01-01', periods=30*24, freq='h')
+    import pandas as pd
+    time = pd.date_range('2020-01-01', periods=30*24, freq='h')
 
     # Simulate signal: trend + tidal component + noise
     t_hours = np.arange(len(time))
@@ -189,7 +191,7 @@ components while preserving lower-frequency signals:
     )
 
     # Apply Demerliac filter
-    filtered = xfilter.demerliac(sea_level, na_thres=0.2)
+    filtered = xoa.filter.demerliac(sea_level, na_thres=0.2)
 
 The Demerliac filter uses pre-defined weights optimized for hourly data.
 It automatically handles sub-hourly data by interpolating the weights.
@@ -203,10 +205,10 @@ tidal filter types:
 .. ipython:: python
 
     # Godin filter (alternative tidal filter)
-    godin_filtered = xfilter.tidal_filter(sea_level, 'godin')
+    godin_filtered = xoa.filter.tidal_filter(sea_level, 'godin')
 
     # Simple moving average (24-hour)
-    mean_filtered = xfilter.tidal_filter(sea_level, 'mean')
+    mean_filtered = xoa.filter.tidal_filter(sea_level, 'mean')
 
 Available filter types:
 
@@ -243,7 +245,7 @@ using smoothing:
     data_with_mask.values[20:30, 30:40] = np.nan
 
     # Erode mask by 3 iterations
-    eroded = xfilter.erode_mask(data_with_mask, until=3)
+    eroded = xoa.filter.erode_mask(data_with_mask, until=3)
 
 The erosion process:
 
@@ -263,7 +265,7 @@ You can also erode until a specific mask is satisfied:
     target_mask.values[25:27, 35:37] = True  # Keep small region masked
 
     # Erode until only target_mask regions remain masked
-    eroded = xfilter.erode_mask(data_with_mask, until=target_mask)
+    eroded = xoa.filter.erode_mask(data_with_mask, until=target_mask)
 
 Coast erosion
 -------------
@@ -288,7 +290,7 @@ The :func:`~xoa.filter.erode_coast` function is specialized for horizontal
     sst.values[:, :10] = np.nan  # "land" on the left
 
     # Fill coastal regions
-    sst_filled = xfilter.erode_coast(sst, until=5)
+    sst_filled = xoa.filter.erode_coast(sst, until=5)
 
 The function automatically:
 
@@ -327,10 +329,10 @@ Basic decimation
     })
 
     # Decimate to ~50km spacing
-    sparse_data = xfilter.decimate(dense_data, radius=50e3, method='pick')
+    sparse_data = xoa.filter.decimate(dense_data, radius=50e3, method='pick')
 
     print(f"Original points: {npts}")
-    print(f"Decimated points: {sparse_data.dims['npts']}")
+    print(f"Decimated points: {sparse_data.sizes['npts']}")
 
 Decimation methods
 ------------------
@@ -342,7 +344,7 @@ Simply selects points ensuring minimum spacing
 
 .. ipython:: python
 
-    decimated_pick = xfilter.decimate(dense_data, radius=50e3, method='pick')
+    decimated_pick = xoa.filter.decimate(dense_data, radius=50e3, method='pick')
 
 **2. Average method** (method='average'):
 At each selected point, averages all nearby points within a radius
@@ -350,7 +352,7 @@ At each selected point, averages all nearby points within a radius
 .. ipython:: python
 
     # Average with smoothing factor
-    decimated_avg = xfilter.decimate(
+    decimated_avg = xoa.filter.decimate(
         dense_data,
         radius=50e3,
         method='average',
@@ -371,7 +373,7 @@ Typical use cases
 .. code-block:: python
 
     # Reduce dense satellite data before kriging
-    satellite_decimated = xfilter.decimate(
+    satellite_decimated = xoa.filter.decimate(
         satellite_obs,
         radius=25e3,  # 25 km spacing
         method='average',
@@ -383,7 +385,7 @@ Typical use cases
 .. code-block:: python
 
     # Thin drifter trajectories for clearer plotting
-    drifter_thinned = xfilter.decimate(
+    drifter_thinned = xoa.filter.decimate(
         drifter_positions,
         radius=10e3,  # 10 km spacing
         method='pick'
@@ -394,7 +396,7 @@ Typical use cases
 .. code-block:: python
 
     # Subsample before expensive geostatistical processing
-    data_subset = xfilter.decimate(
+    data_subset = xoa.filter.decimate(
         observations,
         radius=100e3,  # 100 km spacing
         method='average',
@@ -413,13 +415,13 @@ The ``na_thres`` parameter is critical for controlling how NaNs propagate:
 .. code-block:: python
 
     # Strict: output masked if any input is masked
-    strict = xfilter.smooth(data, kernel=5, na_thres=0)
+    strict = xoa.filter.smooth(data, kernel=5, na_thres=0)
 
     # Moderate: output masked if >50% input is masked
-    moderate = xfilter.smooth(data, kernel=5, na_thres=0.5)
+    moderate = xoa.filter.smooth(data, kernel=5, na_thres=0.5)
 
     # Permissive: output masked only if all input is masked
-    permissive = xfilter.smooth(data, kernel=5, na_thres=1.0)
+    permissive = xoa.filter.smooth(data, kernel=5, na_thres=1.0)
 
 Choosing kernel sizes
 ---------------------
@@ -436,7 +438,7 @@ For anisotropic smoothing:
 
     # Smooth more along one direction
     kernel = {'x': 15, 'y': 5}  # More smoothing in x-direction
-    smoothed = xfilter.smooth(data, kernel=kernel)
+    smoothed = xoa.filter.smooth(data, kernel=kernel)
 
 Computational considerations
 ----------------------------
@@ -448,11 +450,11 @@ Computational considerations
 .. code-block:: python
 
     # Generate kernel once
-    kernel = xfilter.generate_kernel({'x': 11, 'y': 11}, data, window_func='gaussian')
+    kernel = xoa.filter.generate_kernel({'x': 11, 'y': 11}, data, window_func='gaussian')
 
     # Reuse for multiple datasets
-    smoothed1 = xfilter.smooth(data1, kernel=kernel)
-    smoothed2 = xfilter.smooth(data2, kernel=kernel)
+    smoothed1 = xoa.filter.smooth(data1, kernel=kernel)
+    smoothed2 = xoa.filter.smooth(data2, kernel=kernel)
 
 Working with multi-dimensional data
 ------------------------------------
@@ -468,7 +470,7 @@ Filtering works seamlessly with multi-dimensional arrays:
         'lat': 5,       # Spatial smoothing
         'lon': 5
     }
-    smoothed_4d = xfilter.smooth(data_4d, kernel=kernel_4d)
+    smoothed_4d = xoa.filter.smooth(data_4d, kernel=kernel_4d)
 
 See also
 ========

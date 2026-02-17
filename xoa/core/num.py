@@ -85,7 +85,7 @@ def ravel_index(ii, shape):
 
 
 def as_float_array(arr):
-    """Convert input to at least 1D float array, useful for numba accelerated fonctions
+    """Convert input to at least 1D float array, useful for numba accelerated functions
 
     Parameter
     ---------
