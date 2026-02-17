@@ -17,7 +17,7 @@ xoa - xarray-based ocean analysis library
     :alt: Install, linting and tests
 .. image:: https://readthedocs.org/projects/docs/badge/?version=latest
     :alt: Documentation Status
-    :target: https://xoa.readthedocs.io/en/latest/
+    :target: https://xoa.readthedocs.io/
 .. image:: https://anaconda.org/conda-forge/xoa/badges/platforms.svg
     :alt: noarch
     :target: https://anaconda.org/conda-forge/xoa
