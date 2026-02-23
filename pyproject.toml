@@ -60,9 +60,12 @@ xoa = "xoa.cli:main"
 requires = ["setuptools>=64", "wheel", "setuptools-scm[toml]>=8"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["xoa"]
-include-package-data = true
+[tool.setuptools.packages.find]
+include = ["xoa", "xoa.*"]
+
+[tool.setuptools.package-data]
+"xoa" = ["*.txt", "*.ini"]
+"xoa.meta.configs" = ["*.cfg"]
 
 
 [tool.setuptools_scm]

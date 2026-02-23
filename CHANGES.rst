@@ -1,8 +1,8 @@
 What's new
 ##########
 
-Develop
-=======
+2026-02-0
+=========
 
 New features
 ------------
@@ -12,9 +12,6 @@ New features
 - Allow passing a list of "meta_name" to :meth:`xoa.cf.MetaSpecs.get` for enlarging a search [:pull:`102`].
 - The :mod:`xoa.data_samples` module now use Pooch to manage sample files [:pull:`111`].
 - Add the ``multi`` parameter to :class:`xoa.misc.Choices` to allow multiple choices [:pull:`111`].
-
-Breaking changes
-----------------
 
 Deprecations
 ------------
