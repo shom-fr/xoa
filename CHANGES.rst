@@ -1,8 +1,8 @@
 What's new
 ##########
 
-2026-02-0
-=========
+2026.2.0
+========
 
 New features
 ------------
@@ -276,8 +276,8 @@ Bug fixes
 - Fix u and v CF config [:pull:`6`]
 
 
-YYYY-0M-MICRO
-=============
+YYYY.M.MICRO
+============
 
 New features
 ------------
