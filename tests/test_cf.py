@@ -1027,13 +1027,13 @@ def test_cf_get_meta_specs_from_encoding():
         coords={"mylon": np.arange(2), "mylat": np.arange(2)},
     )
 
-    ds.encoding.update(cf_specs="mynam234")
+    ds.encoding.update(meta_specs="mynam234")
     assert meta.get_meta_specs_from_encoding(ds) is cf_specs_in
 
-    ds.mytemp.encoding.update(cf_specs="mynam234")
+    ds.mytemp.encoding.update(meta_specs="mynam234")
     assert meta.get_meta_specs_from_encoding(ds.mytemp) is cf_specs_in
 
-    ds.mylon.encoding.update(cf_specs="mynam234")
+    ds.mylon.encoding.update(meta_specs="mynam234")
     assert meta.get_meta_specs_from_encoding(ds.mylon) is cf_specs_in
 
     assert meta.get_meta_specs_from_encoding(ds.mylat) is None
