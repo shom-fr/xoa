@@ -34,7 +34,7 @@ import cartopy.feature as cfeature
 from . import exceptions
 from . import misc as xmisc
 from . import geo as xgeo
-from . import cf as xcf
+from . import meta as xmeta
 from . import coords as xcoords
 from . import dyn
 
@@ -288,10 +288,10 @@ def plot_ts(
     """
 
     # Potential temperature
-    cfspecs = xcf.get_cf_specs(temp)
+    metaspecs = xmeta.get_meta_specs(temp)
     # potential = POTENTIAL[potential]
     if potential is None:
-        potential = cfspecs.match_data_var(temp, "ptemp")
+        potential = metaspecs.match_data_var(temp, "ptemp")
 
     if not potential:
         import gsw
@@ -303,7 +303,7 @@ def plot_ts(
             pres = gsw.p_from_z(depth, lat)
 
         if absolute is None:
-            absolute = cfspecs.match_data_var(sal, "asal")
+            absolute = metaspecs.match_data_var(sal, "asal")
         if not absolute:
             lon = xcoords.get_lon(temp)
             lat = xcoords.get_lat(temp)
@@ -314,7 +314,7 @@ def plot_ts(
         attrs = temp.attrs
         temp = gsw.pt0_from_t(sal_abs, temp, pres)
         temp.attrs.update(attrs)
-        cfspecs.format_data_var(temp, meta_name="ptemp", copy=False, replace_attrs=True)
+        metaspecs.format_data_var(temp, meta_name="ptemp", copy=False, replace_attrs=True)
 
     # Init plot
     axes = kwargs.get("ax", axes)
@@ -366,7 +366,7 @@ def plot_ts(
         lon_m = xcoords.get_lon(temp).mean()
         lat_m = xcoords.get_lat(temp).mean()
         if absolute is None:
-            absolute = cfspecs.match_data_var(sal, "asal")
+            absolute = metaspecs.match_data_var(sal, "asal")
         if not absolute:
             ss_absolute = gsw.SA_from_SP(ss, 0, lon_m.values, lat_m.values)
         else:

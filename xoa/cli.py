@@ -37,9 +37,6 @@ def get_parser(formatter_class=argparse.ArgumentDefaultsHelpFormatter):
     )
     parser_info.set_defaults(func=main_info)
 
-    parser_reset_cf_cache = subparsers.add_parser('reset_cf_cache', help='remove the CF cache file')
-    parser_reset_cf_cache.set_defaults(func=main_reset_cf_cache)
-
     return parser
 
 
@@ -62,9 +59,3 @@ def main_info(parser, args):
         options.show_options()
 
 
-def main_reset_cf_cache(parser, args):
-    """Handle the ``reset_cf_cache`` subcommand"""
-    from . import cf
-
-    cf.reset_cache(disk=True)
-    print("Removed CF cache file: " + cf.USER_CF_CACHE_FILE)

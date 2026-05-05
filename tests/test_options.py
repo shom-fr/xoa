@@ -56,3 +56,9 @@ class TestOptionsManagement:
         options.reset_options()
         default = options.get_option('plot.cmapdiv')
         assert 'balance' in default.lower() or default == options.get_option('plot.cmapdiv')
+
+    def test_meta_cache_option(self):
+        """Test that the meta.cache option exists and defaults to False"""
+        value = options.get_option('meta.cache')
+        assert isinstance(value, bool)
+        assert value is False

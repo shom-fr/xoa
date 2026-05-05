@@ -126,7 +126,7 @@ class SGLocator(object):
         .. ipython:: python
 
             @suppress
-            from xoa.cf import SGLocator
+            from xoa.meta.sglocator import SGLocator
             sg = SGLocator(name_format="{root}_{loc}")
             sg.parse_attr("name", "super_banana_t")
             sg.parse_attr("standard_name", "super_banana_at_rhum_location")
@@ -327,7 +327,7 @@ class SGLocator(object):
         .. ipython:: python
 
             @suppress
-            from xoa.cf import SGLocator
+            from xoa.meta.sglocator import SGLocator
             sg = SGLocator()
             sg.format_attr('standard_name', 'sea_water_temperature', 't')
             sg.format_attr('standard_name', 'sea_water_temperature', False)
@@ -388,7 +388,7 @@ class SGLocator(object):
         .. ipython:: python
 
             @suppress
-            from xoa.cf import SGLocator
+            from xoa.meta.sglocator import SGLocator
             sg = SGLocator()
             attrs = dict(standard_name='sea_water_temperature_at_t_location',
                          long_name='sea_water_temperature',
@@ -432,7 +432,7 @@ class SGLocator(object):
         .. ipython:: python
 
             @suppress
-            from xoa.cf import SGLocator
+            from xoa.meta.sglocator import SGLocator
             sg = SGLocator()
             sg.merge_attr('name', 'temp_t', 'mytemp')
             sg.merge_attr('name', 'temp', 'mytemp_t')

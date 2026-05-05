@@ -164,7 +164,7 @@ class MetaSpecs(categories._MetaBase_):
 
         # Get it from cache if from str or MetaSpecs with registration name
         if cache is None:
-            cache = options.get_option("cf.cache")
+            cache = options.get_option("meta.cache")
         cache = cache and (
             (isinstance(cfg, str) and "\n" not in cfg)
             or (isinstance(cfg, dict) and "register" in cfg and cfg["register"]["name"])

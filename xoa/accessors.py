@@ -359,7 +359,7 @@ class _MetaCoordAccessor_(_MetaAccessor_):
 
     @property
     def dim(self):
-        from .cf import XoaError
+        from .exceptions import XoaError
 
         try:
             return self._meta_specs.coords.search_dim(self._obj)[0]
@@ -611,7 +611,7 @@ class SigmaAccessor(_BasicMetaAccessor_):
         dict, dict of dict
             A dict is generated for a given sigma variable,
             whose keys are array names, like ``"sc_r"``,
-            and values are :mod:`~xoa.cf` names, like ``"sig"``.
+            and values are :mod:`~xoa.meta` names, like ``"sig"``.
             A special key is the ``"type"`` whose corresponding value
             is the ``standard_name``, stripped from its potential staggered grid
             location indicator.
