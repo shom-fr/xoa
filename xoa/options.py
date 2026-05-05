@@ -28,8 +28,8 @@ _RE_OPTION_MATCH = re.compile(r"^(\w+)\W(\w+)$").match
 
 #: Specifications of configuration options
 CONFIG_SPECS = """
-[cf] # cf module
-cache=boolean(default=False) # use the :mod:`~xoa.cf` in memory and file caches
+[meta] # meta module
+cache=boolean(default=False) # use the :mod:`~xoa.meta` in memory cache
 
 [plot] # plot parameters
 cmapdiv = string(default="cmo.balance") # default diverging colormap
