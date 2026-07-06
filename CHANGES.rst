@@ -1,6 +1,14 @@
 What's new
 ##########
 
+2026.7.0
+========
+
+Bug fixes
+---------
+- Remove the ``xoa reset_cf_cache`` CLI command: the disk cache no longer exists in :mod:`xoa.meta` and the command was raising :exc:`AttributeError` at runtime [:pull:`117`].
+
+
 2026.2.0
 ========
 
@@ -21,7 +29,6 @@ Deprecations
 
 Bug fixes
 ---------
-- Remove the ``xoa reset_cf_cache`` CLI command: the disk cache no longer exists in :mod:`xoa.meta` and the command was raising :exc:`AttributeError` at runtime [:pull:`117`].
 - Fix :func:`xoa.coords.get_time` that was returning None.
 - Fix :func:`xoa.interp.linear1d` extrapolation [:pull:`107`]
 - Fix :func:`xoa.grid.to_rect` warnings.
