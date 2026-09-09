@@ -32,7 +32,7 @@ NOT_CI = os.environ.get("CI", "false") == "false"
 # %% 2D routines
 
 
-@numba.njit(parallel=True, fastmath=True)
+@numba.njit(parallel=True)
 def closest2d(xxi, yyi, xo, yo):
     """Find indices of closest point on 2D lon/lat grid
 
@@ -53,22 +53,45 @@ def closest2d(xxi, yyi, xo, yo):
         index along second dim
     int: j
         Index along first dim
+
+    Notes
+    -----
+    Brute-force O(nxi * nyi) scan. Each row is reduced independently
+    under :func:`numba.prange` into its own array slot, then merged
+    sequentially -- writing directly to shared ``mindist``/``i``/``j``
+    scalars instead is a data race. No ``fastmath=True``: grid points
+    may be NaN (land mask), and it breaks the NaN-skip comparisons.
     """
     nyi, nxi = xxi.shape
+
+    # Each row's local minimum goes into its own slot: no
+    # cross-iteration dependency, so this is safe to parallelize.
+    row_mindist = np.empty(nyi)
+    row_i = np.empty(nyi, dtype=np.int64)
+    for jt in numba.prange(nyi):
+        dmin = np.pi
+        imin = 0
+        for it in range(nxi):
+            dist = haversine(xo, yo, xxi[jt, it], yyi[jt, it])
+            if dist <= dmin:
+                dmin = dist
+                imin = it
+        row_mindist[jt] = dmin
+        row_i[jt] = imin
+
+    # Sequential reduction across rows
     mindist = np.pi
     i = 0
     j = 0
-    for jt in numba.prange(0, nyi):
-        for it in range(0, nxi):
-            dist = haversine(xo, yo, xxi[jt, it], yyi[jt, it])
-            if dist <= mindist:
-                i = it
-                j = jt
-                mindist = dist
+    for jt in range(nyi):
+        if row_mindist[jt] <= mindist:
+            i = row_i[jt]
+            j = jt
+            mindist = row_mindist[jt]
     return i, j
 
 
-@numba.njit(fastmath=True)
+@numba.njit
 def cell2relloc(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
     """Compute coordinates of point relative to a curvilinear cell
 
@@ -138,7 +161,7 @@ def cell2relloc(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
     return p, q
 
 
-@numba.njit(fastmath=True, cache=NOT_CI)
+@numba.njit(cache=NOT_CI)
 def grid2relloc(xxi, yyi, xo, yo):
     """Compute coordinates of point relative to a curvilinear grid
 

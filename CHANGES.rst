@@ -1,6 +1,15 @@
 What's new
 ##########
 
+Unreleased
+==========
+
+Bug fixes
+---------
+- Fix a data race in :func:`xoa.core.interp.closest2d` (parallel scan writing to shared accumulators) that made :func:`xoa.interp.grid2loc` silently return wrong results, or crash, on genuinely curvilinear (non-separable) grids.
+- Remove ``fastmath=True`` from :func:`xoa.core.interp.closest2d`, :func:`xoa.core.interp.cell2relloc` and :func:`xoa.core.interp.grid2relloc`: it could break the NaN-skip comparisons these functions rely on to ignore invalid/land-masked grid points, silently returning a wrong result.
+
+
 2026.7.0
 ========
 

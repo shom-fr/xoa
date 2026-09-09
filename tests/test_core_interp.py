@@ -165,6 +165,96 @@ def test_interp_grid2locs():
     np.testing.assert_allclose(vo_interp[0], vo_truth)
 
 
+def get_sheared_curvilinear_grid(nxi=6, nyi=5):
+    """A genuinely non-separable (sheared) curvilinear lon/lat grid
+
+    Unlike a curvilinear-shaped grid built from ``np.meshgrid`` of two
+    independent 1D axes, longitude and latitude here both depend on
+    *both* grid indices, so the grid cannot be reduced to a rectilinear
+    one. The mapping is affine so the inverse (index -> position) is
+    known exactly, which is used to check the interpolation results.
+    """
+    ii, jj = np.meshgrid(np.arange(nxi, dtype="d"), np.arange(nyi, dtype="d"))
+    xxi = ii + 0.3 * jj
+    yyi = 0.1 * ii + jj
+    return xxi, yyi
+
+
+def relloc_sheared_curvilinear_grid(xo, yo):
+    """Exact analytic inverse of :func:`get_sheared_curvilinear_grid`"""
+    j = (yo - 0.1 * xo) / 0.97
+    i = xo - 0.3 * j
+    return i, j
+
+
+def test_interp_closest2d_curvilinear():
+    """Regression test for a data race in the closest2d parallel scan
+
+    On a genuinely non-separable curvilinear grid, ``closest2d`` used to
+    parallelize its row scan with ``numba.prange`` while accumulating
+    the result in shared scalars (``mindist``, ``i``, ``j``). This is a
+    classic data race that silently returned wrong (and non
+    deterministic) indices -- typically ``(0, 0)`` -- instead of the
+    actual closest grid point.
+    """
+    xxi, yyi = get_sheared_curvilinear_grid()
+    for _ in range(20):  # repeat: a race condition may not fail every time
+        i, j = interp.closest2d(xxi, yyi, 2.3, 2.6)
+        assert (i, j) == (2, 2)
+
+
+def test_interp_closest2d_ignores_nan_corners():
+    """Regression test for closest2d silently misbehaving on NaN corners
+
+    ``closest2d`` used to be decorated with ``fastmath=True``, which
+    enables LLVM's ``nnan`` flag and can break the ``dist <= mindist``
+    NaN-skip comparison it relies on to ignore invalid (e.g.
+    land-masked) grid corners -- silently returning the wrong point
+    instead of skipping the NaN ones.
+    """
+    xxi, yyi = get_sheared_curvilinear_grid(nxi=6, nyi=5)
+    # Mask a block of corners as NaN, away from the query point
+    xxi = xxi.copy()
+    yyi = yyi.copy()
+    xxi[0:2, 0:2] = np.nan
+    yyi[0:2, 0:2] = np.nan
+
+    i, j = interp.closest2d(xxi, yyi, 2.3, 2.6)
+    assert (i, j) == (2, 2)
+
+
+def test_interp_grid2relloc_curvilinear():
+    """grid2relloc on a genuinely non-separable curvilinear grid"""
+    xxi, yyi = get_sheared_curvilinear_grid()
+    xo, yo = 2.3, 2.6
+
+    p, q = interp.grid2relloc(xxi, yyi, xo, yo)
+
+    i_expected, j_expected = relloc_sheared_curvilinear_grid(xo, yo)
+    np.testing.assert_allclose([p, q], [i_expected, j_expected])
+
+
+def test_interp_grid2locs_curvilinear():
+    """grid2locs value interpolation on a genuinely curvilinear grid"""
+    nxi, nyi = 6, 5
+    xxi, yyi = get_sheared_curvilinear_grid(nxi=nxi, nyi=nyi)
+    ii, jj = np.meshgrid(np.arange(nxi, dtype="d"), np.arange(nyi, dtype="d"))
+    vi = (ii + 10.0 * jj).reshape(1, 1, 1, nyi, nxi)
+
+    xo = np.array([2.3])
+    yo = np.array([2.6])
+    zo = np.zeros(1)
+    to = np.zeros(1)
+    ti = np.zeros(1)
+    zi = np.zeros((1, 1, 1, 1, 1))
+
+    vo = interp.grid2locs(xxi, yyi, zi, ti, vi, xo, yo, zo, to)
+
+    i_expected, j_expected = relloc_sheared_curvilinear_grid(xo[0], yo[0])
+    expected = i_expected + 10.0 * j_expected
+    np.testing.assert_allclose(vo[0], [expected])
+
+
 def test_interp_isoslice():
     depth = np.linspace(-50, 0.0, 6)
     values = np.linspace(10, 20.0, 6)

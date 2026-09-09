@@ -8,7 +8,12 @@ import xarray as xr
 import pytest
 
 from xoa import interp
-from test_core_interp import get_grid2locs_coords, vfunc
+from test_core_interp import (
+    get_grid2locs_coords,
+    get_sheared_curvilinear_grid,
+    relloc_sheared_curvilinear_grid,
+    vfunc,
+)
 
 
 class TestGrid2loc:
@@ -100,6 +105,39 @@ class TestGrid2loc:
         assert vo.shape == (2,)
         assert not np.isnan(vo).all()
         np.testing.assert_allclose(vo, [1., 1.])
+
+    def test_curvilinear(self):
+        """Horizontal-only interpolation on a genuinely curvilinear grid
+
+        Regression test: ``lon``/``lat`` here both depend on the two
+        grid dimensions (a sheared grid), unlike a curvilinear-shaped
+        grid built from ``np.meshgrid`` of two independent 1D axes. It
+        used to return NaN (or crash) because of a data race in the
+        underlying ``closest2d`` nearest-point search.
+        """
+        nxi, nyi = 6, 5
+        lon2d, lat2d = get_sheared_curvilinear_grid(nxi=nxi, nyi=nyi)
+        ii, jj = np.meshgrid(np.arange(nxi, dtype="d"), np.arange(nyi, dtype="d"))
+        data = ii + 10.0 * jj
+        vi = xr.DataArray(
+            data,
+            dims=("y", "x"),
+            coords={
+                "lon": (("y", "x"), lon2d),
+                "lat": (("y", "x"), lat2d),
+            },
+        )
+        vi["lon"].attrs["standard_name"] = "longitude"
+        vi["lat"].attrs["standard_name"] = "latitude"
+
+        xo, yo = 2.3, 2.6
+        loc = xr.Dataset(coords={"lon": ("npts", [xo]), "lat": ("npts", [yo])})
+
+        vo = interp.grid2loc(vi, loc)
+
+        i_expected, j_expected = relloc_sheared_curvilinear_grid(xo, yo)
+        expected = i_expected + 10.0 * j_expected
+        np.testing.assert_allclose(vo.values, [expected])
 
 
 class TestIsoslice:
