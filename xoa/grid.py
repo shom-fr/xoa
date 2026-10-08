@@ -26,7 +26,8 @@ from . import exceptions
 from . import misc
 from . import meta
 from . import coords as xcoords
-
+from . import geo as xgeo
+from .core import grid as cgrid
 
 def apply_along_dim(
     ds,
@@ -257,8 +258,11 @@ def get_centers(da, dim):
     return apply_along_dim(da, dim, _get_centers_)
 
 
-def get_edges(da, dim, mode="edge", **kwargs):
+def get_edges(da, dim, mode="linear_extrap", **kwargs):
     """Interpolate and extrapolate a data array at grid edges along the `dim` dimension(s)
+
+    Inner edges are the middle of consecutive centers, and the outer edges are
+    obtained by extrapolating the centers by default.
 
     .. note:: Coordinates are linearly extrapolated
 
@@ -268,7 +272,8 @@ def get_edges(da, dim, mode="edge", **kwargs):
     dim: str, tuple
         Single or tuple of data-array or generic dimension names.
     mode: str
-        Extrapolation mode at grid edges
+        Extrapolation mode at grid edges, which can be ``"linear_extrap"``
+        or any mode of :func:`pad`, like ``"edge"`` to replicate the end values
     kwargs:
         Extra arguments are passed to :func:`pad`
 
@@ -615,39 +620,53 @@ def to_rect(da, tol=1e-5, errors="warn"):
     ------
     xarray.DataArray, xarray.Dataset
     """
-    # da = da.copy()
     new_coords = {}
     rename_args = {}
     da = meta.infer_coords(da)
     errors = misc.ERRORS[errors]
-    for name, coord in da.coords.items():
-        if coord.ndim != 2:
+    coords2d = {name: coord for name, coord in da.coords.items() if coord.ndim == 2}
+    for lon_name, lon in coords2d.items():
+        if not xcoords.is_lon(lon):
             continue
-        if xcoords.is_lon(coord):
-            odim = xcoords.get_ydim(coord, errors="ignore")
-        elif xcoords.is_lat(coord):
-            odim = xcoords.get_xdim(coord, errors="ignore")
-        else:
-            continue
-        dims = [odim] if odim else coord.dims
-        for odim in dims:
-            if np.allclose(coord.min(odim), coord.max(odim), atol=tol, equal_nan=True):
-                new_coords[name] = xr.DataArray(
-                    coord.isel({odim: 0}).data, dims=name, attrs=coord.attrs
-                )
-                new_coords[name].encoding.update(coord.encoding)
-                dim = coord.dims[0] if coord.dims[1] == odim else coord.dims[1]
-                rename_args[dim] = name
+        # The latitude that shares the dimensions of this longitude
+        lat_name = None
+        for name, coord in coords2d.items():
+            if xcoords.is_lat(coord) and set(coord.dims) == set(lon.dims):
+                lat_name, lat = name, coord
                 break
-        else:
+        if lat_name is None:
+            continue
+
+        # Check with the core function after ordering dimensions as (y, x)
+        ydim = xcoords.get_ydim(lon, errors="ignore")
+        xdim = xcoords.get_xdim(lon, errors="ignore")
+        if ydim is None or xdim is None:
+            ydim, xdim = lon.dims
+        grid_type = cgrid.check_grid_type(
+            {"lon": lon.transpose(ydim, xdim).values, "lat": lat.transpose(ydim, xdim).values},
+            tol=tol,
+        )
+        if grid_type == "curvilinear":
             msg = (
-                "Cannot convert curvilinear to rectangular grid since coordinate "
-                f"'{name}' is not constant along one of its dimensions"
+                "Cannot convert curvilinear to rectangular grid since coordinates "
+                f"'{lon_name}' and '{lat_name}' are not constant along one of their dimensions"
             )
             if errors == "raise":
                 raise exceptions.XoaError(msg)
             elif errors == "warn":
                 exceptions.xoa_warn(msg)
+            continue
+
+        # Axis coordinates
+        for name, coord, odim, dim in (
+            (lon_name, lon, ydim, xdim),
+            (lat_name, lat, xdim, ydim),
+        ):
+            new_coords[name] = xr.DataArray(
+                coord.isel({odim: 0}).data, dims=name, attrs=coord.attrs
+            )
+            new_coords[name].encoding.update(coord.encoding)
+            rename_args[dim] = name
     if new_coords:
         return (
             da.reset_coords(list(new_coords), drop=True)
@@ -655,3 +674,242 @@ def to_rect(da, tol=1e-5, errors="warn"):
             .assign_coords(new_coords)
         )
     return da
+
+
+def ds2grid_dict(obj, mask=None, lon_name=None, lat_name=None, time_name=None, bounds=False):
+    """Convert a data array or dataset to a horizontal grid dictionary
+
+    The dictionary is suitable for the core interpolation and regridding
+    classes :class:`xoa.core.interp.XYInterpolator` and
+    :class:`xoa.core.regrid.XYRegridder`.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D
+    mask: str, xarray.DataArray, array_like, None
+        Name of a variable or array of valid points (True)
+    lon_name, lat_name, time_name: str, None
+        Names of the longitude, latitude and time coordinates.
+        They are searched with :mod:`xoa.coords` when not provided.
+    bounds: bool
+        Compute the edges and bounds of the cells, which are large arrays and
+        that the core classes compute by themselves when they need them.
+
+    Return
+    ------
+    dict
+        With the following keys: ``lon``, ``lat``, ``shape``, ``dims``, ``sizes``,
+        ``lon_name``, ``lat_name``, ``coords``, ``type``, ``lon_edges``,
+        ``lat_edges``, ``lon_bounds``, ``lat_bounds``, and optionally ``mask`` and
+        ``time_name``. Edges and bounds are only present if ``bounds`` is True.
+    """
+
+    def _get(name, getter):
+        if name is not None:
+            return obj[name] if name in obj else obj.coords[name]
+        return getter(obj)
+
+    lon = _get(lon_name, xcoords.get_lon)
+    lat = _get(lat_name, xcoords.get_lat)
+
+    # Broadcast to ensure same shape
+    latb, lonb = xr.broadcast(lat, lon)
+
+    grid = {
+        "lon": lonb.values,
+        "lat": latb.values,
+        "shape": lonb.shape,
+        "lon_name": lon.name,
+        "lat_name": lat.name,
+        "dims": lonb.dims,
+        "sizes": lonb.sizes,
+        "coords": {lon.name: lon, lat.name: lat},
+    }
+    grid["type"] = cgrid.check_grid_type(grid)
+
+    # Time
+    time = _get(time_name, lambda o: xcoords.get_time(o, errors="ignore"))
+    if time is not None:
+        grid["time_name"] = time.name
+        grid["coords"][time.name] = time
+
+    # Bounds and edges
+    if bounds:
+        grid["lon_edges"] = cgrid.centers2edges(grid["lon"])
+        grid["lon_bounds"] = cgrid.edges2bounds(grid["lon_edges"])
+        grid["lat_edges"] = cgrid.centers2edges(grid["lat"])
+        grid["lat_bounds"] = cgrid.edges2bounds(grid["lat_edges"])
+
+    # Mask
+    if isinstance(mask, str):
+        grid["mask"] = obj[mask].values
+    elif mask is not None:
+        grid["mask"] = mask.values if hasattr(mask, "values") else mask
+
+    return grid
+
+
+def _get_lonlat_yx_(obj):
+    """Get 2D longitudes and latitudes with (y, x) dimensions"""
+    lon = xcoords.get_lon(obj)
+    lat = xcoords.get_lat(obj)
+    lat, lon = xr.broadcast(lat, lon)
+    if lon.ndim != 2:
+        raise exceptions.XoaError(
+            f"Longitudes and latitudes must be 2D, but got {lon.ndim} dimensions"
+        )
+    ydim = xcoords.get_ydim(lon, errors="ignore")
+    xdim = xcoords.get_xdim(lon, errors="ignore")
+    if ydim is None or xdim is None:
+        ydim, xdim = lon.dims
+    return lon.transpose(ydim, xdim), lat.transpose(ydim, xdim)
+
+
+def get_resolution(obj, radius=xgeo.EARTH_RADIUS):
+    """Compute the horizontal grid resolution along x and y
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D
+    radius: float
+        Radius of the sphere in meters, which defaults to the earth radius
+
+    Return
+    ------
+    xarray.DataArray
+        Distance in meters between adjacent points along x, with one point
+        less than the grid along its last dimension.
+    xarray.DataArray
+        Distance in meters between adjacent points along y, with one point
+        less than the grid along its first dimension.
+
+    See also
+    --------
+    get_median_resolution
+    xoa.core.grid.compute_resolution
+    """
+    lon, lat = _get_lonlat_yx_(obj)
+    dx, dy = cgrid.compute_resolution(lon.values, lat.values, radius=radius)
+    attrs = {"units": "m"}
+    return (
+        xr.DataArray(
+            dx, dims=lon.dims, name="dx", attrs={"long_name": "Resolution along x", **attrs}
+        ),
+        xr.DataArray(
+            dy, dims=lon.dims, name="dy", attrs={"long_name": "Resolution along y", **attrs}
+        ),
+    )
+
+
+def get_median_resolution(obj):
+    """Compute the median horizontal grid resolution in degrees
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D
+
+    Return
+    ------
+    float
+
+    See also
+    --------
+    get_resolution
+    xoa.core.grid.median_resolution_deg
+    """
+    lon, lat = _get_lonlat_yx_(obj)
+    return cgrid.median_resolution_deg(lon.values, lat.values)
+
+
+def get_edge_extents(obj, edges="all", n_cells=1):
+    """Get the geographic extent of the strips along the edges of a grid
+
+    The strips are made of the first or last cells of the grid, so that they follow
+    the grid when it is rotated or curvilinear.
+    North and east are the last indices along the y and x dimensions,
+    and south and west are the first ones.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D
+    edges: str, list(str)
+        Edge names among ``"north"``, ``"south"``, ``"east"``, ``"west"``
+        and ``"all"``
+    n_cells: int
+        Number of grid cells in each strip, counted from the edge
+
+    Return
+    ------
+    dict
+        Keys are edge names and values are extents
+        ``[xmin, xmax, ymin, ymax]``, as returned by :func:`xoa.geo.get_extent`
+
+    See also
+    --------
+    xoa.geo.get_extent
+    """
+    lon, lat = _get_lonlat_yx_(obj)
+    ydim, xdim = lon.dims
+    slices = {
+        "north": {ydim: slice(-n_cells, None)},
+        "south": {ydim: slice(None, n_cells)},
+        "east": {xdim: slice(-n_cells, None)},
+        "west": {xdim: slice(None, n_cells)},
+    }
+    if isinstance(edges, str):
+        edges = [edges]
+    names = []
+    for edge in edges:
+        for name in slices if edge == "all" else [edge]:
+            if name not in slices:
+                raise exceptions.XoaError(
+                    f"Invalid edge '{edge}'. Choose among: all, {', '.join(slices)}"
+                )
+            if name not in names:
+                names.append(name)
+    return {
+        name: xgeo.get_extent((lon.isel(slices[name]).values, lat.isel(slices[name]).values))
+        for name in names
+    }
+
+
+def get_fingerprint(obj, mask=None):
+    """Get the fingerprint of a horizontal grid
+
+    The fingerprint depends on the longitudes, latitudes and mask of the grid, whatever
+    their dimensions are. Equal grids have the same fingerprint, so it is the way
+    to recognise a grid, for instance in a weights file, where the weights
+    of a regridding or an interpolation are stored in a group that is named after
+    the fingerprints of the grids. See :mod:`xoa.weights`.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset, dict
+        Object with longitude and latitude coordinates, that may be 1D or 2D,
+        or a grid dictionary like the one of :func:`ds2grid_dict`
+    mask: str, xarray.DataArray, array_like, None
+        Valid points of the grid, which is ignored for a dictionary
+
+    Return
+    ------
+    str
+
+    Example
+    -------
+    .. code-block:: python
+
+        fingerprint = xoa.grid.get_fingerprint(ds)
+        xoa.weights.find_groups("weights.nc", fingerprint)
+
+    See also
+    --------
+    ds2grid_dict
+    xoa.misc.get_array_fingerprint
+    xoa.weights.find_groups
+    """
+    grid = obj if isinstance(obj, dict) else ds2grid_dict(obj, mask)
+    return misc.get_array_fingerprint(grid["lon"], grid["lat"], grid.get("mask"))

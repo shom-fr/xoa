@@ -11,6 +11,7 @@ locations and :func:`isoslice` for extracting iso-surfaces.
     core routines from the :mod:`xoa.core.interp` and
     :mod:`xoa.core.regrid` modules.
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,12 +26,16 @@ locations and :func:`isoslice` for extracting iso-surfaces.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # import warnings
+
 import numpy as np
 import xarray as xr
 
 from . import coords as xcoords
 from . import grid as xgrid
+from . import misc
+from . import weights
 from .core import num
+from .core.interp import XYInterpolator as CoreXYInterpolator
 
 # Backward compat
 from .core.interp import (  # noqa
@@ -264,3 +269,316 @@ def isoslice(da, values, isoval, dim, reverse=False, dask='parallelized', **kwar
     da_out.attrs.update(da.attrs)
     da_out.encoding.update(da.encoding)
     return da_out
+
+
+class xy_interp_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
+    """Supported :class:`Interpolator` methods"""
+
+    #: Bilinear interpolation (default)
+    bilinear = 1
+    #: Bilinear interpolation (default)
+    linear = 1
+    #: Bicubic interpolation
+    bicubic = 2
+    #: Bicubic interpolation
+    cubic = 2
+
+
+#: Cache of the core interpolators, which hold the weights
+_WEIGHTS_CACHE = misc.SmallCache(maxsize=8)
+
+
+def clear_weights_cache():
+    """Forget the weights that are shared by the :class:`Interpolator` of the same grids"""
+    _WEIGHTS_CACHE.clear()
+
+
+class Interpolator:
+    """Interpolate from a source grid to arbitrary destination points
+
+    The destination can be any shape: a single point, a transect, a 2D grid
+    of scattered points, etc. Unlike :class:`~xoa.regrid.Regridder`,
+    the conservative method is not available.
+
+    Parameters
+    ----------
+    ds_src_grid: xarray.Dataset, xarray.DataArray
+        Source grid with 1D or 2D longitude and latitude coordinates
+    dst_lon, dst_lat: array_like, xarray.DataArray
+        Destination coordinates, any shape, merged with :func:`xoa.coords.geo_merge`.
+        The dimension names of data arrays are preserved on the output.
+    method: str, int
+        Interpolation method among {xy_interp_methods.rst_with_links}
+    weights_file: str, None
+        Path to a netcdf file that may hold the weights of many grids, each one in a group
+        that is named after the method and a fingerprint of the grid and points.
+        The weights are loaded from it if the group exists, and saved to it otherwise,
+        after the first interpolation. See :mod:`xoa.weights`.
+    src_mask: str, xarray.DataArray, array_like, None
+        Valid points of the source grid
+    bias, tension: float
+        Kochanek-Bartels parameters for the bicubic method
+
+    Attributes
+    ----------
+    src_fingerprint: str
+        Fingerprint of the source grid, as given by :func:`xoa.grid.get_fingerprint`
+    dst_fingerprint: str
+        Fingerprint of the destination points
+    fingerprint: str
+        Fingerprint of the grid and the points
+    weights_group: str
+        Name of the group of the weights in a weights file. It is made of the method
+        and the fingerprint, and :func:`xoa.weights.find_groups` finds it from the
+        fingerprint of a grid.
+
+    Notes
+    -----
+    The weights are computed once, when needed, and shared by all the interpolators that
+    have the same source grid, the same destination points, the same method and the same
+    parameters, as long as they are among the most recently used ones.
+    :func:`clear_weights_cache` frees them.
+
+    See also
+    --------
+    xoa.core.interp.XYInterpolator
+    """
+
+    def __init__(
+        self,
+        ds_src_grid,
+        dst_lon,
+        dst_lat,
+        method="bilinear",
+        weights_file=None,
+        src_mask=None,
+        bias=0.0,
+        tension=0.0,
+    ):
+        try:
+            method = str(xy_interp_methods[method])
+        except (KeyError, ValueError):
+            raise ValueError(f"Invalid method {method!r}. Choose among: {xy_interp_methods.rst}")
+
+        self.ds_src_grid = ds_src_grid
+        src_grid = xgrid.ds2grid_dict(ds_src_grid, src_mask)
+
+        self._dst_lon_da, self._dst_lat_da = xcoords.geo_merge(dst_lon, dst_lat)
+        self._dst_dims = self._dst_lon_da.dims
+
+        # The core interpolator holds the weights, which are shared by the interpolators
+        # of the same grids and points
+        self.src_fingerprint = xgrid.get_fingerprint(src_grid)
+        self.dst_fingerprint = misc.get_array_fingerprint(
+            self._dst_lon_da.values, self._dst_lat_da.values
+        )
+        self.fingerprint = misc.combine_fingerprints(self.src_fingerprint, self.dst_fingerprint)
+        self.weights_group = weights.get_group_name("interp", method, self.fingerprint)
+        key = (method, float(bias), float(tension), src_grid["dims"], self.fingerprint)
+        self.core_interp = _WEIGHTS_CACHE.get_or_create(
+            key,
+            lambda: CoreXYInterpolator(
+                src_grid,
+                self._dst_lon_da.values,
+                self._dst_lat_da.values,
+                method,
+                bias=bias,
+                tension=tension,
+            ),
+        )
+        self.src_grid = self.core_interp.src_grid
+
+        self.weights_file = weights_file
+        if (
+            weights_file
+            and not self.core_interp.has_weights
+            and (
+                weights.has_group(weights_file, self.weights_group)
+                or weights.is_legacy(weights_file)
+            )
+        ):
+            self.load_weights(weights_file)
+
+    def compute_weights(self, skipna=False):
+        """Compute the fractional cell indices"""
+        self.core_interp.compute_weights(skipna)
+
+    def save_weights(self, weights_file):
+        """Save the weights to a group of a netcdf file
+
+        The group is named after the method and a fingerprint of the grid and points,
+        and it is added to the file, which may hold the weights of other grids.
+        Nothing is written if the group already exists.
+        """
+        ci = self.core_interp
+        w = ci.get_weights()
+        attrs = {
+            "kind": "interp",
+            "method": ci.method,
+            "fingerprint": self.fingerprint,
+            "src_fingerprint": self.src_fingerprint,
+            "dst_fingerprint": self.dst_fingerprint,
+            "n_dst": int(np.prod(ci.dst_shape)),
+            "n_src": ci.src_grid["lat"].size,
+        }
+        variables = {
+            "j_base": ("n_dst", w["j_base"]),
+            "i_base": ("n_dst", w["i_base"]),
+            "frac_a": ("n_dst", w["frac_a"]),
+            "frac_b": ("n_dst", w["frac_b"]),
+            "valid_dst_mask": ("n_dst", w["valid_dst_mask"]),
+        }
+        weights.save_group(weights_file, self.weights_group, variables, attrs)
+
+    def load_weights(self, weights_file):
+        """Load the weights of this grid and these points from a netcdf file
+
+        The group that matches the fingerprint of the grids and the method is searched.
+        A file in the legacy format, that holds the weights of a single grid without
+        fingerprint, is still read, but only the sizes of the grids can be checked.
+
+        Raises
+        ------
+        ValueError
+            When the file has no weights for this grid, these points and this method
+        """
+        ci = self.core_interp
+        n_dst = int(np.prod(ci.dst_shape))
+        n_src = ci.src_grid["lat"].size
+        ds = weights.select_group(
+            weights_file,
+            self.weights_group,
+            self.fingerprint,
+            ci.method,
+            n_dst,
+            n_src,
+            "this grid, these points",
+        )
+        ci.set_weights(
+            {
+                "j_base": ds["j_base"].values.astype(np.int64, copy=False),
+                "i_base": ds["i_base"].values.astype(np.int64, copy=False),
+                "frac_a": ds["frac_a"].values.astype(np.float64, copy=False),
+                "frac_b": ds["frac_b"].values.astype(np.float64, copy=False),
+                "valid_dst_mask": ds["valid_dst_mask"].values,
+            }
+        )
+
+    def _assign_dst_coords_(self, obj, extra=None):
+        coords = {
+            self._dst_lon_da.name: self._dst_lon_da,
+            self._dst_lat_da.name: self._dst_lat_da,
+        }
+        if extra:
+            coords.update(extra)
+        return obj.assign_coords(coords)
+
+    def interp(self, src_ds, skipna=False, na_thres=1.0):
+        """Interpolate a source dataset or data array to the destination points
+
+        Parameters
+        ----------
+        src_ds: xarray.Dataset, xarray.DataArray
+            Source data with horizontal dimensions matching the source grid
+        skipna: bool
+        na_thres: float
+
+        Return
+        ------
+        xarray.Dataset, xarray.DataArray
+            The horizontal dimensions are replaced by the destination ones.
+            Other dimensions are preserved.
+        """
+        if not self.core_interp.has_weights:
+            self.compute_weights()
+
+        output_sizes = dict(zip(self._dst_dims, self.core_interp.dst_shape))
+        result = xr.apply_ufunc(
+            lambda arr, **kw: self.core_interp.interp(np.asarray(arr), **kw),
+            src_ds,
+            input_core_dims=[list(self.src_grid["dims"])],
+            output_core_dims=[list(self._dst_dims)],
+            exclude_dims=set(self.src_grid["dims"]),
+            kwargs={"skipna": skipna, "na_thres": na_thres},
+            vectorize=False,
+            dask="allowed",
+            keep_attrs=False,
+            on_missing_core_dim="copy",
+            output_dtypes=[np.float64],
+            output_sizes=output_sizes,
+        )
+
+        if self.weights_file and not weights.has_group(self.weights_file, self.weights_group):
+            self.save_weights(self.weights_file)
+
+        return self._assign_dst_coords_(result)
+
+    def interp_with_time(self, src_ds, dst_times, skipna=False, na_thres=1.0, time_method=1):
+        """Interpolate to scattered (lon, lat, time) locations
+
+        Parameters
+        ----------
+        src_ds: xarray.Dataset, xarray.DataArray
+            Source data with a time dimension and horizontal dimensions matching
+            the source grid
+        dst_times: array_like, xarray.DataArray
+            Destination times, with the same shape as the destination coordinates
+        skipna: bool
+        na_thres: float
+        time_method: int
+            Temporal interpolation: 1 for linear
+
+        Return
+        ------
+        xarray.Dataset, xarray.DataArray
+            The time and horizontal dimensions are consumed.
+            Other dimensions and destination coordinates are preserved.
+        """
+        if not self.core_interp.has_weights:
+            self.compute_weights()
+
+        return_da = isinstance(src_ds, xr.DataArray)
+        if return_da:
+            orig_name = src_ds.name
+            da_name = orig_name or "_data"
+            src_ds = src_ds.to_dataset(name=da_name)
+
+        src_time = xcoords.get_time(src_ds)
+        src_times_f64 = num.as_float_array(src_time.values)
+        time_dim = src_time.dims[0]
+        dst_times_f64 = num.as_float_array(dst_times).ravel()
+
+        ci = self.core_interp
+        src_sdims = list(ci.src_grid["dims"])
+
+        result_vars = {}
+        for name, da in src_ds.data_vars.items():
+            if time_dim not in da.dims or not set(src_sdims).issubset(da.dims):
+                continue
+            extra_dims = [d for d in da.dims if d != time_dim and d not in src_sdims]
+            ordered = [time_dim] + extra_dims + src_sdims
+            data = np.ascontiguousarray(da.transpose(*ordered).values, dtype=np.float64)
+            result = ci.interp_with_time(
+                data,
+                src_times_f64,
+                dst_times_f64,
+                skipna=skipna,
+                na_thres=na_thres,
+                time_method=time_method,
+            )
+            result_vars[name] = xr.DataArray(
+                result, dims=extra_dims + list(self._dst_dims), attrs=da.attrs
+            )
+
+        extra = None
+        if isinstance(dst_times, xr.DataArray) and dst_times.name:
+            extra = {dst_times.name: dst_times}
+        result_ds = self._assign_dst_coords_(xr.Dataset(result_vars), extra)
+        if return_da:
+            result = result_ds[da_name]
+            result.name = orig_name
+            return result
+        return result_ds
+
+
+Interpolator.__doc__ = Interpolator.__doc__.format(**locals())

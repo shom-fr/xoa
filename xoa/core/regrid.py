@@ -23,8 +23,19 @@ import os
 import numpy as np
 import numba
 
-from .num import ravel_index, unravel_index, get_iminmax
-
+from ..exceptions import xoa_warn
+from .conserv import compute_conservative_weights
+from .grid import centers2edges, check_grid_type, edges2bounds, unwrap_grid_longitudes
+from .interp import XYInterpolator, _get_source_matrix_
+from .num import (
+    EMPTY_OFFSETS,
+    CsrMatrix,
+    coo_to_csr,
+    csr_spmm_skipna_unified,
+    get_iminmax,
+    ravel_index,
+    unravel_index,
+)
 
 NOT_CI = os.environ.get("CI", "false") == "false"
 
@@ -634,3 +645,239 @@ def cellave1d(
                     varo[ix, iyo] = np.nan
 
     return varo
+
+
+# %% Horizontal regridding
+
+
+class XYRegridder(XYInterpolator):
+    """
+    Numba-accelerated horizontal regridder for curvilinear and rectangular horizontal grids.
+
+    Inherits bilinear and bicubic interpolation from XYInterpolator.
+    Adds conservative remapping (requires destination to be a structured 2D grid).
+    """
+
+    valid_methods = ['bilinear', 'bicubic', 'conservative']
+
+    def __init__(self, src_grid, dst_grid, method='bilinear', num_threads=0, bias=0.0, tension=0.0):
+        if method not in self.valid_methods:
+            raise ValueError(
+                f"Method '{method}' not supported. Valid methods: {self.valid_methods}"
+            )
+
+        self.dst_grid = dst_grid.copy()
+        self.num_threads = num_threads
+
+        # Conservative CSR state (None for bilinear/bicubic)
+        self.weights = None
+        self._nb_indptr = None
+        self._nb_indices = None
+        self._nb_wdata = None
+
+        if method == 'conservative':
+            self.src_grid = src_grid.copy()
+            self.method = method
+            self.bias = bias
+            self.tension = tension
+            self._j_base = None
+            self._i_base = None
+            self._frac_a = None
+            self._frac_b = None
+            self._valid_dst_mask = None
+            self._dst_shape = self.dst_grid['lon'].shape
+            self._validate_conservative_grids()
+            self._prepare_grids()
+        else:
+            super().__init__(
+                src_grid, dst_grid['lon'], dst_grid['lat'], method, bias=bias, tension=tension
+            )
+
+    @property
+    def has_weights(self):
+        """True if the weights have been computed or loaded."""
+        if self.method == 'conservative':
+            return self._nb_indptr is not None
+        return super().has_weights
+
+    def _validate_conservative_grids(self):
+        for grid_name, grid in [('source', self.src_grid), ('destination', self.dst_grid)]:
+            for key in ['lon', 'lat']:
+                if key not in grid:
+                    raise ValueError(f"{grid_name} grid missing required key: '{key}'")
+
+            if not isinstance(grid['lon'], np.ndarray) or not isinstance(grid['lat'], np.ndarray):
+                raise ValueError(f"{grid_name} grid 'lon' and 'lat' must be numpy arrays")
+
+            if grid['lon'].shape != grid['lat'].shape:
+                raise ValueError(f"{grid_name} grid 'lon' and 'lat' must have the same shape")
+
+            if len(grid['lon'].shape) != 2:
+                raise ValueError(f"{grid_name} grid 'lon' and 'lat' must be 2D arrays")
+
+            ny, nx = grid['lon'].shape
+            if 'lon_bounds' not in grid or 'lat_bounds' not in grid:
+                if 'lon_edges' not in grid:
+                    grid['lon_edges'] = centers2edges(unwrap_grid_longitudes(grid['lon']))
+                    grid['lat_edges'] = centers2edges(grid['lat'])
+                grid['lon_bounds'] = edges2bounds(grid['lon_edges'])
+                grid['lat_bounds'] = edges2bounds(grid['lat_edges'])
+            elif grid['lon_bounds'].shape != (ny, nx, 4) or grid['lat_bounds'].shape != (ny, nx, 4):
+                raise ValueError(f'{grid_name} grid corner arrays must have shape ({ny}, {nx}, 4)')
+
+            if np.any(grid['lon'] < -180) or np.any(grid['lon'] > 180):
+                raise ValueError(f'{grid_name} grid longitudes must be in range [-180, 180]')
+
+            if np.any(grid['lat'] < -90) or np.any(grid['lat'] > 90):
+                raise ValueError(f'{grid_name} grid latitudes must be in range [-90, 90]')
+
+            if 'mask' in grid and grid['mask'] is not None:
+                if grid['mask'].shape != grid['lon'].shape:
+                    raise ValueError(f'{grid_name} grid mask must have same shape as coordinates')
+                if grid['mask'].dtype != bool:
+                    xoa_warn(f'Converting {grid_name} grid mask to boolean')
+                    grid['mask'] = grid['mask'].astype(bool)
+
+            if 'type' not in grid or grid['type'] is None:
+                check_grid_type(grid)
+            else:
+                if grid['type'] not in self.valid_grid_types:
+                    raise ValueError(f'Unsupported grid type {grid["type"]}')
+
+    def _prepare_grids(self):
+        for grid in [self.src_grid, self.dst_grid]:
+            for key in grid:
+                if isinstance(grid[key], np.ndarray) and key != 'mask':
+                    grid[key] = np.ascontiguousarray(grid[key], dtype=np.float64)
+
+    def compute_weights(self, skipna=False):
+        """Compute interpolation weights.
+
+        For bilinear/bicubic: computes fractional cell indices (cheap, no CSR).
+        For conservative: computes a precomputed CSR weight matrix.
+        The skipna parameter is kept for API compatibility.
+        """
+        if self.method != 'conservative':
+            super().compute_weights(skipna)
+            return None
+
+        n_dst = self.dst_grid['lat'].size
+        n_src = self.src_grid['lat'].size
+
+        kw = {}
+        if 'mask' in self.dst_grid and self.dst_grid['mask'] is not None:
+            kw['dst_mask'] = self.dst_grid['mask'].ravel()
+        row_indices, col_indices, weights_data, valid_dst = compute_conservative_weights(
+            self.src_grid['lat_bounds'].reshape(-1, 4),
+            self.src_grid['lon_bounds'].reshape(-1, 4),
+            self.dst_grid['lat_bounds'].reshape(-1, 4),
+            self.dst_grid['lon_bounds'].reshape(-1, 4),
+            **kw,
+        )
+        self.weights = coo_to_csr(row_indices, col_indices, weights_data, n_dst, n_src)
+        self._nb_indptr = self.weights.indptr
+        self._nb_indices = self.weights.indices
+        self._nb_wdata = self.weights.data
+        self._valid_dst_mask = valid_dst
+        return self.weights
+
+    def _apply_conservative(self, data, skipna, na_thres):
+        n_dst = self.dst_grid['lat'].size
+        extra = data.shape[:-2]
+        K = int(np.prod(extra)) if extra else 1
+
+        X = _get_source_matrix_(data, self.src_grid.get('mask'))  # (n_src, K)
+        out = np.empty((n_dst, K), dtype=np.float64)
+
+        csr_spmm_skipna_unified(
+            self._nb_indptr,
+            self._nb_indices,
+            self._nb_wdata,
+            self._nb_wdata,
+            EMPTY_OFFSETS,
+            X,
+            out,
+            na_thres,
+        )
+
+        dst_shape = self.dst_grid['lon'].shape
+        return out.T.reshape(extra + dst_shape)
+
+    def regrid(self, data, skipna=False, na_thres=1.0):
+        """
+        Regrid data from source to destination grid.
+
+        Parameters
+        ----------
+        data : np.ndarray, shape (..., ny_src, nx_src)
+        skipna : bool
+        na_thres : float
+
+        Returns
+        -------
+        np.ndarray, shape (..., ny_dst, nx_dst)
+        """
+        if self.method == 'conservative':
+            if self._nb_indptr is None:
+                self.compute_weights()
+            data = np.asarray(data, dtype=np.float64)
+            if data.shape[-2:] != self.src_grid['lon'].shape:
+                raise ValueError(
+                    f"Data shape {data.shape} doesn't match source grid {self.src_grid['lon'].shape}"
+                )
+            return self._apply_conservative(data, skipna, na_thres)
+        return self.interp(data, skipna, na_thres)
+
+    def save_weights(self, filename):
+        """Save computed weights to a npz file"""
+        if self.method != 'conservative':
+            super().save_weights(filename)
+            return
+
+        if self._nb_indptr is None:
+            raise ValueError('No weights computed yet')
+
+        with open(filename, "wb") as f:
+            np.savez(
+                f,
+                method=self.method,
+                src_shape=self.src_grid['lon'].shape,
+                dst_shape=self.dst_grid['lon'].shape,
+                valid_dst_mask=self._valid_dst_mask,
+                nb_indptr=self._nb_indptr,
+                nb_indices=self._nb_indices,
+                nb_wdata=self._nb_wdata,
+            )
+
+    def load_weights(self, filename):
+        """Load precomputed weights from a npz file"""
+        if self.method != 'conservative':
+            super().load_weights(filename)
+            return
+
+        with np.load(filename) as p:
+            p = {key: p[key] for key in p.files}
+
+        if self.src_grid['lon'].shape != tuple(p['src_shape']):
+            raise ValueError(
+                f"Source grid shape {self.src_grid['lon'].shape} "
+                f"doesn't match saved weights shape {tuple(p['src_shape'])}"
+            )
+        if self.dst_grid['lon'].shape != tuple(p['dst_shape']):
+            raise ValueError(
+                f"Destination grid shape {self.dst_grid['lon'].shape} "
+                f"doesn't match saved weights shape {tuple(p['dst_shape'])}"
+            )
+        if str(p['method']) != self.method:
+            xoa_warn(f"Saved method '{p['method']}' differs from '{self.method}'")
+
+        self._valid_dst_mask = p['valid_dst_mask']
+        self._nb_indptr = p.get('nb_indptr')
+        self._nb_indices = p.get('nb_indices')
+        self._nb_wdata = p.get('nb_wdata')
+        if self._nb_indptr is not None:
+            n_dst = self.dst_grid['lat'].size
+            n_src = self.src_grid['lat'].size
+            self.weights = CsrMatrix(
+                self._nb_indptr, self._nb_indices, self._nb_wdata, (n_dst, n_src)
+            )

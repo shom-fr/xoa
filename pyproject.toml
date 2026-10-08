@@ -29,7 +29,7 @@ dependencies = [
     "numba",
     "pooch",
     "scipy",
-    "xarray>=0.17"
+    "xarray>=2024.6"
 ]
 
 [project.optional-dependencies]

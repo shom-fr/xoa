@@ -17,7 +17,9 @@ Miscellaneous low level utilities
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import types
+from collections import OrderedDict
 from enum import IntEnum, EnumMeta
 
 import numpy as np
@@ -879,3 +881,92 @@ def list_xr_names(obj, data_vars=True, coords=True, dims=True):
     if dims:
         out = out.union(obj.dims)
     return out
+
+
+def get_array_fingerprint(*arrays):
+    """Get a fingerprint of the shape, type and content of arrays
+
+    Parameters
+    ----------
+    arrays: array_like, None
+        Arrays that are hashed, with ``None`` allowed.
+
+    Return
+    ------
+    str
+        A hash that is the same for arrays that have the same shape, type and values.
+        It is meant to be used as a cache key.
+    """
+    hasher = hashlib.blake2b(digest_size=16)
+    for array in arrays:
+        if array is None:
+            hasher.update(b"None")
+            continue
+        array = np.ascontiguousarray(array)
+        hasher.update(repr((array.shape, array.dtype.str)).encode())
+        hasher.update(array.reshape(-1).view(np.uint8) if array.size else b"")
+    return hasher.hexdigest()
+
+
+def combine_fingerprints(*fingerprints):
+    """Combine fingerprints, like the ones of a source and a destination grid, into one
+
+    Parameters
+    ----------
+    fingerprints: str
+        Fingerprints as returned by :func:`get_array_fingerprint`
+
+    Return
+    ------
+    str
+        A fingerprint that depends on all of them and on their order
+    """
+    return hashlib.blake2b("|".join(fingerprints).encode(), digest_size=16).hexdigest()
+
+
+class SmallCache(object):
+    """A small cache that forgets the least recently used items
+
+    Parameters
+    ----------
+    maxsize: int
+        Maximal number of items
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        from xoa.misc import SmallCache
+        cache = SmallCache(maxsize=2)
+        cache.get_or_create("a", lambda: 1)
+        cache.get_or_create("a", lambda: 2)
+        len(cache)
+        cache.clear()
+        len(cache)
+    """
+
+    def __init__(self, maxsize=4):
+        self.maxsize = maxsize
+        self._items = OrderedDict()
+
+    def get_or_create(self, key, factory):
+        """Get the item of a key, or create and store it with the ``factory`` callable"""
+        if key in self._items:
+            self._items.move_to_end(key)
+            return self._items[key]
+        value = factory()
+        self._items[key] = value
+        while len(self._items) > self.maxsize:
+            self._items.popitem(last=False)
+        return value
+
+    def clear(self):
+        """Remove all the items"""
+        self._items.clear()
+
+    def __len__(self):
+        return len(self._items)
+
+    def __contains__(self, key):
+        return key in self._items

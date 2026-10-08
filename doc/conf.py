@@ -50,6 +50,7 @@ extensions = [
     'genoptions',
     'genmetaspecs',
     'genlogos',
+    'genfigs',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput',
     'sphinx_autosummary_accessors',

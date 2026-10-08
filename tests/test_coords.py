@@ -72,3 +72,23 @@ def test_geo_stack():
 
     tempc = coords.geo_stack(ds.temp, "npts")
     xr.testing.assert_equal(tempc, dss.temp)
+
+
+def test_coords_geo_merge():
+    # Numpy: same shape
+    lon, lat = coords.geo_merge(np.arange(3.0), np.arange(3.0))
+    assert lon.dims == lat.dims == ("pts",)
+    assert (lon.name, lat.name) == ("lon", "lat")
+    # Numpy: rectangular
+    lon, lat = coords.geo_merge(np.arange(5.0), np.arange(4.0))
+    assert lon.dims == ("pts_y", "pts_x")
+    assert lon.shape == (4, 5)
+    # DataArrays with different dims
+    lon = xr.DataArray(np.arange(5.0), dims="x", name="xx")
+    lat = xr.DataArray(np.arange(4.0), dims="y", name="yy")
+    lon, lat = coords.geo_merge(lon, lat)
+    assert lon.dims == lat.dims == ("y", "x")
+    assert (lon.name, lat.name) == ("xx", "yy")
+    # Incompatible
+    with pytest.raises(xoa.XoaError):
+        coords.geo_merge(np.zeros((2, 3)), np.zeros(4))

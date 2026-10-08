@@ -92,3 +92,82 @@ class TestBearing:
         # Just verify it's in reasonable range and consistent
         assert -180 <= angle <= 180
         assert isinstance(angle, (float, np.floating))
+
+
+class TestGridHelpers:
+    """Test the grid search and cell location helpers"""
+
+    def test_diff_lon(self):
+        assert geo.diff_lon(170.0, -170.0) == 20.0
+        assert geo.diff_lon(-170.0, 170.0) == -20.0
+
+    def test_normalize_longitude(self):
+        assert geo.normalize_longitude(190.0) == -170.0
+        assert geo.normalize_longitude(-190.0) == 170.0
+
+    def test_closest_point_fast(self):
+        for n in (5, 120):
+            lons, lats = np.meshgrid(np.arange(n, dtype="d"), np.arange(n, dtype="d"))
+            assert geo.closest_point_fast(lons, lats, 2.1, 3.2) == (2, 3)
+
+    def test_relative_cell_coords(self):
+        p, q = geo.relative_cell_coords(0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.25, 0.75)
+        np.testing.assert_allclose((p, q), (0.25, 0.75))
+        assert geo.relative_cell_coords(0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0) == (
+            -1.0,
+            -1.0,
+        )
+
+
+class TestClosestPointFastOnLargeGrids:
+    """The search for large grids must find the closest node of the grid"""
+
+    @staticmethod
+    def get_grid(n):
+        x, y = np.meshgrid(np.linspace(0, 10, n), np.linspace(0, 8, n))
+        return x + 0.5 * np.sin(0.7 * y) + 0.05 * y, y + 0.4 * np.sin(0.6 * x) - 0.03 * x
+
+    @staticmethod
+    def get_exact(lon, lat, x, y):
+        dist = geo.haversine(x, y, lon, lat)
+        j, i = np.unravel_index(np.argmin(dist), dist.shape)
+        return i, j
+
+    @pytest.mark.parametrize("n", [60, 300, 600])
+    def test_same_node_as_the_full_search(self, n):
+        lon, lat = self.get_grid(n)
+        rng = np.random.default_rng(1)
+        jj, ii = rng.integers(2, n - 3, 150), rng.integers(2, n - 3, 150)
+        # Points inside the cells, which are not on the nodes
+        x = lon[jj, ii] + rng.uniform(-0.5, 0.5, 150) * (lon[jj, ii + 1] - lon[jj, ii])
+        y = lat[jj, ii] + rng.uniform(-0.5, 0.5, 150) * (lat[jj + 1, ii] - lat[jj, ii])
+        for xi, yi in zip(x, y):
+            assert geo.closest_point_fast(lon, lat, xi, yi) == self.get_exact(lon, lat, xi, yi)
+
+    def test_points_that_are_far_from_the_grid(self):
+        lon, lat = self.get_grid(200)
+        i, j = geo.closest_point_fast(lon, lat, -5.0, -5.0)
+        assert (i, j) == self.get_exact(lon, lat, -5.0, -5.0) == (0, 0)
+        i, j = geo.closest_point_fast(lon, lat, 20.0, 20.0)
+        assert (i, j) == self.get_exact(lon, lat, 20.0, 20.0)
+
+    def test_nan_nodes_are_ignored(self):
+        lon, lat = self.get_grid(200)
+        x, y = lon[100, 100], lat[100, 100]
+        lon, lat = lon.copy(), lat.copy()
+        lon[95:106, 95:106] = np.nan
+        lat[95:106, 95:106] = np.nan
+        i, j = geo.closest_point_fast(lon, lat, x, y)
+        assert np.isfinite(lon[j, i])
+        dist = geo.haversine(x, y, lon, lat)
+        jx, ix = np.unravel_index(np.nanargmin(dist), dist.shape)
+        assert (i, j) == (ix, jx)
+
+    def test_all_the_subsampled_nodes_are_nan(self):
+        lon, lat = self.get_grid(200)
+        mask = np.ones(lon.shape, bool)
+        mask[::10, ::10] = False  # the subsampled nodes (step 10) are the only valid ones... inverted
+        lon = np.where(mask, lon, np.nan)
+        lat = np.where(mask, lat, np.nan)
+        x, y = lon[51, 52], lat[51, 52]
+        assert geo.closest_point_fast(lon, lat, x, y) == (52, 51)

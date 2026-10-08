@@ -11,7 +11,8 @@ regridding operations, and handling terrain-following parametric vertical coordi
 (sigma coordinates). This guide covers three main modules:
 
 - :mod:`xoa.grid`: Grid utilities for 1D to nD grid operations on a single grid
-- :mod:`xoa.regrid`: Regridding utilities for operations between different grids
+- :mod:`xoa.regrid`: Regridding utilities for operations between different grids,
+  with the 1D regridding detailed here and the horizontal one in :ref:`indepth.horizontal`
 - :mod:`xoa.sigma`: Terrain-following parametric vertical coordinates following CF conventions
 
 .. _indepth.grids.grid:
@@ -65,6 +66,37 @@ on data array or dataset dimensions, potentially changing the size of the array.
 
     # Interpolate between grid points
     ds_mean = xgrid.apply_along_dim(ds, 'x', xgrid.get_centers)
+
+
+Horizontal resolution and edges
+-------------------------------
+
+The :func:`~xoa.grid.get_resolution` function computes the distance in meters
+between adjacent points along x and y, and :func:`~xoa.grid.get_median_resolution` gives
+a single value in degrees. The :func:`~xoa.grid.get_edge_extents` function gives the
+geographic extent of the strips along the edges of a grid, which follow it when it
+is rotated or curvilinear:
+
+.. ipython:: python
+
+    lon = xr.DataArray(
+        np.arange(0.0, 5.0), dims="lon",
+        attrs={"standard_name": "longitude", "units": "degrees_east"})
+    lat = xr.DataArray(
+        np.arange(0.0, 4.0), dims="lat",
+        attrs={"standard_name": "latitude", "units": "degrees_north"})
+    ds_ll = xr.Dataset(coords={"lon": lon, "lat": lat})
+
+    dx, dy = xgrid.get_resolution(ds_ll)
+    dx.values[0]
+    xgrid.get_median_resolution(ds_ll)
+    xgrid.get_edge_extents(ds_ll, ["north", "west"], n_cells=2)
+
+The :func:`~xoa.grid.to_rect` function converts 2D longitudes and latitudes to 1D axes
+when the grid is not curvilinear, according to :func:`xoa.core.grid.check_grid_type`.
+The :func:`xoa.plot.plot_grid` function draws the edges and centers of a grid, or its bathymetry or
+resolution, on a map (see :ref:`indepth.plot`).
+See the :ref:`sphx_glr_examples_plot_grid_tools.py` example for a complete tutorial.
 
 
 Staggered grids
@@ -144,8 +176,10 @@ Available modes include:
 Horizontal regridding
 ---------------------
 
-For 2D horizontal regridding, xoa provides the :func:`~xoa.regrid.grid2loc` function
-to interpolate from a grid to specific locations.
+The :class:`~xoa.regrid.Regridder` and :class:`~xoa.interp.Interpolator` classes regrid
+and interpolate horizontally, on regular, rectangular and curvilinear grids, with the
+``bilinear``, ``bicubic`` and ``conservative`` methods. They have their own guide,
+:ref:`indepth.horizontal`, and a :ref:`tutorial <sphx_glr_examples_plot_regrid_interp.py>`.
 
 Vertical regridding
 -------------------

@@ -231,3 +231,46 @@ class TestAccessorClassHierarchy:
     def test_xoa_dataarray_accessor_base(self):
         """Test that XoaDataArrayAccessor inherits from MetaDataArrayAccessor"""
         assert issubclass(accessors.XoaDataArrayAccessor, accessors.MetaDataArrayAccessor)
+
+
+class TestInterpRegridAccessor:
+    """Tests for the interp and regrid methods of the xoa accessors"""
+
+    def setup_method(self):
+        xoa.register_accessors(xoa=True, meta=True)
+        lon = xr.DataArray(
+            np.linspace(0, 5, 11),
+            dims="lon",
+            attrs={"standard_name": "longitude", "units": "degrees_east"},
+        )
+        lat = xr.DataArray(
+            np.linspace(0, 4, 9),
+            dims="lat",
+            attrs={"standard_name": "latitude", "units": "degrees_north"},
+        )
+        self.da = (2 * lon + lat).transpose("lat", "lon").rename("var")
+        self.da = self.da.assign_coords(lon=lon, lat=lat)
+        self.dst = xr.Dataset(
+            coords={
+                "lon": ("lon", np.linspace(1.2, 3.8, 5), lon.attrs),
+                "lat": ("lat", np.linspace(1.2, 2.8, 4), lat.attrs),
+            }
+        )
+
+    def test_interp(self):
+        dst_lon = np.array([1.0, 2.5, 3.0])
+        dst_lat = np.array([1.0, 2.0, 2.5])
+        for obj in self.da, self.da.to_dataset():
+            out = obj.xoa.interp(dst_lon, dst_lat)
+            res = out if isinstance(out, xr.DataArray) else out["var"]
+            np.testing.assert_allclose(res, 2 * dst_lon + dst_lat)
+
+    def test_regrid(self):
+        for method in "bilinear", "bicubic":
+            for obj in self.da, self.da.to_dataset():
+                out = obj.xoa.regrid(self.dst, method=method)
+                res = out if isinstance(out, xr.DataArray) else out["var"]
+                expected = 2 * self.dst.lon + self.dst.lat
+                np.testing.assert_allclose(
+                    res.transpose("lat", "lon"), expected.transpose("lat", "lon")
+                )
