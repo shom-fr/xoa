@@ -290,3 +290,63 @@ def test_auto_stride_uses_a_bounded_amount_of_memory():
     tracemalloc.stop()
     assert strides == (48, 48)  # 0.25 pixel spacing, so at least 48 cells for 12 pixels
     assert peak < 0.5 * lon.nbytes  # and not a full (ny, nx, 2) array
+
+
+class TestTaylor:
+    def test_positions(self):
+        diagram = cplot.plot_taylor([0.5, 1.0], [0.0, 1.0])
+        x, y = diagram.artists[0].get_data()
+        assert np.isclose(x[0], np.pi / 2) and np.isclose(y[0], 0.5)
+        assert not diagram.negative
+        assert np.isclose(diagram.ax.get_thetamax(), 90)
+
+    def test_negative_correlations(self):
+        diagram = cplot.plot_taylor([0.5, 1.0], [-0.5, 1.0])
+        assert diagram.negative
+        assert np.isclose(diagram.ax.get_thetamax(), 180)
+        x, _ = diagram.artists[0].get_data()
+        assert np.isclose(x[0], np.arccos(-0.5))
+        with pytest.raises(xoa.exceptions.XoaError):
+            cplot.plot_taylor([1.0], [-0.5], diagram=cplot.TaylorDiagram())
+
+    def test_default_reference_is_normalized(self):
+        assert cplot.TaylorDiagram().ref_std == 1.0
+        diagram = cplot.plot_taylor([3.0], [0.9], ref_std=2.0)
+        assert diagram.ref_std == 2.0
+        assert diagram.rmax >= 3.0
+
+    def test_labels_markers_legend(self):
+        diagram = cplot.plot_taylor(
+            [1, 1, 1], [0.9, 0.8, 0.7], labels=["a", "b", "c"], markers=["o", "s"]
+        )
+        texts = [t.get_text() for t in diagram.legend.get_texts()]
+        assert texts == ["Reference", "a", "b", "c"]
+        assert [a.get_marker() for a in diagram.artists] == ["o", "s", "o"]
+
+    def test_values_make_a_colorbar(self):
+        diagram = cplot.plot_taylor(
+            [1, 1, 1], [0.9, 0.8, 0.7], values=[1, 2, 3], markers=["o", "s"]
+        )
+        assert diagram.colorbar is not None
+        assert diagram.legend is None
+        assert len(diagram.artists) == 2
+
+    def test_errors(self):
+        with pytest.raises(xoa.exceptions.XoaError):
+            cplot.plot_taylor([1.0, 1.0], [0.5])
+        with pytest.raises(xoa.exceptions.XoaError):
+            cplot.plot_taylor([1.0], [1.5])
+        with pytest.raises(xoa.exceptions.XoaError):
+            cplot.plot_taylor([1.0], [0.5], labels=["a", "b"])
+
+    def test_tuning(self):
+        diagram = cplot.plot_taylor(
+            [1.0],
+            [0.5],
+            rmax=2,
+            rms_levels=False,
+            corr_ticks=[0, 0.5, 1],
+            ref_kwargs={"arc": False},
+        )
+        assert diagram.ax.get_ylim()[1] == 2
+        assert len(diagram.ax.get_xticks()) == 3

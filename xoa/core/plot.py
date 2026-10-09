@@ -21,6 +21,7 @@ They are used by the high level plotting functions of the :mod:`xoa.plot` module
 # limitations under the License.
 import matplotlib.collections as mcollections
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import numpy as np
 
 from .. import exceptions
@@ -464,3 +465,345 @@ def plot_sticks(ax, x, u, v, scale=None, color="steelblue", **kwargs):
     ax.axhline(0, color="0.5", linewidth=0.5)
     ax.get_yaxis().set_visible(False)
     return quiver
+
+
+# %% Taylor diagrams
+
+#: Default ticks of the correlation axis
+TAYLOR_CORR_TICKS = (0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1)
+
+
+class TaylorDiagram:
+    """A Taylor diagram on a polar axes
+
+    The angle is the arc cosine of the correlation and the radius is the standard
+    deviation. The reference is on the horizontal axis at ``ref_std``, and the distance
+    to it is the centered root mean square difference, which is shown by contours.
+    The diagram is a quarter of circle, or a half circle when there are negative
+    correlations.
+
+    Parameters
+    ----------
+    fig: None, matplotlib.figure.Figure
+        A new figure by default
+    subplot: int, matplotlib.gridspec.SubplotSpec
+        Position of the axes in the figure
+    ref_std: float
+        Standard deviation of the reference, which is 1 for normalized data
+    rmax: None, float
+        Maximal standard deviation
+    negative: bool
+        Show negative correlations
+    corr_ticks: None, array_like
+        Positive correlations where ticks are drawn. The negative ones are mirrored.
+    rms_levels: None, False, array_like
+        Levels of the contours of centered root mean square difference.
+        Automatic by default and no contours when ``False``.
+    ref_label: None, str
+        Label of the reference marker in the legend. No legend entry when None.
+    std_label, corr_label: str
+        Axis labels
+    grid_kwargs: None, dict
+        Parameters of :meth:`matplotlib.axes.Axes.grid`
+    contour_kwargs: None, dict
+        Parameters of :meth:`matplotlib.axes.Axes.contour`
+    ref_kwargs: None, dict
+        Parameters of :meth:`matplotlib.axes.Axes.plot` for the reference marker
+        and the arc of constant standard deviation.
+        Use ``arc=False`` to hide the arc.
+
+    Attributes
+    ----------
+    ax: matplotlib.projections.polar.PolarAxes
+    artists: list
+        Artists of the points that are added
+    legend: None, matplotlib.legend.Legend
+    colorbar: None, matplotlib.colorbar.Colorbar
+    """
+
+    def __init__(
+        self,
+        fig=None,
+        subplot=111,
+        ref_std=1.0,
+        rmax=None,
+        negative=False,
+        corr_ticks=None,
+        rms_levels=None,
+        ref_label="Reference",
+        std_label="Standard deviation",
+        corr_label="Correlation",
+        grid_kwargs=None,
+        contour_kwargs=None,
+        ref_kwargs=None,
+    ):
+        self.ref_std = float(ref_std)
+        self.rmax = float(rmax) if rmax is not None else 1.25 * self.ref_std
+        self.negative = bool(negative)
+        self.thetamax = np.pi if negative else 0.5 * np.pi
+        self.artists = []
+        self.legend = None
+        self.colorbar = None
+        if fig is None:
+            fig = plt.figure(figsize=(7, 5))
+        ax = self.ax = fig.add_subplot(subplot, projection="polar")
+        ax.set_thetamin(0)
+        ax.set_thetamax(np.degrees(self.thetamax))
+        ax.set_ylim(0, self.rmax)
+
+        # Correlation axis
+        ticks = np.asarray(TAYLOR_CORR_TICKS if corr_ticks is None else corr_ticks, dtype="d")
+        if negative:
+            ticks = np.unique(np.concatenate([ticks, -ticks]))
+        ax.set_xticks(np.arccos(ticks))
+        ax.set_xticklabels([f"{t + 0.0:g}" for t in ticks])
+        ax.text(
+            0.5 * self.thetamax,
+            1.2 * self.rmax,
+            corr_label,
+            rotation=np.degrees(0.5 * self.thetamax) - 90,
+            ha="center",
+            va="center",
+        )
+        ax.annotate(
+            std_label,
+            (0, 0.5 * self.rmax),
+            xytext=(0, -26),
+            textcoords="offset points",
+            ha="center",
+            va="top",
+            annotation_clip=False,
+        )
+        ax.grid(**{"linestyle": ":", "alpha": 0.6, **(grid_kwargs or {})})
+
+        # Contours of centered rms difference
+        if rms_levels is not False:
+            theta = np.linspace(0, self.thetamax, 181)
+            radius = np.linspace(0, self.rmax, 101)
+            rr, tt = np.meshgrid(radius, theta)
+            dist = np.sqrt(rr**2 + self.ref_std**2 - 2 * rr * self.ref_std * np.cos(tt))
+            if rms_levels is None:
+                rms_levels = mticker.MaxNLocator(nbins=5, prune="both").tick_values(0, dist.max())
+                rms_levels = [lev for lev in rms_levels if 0 < lev < dist.max()]
+            if len(rms_levels):
+                kw = {"colors": "0.55", "linestyles": "--", "linewidths": 0.7}
+                kw.update(contour_kwargs or {})
+                cs = ax.contour(tt, rr, dist, levels=rms_levels, **kw)
+                ax.clabel(cs, fmt="%g", fontsize=7)
+
+        # Reference
+        kw = {
+            "marker": "*",
+            "color": "k",
+            "markersize": 12,
+            "linestyle": "none",
+            "zorder": 5,
+            "clip_on": False,
+        }
+        kw.update(ref_kwargs or {})
+        arc = kw.pop("arc", True)
+        if arc:
+            ax.plot(
+                np.linspace(0, self.thetamax, 181),
+                np.full(181, self.ref_std),
+                color=kw["color"],
+                linestyle="--",
+                linewidth=0.8,
+            )
+        ax.plot([0], [self.ref_std], label=ref_label or "_nolegend_", **kw)
+
+    def add_points(
+        self,
+        std,
+        corr,
+        labels=None,
+        values=None,
+        markers="o",
+        colors=None,
+        cmap=None,
+        vmin=None,
+        vmax=None,
+        legend=True,
+        colorbar=True,
+        legend_kwargs=None,
+        cbar_kwargs=None,
+        **kwargs,
+    ):
+        """Add points to the diagram
+
+        Parameters
+        ----------
+        std, corr: array_like(n)
+            Standard deviations and correlations
+        labels: None, list(str)
+            One label per point, added to the legend. With ``values``, they are
+            written next to the points.
+        values: None, array_like(n)
+            Values that color the markers, with a colorbar.
+        markers: str, list(str)
+            One marker for all the points, or one per point, cycled if shorter.
+        colors: None, color, list
+            Colors when no values are given. They follow the color cycle by default.
+        cmap, vmin, vmax:
+            Colormap and its limits when values are given
+        legend, colorbar: bool
+            Add a legend (when there are labels and no values) or a colorbar
+            (when there are values)
+        legend_kwargs, cbar_kwargs: None, dict
+            Parameters of :meth:`matplotlib.axes.Axes.legend` and
+            :func:`add_colorbar`
+        kwargs:
+            Extra parameters are passed to :meth:`matplotlib.axes.Axes.plot` or
+            :meth:`matplotlib.axes.Axes.scatter`
+
+        Return
+        ------
+        list
+            The artists, one per point without values and one per marker with values
+        """
+        std = np.atleast_1d(np.asarray(std, dtype="d"))
+        corr = np.atleast_1d(np.asarray(corr, dtype="d"))
+        n = len(std)
+        if corr.shape != std.shape:
+            raise exceptions.XoaError("std and corr must have the same shape")
+        if (corr < -1).any() or (corr > 1).any():
+            raise exceptions.XoaError("Correlations must be between -1 and 1")
+        if (corr < 0).any() and not self.negative:
+            raise exceptions.XoaError(
+                "There are negative correlations: create the diagram with negative=True"
+            )
+        if labels is not None and len(labels) != n:
+            raise exceptions.XoaError("labels must have one item per point")
+        if values is not None:
+            values = np.asarray(values, dtype="d")
+            if values.shape != std.shape:
+                raise exceptions.XoaError("values must have one item per point")
+        markers = [markers] if isinstance(markers, str) else list(markers)
+        markers = [markers[i % len(markers)] for i in range(n)]
+        theta = np.arccos(corr)
+        ax = self.ax
+        artists = []
+
+        if values is None:
+            if colors is None:
+                cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+                colors = [cycle[i % len(cycle)] for i in range(n)]
+            elif isinstance(colors, str) or not np.iterable(colors):
+                colors = [colors] * n
+            kw = {"linestyle": "none", "markersize": 8, "zorder": 6, "clip_on": False}
+            kw.update(kwargs)
+            for i in range(n):
+                label = labels[i] if labels is not None else "_nolegend_"
+                artists.extend(
+                    ax.plot(
+                        [theta[i]],
+                        [std[i]],
+                        marker=markers[i],
+                        color=colors[i % len(colors)],
+                        label=label,
+                        **kw,
+                    )
+                )
+        else:
+            vmin = np.nanmin(values) if vmin is None else vmin
+            vmax = np.nanmax(values) if vmax is None else vmax
+            kw = {"s": 60, "zorder": 6, "edgecolors": "k", "linewidths": 0.5}
+            kw.update(kwargs)
+            for marker in dict.fromkeys(markers):
+                idx = [i for i in range(n) if markers[i] == marker]
+                artists.append(
+                    ax.scatter(
+                        theta[idx],
+                        std[idx],
+                        c=values[idx],
+                        marker=marker,
+                        cmap=cmap,
+                        vmin=vmin,
+                        vmax=vmax,
+                        **kw,
+                    )
+                )
+            if labels is not None:
+                for i in range(n):
+                    ax.annotate(
+                        labels[i],
+                        (theta[i], std[i]),
+                        xytext=(5, 5),
+                        textcoords="offset points",
+                        fontsize=8,
+                    )
+            if colorbar:
+                self.colorbar = add_colorbar(artists[0], ax, **(cbar_kwargs or {}))
+        self.artists.extend(artists)
+
+        if legend and values is None and labels is not None:
+            self.add_legend(**(legend_kwargs or {}))
+        return artists
+
+    def add_legend(self, **kwargs):
+        """Add the legend outside of the diagram, on its right"""
+        kw = {"loc": "upper left", "bbox_to_anchor": (1.04, 1.0), "frameon": False}
+        kw.update(kwargs)
+        self.legend = self.ax.legend(**kw)
+        return self.legend
+
+
+def plot_taylor(std, corr, ref_std=1.0, diagram=None, **kwargs):
+    """Plot points in a Taylor diagram
+
+    Parameters
+    ----------
+    std, corr: array_like(n)
+        Standard deviations and correlations of ``n`` points.
+        The correlations may be negative.
+    ref_std: float
+        Standard deviation of the reference. The default of 1 is for data
+        that are already normalized by the reference.
+    diagram: None, TaylorDiagram
+        Existing diagram. It is created when not provided, with a half circle
+        if there are negative correlations and a maximal standard deviation
+        that fits the points.
+    kwargs:
+        Parameters of :class:`TaylorDiagram` when the diagram is created, or
+        of :meth:`TaylorDiagram.add_points`, like ``labels``, ``values``
+        and ``markers``.
+
+    Return
+    ------
+    TaylorDiagram
+        The diagram, which holds the axes in its ``ax`` attribute and the plotted artists
+
+    Example
+    -------
+    .. code-block:: python
+
+        plot_taylor([0.9, 1.2, 0.7], [0.95, 0.8, -0.3], labels=["a", "b", "c"],
+                    markers=["o", "s", "^"])
+    """
+    std = np.atleast_1d(np.asarray(std, dtype="d"))
+    corr = np.atleast_1d(np.asarray(corr, dtype="d"))
+    if diagram is None:
+        init = {key: kwargs.pop(key) for key in list(kwargs) if key in TAYLOR_INIT_KEYS}
+        init.setdefault("negative", bool((corr < 0).any()))
+        if "rmax" not in init:
+            init["rmax"] = 1.25 * max(np.nanmax(std), ref_std)
+        diagram = TaylorDiagram(ref_std=ref_std, **init)
+    diagram.add_points(std, corr, **kwargs)
+    return diagram
+
+
+#: Parameters of :class:`TaylorDiagram` that can be passed to :func:`plot_taylor`
+TAYLOR_INIT_KEYS = (
+    "fig",
+    "subplot",
+    "rmax",
+    "negative",
+    "corr_ticks",
+    "rms_levels",
+    "ref_label",
+    "std_label",
+    "corr_label",
+    "grid_kwargs",
+    "contour_kwargs",
+    "ref_kwargs",
+)

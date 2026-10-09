@@ -24,6 +24,7 @@ Package API
     xoa.core.regrid
     xoa.core.sigma
     xoa.core.spline
+    xoa.core.stats
     xoa.core.time
     xoa.data_samples
     xoa.dyn

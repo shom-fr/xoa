@@ -23,6 +23,7 @@ New features
 - Add the :func:`xoa.regrid.regridxy` and :func:`xoa.interp.interpxy` functions, that build and apply a regridder or an interpolator in a single call, or reuse one that is passed to them. The ``interp`` and ``regrid`` methods of the ``xoa`` accessors are now based on them.
 - Add the ``interp`` and ``regrid`` methods to the ``xoa`` accessors.
 - Add the :mod:`xoa.core.grid`, :mod:`xoa.core.poly` and :mod:`xoa.core.time` modules.
+- Add Taylor diagrams with :func:`xoa.plot.plot_taylor` for xarray objects, and the :class:`xoa.core.plot.TaylorDiagram` class and :func:`xoa.core.plot.plot_taylor` function for numpy arrays, with labels, markers, colored values and negative correlations. The numba statistics are computed by :func:`xoa.core.stats.taylor_stats` of the new :mod:`xoa.core.stats` module.
 
 Breaking changes
 ----------------

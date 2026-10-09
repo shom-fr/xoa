@@ -535,3 +535,60 @@ class TestAddColorbar:
         np.testing.assert_allclose(
             via_field.ax.get_position().height, via_helper.ax.get_position().height
         )
+
+
+class TestPlotTaylor:
+    @staticmethod
+    def get_data(nm=3):
+        rng = np.random.default_rng(1)
+        ref = xr.DataArray(rng.normal(size=(40, 5)), dims=("time", "x"))
+        mod = xr.concat(
+            [0.7 * ref + 0.3 * rng.normal(size=ref.shape), -ref, 2 * ref][:nm],
+            dim=xr.DataArray(list("abc")[:nm], dims="model", name="model"),
+        )
+        return mod, ref
+
+    def test_single_point_by_default(self):
+        mod, ref = self.get_data()
+        diagram = xplot.plot_taylor(mod.isel(model=0), ref)
+        assert len(diagram.artists) == 1
+        assert diagram.legend is None
+        assert np.isclose(diagram.ref_std, float(ref.std()))
+
+    def test_points_from_remaining_dims(self):
+        mod, ref = self.get_data()
+        diagram = xplot.plot_taylor(mod, ref, dim=("time", "x"), normalize=True)
+        assert diagram.negative
+        assert len(diagram.artists) == 3
+        assert [t.get_text() for t in diagram.legend.get_texts()][1:] == ["a", "b", "c"]
+        theta, std = diagram.artists[2].get_data()
+        assert np.isclose(std[0], 2.0) and np.isclose(theta[0], 0)
+        assert diagram.ref_std == 1.0
+
+    def test_not_normalized_needs_common_reference(self):
+        mod, ref = self.get_data()
+        ref = ref * xr.DataArray([1.0, 2.0], dims="model", coords={"model": ["a", "b"]})
+        mod = mod.sel(model=["a", "b"])
+        with pytest.raises(xoa.exceptions.XoaError):
+            xplot.plot_taylor(mod, ref, dim=("time", "x"))
+        xplot.plot_taylor(mod, ref, dim=("time", "x"), normalize=True)
+
+    def test_dataset_and_values(self):
+        mod, ref = self.get_data(2)
+        ds = xr.Dataset({"u": mod.isel(model=0, drop=True), "v": mod.isel(model=1, drop=True)})
+        diagram = xplot.plot_taylor(
+            ds, ref, values=xr.DataArray([1.0, 2.0], attrs={"long_name": "Depth"})
+        )
+        assert len(diagram.artists) == 1
+        assert diagram.colorbar.ax.get_ylabel() == "Depth"
+
+    def test_dataset_reference_by_name(self):
+        mod, ref = self.get_data(1)
+        ds = xr.Dataset({"obs": ref, "mod": mod.isel(model=0, drop=True)})
+        diagram = xplot.plot_taylor(ds, "obs")
+        assert len(diagram.artists) == 1
+
+    def test_errors(self):
+        mod, ref = self.get_data()
+        with pytest.raises(xoa.exceptions.XoaError):
+            xplot.plot_taylor(mod, ref, dim="lon")
