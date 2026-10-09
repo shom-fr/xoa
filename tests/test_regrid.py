@@ -1368,3 +1368,75 @@ class TestRegridderTimeAndAgreement:
         np.testing.assert_array_equal(out.values, core)
         points = interp.Interpolator(series, dlon.ravel(), dlat.ravel(), method).interp(series)
         np.testing.assert_allclose(points.values.reshape(dlon.shape), core, atol=1e-12)
+
+
+class TestRegridxy:
+    """Functional interface of the horizontal regridding"""
+
+    def setup_method(self):
+        from test_interp import make_da, make_dst_ds, make_src_ds
+
+        interp.clear_weights_cache()
+        self.make_src_ds = make_src_ds
+        self.make_da = make_da
+        self.src = make_src_ds()
+        self.da = make_da(self.src).assign_coords(lon=self.src.lon, lat=self.src.lat)
+        self.dst = make_dst_ds()
+
+    @pytest.mark.parametrize("method", ["bilinear", "bicubic", "conservative"])
+    def test_same_as_the_class(self, method):
+        ref = Regridder(self.da, self.dst, method).regrid(self.da)
+        out = regrid.regridxy(self.da, self.dst, method)
+        xr.testing.assert_identical(out, ref)
+
+    def test_dataset(self):
+        ds = self.src.assign(field=self.da.reset_coords(drop=True))
+        out = regrid.regridxy(ds, self.dst)
+        np.testing.assert_allclose(out["field"].values, self.dst["lon"] + self.dst["lat"])
+
+    def test_accessor(self):
+        xoa.register_accessors(xoa=True)
+        out = self.da.xoa.regrid(self.dst)
+        xr.testing.assert_identical(out, regrid.regridxy(self.da, self.dst))
+
+    def test_given_regridder_is_used(self, monkeypatch):
+        regridder = Regridder(self.da, self.dst, "bilinear")
+        calls = []
+        monkeypatch.setattr(Regridder, "__init__", lambda *a, **k: calls.append(1))
+        out = regrid.regridxy(self.da, regridder=regridder)
+        assert not calls
+        np.testing.assert_allclose(out.values, self.dst["lon"] + self.dst["lat"])
+
+    def test_given_regridder_must_match_the_grid(self):
+        regridder = Regridder(self.da, self.dst, "bilinear")
+        with pytest.raises(ValueError, match="does not match"):
+            other = self.make_src_ds(nx=20)
+            regrid.regridxy(
+                self.make_da(other).assign_coords(lon=other.lon, lat=other.lat),
+                regridder=regridder,
+            )
+
+    def test_weights_are_shared_between_calls(self):
+        regrid.regridxy(self.da, self.dst)
+        a = Regridder(self.da, self.dst, "bilinear")
+        b = Regridder(self.da, self.dst, "bilinear")
+        assert a.core_regridder is b.core_regridder
+        assert a.core_regridder.has_weights
+
+    def test_weights_file_is_written_once_then_read(self, tmp_path):
+        from xoa import weights
+
+        path = str(tmp_path / "weights.nc")
+        ref = regrid.regridxy(self.da, self.dst, weights_file=path)
+        groups = weights.list_groups(path)
+        assert len(groups) == 1
+        regrid.regridxy(self.da, self.dst, weights_file=path)
+        assert weights.list_groups(path) == groups
+        interp.clear_weights_cache()
+        regridder = Regridder(self.da, self.dst, "bilinear", weights_file=path)
+        assert regridder.core_regridder.has_weights
+        np.testing.assert_allclose(regrid.regridxy(self.da, regridder=regridder), ref)
+
+    def test_invalid_method(self):
+        with pytest.raises(ValueError):
+            regrid.regridxy(self.da, self.dst, method="nope")

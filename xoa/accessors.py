@@ -4,6 +4,7 @@
 xarray and pandas xoa accessors
 
 """
+
 # Copyright 2020-2026 Shom
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -676,12 +677,14 @@ class _InterpRegridMixin_:
 
         See also
         --------
+        xoa.interp.interpxy
         xoa.interp.Interpolator
         """
-        from .interp import Interpolator
+        from .interp import interpxy
 
-        interpolator = Interpolator(self._obj, dst_lon, dst_lat, method=method, **kwargs)
-        return interpolator.interp(self._obj, skipna=skipna, na_thres=na_thres)
+        return interpxy(
+            self._obj, dst_lon, dst_lat, method, skipna=skipna, na_thres=na_thres, **kwargs
+        )
 
     def regrid(
         self,
@@ -716,12 +719,14 @@ class _InterpRegridMixin_:
 
         See also
         --------
+        xoa.regrid.regridxy
         xoa.regrid.Regridder
         """
-        from .regrid import Regridder
+        from .regrid import regridxy
 
-        regridder = Regridder(self._obj, dst, method, **kwargs)
-        return regridder.regrid(self._obj, dst_time=dst_time, skipna=skipna, na_thres=na_thres)
+        return regridxy(
+            self._obj, dst, method, dst_time=dst_time, skipna=skipna, na_thres=na_thres, **kwargs
+        )
 
 
 class XoaDataArrayAccessor(_InterpRegridMixin_, MetaDataArrayAccessor):

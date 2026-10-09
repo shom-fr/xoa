@@ -39,7 +39,8 @@ Which tool for which job?
     * - :class:`xoa.interp.Interpolator`
       - Any points: a point, a transect, scattered positions or a grid
       - ``bilinear``, ``bicubic``
-    * - ``da.xoa.regrid``, ``da.xoa.interp``
+    * - :func:`xoa.regrid.regridxy`, :func:`xoa.interp.interpxy`,
+        ``da.xoa.regrid``, ``da.xoa.interp``
       - Same as above, in a single call
       - Same as above
     * - :func:`xoa.regrid.regrid1d`
@@ -54,6 +55,11 @@ The first three share the same numba kernels, which are available for plain nump
 The classes of :mod:`xoa.regrid` and :mod:`xoa.interp` add the xarray layer: they find the
 coordinates with :mod:`xoa.meta`, apply the kernels to all the variables of a dataset and
 restore the dimensions, coordinates and attributes.
+
+Each of these classes has a function that builds it and applies it in a single call, which is
+convenient for a one-off operation. In a loop over variables or time steps, create the object
+once and pass it with the ``regridder`` or ``interpolator`` argument of the functions: this
+skips the fingerprinting of the grids, the only cost left when the weights are already shared.
 
 Interpolation or regridding?
 ============================

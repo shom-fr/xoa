@@ -20,6 +20,7 @@ New features
 - Add the :func:`xoa.plot.add_colorbar` and :func:`xoa.core.plot.add_colorbar` functions that add shrunk colorbars, labelled from the data array, which are used by all the colorbars of :mod:`xoa.plot`.
 - Add the :mod:`xoa.core.plot` module with the low level plotting routines that work on numpy arrays and axes, like :func:`xoa.core.plot.plot_mesh`, :func:`xoa.core.plot.plot_depth_section` and :func:`xoa.core.plot.plot_sticks`, which are used by the high level functions of :mod:`xoa.plot`.
 - :mod:`xoa.plot` imports cartopy lazily, only when a map is drawn.
+- Add the :func:`xoa.regrid.regridxy` and :func:`xoa.interp.interpxy` functions, that build and apply a regridder or an interpolator in a single call, or reuse one that is passed to them. The ``interp`` and ``regrid`` methods of the ``xoa`` accessors are now based on them.
 - Add the ``interp`` and ``regrid`` methods to the ``xoa`` accessors.
 - Add the :mod:`xoa.core.grid`, :mod:`xoa.core.poly` and :mod:`xoa.core.time` modules.
 

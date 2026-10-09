@@ -694,3 +694,73 @@ class Regridder:
 
 
 Regridder.__doc__ = Regridder.__doc__.format(**locals())
+
+
+def regridxy(
+    da,
+    dst=None,
+    method="bilinear",
+    dst_time=None,
+    skipna=False,
+    na_thres=1.0,
+    regridder=None,
+    **kwargs,
+):
+    """Regrid horizontally, and optionally in time, to a destination grid
+
+    This is the functional counterpart of :func:`regrid1d` for the horizontal
+    dimensions. It is a shortcut to :class:`Regridder`.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+        Source data with longitude and latitude coordinates
+    dst: xarray.DataArray, xarray.Dataset, None
+        Destination grid with longitude and latitude coordinates.
+        It is not needed when a ``regridder`` is given.
+    method: str, int
+        Regridding method, see :class:`xy_regrid_methods`
+    dst_time: array_like, xarray.DataArray, None
+        Target times
+    skipna: bool
+        Skip NaN values
+    na_thres: float
+        Threshold for NaN handling
+    regridder: Regridder, None
+        Existing regridder to use, to avoid initializing it again in a loop.
+        Its source grid must be the one of ``da``. ``dst``, ``method`` and ``kwargs``
+        are then ignored, but ``src_mask`` must be provided again if it was used to create it.
+    kwargs:
+        Extra parameters are passed to :class:`Regridder`, like ``weights_file``,
+        ``src_mask``, ``dst_mask``, ``bias`` or ``tension``.
+        When ``weights_file`` is provided, the weights are loaded from it if they
+        are in, and saved to it otherwise.
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+
+    Notes
+    -----
+    The weights are shared by the calls that use the same grids, method and parameters,
+    but the grids must be fingerprinted at each call. Create a :class:`Regridder` once
+    and pass it as ``regridder`` when regridding many variables or time steps.
+
+    See also
+    --------
+    Regridder
+    xoa.interp.interpxy
+    """
+    if regridder is None:
+        if dst is None:
+            raise ValueError("A destination grid or a regridder is needed")
+        regridder = Regridder(da, dst, method, **kwargs)
+    else:
+        src_grid = xgrid.ds2grid_dict(da, kwargs.get("src_mask"))
+        fingerprint = xgrid.get_fingerprint(src_grid)
+        if fingerprint != regridder.src_fingerprint:
+            raise ValueError(
+                "The source grid of the data does not match the one of the regridder: "
+                f"{fingerprint} instead of {regridder.src_fingerprint}."
+            )
+    return regridder.regrid(da, dst_time=dst_time, skipna=skipna, na_thres=na_thres)

@@ -582,3 +582,72 @@ class Interpolator:
 
 
 Interpolator.__doc__ = Interpolator.__doc__.format(**locals())
+
+
+def interpxy(
+    da,
+    dst_lon=None,
+    dst_lat=None,
+    method="bilinear",
+    skipna=False,
+    na_thres=1.0,
+    interpolator=None,
+    **kwargs,
+):
+    """Interpolate horizontally to arbitrary destination points
+
+    It is a shortcut to :class:`Interpolator`.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+        Source data with longitude and latitude coordinates
+    dst_lon, dst_lat: array_like, xarray.DataArray, None
+        Destination coordinates, any shape. See :func:`xoa.coords.geo_merge`.
+        They are not needed when an ``interpolator`` is given.
+    method: str, int
+        Interpolation method, see :class:`xy_interp_methods`
+    skipna: bool
+        Skip NaN values
+    na_thres: float
+        Threshold for NaN handling
+    interpolator: Interpolator, None
+        Existing interpolator to use, to avoid initializing it again in a loop.
+        Its source grid must be the one of ``da``. ``dst_lon``, ``dst_lat``,
+        ``method`` and ``kwargs`` are then ignored, but ``src_mask`` must be provided again
+        if it was used to create it.
+    kwargs:
+        Extra parameters are passed to :class:`Interpolator`, like ``weights_file``,
+        ``src_mask``, ``bias`` or ``tension``.
+        When ``weights_file`` is provided, the weights are loaded from it if they
+        are in, and saved to it otherwise.
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+
+    Notes
+    -----
+    The weights are shared by the calls that use the same grid, points, method and
+    parameters, but the grids must be fingerprinted at each call. Create an
+    :class:`Interpolator` once and pass it as ``interpolator`` when interpolating
+    many variables or time steps.
+
+    See also
+    --------
+    Interpolator
+    xoa.regrid.regridxy
+    """
+    if interpolator is None:
+        if dst_lon is None or dst_lat is None:
+            raise ValueError("Destination points or an interpolator are needed")
+        interpolator = Interpolator(da, dst_lon, dst_lat, method=method, **kwargs)
+    else:
+        src_grid = xgrid.ds2grid_dict(da, kwargs.get("src_mask"))
+        fingerprint = xgrid.get_fingerprint(src_grid)
+        if fingerprint != interpolator.src_fingerprint:
+            raise ValueError(
+                "The source grid of the data does not match the one of the interpolator: "
+                f"{fingerprint} instead of {interpolator.src_fingerprint}."
+            )
+    return interpolator.interp(da, skipna=skipna, na_thres=na_thres)

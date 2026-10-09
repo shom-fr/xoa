@@ -693,3 +693,72 @@ class TestInterpolatorTime:
         out = interp.Interpolator(series, [1.0] * 4, [1.0] * 4).interp_with_time(series, times)
         np.testing.assert_allclose(out.values[1:3], [2.0 - 1.0, 2.0 - 1.0 + 20.0], atol=1e-9)
         assert np.isnan(out.values[[0, 3]]).all()
+
+
+class TestInterpxy:
+    """Functional interface of the horizontal interpolation"""
+
+    def setup_method(self):
+        interp.clear_weights_cache()
+        self.src = make_src_ds()
+        self.da = make_da(self.src).assign_coords(lon=self.src.lon, lat=self.src.lat)
+        self.dst = make_dst_ds()
+        self.args = (self.dst["lon"], self.dst["lat"])
+
+    def test_same_as_the_class(self):
+        ref = Interpolator(self.da, *self.args, method="bilinear").interp(self.da)
+        out = interp.interpxy(self.da, *self.args)
+        xr.testing.assert_identical(out, ref)
+
+    def test_dataset(self):
+        ds = self.src.assign(field=self.da.reset_coords(drop=True))
+        out = interp.interpxy(ds, *self.args)
+        assert "field" in out
+        np.testing.assert_allclose(out["field"].values, self.dst["lon"] + self.dst["lat"])
+
+    def test_accessor(self):
+        xoa.register_accessors(xoa=True)
+        out = self.da.xoa.interp(*self.args)
+        xr.testing.assert_identical(out, interp.interpxy(self.da, *self.args))
+
+    def test_given_interpolator_is_used(self, monkeypatch):
+        interpolator = Interpolator(self.da, *self.args)
+        calls = []
+        monkeypatch.setattr(Interpolator, "__init__", lambda *a, **k: calls.append(1))
+        out = interp.interpxy(self.da, interpolator=interpolator)
+        assert not calls
+        np.testing.assert_allclose(out.values, self.dst["lon"] + self.dst["lat"])
+
+    def test_given_interpolator_must_match_the_grid(self):
+        interpolator = Interpolator(self.da, *self.args)
+        other = make_src_ds(nx=20)
+        with pytest.raises(ValueError, match="does not match"):
+            interp.interpxy(
+                make_da(other).assign_coords(lon=other.lon, lat=other.lat),
+                interpolator=interpolator,
+            )
+
+    def test_weights_are_shared_between_calls(self):
+        interp.interpxy(self.da, *self.args)
+        a = Interpolator(self.da, *self.args)
+        b = Interpolator(self.da, *self.args)
+        assert a.core_interp is b.core_interp
+        assert a.core_interp.has_weights
+
+    def test_weights_file_is_written_once_then_read(self, tmp_path):
+        from xoa import weights
+
+        path = str(tmp_path / "weights.nc")
+        ref = interp.interpxy(self.da, *self.args, weights_file=path)
+        groups = weights.list_groups(path)
+        assert len(groups) == 1
+        interp.interpxy(self.da, *self.args, weights_file=path)
+        assert weights.list_groups(path) == groups
+        interp.clear_weights_cache()
+        interpolator = Interpolator(self.da, *self.args, weights_file=path)
+        assert interpolator.core_interp.has_weights
+        np.testing.assert_allclose(interp.interpxy(self.da, interpolator=interpolator), ref)
+
+    def test_invalid_method(self):
+        with pytest.raises(ValueError):
+            interp.interpxy(self.da, *self.args, method="nope")
