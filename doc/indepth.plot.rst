@@ -57,6 +57,9 @@ Two layers
     * - :func:`~xoa.plot.plot_stick`
       - :func:`~xoa.core.plot.plot_sticks`
       - A current time series as sticks
+    * - :func:`~xoa.plot.plot_taylor`
+      - :func:`~xoa.core.plot.plot_taylor`
+      - A Taylor diagram of arrays against a reference
     * - :func:`~xoa.plot.add_colorbar`
       - :func:`~xoa.core.plot.add_colorbar`
       - A shrunk and labelled colorbar
@@ -260,6 +263,42 @@ Sticks
 line, are oriented along the current and are as long as its speed. This is a compact way to
 show the rotation of tidal currents. Pass ``u`` and ``v``, or a dataset that holds them,
 and use ``scale`` to change the lengths (the smaller, the longer).
+
+Taylor diagrams
+===============
+
+:func:`~xoa.plot.plot_taylor` summarizes how well arrays match a reference: the angle is the
+correlation, the radius is the standard deviation and the distance to the reference
+point is the centered root mean square difference (dashed contours). The ``ref`` argument
+is mandatory.
+
+- ``dim`` lists the dimensions where the statistics are computed. By default, all of them, which
+  gives a single point per variable. The other dimensions create the points, labelled
+  with their coordinates, and each variable of a dataset adds its own points.
+- ``normalize=True`` divides the standard deviations by the one of the reference, which is
+  then at 1. It is needed when the points do not share the same reference.
+- ``labels`` are listed in the legend. With ``values``, the markers are colored instead and
+  a colorbar is added, and the labels are written next to the points.
+- ``markers`` is one marker, or one per point (cycled).
+- The diagram is a quarter of circle, and a half circle if some correlations are negative.
+
+The tuning parameters are the ones of :class:`~xoa.core.plot.TaylorDiagram`: ``rmax``,
+``rms_levels``, ``corr_ticks``, ``grid_kwargs``, ``contour_kwargs`` and ``ref_kwargs``.
+The returned diagram can receive more points with
+:meth:`~xoa.core.plot.TaylorDiagram.add_points`, using the ``diagram`` argument.
+
+.. code-block:: python
+
+    plot_taylor(ds.sst_models, ds.sst_obs, dim=("time", "lat", "lon"), markers=["o", "s", "^"])
+
+Without a reference array, already normalized statistics are drawn with the low level
+:func:`~xoa.core.plot.plot_taylor`, whose ``ref_std`` is 1 by default:
+
+.. code-block:: python
+
+    cplot.plot_taylor([0.9, 1.2, 0.7], [0.95, 0.8, -0.3], labels=["a", "b", "c"])
+
+The statistics themselves come from :func:`xoa.core.stats.taylor_stats`.
 
 Low level routines
 ==================

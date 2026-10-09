@@ -6,6 +6,7 @@ Filters are adapted from https://matplotlib.org/stable/gallery/misc/demo_agg_fil
 and http://vacumm.github.io/vacumm/library/misc.core_plot.html
 
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,6 +38,7 @@ from . import coords as xcoords
 from . import dyn
 from .core import grid as cgrid
 from .core import plot as cplot
+from .core import stats as cstats
 from .core.plot import (  # noqa
     add_land,
     create_base_map,
@@ -1228,6 +1230,138 @@ def plot_stick(u, v=None, ax=None, scale=None, color="steelblue", **kwargs):
     if xlabel:
         ax.set_xlabel(xlabel)
     return quiver
+
+
+def _taylor_points_(da, ref, dim):
+    """Statistics of the points of a single data array, and their labels"""
+    da, ref = xr.broadcast(da, ref)
+    dims = list(da.dims) if dim is None else ([dim] if isinstance(dim, str) else list(dim))
+    for d in dims:
+        if d not in da.dims:
+            raise exceptions.XoaError(f"Invalid dimension: {d}. Valid dimensions: {da.dims}")
+    pdims = [d for d in da.dims if d not in dims]
+    da = da.transpose(*pdims, *dims)
+    ref = ref.transpose(*pdims, *dims)
+    npoints = int(np.prod([da.sizes[d] for d in pdims])) if pdims else 1
+    out = cstats.taylor_stats(da.values.reshape(npoints, -1), ref.values.reshape(npoints, -1))
+    if pdims:
+        index = da.stack(point=pdims).get_index("point")
+        labels = [
+            ", ".join(map(str, item if isinstance(item, tuple) else (item,))) for item in index
+        ]
+    else:
+        labels = [None]
+    return out, labels
+
+
+def plot_taylor(
+    obj, ref, dim=None, normalize=False, labels=None, values=None, diagram=None, **kwargs
+):
+    """Plot a Taylor diagram of arrays against a reference
+
+    The standard deviation, the correlation with the reference and the centered root mean
+    square difference are computed over the dimensions ``dim``, and the other dimensions
+    create the points of the diagram. The samples that are missing in the array or in the
+    reference are ignored. Correlations may be negative.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Array to evaluate. With a dataset, each variable gives at least one point.
+    ref: xarray.DataArray, xarray.Dataset, str
+        Reference, which is broadcast against the array. With a dataset, it can be a variable
+        name, or a dataset whose variables have the names of the variables of ``obj``.
+    dim: None, str, list(str)
+        Dimensions where the statistics are computed, which are all the dimensions by default,
+        giving a single point per variable. Dimensions that are not listed create points.
+    normalize: bool
+        Divide the standard deviations by the one of the reference, which is thus at 1.
+        It is required when the reference has different standard deviations for the points.
+    labels: None, list(str)
+        Labels of the points, that are shown in the legend. They are
+        made from the variable names and the coordinates of the point dimensions by default.
+    values: None, array_like, xarray.DataArray
+        One value per point, with the same order, that colors the markers
+        instead of the legend, with a colorbar labelled with :func:`get_label`.
+    diagram: None, xoa.core.plot.TaylorDiagram
+        Existing diagram
+    kwargs:
+        Extra parameters, like ``markers``, ``colors``, ``rmax``, ``rms_levels`` or ``cmap``,
+        are passed to :func:`xoa.core.plot.plot_taylor`.
+
+    Return
+    ------
+    xoa.core.plot.TaylorDiagram
+
+    Example
+    -------
+    .. code-block:: python
+
+        # One point per model, statistics over time and space
+        plot_taylor(ds.sst_models, ds.sst_obs, dim=("time", "lat", "lon"), markers=["o", "s"])
+        # One point per variable of a dataset
+        plot_taylor(ds_models, ref=ds_obs, normalize=True)
+
+    See also
+    --------
+    xoa.core.plot.TaylorDiagram
+    xoa.core.stats.taylor_stats
+    """
+    if isinstance(obj, xr.Dataset):
+        items = []
+        for name, da in obj.data_vars.items():
+            if isinstance(ref, str):
+                rda = obj[ref]
+                if name == ref:
+                    continue
+            elif isinstance(ref, xr.Dataset):
+                if name not in ref:
+                    continue
+                rda = ref[name]
+            else:
+                rda = ref
+            items.append((name, da, rda))
+        if not items:
+            raise exceptions.XoaError("No variable to compare with the reference")
+    else:
+        items = [(None, obj, ref)]
+    stats = []
+    pts = []
+    for name, da, rda in items:
+        out, plabels = _taylor_points_(da, rda, dim)
+        stats.append(out)
+        for label in plabels:
+            pts.append(", ".join(str(x) for x in (name, label) if x is not None) or None)
+    std, std_ref, corr, _ = (np.concatenate([out[i] for out in stats]) for i in range(4))
+
+    if normalize:
+        std = std / std_ref
+        ref_std = 1.0
+    else:
+        ref_std = float(np.nanmean(std_ref))
+        if not np.allclose(std_ref, ref_std, equal_nan=True):
+            raise exceptions.XoaError(
+                "The reference has different standard deviations: use normalize=True"
+            )
+
+    if labels is None and len(pts) > 1:
+        labels = pts
+    if diagram is None:
+        first = items[0][1]
+        units = first.attrs.get("units")
+        if normalize:
+            kwargs.setdefault("std_label", "Normalized standard deviation")
+        elif units:
+            kwargs.setdefault("std_label", f"Standard deviation [{units}]")
+    if values is not None:
+        if isinstance(values, xr.DataArray):
+            cbar_kwargs = dict(kwargs.get("cbar_kwargs") or {})
+            cbar_kwargs.setdefault("label", get_label(values))
+            kwargs["cbar_kwargs"] = cbar_kwargs
+        values = np.ravel(values)
+    return cplot.plot_taylor(
+        std, corr, ref_std=ref_std, diagram=diagram, labels=labels, values=values, **kwargs
+    )
 
 
 # %% Filters
