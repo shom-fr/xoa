@@ -35,6 +35,10 @@ how to use the low level routines. The tutorials show them at work, with figures
     from xoa.core import plot as cplot
     xoa.register_accessors()
 
+The main ``xoa`` accessors give access to the high level functions through the ``plot``
+subaccessor, with the array or dataset as the first argument:
+``da.xoa.plot.field()``, ``grid()``, ``section()``, ``stick()`` and ``taylor(ref)``.
+
 Two layers
 ==========
 
@@ -165,14 +169,30 @@ one dictionary per layer, with the parameters of :meth:`matplotlib.axes.Axes.con
 ``field`` key that is a data array, which may be on another grid, or a generic name that is
 searched in the dataset given by ``ds``:
 
-.. code-block:: python
+.. ipython:: python
 
-    plot_field(
-        ds.temp.isel(time=0),
-        overlay_contours=[
-            dict(field="mask", levels=[0.5]),
-            dict(field="bathy", levels=[200, 1000], colors="0.4", linestyles="--"),
-        ],
+    import cmocean
+    from xoa.core.grid import create_rotated_grid
+    rgrid = create_rotated_grid(41, 31, -4.0, 47.5, 20.0, 4.0, 3.0)
+    lon2d, lat2d = rgrid["lon"], rgrid["lat"]
+    depth = 100 + 1500 * (lon2d - lon2d.min()) / np.ptp(lon2d)
+    ds = xr.Dataset(
+        {
+            "temp": (("y", "x"), 12 + 3 * np.sin(lon2d) * np.cos(lat2d),
+                     {"standard_name": "sea_water_temperature", "units": "degC"}),
+            "h": (("y", "x"), depth, {"standard_name": "model_sea_floor_depth_below_geoid"}),
+        },
+        coords={
+            "lon": (("y", "x"), lon2d, {"standard_name": "longitude"}),
+            "lat": (("y", "x"), lat2d, {"standard_name": "latitude"}),
+        },
+    )
+
+    @savefig indepth.plot.overlay.png width=5in
+    xplot.plot_field(
+        ds.temp,
+        cmap=cmocean.cm.thermal,
+        overlay_contours=[dict(field="bathy", levels=[200, 1000], colors="0.4", linestyles="--")],
         ds=ds,
     )
 
@@ -188,12 +208,20 @@ and labelled with :func:`~xoa.plot.get_label`, so that they do not dwarf the map
 - For several panels, skip the colorbars and add a single shared one with
   :func:`~xoa.plot.add_colorbar`, which takes the axes and the array that gives the label:
 
-.. code-block:: python
+.. ipython:: python
 
-    fig, axes = plt.subplots(1, 3, subplot_kw={"projection": ccrs.Mercator()})
+    import cartopy.crs as ccrs
+    fields = [ds.temp + d for d in (-2, 0, 2)]
+
+    @savefig indepth.plot.colorbar.png width=6in
+    fig, axes = plt.subplots(
+        1, 3, figsize=(11, 3.6), subplot_kw={"projection": ccrs.Mercator()},
+        constrained_layout=True,
+    )
     for ax, da in zip(axes, fields):
-        mappable = plot_field(da, ax=ax, add_colorbar=False, vmin=0, vmax=20)
-    add_colorbar(mappable, axes, da=fields[0])
+        mappable = xplot.plot_field(da, ax=ax, add_colorbar=False, vmin=8, vmax=18,
+                                  cmap=cmocean.cm.thermal)
+    xplot.add_colorbar(mappable, axes, da=fields[0])
 
 The adaptive grid stride
 ========================
@@ -229,6 +257,13 @@ coordinates are pixels, the rule is easy to follow:
     cplot.get_strides("auto", lon, lat, ax, min_spacing=5)
     cplot.get_strides((2, 4), lon, lat)
 
+The same grid is drawn with :func:`~xoa.plot.plot_grid`, with a stride that suits the figure:
+
+.. ipython:: python
+
+    @savefig indepth.plot.grid.png width=4in
+    xplot.plot_grid(ds.temp, stride="auto", cmap=cmocean.cm.thermal)
+
 Other options of :func:`~xoa.plot.plot_grid`:
 
 - ``kind``: ``"mesh"`` (edges and centers, the default), ``"bathy"`` (the bathymetry found in a
@@ -255,6 +290,25 @@ The ``x`` parameter selects the horizontal axis: ``None`` picks longitude or lat
 the one with the largest extent, ``"lon"`` and ``"lat"`` force one, ``"distance"`` is the
 distance in km along the section, and any array that broadcasts to the horizontal
 dimension is accepted.
+
+.. ipython:: python
+
+    depths = xr.DataArray(
+        np.linspace(0, 200, 30), dims="z", attrs={"standard_name": "ocean_depth", "positive": "down", "units": "m"}
+    )
+    lons1d = xr.DataArray(
+        np.linspace(-6, -2, 20), dims="x", attrs={"standard_name": "longitude", "units": "degrees_east"}
+    )
+    sec = xr.DataArray(
+        20 - depths.values[:, None] / 20 * (1 + 0.5 * np.sin(lons1d.values[None])),
+        dims=("z", "x"),
+        coords={"depth": depths, "lon": lons1d},
+        attrs={"standard_name": "sea_water_temperature", "units": "degC"},
+    )
+
+    @savefig indepth.plot.section.png width=5in
+    fig, ax = plt.subplots(figsize=(7, 3.5), constrained_layout=True)
+    xplot.plot_section(sec, ax=ax, cmap=cmocean.cm.thermal)
 
 Sticks
 ======
@@ -287,15 +341,24 @@ The tuning parameters are the ones of :class:`~xoa.core.plot.TaylorDiagram`: ``r
 The returned diagram can receive more points with
 :meth:`~xoa.core.plot.TaylorDiagram.add_points`, using the ``diagram`` argument.
 
-.. code-block:: python
+.. ipython:: python
 
-    plot_taylor(ds.sst_models, ds.sst_obs, dim=("time", "lat", "lon"), markers=["o", "s", "^"])
+    rng = np.random.default_rng(0)
+    obs = xr.DataArray(rng.normal(size=200), dims="time", name="obs")
+    models = xr.Dataset({
+        name: obs * a + rng.normal(scale=b, size=200)
+        for name, a, b in [("m1", 1.0, 0.3), ("m2", 0.7, 0.6), ("m3", 1.3, 0.9)]
+    })
+
+    @savefig indepth.plot.taylor.png width=4in
+    xplot.plot_taylor(models, obs, normalize=True, markers=["o", "s", "^"])
 
 Without a reference array, already normalized statistics are drawn with the low level
 :func:`~xoa.core.plot.plot_taylor`, whose ``ref_std`` is 1 by default:
 
-.. code-block:: python
+.. ipython:: python
 
+    @savefig indepth.plot.taylor_low.png width=4in
     cplot.plot_taylor([0.9, 1.2, 0.7], [0.95, 0.8, -0.3], labels=["a", "b", "c"])
 
 The statistics themselves come from :func:`xoa.core.stats.taylor_stats`.

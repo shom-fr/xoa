@@ -729,7 +729,56 @@ class _InterpRegridMixin_:
         )
 
 
-class XoaDataArrayAccessor(_InterpRegridMixin_, MetaDataArrayAccessor):
+class XoaPlotAccessor(object):
+    """Plotting methods of the main xoa accessors, that call the :mod:`xoa.plot` functions
+
+    The accessed array or dataset is passed as the first argument.
+    """
+
+    def __init__(self, obj):
+        self._obj = obj
+
+    def field(self, *args, **kwargs):
+        """Plot a field on a map, see :func:`xoa.plot.plot_field`"""
+        from .plot import plot_field
+
+        return plot_field(self._obj, *args, **kwargs)
+
+    def grid(self, *args, **kwargs):
+        """Plot a grid, see :func:`xoa.plot.plot_grid`"""
+        from .plot import plot_grid
+
+        return plot_grid(self._obj, *args, **kwargs)
+
+    def section(self, *args, **kwargs):
+        """Plot a vertical section, see :func:`xoa.plot.plot_section`"""
+        from .plot import plot_section
+
+        return plot_section(self._obj, *args, **kwargs)
+
+    def stick(self, *args, **kwargs):
+        """Plot sticks of currents, see :func:`xoa.plot.plot_stick`"""
+        from .plot import plot_stick
+
+        return plot_stick(self._obj, *args, **kwargs)
+
+    def taylor(self, ref, *args, **kwargs):
+        """Plot a Taylor diagram against a reference, see :func:`xoa.plot.plot_taylor`"""
+        from .plot import plot_taylor
+
+        return plot_taylor(self._obj, ref, *args, **kwargs)
+
+
+class _PlotMixin_:
+    """Provide the ``plot`` subaccessor"""
+
+    @property
+    def plot(self):
+        """The :class:`XoaPlotAccessor` subaccessor"""
+        return XoaPlotAccessor(self._obj)
+
+
+class XoaDataArrayAccessor(_PlotMixin_, _InterpRegridMixin_, MetaDataArrayAccessor):
     """Main xoa accessor registered on :class:`xarray.DataArray`"""
 
     @property
@@ -756,7 +805,7 @@ class XoaDataArrayAccessor(_InterpRegridMixin_, MetaDataArrayAccessor):
         return self.meta
 
 
-class XoaDatasetAccessor(_InterpRegridMixin_, MetaDatasetAccessor):
+class XoaDatasetAccessor(_PlotMixin_, _InterpRegridMixin_, MetaDatasetAccessor):
     """Main xoa accessor registered on :class:`xarray.Dataset`"""
 
     @property

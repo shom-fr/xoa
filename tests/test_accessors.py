@@ -274,3 +274,33 @@ class TestInterpRegridAccessor:
                 np.testing.assert_allclose(
                     res.transpose("lat", "lon"), expected.transpose("lat", "lon")
                 )
+
+
+class TestPlotAccessor:
+    def setup_method(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        xoa.register_accessors()
+        lon = xr.DataArray(
+            np.linspace(0, 3, 4), dims="lon", attrs={"standard_name": "longitude"}, name="lon"
+        )
+        lat = xr.DataArray(
+            np.linspace(0, 2, 3), dims="lat", attrs={"standard_name": "latitude"}, name="lat"
+        )
+        self.da = xr.DataArray(
+            np.random.default_rng(0).normal(size=(3, 4)),
+            dims=("lat", "lon"),
+            coords={"lon": lon, "lat": lat},
+            name="var",
+        )
+
+    def test_plot_methods(self):
+        import matplotlib.pyplot as plt
+
+        for obj in self.da, self.da.to_dataset():
+            assert isinstance(obj.xoa.plot, accessors.XoaPlotAccessor)
+        assert self.da.xoa.plot.field() is not None
+        assert self.da.xoa.plot.grid() is not None
+        assert self.da.xoa.plot.taylor(self.da) is not None
+        plt.close("all")
