@@ -27,7 +27,7 @@ from .core import geo as _geo
 
 
 #: Earth radius in meters
-EARTH_RADIUS = 6371e3
+EARTH_RADIUS = _geo.EARTH_RADIUS
 
 
 def haversine(lon0, lat0, lon1, lat1, radius=EARTH_RADIUS):

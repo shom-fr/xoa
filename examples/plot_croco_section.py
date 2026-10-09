@@ -23,6 +23,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import cmocean  # noqa
 import xoa
+from xoa.plot import plot_section
 from xoa.regrid import regrid1d
 from xoa.thermdyn import mixed_layer_depth
 import xoa.meta as xmeta
@@ -125,14 +126,19 @@ mldz = -mixed_layer_depth(temp, deltatemp=deltatemp)
 # -----
 
 # %%
-# Plot the full section.
+# Plot the full section with :func:`xoa.plot.plot_section`, that finds the depths and
+# labels the axes from the meta-data.
 
 fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10, 4))
-kw = dict(levels=np.arange(0, 23))
-temp.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[0], **kw)
-temp.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[0], **kw)
-tempz.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[1], **kw)
-tempz.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[1], **kw)
+kw = dict(levels=np.arange(0, 23), x="lat")
+plot_section(temp, ax=axs[0], method="contourf", cmap="cmo.thermal", **kw)
+plot_section(
+    temp, ax=axs[0], method="contour", colors="k", linewidths=0.3, add_colorbar=False, **kw
+)
+plot_section(tempz, ax=axs[1], method="contourf", cmap="cmo.thermal", **kw)
+plot_section(
+    tempz, ax=axs[1], method="contour", colors="k", linewidths=0.3, add_colorbar=False, **kw
+)
 axs[0].set_title("Original")
 axs[1].set_title("Interpolated")
 
@@ -140,12 +146,15 @@ axs[1].set_title("Interpolated")
 # Plot a zoom near the surface and add the mixed layer depth isoline.
 
 fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10, 3))
-kw = dict(levels=np.arange(0, 23))
-temp.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[0], **kw)
-temp.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[0], **kw)
+plot_section(temp, ax=axs[0], method="contourf", cmap="cmo.thermal", **kw)
+plot_section(
+    temp, ax=axs[0], method="contour", colors="k", linewidths=0.3, add_colorbar=False, **kw
+)
 mld.plot.line(x=lat_name, color="k", linewidth=2, linestyle="--", ax=axs[0])
-tempz.plot.contourf(lat_name, "depth", cmap="cmo.thermal", ax=axs[1], **kw)
-tempz.plot.contour(lat_name, "depth", colors='k', linewidths=0.3, ax=axs[1], **kw)
+plot_section(tempz, ax=axs[1], method="contourf", cmap="cmo.thermal", **kw)
+plot_section(
+    tempz, ax=axs[1], method="contour", colors="k", linewidths=0.3, add_colorbar=False, **kw
+)
 mldz.plot.line(x=lat_name, color="k", linewidth=2, linestyle="--", ax=axs[1])
 axs[0].set_ylim(-300, 0)
 axs[0].set_title("Original")

@@ -46,6 +46,8 @@ Methods
     DataArray.xoa.get
     DataArray.xoa.get_coord
     DataArray.xoa.get_depth
+    DataArray.xoa.interp
+    DataArray.xoa.regrid
 
 
 Dataset
@@ -83,6 +85,8 @@ Methods
     Dataset.xoa.get
     Dataset.xoa.get_coord
     Dataset.xoa.get_depth
+    Dataset.xoa.interp
+    Dataset.xoa.regrid
     Dataset.decode_sigma.decode
     Dataset.decode_sigma.get_sigma_terms
 

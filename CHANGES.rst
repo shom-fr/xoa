@@ -4,8 +4,50 @@ What's new
 Unreleased
 ==========
 
+New features
+------------
+- Add the :class:`xoa.core.interp.XYInterpolator` and :class:`xoa.core.regrid.XYRegridder` numba classes for horizontal bilinear, bicubic and conservative interpolation and regridding, with their kernels in the new :mod:`xoa.core.spline` and :mod:`xoa.core.conserv` modules.
+- Add the :class:`xoa.interp.Interpolator` and :class:`xoa.regrid.Regridder` xarray classes for horizontal (and temporal) interpolation and regridding, with the :func:`xoa.coords.geo_merge` and :func:`xoa.grid.ds2grid_dict` helpers.
+- The methods of :class:`xoa.interp.Interpolator` and :class:`xoa.regrid.Regridder` are listed in the :class:`xoa.interp.xy_interp_methods` and :class:`xoa.regrid.xy_regrid_methods` enums, that accept aliases like ``"linear"``.
+- :func:`xoa.regrid.regrid1d` and :func:`xoa.regrid.extrap1d` now accept datasets: only variables that have the working dimension are processed.
+- Add the :func:`xoa.grid.get_resolution`, :func:`xoa.grid.get_median_resolution` and :func:`xoa.grid.get_edge_extents` functions, and their numpy counterparts :func:`xoa.core.grid.compute_resolution` and :func:`xoa.core.grid.median_resolution_deg`.
+- Add the plotting helpers :func:`xoa.plot.plot_field`, :func:`xoa.plot.plot_grid`, :func:`xoa.plot.plot_section`, :func:`xoa.plot.plot_stick`, :func:`xoa.plot.get_label`, :func:`xoa.plot.create_base_map`, :func:`xoa.plot.setup_map_axes` and :func:`xoa.plot.add_land`. Their inputs are found with :mod:`xoa.meta`.
+- The weights of :class:`xoa.interp.Interpolator` and :class:`xoa.regrid.Regridder` are computed only once for the same grids, points and parameters: they are shared between the objects, and thus between the calls of the ``xoa`` accessors on the variables of a dataset. The :func:`xoa.interp.clear_weights_cache` and :func:`xoa.regrid.clear_weights_cache` functions free them.
+- The weights files of :class:`xoa.interp.Interpolator` and :class:`xoa.regrid.Regridder` are now netcdf files with one group per grid and method, named after a fingerprint of the grids, so that a single file serves all your grids, the weights are found automatically and cannot be loaded for other grids. A group is added to the file when it is not found. Files in the previous format are still read, with a warning, but the grids cannot be checked. See the new :mod:`xoa.weights` module.
+- The fingerprint of a grid is available with :func:`xoa.grid.get_fingerprint`, and from the ``src_fingerprint``, ``dst_fingerprint``, ``fingerprint`` and ``weights_group`` attributes of :class:`xoa.regrid.Regridder` and :class:`xoa.interp.Interpolator`. The :func:`xoa.weights.find_groups` and :func:`xoa.weights.describe_groups` functions find and describe the weights of a grid in a weights file.
+- Add the in-depth guides :ref:`indepth.horizontal` and :ref:`indepth.plot`.
+- Add the :func:`xoa.misc.get_array_fingerprint` and :func:`xoa.misc.combine_fingerprints` functions and the :class:`xoa.misc.SmallCache` class.
+- Add the :func:`xoa.plot.add_colorbar` and :func:`xoa.core.plot.add_colorbar` functions that add shrunk colorbars, labelled from the data array, which are used by all the colorbars of :mod:`xoa.plot`.
+- Add the :mod:`xoa.core.plot` module with the low level plotting routines that work on numpy arrays and axes, like :func:`xoa.core.plot.plot_mesh`, :func:`xoa.core.plot.plot_depth_section` and :func:`xoa.core.plot.plot_sticks`, which are used by the high level functions of :mod:`xoa.plot`.
+- :mod:`xoa.plot` imports cartopy lazily, only when a map is drawn.
+- Add the :func:`xoa.regrid.regridxy` and :func:`xoa.interp.interpxy` functions, that build and apply a regridder or an interpolator in a single call, or reuse one that is passed to them. The ``interp`` and ``regrid`` methods of the ``xoa`` accessors are now based on them.
+- Add the ``interp`` and ``regrid`` methods to the ``xoa`` accessors.
+- Add the :mod:`xoa.core.grid`, :mod:`xoa.core.poly` and :mod:`xoa.core.time` modules.
+
+Breaking changes
+----------------
+- :func:`xoa.grid.get_edges` now extrapolates the outer edges linearly by default (``mode="linear_extrap"``) instead of replicating the end values. Pass ``mode="edge"`` to recover the previous behaviour. This also changes the edges inferred by the ``cellave`` method of :func:`xoa.regrid.regrid1d`.
+- The minimal version of xarray is now 2024.6, which provides the ``on_missing_core_dim`` argument of :func:`xarray.apply_ufunc` used to interpolate and regrid datasets.
+- :func:`xoa.grid.to_rect` now relies on :func:`xoa.core.grid.check_grid_type` and converts a longitude and the latitude that shares its dimensions together, only if the grid is not curvilinear.
+
+Deprecations
+------------
+- :func:`xoa.core.interp.grid2rellocs` is deprecated, use :func:`xoa.core.spline.compute_frac_indices` or :class:`xoa.core.interp.XYInterpolator` instead.
+- :func:`xoa.core.interp.cell2relloc` is deprecated, use :func:`xoa.core.geo.relative_cell_coords` instead (vertices 2 and 4 are swapped).
+- :func:`xoa.core.interp.closest2d` is deprecated, use :func:`xoa.core.geo.closest_point_fast` instead.
+
 Bug fixes
 ---------
+- Fix the conservative weights of the cells that cross the dateline or that are on the other side of it, which were missing. Longitudes of the cells are made continuous before computing their overlaps, with :func:`xoa.core.poly.unwrap_longitudes` and :func:`xoa.core.grid.unwrap_grid_longitudes`.
+- Fix the points that are on the first and last lines of a regular source grid, that were NaN on the last one and extrapolated up to one cell before the first one, with the bilinear and bicubic methods. Cells are now closed and what is outside is NaN on all sides.
+- Fix the bicubic method that returned NaN for the points that are exactly on the second and last but one lines of a rectangular grid, whereas they are valid on a regular grid.
+- Fix the interpolation on rectangular grids, which have an irregular spacing, whose latitudes decrease along their dimension, that gave NaN everywhere, and a longitude search that wrongly found points that are on the opposite side of the globe of a cell that crosses the dateline.
+- Fix the interpolation on curvilinear grids that cross the dateline, that gave NaN or wrong values near it.
+- Fix the search of the closest node of large curvilinear grids, that missed the cell of some points of the inside of the grid (0.1% on a 400 x 400 grid): the closest node of a subsampled grid is now refined by walking downhill instead of searching a window of fixed size, and invalid nodes trigger a full search.
+- Fix the conservative weights that were silently truncated to ten links per source cell, so that regridding to a much finer grid gave wrong values, and make their computation much faster with an index of the source cells, instead of testing all the pairs of cells.
+- :func:`xoa.core.grid.check_grid_type` no longer warns for a grid with a single row or column.
+- :meth:`xoa.interp.Interpolator.interp_with_time` no longer renames an unnamed data array.
+- :func:`xoa.plot.plot_ts` only adds a colorbar automatically when the scatter colors are a data array, and not a numpy array, and its colorbar is now shrunk and labelled like the others. Its axis labels are built with :func:`xoa.plot.get_label`.
 - Fix a data race in :func:`xoa.core.interp.closest2d` (parallel scan writing to shared accumulators) that made :func:`xoa.interp.grid2loc` silently return wrong results, or crash, on genuinely curvilinear (non-separable) grids.
 - Remove ``fastmath=True`` from :func:`xoa.core.interp.closest2d`, :func:`xoa.core.interp.cell2relloc` and :func:`xoa.core.interp.grid2relloc`: it could break the NaN-skip comparisons these functions rely on to ignore invalid/land-masked grid points, silently returning a wrong result.
 

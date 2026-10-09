@@ -1167,3 +1167,101 @@ def geo_stack(
     # Keep trace
     obj.encoding["geo_stack"] = (stack_dim, lon.name, lat.name)
     return obj
+
+
+def geo_merge(lon, lat, stack_dim="pts"):
+    """Merge lon/lat coordinates into data arrays with coherent dimensions
+
+    Four cases are handled:
+
+    - **DataArray, same dims**: already a point cloud or an aligned nD array.
+      Dimension and variable names are preserved.
+    - **DataArray, different dims**: rectangular (``lon(x)`` + ``lat(y)``) or
+      partially shared grid. Both arrays are broadcast to the union of
+      dimensions with latitude-only dimensions first (y before x).
+    - **Numpy, same shape**: point cloud or nD grid, with auto-generated dimension
+      names (``stack_dim``, ``stack_dim_y``/``stack_dim_x``, ...).
+    - **Numpy 1D, different sizes**: rectangular grid converted with
+      :func:`numpy.meshgrid` to shape ``(ny, nx)``.
+
+    Parameters
+    ----------
+    lon, lat: array_like, xarray.DataArray
+        Longitude and latitude arrays, any shape.
+        Names of data arrays are preserved, and others are named ``"lon"``
+        and ``"lat"``.
+    stack_dim: str
+        Base name used when auto-generating dimension names.
+
+    Return
+    ------
+    xarray.DataArray
+        Longitudes with coherent dimensions.
+    xarray.DataArray
+        Latitudes with the same dimensions.
+
+    See also
+    --------
+    geo_stack
+    """
+    lon_is_da = isinstance(lon, xr.DataArray)
+    lat_is_da = isinstance(lat, xr.DataArray)
+    lon_name = (lon.name if lon_is_da and lon.name else None) or "lon"
+    lat_name = (lat.name if lat_is_da and lat.name else None) or "lat"
+
+    if lon_is_da or lat_is_da:
+        if not lon_is_da:
+            lon = xr.DataArray(
+                np.asarray(lon, dtype=np.float64), dims=[f"{stack_dim}_x"], name=lon_name
+            )
+        if not lat_is_da:
+            lat = xr.DataArray(
+                np.asarray(lat, dtype=np.float64), dims=[f"{stack_dim}_y"], name=lat_name
+            )
+        if lon.dims == lat.dims:
+            return (
+                lon.astype(np.float64, copy=False).rename(lon_name),
+                lat.astype(np.float64, copy=False).rename(lat_name),
+            )
+
+        # Different dims: broadcast with lat-only dims first
+        lat_only = [d for d in lat.dims if d not in lon.dims]
+        lon_only = [d for d in lon.dims if d not in lat.dims]
+        shared = [d for d in lat.dims if d in lon.dims]
+        dims = tuple(lat_only + shared + lon_only)
+        lon_bc, lat_bc = xr.broadcast(lon, lat)
+        return (
+            lon_bc.transpose(*dims).astype(np.float64, copy=False).rename(lon_name),
+            lat_bc.transpose(*dims).astype(np.float64, copy=False).rename(lat_name),
+        )
+
+    lon_np = np.asarray(lon, dtype=np.float64)
+    lat_np = np.asarray(lat, dtype=np.float64)
+
+    if lon_np.shape == lat_np.shape:
+        lon_np = lon_np.reshape(1) if lon_np.ndim == 0 else lon_np
+        lat_np = lat_np.reshape(1) if lat_np.ndim == 0 else lat_np
+        if lon_np.ndim == 1:
+            dims = (stack_dim,)
+        elif lon_np.ndim == 2:
+            dims = (f"{stack_dim}_y", f"{stack_dim}_x")
+        else:
+            dims = tuple(f"{stack_dim}_{i}" for i in range(lon_np.ndim))
+        return (
+            xr.DataArray(lon_np, dims=dims, name=lon_name),
+            xr.DataArray(lat_np, dims=dims, name=lat_name),
+        )
+
+    if lon_np.ndim == 1 and lat_np.ndim == 1:
+        lon_np, lat_np = np.meshgrid(lon_np, lat_np)  # (ny, nx)
+        dims = (f"{stack_dim}_y", f"{stack_dim}_x")
+        return (
+            xr.DataArray(lon_np, dims=dims, name=lon_name),
+            xr.DataArray(lat_np, dims=dims, name=lat_name),
+        )
+
+    raise exceptions.XoaError(
+        f"lon shape {np.shape(lon)} and lat shape {np.shape(lat)} are incompatible: "
+        "only 1D arrays of different sizes are accepted as a rectangular grid; "
+        "otherwise both arrays must have the same shape."
+    )

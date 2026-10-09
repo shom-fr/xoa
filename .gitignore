@@ -144,3 +144,5 @@ my/
 
 build_artifacts
 # conda smithy ci-skeleton end
+doc/_static/interp-vs-regrid.png
+doc/_static/method-stencils.png

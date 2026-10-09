@@ -28,8 +28,6 @@ import matplotlib.artist as martist
 import matplotlib.text as mtext
 import matplotlib.patheffects as mpatheffects
 import xarray as xr
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
 
 from . import exceptions
 from . import misc as xmisc
@@ -37,6 +35,16 @@ from . import geo as xgeo
 from . import meta as xmeta
 from . import coords as xcoords
 from . import dyn
+from .core import grid as cgrid
+from .core import plot as cplot
+from .core.plot import (  # noqa
+    add_land,
+    create_base_map,
+    setup_map_axes,
+    _import_cartopy_,
+)
+
+_AX_SETUP_KEYS = cplot.AX_SETUP_KEYS
 
 # %% Special functions
 
@@ -241,7 +249,8 @@ def plot_ts(
     colorbar: bool, None
         Should we add the colorbar? If None, check if scatter plot color is a data array.
     colorbar_kwargs: dict, None
-        Parameters that are passed to :func:`~matplotlib.pyplot.colorbar`.
+        Parameters that are passed to :func:`add_colorbar`.
+        The colorbar is shrunk and labelled from the scatter color array by default.
     contour_kwargs: dict, None
         Parameters that are passed to :func:`~matplotlib.pyplot.contour`.
     axes: None
@@ -330,27 +339,19 @@ def plot_ts(
 
     # Colorbar
     if colorbar is None:
-        colorbar = "c" in scatter_kwargs and hasattr(scatter_kwargs["c"], "data")
+        colorbar = isinstance(scatter_kwargs.get("c"), xr.DataArray)
     if colorbar:
         colorbar_kwargs = xmisc.dict_filter(
             kwargs, "colorbar_", defaults={}, **(colorbar_kwargs or {})
         )
         c = scatter_kwargs["c"]
-        if "label" not in colorbar_kwargs and hasattr(c, "attrs"):
-            label = c.attrs.get("long_name") or c.name
-            if label:
-                label = label.title()
-                units = c.attrs.get("units")
-                if units:
-                    label = f"{label} [{units}]"
-                colorbar_kwargs["label"] = label
-        out["colorbar"] = plt.colorbar(out["scatter"], ax=axes, **colorbar_kwargs)
+        out["colorbar"] = add_colorbar(
+            out["scatter"], axes, da=c if isinstance(c, xr.DataArray) else None, **colorbar_kwargs
+        )
 
     # Labels
-    axes.set_xlabel(sal.attrs.get("long_name", "Salinity").title())
-    tlabel = temp.attrs.get("long_name", "Temperature").title()
-    tunits = temp.attrs.get("units", "°C")
-    axes.set_ylabel(f"{tlabel} [{tunits}]")
+    axes.set_xlabel(get_label(sal, units=False))
+    axes.set_ylabel(get_label(temp))
 
     # Density contours
     if dens is not False:
@@ -513,6 +514,7 @@ def plot_minimap(
     xoa.geo.get_extent
     """
     # Create map
+    ccrs, cfeature = _import_cartopy_()
     pcar = ccrs.PlateCarree()
     if isinstance(obj, tuple):
         lon, lat = obj
@@ -661,6 +663,571 @@ def plot_double_minimap(obj, regional_ax="below", **kwargs):
     regional_ax = plot_minimap(obj, **kw)
 
     return global_ax, regional_ax
+
+
+# %% Labels and maps
+
+
+def get_label(da, units=True):
+    """Get a label like ``"Long name [units]"`` for a data array
+
+    Missing attributes are completed from the current meta specs with
+    :meth:`xoa.meta.MetaSpecs.fill_attrs`.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+    units: bool
+        Add the units between brackets.
+
+    Return
+    ------
+    str
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import xarray as xr
+        @suppress
+        from xoa.plot import get_label
+        da = xr.DataArray([1.], dims="x", name="temp")
+        get_label(da)
+        get_label(da, units=False)
+    """
+    attrs = xmeta.get_meta_specs(da).fill_attrs(da).attrs
+    label = attrs.get("long_name") or attrs.get("standard_name") or da.name or ""
+    label = str(label)
+    if label:
+        label = label[0].upper() + label[1:]
+    unit = attrs.get("units")
+    if units and unit:
+        label = f"{label} [{unit}]" if label else f"[{unit}]"
+    return label
+
+
+def _get_cbar_kwargs_(da=None, cbar_kwargs=None):
+    """Get the colorbar parameters with the shrink factor and the label as defaults"""
+    kwargs = dict(cbar_kwargs or {})
+    kwargs.setdefault("shrink", cplot.CBAR_SHRINK)
+    if da is not None:
+        kwargs.setdefault("label", get_label(da))
+    return kwargs
+
+
+def add_colorbar(mappable, ax=None, da=None, **kwargs):
+    """Add a colorbar that is shrunk and labelled by default
+
+    Parameters
+    ----------
+    mappable: matplotlib.cm.ScalarMappable
+        The plotted artist, as returned by the plotting functions of this module
+    ax: None, matplotlib.axes.Axes, list(matplotlib.axes.Axes)
+        Axes that are shrunk to make room for the colorbar, which is shared if there are
+        several. It defaults to the axes of the artist.
+    da: None, xarray.DataArray
+        Array that is used to label the colorbar with :func:`get_label`
+    kwargs:
+        Extra parameters are passed to :func:`xoa.core.plot.add_colorbar`.
+        They override the label and the default shrink factor.
+
+    Return
+    ------
+    matplotlib.colorbar.Colorbar
+
+    Example
+    -------
+    .. code-block:: python
+
+        fig, axes = plt.subplots(1, 2, subplot_kw={"projection": ccrs.Mercator()})
+        for ax in axes:
+            mappable = plot_field(da, ax=ax, add_colorbar=False)
+        add_colorbar(mappable, axes, da=da)  # one shared colorbar
+    """
+    return cplot.add_colorbar(mappable, ax, **_get_cbar_kwargs_(da, kwargs))
+
+
+# For the functions that have a parameter with the same name
+_add_colorbar_ = add_colorbar
+
+
+def _get_meta_var_(obj, meta_name):
+    """Get a data variable from its generic meta name or return None"""
+    return xmeta.get_meta_specs(obj).search(obj, meta_name, errors="ignore")
+
+
+def plot_field(
+    field,
+    ax=None,
+    method="pcolormesh",
+    transform=None,
+    title=None,
+    margin=0.0,
+    map_kw=None,
+    overlay_contours=None,
+    ds=None,
+    **kwargs,
+):
+    """Plot a field on a map
+
+    Longitudes and latitudes are found with :func:`xoa.coords.get_lon` and
+    :func:`xoa.coords.get_lat`, and the extent of the map is computed with
+    :func:`xoa.geo.get_extent`.
+    The colorbar is labelled with :func:`get_label`.
+
+    Parameters
+    ----------
+    field: xarray.DataArray
+        Field with longitude and latitude coordinates, and no other dimension
+        than the horizontal ones.
+    ax: None, cartopy.mpl.geoaxes.GeoAxes
+        Axes to plot on. A map is created if not provided.
+    method: {"pcolormesh", "contourf", "contour"}
+        Plot method of :class:`xarray.DataArray.plot`
+    transform: None, cartopy.crs.CRS
+        Coordinate system of the field, which defaults to ``PlateCarree``
+    title: None, str
+    margin: float
+        Margin added to the extent. See :func:`xoa.geo.get_extent`.
+    map_kw: None, dict
+        Parameters that decorate the map, as accepted by :func:`setup_map_axes`.
+        When ``ax`` is not provided, ``figsize`` and ``projection`` are also
+        accepted, as in :func:`create_base_map`.
+    overlay_contours: None, True, list(dict)
+        Line contours drawn over the field. ``True`` is a shorthand for a single
+        contour of the field. Each item is a dict of parameters passed to
+        :meth:`matplotlib.axes.Axes.contour`, with an extra ``field`` key, which is
+        either a data array on any grid, a generic meta name like ``"bathy"``
+        or ``"mask"`` that is searched in ``ds`` with :mod:`xoa.meta`,
+        or the plotted field by default. Colors default to black.
+    ds: None, xarray.Dataset
+        Dataset where the meta names of overlay fields are searched
+    kwargs:
+        Extra parameters are passed to the plot method, like ``cmap``, ``vmin``,
+        ``vmax`` or ``add_colorbar``. The colorbar is shrunk by default, which
+        can be changed with ``cbar_kwargs``.
+
+    Return
+    ------
+    matplotlib.cm.ScalarMappable
+        The artist returned by the plot method
+
+    Example
+    -------
+    .. code-block:: python
+
+        plot_field(ds.temp.isel(time=0), cmap="Spectral_r",
+                   overlay_contours=[dict(field="bathy", levels=[100, 1000])], ds=ds)
+
+    See also
+    --------
+    plot_grid
+    plot_section
+    """
+    ccrs, _ = _import_cartopy_()
+    if transform is None:
+        transform = ccrs.PlateCarree()
+    lon = xcoords.get_lon(field)
+    lat = xcoords.get_lat(field)
+    extent = xgeo.get_extent(field, margin=margin)
+    kw = dict(map_kw or {})
+    if ax is None:
+        _, ax = create_base_map(extent, **kw)
+    else:
+        setup_map_axes(
+            ax, extent, transform, **{k: v for k, v in kw.items() if k in _AX_SETUP_KEYS}
+        )
+
+    if kwargs.get("add_colorbar", True):
+        kwargs["cbar_kwargs"] = _get_cbar_kwargs_(field, kwargs.get("cbar_kwargs"))
+    mappable = getattr(field.plot, method)(
+        x=lon.name, y=lat.name, ax=ax, transform=transform, add_labels=False, **kwargs
+    )
+
+    if overlay_contours is True:
+        overlay_contours = [{}]
+    for spec in overlay_contours or ():
+        spec = dict(spec)
+        ofield = spec.pop("field", field)
+        if isinstance(ofield, str):
+            if ds is None:
+                raise exceptions.XoaError(
+                    f"Cannot search the overlay field '{ofield}' without the ds parameter"
+                )
+            name = ofield
+            ofield = _get_meta_var_(ds, name)
+            if ofield is None:
+                raise exceptions.XoaError(f"Overlay field '{name}' not found in the dataset")
+        spec.setdefault("colors", "k")
+        olon = xcoords.get_lon(ofield)
+        olat = xcoords.get_lat(ofield)
+        ax.contour(ofield[olon.name], ofield[olat.name], ofield, transform=transform, **spec)
+
+    if title:
+        ax.set_title(title)
+    return mappable
+
+
+def plot_grid(
+    obj,
+    ax=None,
+    kind="mesh",
+    stride="auto",
+    min_spacing=12,
+    edges=None,
+    centers=None,
+    strips=None,
+    n_cells=1,
+    transform=None,
+    map_kw=None,
+    edge_kw=None,
+    center_kw=None,
+    **kwargs,
+):
+    """Plot a horizontal grid
+
+    A grid is made of cells whose centers are the points where the data are defined.
+    Cell edges are computed from the centers with :func:`xoa.core.grid.centers2edges`,
+    and both can be drawn, optionally over a field. Large grids are under-sampled to stay
+    readable.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D.
+        With the ``"mesh"`` and ``"resolution"`` kinds, the coordinates must be unambiguous,
+        which means a single location on a staggered grid: pass a data array in
+        case of doubt. With the ``"bathy"`` kind, the grid is the one of the bathymetry.
+    ax: None, cartopy.mpl.geoaxes.GeoAxes
+        Axes to plot on. A map is created if not provided.
+    kind: {"mesh", "bathy", "resolution"}
+        What to draw:
+
+        - ``"mesh"``: only the edges and centers
+        - ``"bathy"``: the bathymetry that is searched in ``obj`` with
+          the ``"bathy"`` meta name and masked with the ``"mask"`` one if any.
+          It falls back to the mesh with a warning if there is no bathymetry.
+        - ``"resolution"``: the resolution computed with :func:`xoa.grid.get_resolution`
+          as the geometric mean of the resolutions along x and y, in km.
+
+    stride: str, int, tuple(int)
+        Under-sampling of the edges and centers, either one value for both directions
+        or a ``(y, x)`` tuple. With ``"auto"``, the stride is adapted to the size of the axes
+        and to the number of cells, so that there are at least ``min_spacing`` pixels
+        between consecutive cells, measured on the map. When the grid is under-sampled, the drawn centers
+        are the ones of the coarse cells delimited by the drawn edges.
+    min_spacing: float
+        Minimal spacing in pixels between cells in the ``"auto"`` stride mode.
+    edges: None, bool
+        Draw the edges of the cells. It defaults to True for the ``"mesh"`` kind, and
+        to False with the others. The first and last edges are always drawn.
+    centers: None, bool
+        Draw the centers of the cells. It defaults to True for the ``"mesh"`` kind, and
+        to False with the others.
+    strips: None, str, list(str)
+        Draw the extent of the strips along these edges.
+        See :func:`xoa.grid.get_edge_extents`.
+    n_cells: int
+        Number of cells of the strips
+    transform: None, cartopy.crs.CRS
+        Coordinate system, which defaults to ``PlateCarree``
+    map_kw: None, dict
+        Parameters that decorate the map. See :func:`plot_field`.
+    edge_kw: None, dict
+        Parameters passed to :class:`matplotlib.collections.LineCollection`
+        to draw the edges, like ``colors`` or ``linewidths``.
+    center_kw: None, dict
+        Parameters passed to :meth:`matplotlib.axes.Axes.plot` to draw the centers,
+        like ``color`` or ``markersize``.
+    kwargs:
+        With the ``"bathy"`` and ``"resolution"`` kinds, extra parameters are passed
+        to :func:`plot_field`.
+
+    Return
+    ------
+    cartopy.mpl.geoaxes.GeoAxes
+
+    Example
+    -------
+    .. code-block:: python
+
+        plot_grid(ds.temp)  # edges and centers, under-sampled if needed
+        plot_grid(ds.temp, stride=(2, 4), centers=False)
+        plot_grid(ds, kind="bathy", edges=True, strips="north")
+
+    See also
+    --------
+    plot_field
+    xoa.grid.get_resolution
+    xoa.grid.get_edge_extents
+    xoa.core.grid.centers2edges
+    """
+    from . import grid as xgrid
+
+    ccrs, _ = _import_cartopy_()
+    if transform is None:
+        transform = ccrs.PlateCarree()
+    if kind not in ("mesh", "bathy", "resolution"):
+        raise exceptions.XoaError(f"Invalid kind '{kind}'. Choose among: mesh, bathy, resolution")
+
+    # Background field, whose coordinates define the grid for the bathymetry
+    field = None
+    if kind == "bathy":
+        field = _get_meta_var_(obj, "bathy") if isinstance(obj, xr.Dataset) else None
+        if field is None:
+            exceptions.xoa_warn("No bathymetry found: plotting the mesh instead")
+            kind = "mesh"
+        else:
+            mask = _get_meta_var_(obj, "mask")
+            if mask is not None and set(mask.dims) == set(field.dims):
+                field = field.where(mask != 0)
+            kwargs.setdefault("cmap", "terrain_r")
+            obj = field
+    if edges is None:
+        edges = kind == "mesh"
+    if centers is None:
+        centers = kind == "mesh"
+
+    # Axes
+    lon, lat = xgrid._get_lonlat_yx_(obj)
+    extent = xgeo.get_extent((lon.values, lat.values), margin=0.05)
+    kw = dict(map_kw or {})
+    if ax is None:
+        _, ax = create_base_map(extent, **kw)
+    else:
+        setup_map_axes(
+            ax, extent, transform, **{k: v for k, v in kw.items() if k in _AX_SETUP_KEYS}
+        )
+
+    # Background field
+    if kind == "resolution":
+        field = xr.DataArray(
+            cgrid.compute_center_resolution(lon.values, lat.values) * 1e-3,
+            dims=lon.dims,
+            coords={lon.name: lon, lat.name: lat},
+            attrs={"long_name": "Grid resolution", "units": "km"},
+        )
+    if field is not None:
+        plot_field(field, ax=ax, transform=transform, **kwargs)
+
+    # Edges and centers
+    if edges or centers:
+        cplot.plot_mesh(
+            ax,
+            lon.values,
+            lat.values,
+            stride=stride,
+            min_spacing=min_spacing,
+            edges=edges,
+            centers=centers,
+            transform=transform,
+            edge_kw=edge_kw,
+            center_kw=center_kw,
+        )
+
+    # Strips
+    if strips:
+        for xmin, xmax, ymin, ymax in xgrid.get_edge_extents(obj, strips, n_cells).values():
+            ax.plot(
+                [xmin, xmax, xmax, xmin, xmin],
+                [ymin, ymin, ymax, ymax, ymin],
+                color="tab:orange",
+                linewidth=1.5,
+                transform=transform,
+            )
+    return ax
+
+
+# %% Sections and series
+
+
+def plot_section(
+    da,
+    x=None,
+    ax=None,
+    method="pcolormesh",
+    title=None,
+    add_colorbar=True,
+    cbar_kwargs=None,
+    **kwargs,
+):
+    """Plot a vertical section
+
+    The depth is found with :func:`xoa.coords.get_depth` and may vary with the
+    horizontal dimension, like with terrain-following coordinates.
+    The vertical axis is inverted when depths are positive down,
+    according to :func:`xoa.coords.get_positive_attr`.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Array with a vertical and a horizontal dimension only
+    x: None, str, xarray.DataArray
+        Horizontal axis as one of:
+
+        - ``None``: longitude or latitude, according to the largest extent
+        - ``"lon"``, ``"lat"``: the coordinate found with :mod:`xoa.coords`
+        - ``"distance"``: the distance in km along the section
+        - a data array that is broadcastable to the horizontal dimension
+
+    ax: None, matplotlib.axes.Axes
+    method: {"pcolormesh", "contourf", "contour"}
+        Plot method of :class:`matplotlib.axes.Axes`
+    title: None, str
+    add_colorbar: bool
+    cbar_kwargs: None, dict
+        Parameters passed to :meth:`matplotlib.figure.Figure.colorbar`.
+        The colorbar is shrunk by default (``shrink=0.7``).
+    kwargs:
+        Extra parameters are passed to the plot method.
+
+    Return
+    ------
+    matplotlib.cm.ScalarMappable
+
+    Example
+    -------
+    .. code-block:: python
+
+        plot_section(ds.temp.isel(time=0, eta_rho=10), cmap="Spectral_r")
+    """
+    zdim = xcoords.get_zdim(da, errors="raise")
+    hdims = [dim for dim in da.dims if dim != zdim]
+    if len(hdims) != 1:
+        raise exceptions.XoaError(
+            f"A section needs a single horizontal dimension, but got: {hdims}"
+        )
+    hdim = hdims[0]
+
+    # Depth
+    depth = xcoords.get_depth(da, errors="ignore")
+    if depth is None:
+        depth = (
+            da[zdim] if zdim in da.coords else xr.DataArray(np.arange(da.sizes[zdim]), dims=zdim)
+        )
+    positive = xcoords.get_positive_attr(da, zdim=zdim)
+
+    # Horizontal axis
+    lon = xcoords.get_lon(da, errors="ignore")
+    lat = xcoords.get_lat(da, errors="ignore")
+    if isinstance(x, xr.DataArray):
+        xaxis = x
+    else:
+        if x is None:
+            if lon is not None and lat is not None:
+                xlon = float(lon.max() - lon.min()) * np.cos(np.radians(float(lat.mean())))
+                x = "lon" if xlon >= float(lat.max() - lat.min()) else "lat"
+            else:
+                x = "lon" if lon is not None else "lat"
+        if x == "distance":
+            if lon is None or lat is None:
+                raise exceptions.XoaError("Longitude and latitude are needed to compute distances")
+            lonv, latv = xr.broadcast(lon, lat)
+            lonv = lonv.transpose(hdim, ...).values.reshape(da.sizes[hdim], -1)[:, 0]
+            latv = latv.transpose(hdim, ...).values.reshape(da.sizes[hdim], -1)[:, 0]
+            dist = np.concatenate(
+                [[0], np.cumsum(xgeo.haversine(lonv[:-1], latv[:-1], lonv[1:], latv[1:]))]
+            )
+            xaxis = xr.DataArray(
+                dist * 1e-3, dims=hdim, attrs={"long_name": "Distance", "units": "km"}
+            )
+        elif x in ("lon", "lat"):
+            xaxis = lon if x == "lon" else lat
+            if xaxis is None:
+                raise exceptions.XoaError(f"No {x} coordinate found")
+        else:
+            raise exceptions.XoaError("x must be None, 'lon', 'lat', 'distance' or a data array")
+    xaxis, depth = xr.broadcast(xaxis, depth)
+    xaxis = xaxis.transpose(zdim, hdim)
+    depth = depth.transpose(zdim, hdim)
+    data = da.transpose(zdim, hdim)
+
+    # Plot
+    if ax is None:
+        ax = plt.gca()
+    mappable = cplot.plot_depth_section(
+        ax,
+        xaxis.values,
+        depth.values,
+        data.values,
+        method=method,
+        invert_yaxis=positive == "down",
+        **kwargs,
+    )
+    ax.set_xlabel(get_label(xaxis))
+    ax.set_ylabel(get_label(depth))
+    if add_colorbar:
+        _add_colorbar_(mappable, ax, da=da, **(cbar_kwargs or {}))
+    if title:
+        ax.set_title(title)
+    return mappable
+
+
+def plot_stick(u, v=None, ax=None, scale=None, color="steelblue", **kwargs):
+    """Plot a current time series as sticks
+
+    Each vector is drawn as a stick anchored at ``y=0``, oriented along the current
+    and scaled by its speed. This shows the direction and intensity of
+    the currents, like tidal ones, along a single axis.
+
+    Parameters
+    ----------
+    u: xarray.DataArray, xarray.Dataset
+        Eastward component with a single dimension. If it is a dataset,
+        the ``"u"`` and ``"v"`` generic meta names are searched in it with :mod:`xoa.meta`.
+    v: xarray.DataArray, None
+        Northward component, with the same dimension
+    ax: None, matplotlib.axes.Axes
+    scale: None, float
+        Scale passed to :meth:`matplotlib.axes.Axes.quiver`: the smaller, the longer
+        the sticks.
+    color: color
+    kwargs:
+        Extra parameters are passed to :meth:`matplotlib.axes.Axes.quiver`
+
+    Return
+    ------
+    matplotlib.quiver.Quiver
+
+    Example
+    -------
+    .. code-block:: python
+
+        plot_stick(ds.u, ds.v, scale=2.0)
+        plot_stick(ds)  # u and v are searched
+
+    See also
+    --------
+    plot_flow
+    """
+    if v is None:
+        ds = u
+        u = _get_meta_var_(ds, "u")
+        v = _get_meta_var_(ds, "v")
+        if u is None or v is None:
+            raise exceptions.XoaError("Cannot find the u and v components in the dataset")
+    if u.ndim != 1 or v.ndim != 1:
+        raise exceptions.XoaError("u and v must have a single dimension")
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 3))
+
+    dim = u.dims[0]
+    time = xcoords.get_time(u, errors="ignore")
+    if time is not None and time.dims == (dim,):
+        x = time.values
+        xlabel = time.name
+    elif dim in u.coords:
+        x = u.coords[dim].values
+        xlabel = dim
+    else:
+        x = np.arange(u.sizes[dim])
+        xlabel = None
+
+    quiver = cplot.plot_sticks(ax, x, u.values, v.values, scale=scale, color=color, **kwargs)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    return quiver
 
 
 # %% Filters

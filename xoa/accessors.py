@@ -4,6 +4,7 @@
 xarray and pandas xoa accessors
 
 """
+
 # Copyright 2020-2026 Shom
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -641,7 +642,94 @@ class SigmaAccessor(_BasicMetaAccessor_):
         return get_sigma_terms(self._ds, loc=loc, rename=rename)
 
 
-class XoaDataArrayAccessor(MetaDataArrayAccessor):
+class _InterpRegridMixin_:
+    """Horizontal interpolation and regridding methods of the main xoa accessors"""
+
+    def interp(
+        self,
+        dst_lon,
+        dst_lat,
+        method="bilinear",
+        skipna=False,
+        na_thres=1.0,
+        **kwargs,
+    ):
+        """Interpolate to arbitrary destination points
+
+        Parameters
+        ----------
+        dst_lon, dst_lat: array_like, xarray.DataArray
+            Destination coordinates, any shape.
+            See :func:`xoa.coords.geo_merge`.
+        method: str, int
+            Interpolation method, see :class:`xoa.interp.xy_interp_methods`
+        skipna: bool
+            Skip NaN values
+        na_thres: float
+            Threshold for NaN handling
+        kwargs:
+            Extra parameters are passed to :class:`xoa.interp.Interpolator`,
+            like ``weights_file``, ``src_mask``, ``bias`` or ``tension``.
+
+        Return
+        ------
+        xarray.DataArray, xarray.Dataset
+
+        See also
+        --------
+        xoa.interp.interpxy
+        xoa.interp.Interpolator
+        """
+        from .interp import interpxy
+
+        return interpxy(
+            self._obj, dst_lon, dst_lat, method, skipna=skipna, na_thres=na_thres, **kwargs
+        )
+
+    def regrid(
+        self,
+        dst,
+        method="bilinear",
+        dst_time=None,
+        skipna=False,
+        na_thres=1.0,
+        **kwargs,
+    ):
+        """Regrid horizontally, and optionally in time, to a destination grid
+
+        Parameters
+        ----------
+        dst: xarray.DataArray, xarray.Dataset
+            Destination grid with longitude and latitude coordinates
+        method: str, int
+            Regridding method, see :class:`xoa.regrid.xy_regrid_methods`
+        dst_time: array_like, xarray.DataArray, None
+            Target times
+        skipna: bool
+            Skip NaN values
+        na_thres: float
+            Threshold for NaN handling
+        kwargs:
+            Extra parameters are passed to :class:`xoa.regrid.Regridder`,
+            like ``weights_file``, ``src_mask``, ``dst_mask``, ``bias`` or ``tension``.
+
+        Return
+        ------
+        xarray.DataArray, xarray.Dataset
+
+        See also
+        --------
+        xoa.regrid.regridxy
+        xoa.regrid.Regridder
+        """
+        from .regrid import regridxy
+
+        return regridxy(
+            self._obj, dst, method, dst_time=dst_time, skipna=skipna, na_thres=na_thres, **kwargs
+        )
+
+
+class XoaDataArrayAccessor(_InterpRegridMixin_, MetaDataArrayAccessor):
     """Main xoa accessor registered on :class:`xarray.DataArray`"""
 
     @property
@@ -668,7 +756,7 @@ class XoaDataArrayAccessor(MetaDataArrayAccessor):
         return self.meta
 
 
-class XoaDatasetAccessor(MetaDatasetAccessor):
+class XoaDatasetAccessor(_InterpRegridMixin_, MetaDatasetAccessor):
     """Main xoa accessor registered on :class:`xarray.Dataset`"""
 
     @property
