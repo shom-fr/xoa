@@ -82,7 +82,7 @@ Finding z and depth
 ===================
 
 The :func:`~xoa.coords.get_z` and :func:`~xoa.coords.get_depth` functions look for
-the coordinate with :mod:`xoa.meta`, and fall back on the other one, with the sign changed when its ``positive`` attribute says so:
+the coordinate with :mod:`xoa.meta`, and fall back on the other one. The sign is changed whenever the ``positive`` attribute, or the name when there is none, differs from the requested convention:
 
 .. ipython:: python
 
@@ -168,12 +168,12 @@ What uses them
 Pitfalls
 ========
 
-- **Trust the attribute, not the name.** A coordinate is returned as found, and a variable
-  named ``depth`` whose ``positive`` attribute is ``"up"`` is already a ``z``:
-  :func:`~xoa.coords.get_z` returns it as is, without changing its sign, and
-  :func:`~xoa.coords.get_depth` returns it as is too. Without this attribute, the
-  ``depth`` name is taken as positive down. Set the attribute of your coordinates when
-  their sign is not the usual one.
+- **The attribute prevails over the name.** :func:`~xoa.coords.get_z` and
+  :func:`~xoa.coords.get_depth` guarantee their sign from the ``positive`` attribute of what they
+  find: a variable named ``depth`` whose attribute is ``"up"`` is negated by
+  :func:`~xoa.coords.get_depth` and returned as is by :func:`~xoa.coords.get_z`.
+  Without this attribute, the name decides, and ``depth`` is taken as positive down.
+  Set the attribute of your coordinates when their sign is not the usual one.
 - **Mixing signs in a regridding or an isoline.** Values and bounds must have the same sign:
   ``-15`` m is a ``z``, ``15`` m is a ``depth``.
 - **A dimension called** ``z``. A vertical dimension named like the ``z`` coordinate,

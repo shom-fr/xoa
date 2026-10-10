@@ -177,18 +177,25 @@ def is_lat(da, loc="any"):
     return meta.get_meta_specs(da).coords.match(da, "lat", loc=loc)
 
 
+_POSITIVE = {"z": "up", "depth": "down"}
+
+
 def _search_z_depth_(da, name, **kwargs):
-    """Search for `name` ("z" or "depth"), else for the other one, converted if needed"""
+    """Search for `name` ("z" or "depth"), else for the other one
+
+    The result is converted when its ``positive`` attribute, or its name when it has none,
+    is not the one of `name`.
+    """
     metaspecs = meta.get_meta_specs(da)
-    other = "depth" if name == "z" else "z"
-    found = metaspecs.search(da, name, errors="ignore", **kwargs)
-    if found is not None:
-        return found
-    found = metaspecs.search(da, other, errors="ignore", **kwargs)
-    if found is not None:
-        if found.attrs.get("positive") == ("up" if name == "z" else "down"):
-            return found  # already in the requested convention, whatever its name
-        return to_z(found) if name == "z" else to_depth(found)
+    for found_name in (name, "depth" if name == "z" else "z"):
+        found = metaspecs.search(da, found_name, errors="ignore", **kwargs)
+        if found is not None:
+            positive = found.attrs.get("positive")
+            if positive not in ("up", "down"):
+                positive = _POSITIVE[found_name]
+            if positive == _POSITIVE[name]:
+                return found
+            return to_z(found) if name == "z" else to_depth(found)
 
 
 def _get_z_depth_(da, name, errors, **kwargs):
@@ -235,6 +242,8 @@ def get_z(da, errors="raise", **kwargs):
     If a z variable cannot be found, it uses the depth, if any, with
     :func:`to_z`, or tries to compute it either from sigma-like coordinates
     or from layer thicknesses.
+    What is found is converted when its ``positive`` attribute, or its name when it has none,
+    is not ``"up"``.
 
     Parameters
     ----------
@@ -290,6 +299,8 @@ def get_depth(da, errors="raise", **kwargs):
     If a depth variable cannot be found, it uses the z coordinate, if any,
     with :func:`to_depth`, or tries to compute it either
     from sigma-like coordinates or from layer thicknesses.
+    What is found is converted when its ``positive`` attribute, or its name when it has none,
+    is not ``"down"``.
 
     Parameters
     ----------
