@@ -185,8 +185,8 @@ Bug fixes
 
 Documentation
 -------------
-- Add an example of `xoa.plot.plot_double_minimap` to :ref:`sphx_glr_examples_plot_mercator_argo.py` and :ref:`sphx_glr_examples_plot_hycom_gdp.py` examples [:pull:`73`].
-- Add an example of `xoa.thermdyn.mixed_layer_depth` to :ref:`sphx_glr_examples_plot_croco_section.py` example [:pull:`67`].
+- Add an example of `xoa.plot.plot_double_minimap` to :ref:`sphx_glr_tutorials_plot_mercator_argo.py` and :ref:`sphx_glr_tutorials_plot_hycom_gdp.py` examples [:pull:`73`].
+- Add an example of `xoa.thermdyn.mixed_layer_depth` to :ref:`sphx_glr_tutorials_plot_croco_section.py` example [:pull:`67`].
 
 
 0.6.1 (2022-02-24)
@@ -222,7 +222,7 @@ Bug fixes
 
 Documentation
 -------------
-- Add the :ref:`Compare Mercator to ARGO <sphx_glr_examples_plot_mercator_argo.py>` example.
+- Add the :ref:`Compare Mercator to ARGO <sphx_glr_tutorials_plot_mercator_argo.py>` example.
 
 
 0.6.0 (2022-02-24)
@@ -292,7 +292,7 @@ Bug fixes
 
 Documentation
 -------------
-- The :ref:`indepth.meta` section and :ref:`sphx_glr_examples_plot_hycom_gdp.py` example are adapted to reflect changes.
+- The :ref:`indepth.meta` section and :ref:`sphx_glr_tutorials_plot_hycom_gdp.py` example are adapted to reflect changes.
 
 
 v0.3.1 (2021-05-21)

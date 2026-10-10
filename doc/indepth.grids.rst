@@ -96,7 +96,7 @@ The :func:`~xoa.grid.to_rect` function converts 2D longitudes and latitudes to 1
 when the grid is not curvilinear, according to :func:`xoa.core.grid.check_grid_type`.
 The :func:`xoa.plot.plot_grid` function draws the edges and centers of a grid, or its bathymetry or
 resolution, on a map (see :ref:`indepth.plot`).
-See the :ref:`sphx_glr_examples_plot_grid_tools.py` example for a complete tutorial.
+See the :ref:`sphx_glr_tutorials_plot_grid_tools.py` tutorial for a complete tutorial.
 
 
 Staggered grids
@@ -179,7 +179,7 @@ Horizontal regridding
 The :class:`~xoa.regrid.Regridder` and :class:`~xoa.interp.Interpolator` classes regrid
 and interpolate horizontally, on regular, rectangular and curvilinear grids, with the
 ``bilinear``, ``bicubic`` and ``conservative`` methods. They have their own guide,
-:ref:`indepth.horizontal`, and a :ref:`tutorial <sphx_glr_examples_plot_regrid_interp.py>`.
+:ref:`indepth.horizontal`, and a :ref:`tutorial <sphx_glr_tutorials_plot_regrid_interp.py>`.
 
 Vertical regridding
 -------------------
@@ -292,7 +292,7 @@ vertical sections and perform operations like:
 - Computing vertical derivatives
 - Creating vertical transects
 
-See the gallery example :ref:`sphx_glr_examples_plot_croco_section.py` for a practical
+See the gallery tutorial :ref:`sphx_glr_tutorials_plot_croco_section.py` for a practical
 demonstration of working with sigma coordinates and vertical sections.
 
 Formula terms mapping
@@ -352,5 +352,5 @@ See also
 - :mod:`xoa.regrid`: Regridding module
 - :mod:`xoa.sigma`: Sigma coordinates module
 - :mod:`xoa.coords`: Coordinate utilities
-- :ref:`examples`: Gallery of examples including grid and sigma operations
+- :ref:`tutorials`: Gallery of tutorials including grid and sigma operations
 - :ref:`indepth.meta`: For more on CF metadata and grid location encoding

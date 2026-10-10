@@ -141,8 +141,8 @@ extlinks = {
 # %% Sphinx gallery
 warnings.simplefilter("ignore", MatplotlibDeprecationWarning)
 sphinx_gallery_conf = {
-    "examples_dirs": "../examples",
-    "gallery_dirs": "examples",
+    "examples_dirs": "../tutorials",
+    "gallery_dirs": "tutorials",
     "binder": {
         'org': 'shom-fr',
         'repo': 'xoa',

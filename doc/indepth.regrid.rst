@@ -8,7 +8,7 @@ Introduction
 
 This guide explains how the horizontal interpolation and regridding tools work, what they
 assume and how to choose between them. The :ref:`regridding tutorial
-<sphx_glr_examples_plot_regrid_interp.py>` shows them at work on real data, with figures:
+<sphx_glr_tutorials_plot_regrid_interp.py>` shows them at work on real data, with figures:
 read it first for a walkthrough, and come back here for the rules behind it.
 
 .. ipython:: python
@@ -457,7 +457,7 @@ The core classes take dictionaries of arrays, with ``lon`` and ``lat`` keys and 
 See also
 ========
 
-- The :ref:`tutorial <sphx_glr_examples_plot_regrid_interp.py>` for maps, the curvilinear case,
+- The :ref:`tutorial <sphx_glr_tutorials_plot_regrid_interp.py>` for maps, the curvilinear case,
   time and masks on real data.
 - :ref:`indepth.grids` for the 1D regridding, edges, resolutions and ``to_rect``.
 - :ref:`indepth.plot` for the plotting of fields, grids and sections.

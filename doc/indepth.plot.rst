@@ -13,9 +13,9 @@ from xarray objects, and finds what to draw with :mod:`xoa.meta`. The lower leve
 This guide explains how the functions find their inputs, what their options mean, and
 how to use the low level routines. The tutorials show them at work, with figures:
 
-- :ref:`sphx_glr_examples_plot_grid_tools.py`: grids, resolutions and edges,
-- :ref:`sphx_glr_examples_plot_regrid_interp.py`: maps of regridded fields,
-- :ref:`sphx_glr_examples_plot_croco_section.py`: sections.
+- :ref:`sphx_glr_tutorials_plot_grid_tools.py`: grids, resolutions and edges,
+- :ref:`sphx_glr_tutorials_plot_regrid_interp.py`: maps of regridded fields,
+- :ref:`sphx_glr_tutorials_plot_croco_section.py`: sections.
 
 .. ipython:: python
 
@@ -213,7 +213,6 @@ and labelled with :func:`~xoa.plot.get_label`, so that they do not dwarf the map
     import cartopy.crs as ccrs
     fields = [ds.temp + d for d in (-2, 0, 2)]
 
-    @savefig indepth.plot.colorbar.png width=6in
     fig, axes = plt.subplots(
         1, 3, figsize=(11, 3.6), subplot_kw={"projection": ccrs.Mercator()},
         constrained_layout=True,
@@ -221,6 +220,7 @@ and labelled with :func:`~xoa.plot.get_label`, so that they do not dwarf the map
     for ax, da in zip(axes, fields):
         mappable = xplot.plot_field(da, ax=ax, add_colorbar=False, vmin=8, vmax=18,
                                   cmap=cmocean.cm.thermal)
+    @savefig indepth.plot.colorbar.png width=6in
     xplot.add_colorbar(mappable, axes, da=fields[0])
 
 The adaptive grid stride
@@ -306,8 +306,8 @@ dimension is accepted.
         attrs={"standard_name": "sea_water_temperature", "units": "degC"},
     )
 
-    @savefig indepth.plot.section.png width=5in
     fig, ax = plt.subplots(figsize=(7, 3.5), constrained_layout=True)
+    @savefig indepth.plot.section.png width=5in
     xplot.plot_section(sec, ax=ax, cmap=cmocean.cm.thermal)
 
 Sticks
@@ -381,9 +381,9 @@ and then drawn on any axes:
 
 .. ipython:: python
 
-    @savefig indepth.plot.mesh.png width=3in
     fig, ax = plt.subplots(figsize=(3, 2.5))
     cplot.plot_mesh(ax, lons, lats, stride=1)
+    @savefig indepth.plot.mesh.png width=3in
     ax.set_aspect("equal")
 
 The other routines are the same: :func:`~xoa.core.plot.plot_depth_section` takes the 2D arrays

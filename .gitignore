@@ -129,7 +129,7 @@ dmypy.json
 # Sphinx
 doc/_build/
 doc/accessors/
-doc/examples/
+doc/tutorials/
 doc/api/
 doc/savefig/
 doc/genoptions/

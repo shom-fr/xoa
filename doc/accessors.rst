@@ -48,11 +48,6 @@ Methods
     DataArray.xoa.get_depth
     DataArray.xoa.interp
     DataArray.xoa.regrid
-    DataArray.xoa.plot.field
-    DataArray.xoa.plot.grid
-    DataArray.xoa.plot.section
-    DataArray.xoa.plot.stick
-    DataArray.xoa.plot.taylor
 
 
 Dataset
@@ -92,11 +87,6 @@ Methods
     Dataset.xoa.get_depth
     Dataset.xoa.interp
     Dataset.xoa.regrid
-    Dataset.xoa.plot.field
-    Dataset.xoa.plot.grid
-    Dataset.xoa.plot.section
-    Dataset.xoa.plot.stick
-    Dataset.xoa.plot.taylor
     Dataset.decode_sigma.decode
     Dataset.decode_sigma.get_sigma_terms
 
@@ -110,3 +100,13 @@ Callables
     :template: autosummary/accessor_callable.rst
 
     Dataset.decode_sigma
+
+
+Plotting
+~~~~~~~~
+
+The ``plot`` attribute of the ``xoa`` accessors, like ``da.xoa.plot.field()``,
+has the following methods.
+
+.. autoclass:: xoa.accessors.XoaPlotAccessor
+    :members:
