@@ -72,7 +72,7 @@ Let's set up a sample dataset and register the accessors:
 .. ipython:: python
 
     import xoa
-    xoa.register_accessors()
+    xoa.register_accessors(xoa=False)
 
 All these arrays are CF compliant according to their
 ``standard_name`` attribute, despite their names not being very explicit.
@@ -821,7 +821,7 @@ Register the :class:`xoa <~xoa.accessors.XoaDatasetAccessor>` accessor:
 
 .. ipython:: python
 
-    xoa.register_accessors()
+    xoa.register_accessors(xoa=False)
 
 Now let's open a Croco sample as a xarray dataset:
 

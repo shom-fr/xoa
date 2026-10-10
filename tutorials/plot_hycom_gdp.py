@@ -32,11 +32,6 @@ from xoa.plot import plot_flow, plot_double_minimap
 xr.set_options(display_style="text")
 
 # %%
-# Register the :ref:`xoa <accessors>` accessors:
-
-xoa.register_accessors()
-
-# %%
 # Set the internal Hycom naming specifications as the current ones
 hycom_cfg_file = xoa.get_meta_config_file("hycom")
 print(hycom_cfg_file)

@@ -355,7 +355,7 @@ def bilinear_frac(j_base, i_base, frac_a, frac_b, X, nx_src, out, skipna, na_thr
     na_thres       : float
     """
     nan = np.nan
-    na_threshold = max(EPSILON, 1.0 - na_thres)
+    na_threshold = min(max(1.0 - na_thres, EPSILON), 1.0 - EPSILON)
     n_dst = j_base.shape[0]
     K = X.shape[1]
 
@@ -429,7 +429,7 @@ def bicubic_frac(
     bias, tension  : float  Hermite parameters (default 0)
     """
     nan = np.nan
-    na_threshold = max(EPSILON, 1.0 - na_thres)
+    na_threshold = min(max(1.0 - na_thres, EPSILON), 1.0 - EPSILON)
     n_dst = j_base.shape[0]
     K = X.shape[1]
 

@@ -7,6 +7,7 @@ Compare simulations with a reference using Taylor diagrams
 In this tutorial, we show how to:
 
 * plot one point per model, with a legend and different markers,
+* add drop shadows to the markers,
 * color the points with values,
 * handle negative correlations,
 * draw already normalized statistics without a reference array.
@@ -46,14 +47,13 @@ models = xr.concat(
 # -------------------
 # The statistics are computed over ``time`` and ``x``. The remaining ``model``
 # dimension creates the points, whose labels are the coordinates.
+# A blurred drop shadow is added to the markers with :func:`xoa.plot.add_shadow`.
+# It must be called in the same cell as the plot, since the figure is captured
+# at the end of the cell.
 
 diagram = plot_taylor(models, ref, dim=("time", "x"), markers=["o", "s", "^", "D"])
-
-# %%
-# The markers can be given a blurred drop shadow with :func:`xoa.plot.add_shadow`.
-
 points = [line for line in diagram.ax.lines if line.get_marker() not in (None, "None", "")]
-add_shadow(points, width=4, xoffset=3, yoffset=-3, alpha=0.7, ax=diagram.ax)
+add_shadow(points, width=3, xoffset=2, yoffset=-2, alpha=0.4, ax=diagram.ax)
 
 # %%
 # Normalized, with colored points

@@ -33,7 +33,6 @@ how to use the low level routines. The tutorials show them at work, with figures
     import xoa
     from xoa import plot as xplot
     from xoa.core import plot as cplot
-    xoa.register_accessors()
 
 The main ``xoa`` accessors give access to the high level functions through the ``plot``
 subaccessor, with the array or dataset as the first argument:

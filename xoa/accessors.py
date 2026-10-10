@@ -834,9 +834,10 @@ class XoaDatasetAccessor(_PlotMixin_, _InterpRegridMixin_, MetaDatasetAccessor):
     @property
     def decode_sigma(self):
         """The :class:`~xoa.accessors.SigmaAccessor` subaccessor for sigma coordinates"""
-        if not hasattr(self, "_sigma"):
-            self._sigma = SigmaAccessor(self._ds)
-        return self._sigma
+        # __getattr__ is a meta search that never raises, hence the __dict__ access
+        if "_sigma" not in self.__dict__:
+            self.__dict__["_sigma"] = SigmaAccessor(self._obj)
+        return self.__dict__["_sigma"]
 
 
 def _register_xarray_accessors_(dataarrays=None, datasets=None):

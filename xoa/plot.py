@@ -282,9 +282,6 @@ def plot_ts(
         @suppress
         from xoa.plot import plot_ts
 
-        # Register the main xoa accessor
-        xoa.register_accessors()
-
         # Load the Mercator data
         file_name = xoa.get_data_sample("MODELS/CMEMS-IBI/ibi-argo-7900573.nc")
         ds = xr.open_dataset(file_name)

@@ -21,7 +21,6 @@ read it first for a walkthrough, and come back here for the rules behind it.
     import xarray as xr
     import xoa
     from xoa import interp, regrid
-    xoa.register_accessors()
 
 Which tool for which job?
 -------------------------

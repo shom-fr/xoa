@@ -35,7 +35,7 @@ from .data_samples import (  # noqa: F401
     show_data_samples,
     open_data_sample,
 )
-from .accessors import register_accessors
+from .accessors import register_accessors, register_xoa_accessors
 
 try:
     from ._version import version as __version__
@@ -60,6 +60,9 @@ __all__ = [
     "register_accessors",
 ]
 
+
+# The main accessor is always available
+register_xoa_accessors()
 
 # Directory of sample files
 _SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "_samples")
