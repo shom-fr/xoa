@@ -514,7 +514,8 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
     # Finalize
     depth.attrs["positive"] = positive
     depth = meta_specs.format_coord(
-        depth, "depth", rename=True, format_coords=False, rename_dims=False
+        depth, "z" if positive == "up" else "depth", rename=True, format_coords=False,
+        rename_dims=False
     )
 
     return depth
@@ -542,7 +543,7 @@ def decode_dz2depth(ds, errors="raise", **kwargs):
     Return
     ------
     xarray.Dataset
-        A new dataset with a depth coordinate
+        A new dataset with a depth coordinate if positive down, else a z coordinate
 
     See also
     --------
@@ -591,7 +592,16 @@ def decode_dz2depth(ds, errors="raise", **kwargs):
     )
 
     # Assign to dataset
-    return ds.assign_coords(depth=depth)
+    if depth.name in ds.dims:
+        msg = "Can't assign the {} coordinate since a dimension has the same name".format(
+            depth.name
+        )
+        if errors == "raise":
+            raise exceptions.XoaGridError(msg)
+        if errors == "warn":
+            exceptions.xoa_warn(msg)
+        return ds
+    return ds.assign_coords({depth.name: depth})
 
 
 def decode_cf_dz2depth(*args, **kwargs):

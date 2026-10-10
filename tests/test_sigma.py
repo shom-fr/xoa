@@ -157,4 +157,7 @@ def test_decode_sigma():
     assert "temp" in ds_out
     depth_coord = [c for c in ds_out["temp"].coords if c not in ("sig",)]
     assert len(depth_coord) > 0
+    assert ds_out.z.attrs["positive"] == "up"
+    np.testing.assert_allclose(ds_out.z.isel(nx=0), np.linspace(-100, 0, nz))
+    assert "depth" not in ds_out
     assert ds_out.encoding.get("xoa_sigma_type") == "ocean_sigma_coordinate"

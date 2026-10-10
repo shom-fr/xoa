@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
-Interpolate a meridional section of CROCO outputs to regular depths
-===================================================================
+Interpolate a meridional section of CROCO outputs to regular heights
+====================================================================
 
 In this notebook, we show:
 
-* how to compute the depths from s-coordinates,
+* how to compute the z heights from s-coordinates,
 * how to easily find the name of variables and coordinates,
-* how to interpolate a 3D field with varying depths to regular depths,
+* how to interpolate a 3D field with varying heights to regular heights,
 * how to compute the mixed layer depth from temperature.
 """
 
@@ -55,27 +55,27 @@ ds = xr.open_dataset(sample_file)
 print(ds)
 
 # %%
-# Compute depths from s-coordinates
+# Compute heights from s-coordinates
 # ---------------------------------
 #
 # Decode the dataset according to the CF conventions:
 #
 # 1. Find sigma terms
-# 2. Compute depths
-# 3. Assign depths as coordinates
+# 2. Compute the ``z`` heights, that are negative in the ocean
+# 3. Assign them as coordinates
 #
 # Note that the ``decode_sigma`` subaccessor of the :ref:`xoa <accessors>` accessor
 # calls the :func:`xoa.sigma.decode_cf_sigma` function.
 
 ds = ds.xoa.decode_sigma()
-print(ds.depth)
+print(ds.z)
 
 # %%
 # Find coordinate names from CF conventions
 # -----------------------------------------
 #
-# The `depth` was assigned as coordinates at the previous stage.
-# We use the :ref:`xoa <accessors.dataset>` accessor to easily access the temperature, latitude and depth arrays.
+# The `z` was assigned as coordinates at the previous stage.
+# We use the :ref:`xoa <accessors.dataset>` accessor to easily access the temperature, latitude and z arrays.
 # The default configuration exposes shortcuts for some variables and coordinates
 # as shown in :metasec:`accessors`.
 
@@ -84,21 +84,21 @@ temp = temp.where(temp != 0)  # convert zeros to nans
 lat_name = temp.xoa.lat.name
 
 # %%
-# Interpolate at regular depths
+# Interpolate at regular heights
 # -----------------------------
 #
-# We interpolate the temperature array from irregular to regular depths.
+# We interpolate the temperature array from irregular to regular heights.
 #
-# Let's create the output depths.
+# Let's create the output heights.
 
-depth = xr.DataArray(
-    np.linspace(ds.depth.values.min(), ds.depth.values.max(), 1000), name="depth", dims="depth"
+z = xr.DataArray(
+    np.linspace(ds.z.values.min(), ds.z.values.max(), 1000), name="z", dims="z"
 )
 
 # %%
 # Let's interpolate the temperature.
 
-tempz = regrid1d(temp, depth, extrap="top")
+tempz = regrid1d(temp, z, extrap="top")
 
 # %%
 # Compute the mixed layer depths

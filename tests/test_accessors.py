@@ -162,6 +162,16 @@ class TestXoaAccessorSubaccessors:
         # Since the return is based on the object state, just check it's accessible
         assert meta_accessor is not None or hasattr(self.ds.xoa, '_meta')
 
+    def test_xoa_get_z_and_depth(self):
+        """Test the conversion between z and depth"""
+        z = xr.DataArray(
+            [-20.0, -10, 0], dims="k", name="z", attrs={"units": "m", "positive": "up"}
+        )
+        da = xr.DataArray(np.ones(3), dims="k", coords={"z": z})
+        assert da.xoa.get_z().name == "z"
+        np.testing.assert_array_equal(da.xoa.get_depth(), [20, 10, 0])
+        assert da.xoa.z.name == "z"
+
     def test_xoa_decode_sigma_subaccessor(self):
         """Test that .xoa.decode_sigma is a SigmaAccessor, cached on the xoa accessor"""
         from xoa.accessors import SigmaAccessor

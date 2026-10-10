@@ -336,7 +336,7 @@ def mixed_layer_depth(
     da: xarray.DataArray
         A data array that contains either the potential temperature,
         the potential density or the vertical tracer diffusivity.
-        This array **must contain a depth coordinate**, which should have
+        This array **must contain a depth or z coordinate**, which should have
         a ``positive`` attribute.
     {method}
     zref: float
@@ -384,8 +384,10 @@ def mixed_layer_depth(
         assert zdim in da.dims
     assert zdim in da.dims
 
-    # Depths
-    depth = xcoords.get_depth(da)
+    # Depths, as found, since the order of levels follows their positive attribute
+    depth = xcoords.get_vertical(da, errors="ignore")
+    if depth is None:
+        depth = xcoords.get_depth(da)
     positive = xcoords.get_positive_attr(depth, zdim=zdim) or "up"
 
     # Method

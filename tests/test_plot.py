@@ -16,6 +16,7 @@ import pytest
 import xarray as xr
 
 import xoa
+from xoa import coords as xcoords
 from xoa import plot as xplot
 
 pytest.importorskip("cartopy")
@@ -343,6 +344,16 @@ class TestPlotSection:
         fig, ax = plt.subplots()
         xplot.plot_section(get_section("up"), ax=ax)
         assert not ax.yaxis_inverted()
+
+    def test_z_up_is_not_inverted(self):
+        da = get_section("up")
+        z = xcoords.to_z(da.depth)
+        z.attrs["standard_name"] = "altitude"
+        da = da.drop_vars("depth").assign_coords(z=z)
+        fig, ax = plt.subplots()
+        xplot.plot_section(da, ax=ax, add_colorbar=False)
+        assert not ax.yaxis_inverted()
+        assert ax.get_ylabel().startswith("Height")
 
     @pytest.mark.parametrize("method", ["pcolormesh", "contourf", "contour"])
     def test_methods_with_2d_depth(self, method):
