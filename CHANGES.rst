@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Add the :ref:`indepth.vertical` guide. Distinguish the ``z`` coordinate, which is positive up, negative in the ocean and increases from the bottom to the surface, from the ``depth``, which is positive down. Add the ``z`` meta specification, with the :func:`xoa.coords.get_z` and :func:`xoa.coords.is_z` functions and the ``xoa.get_z`` accessor method, and the :func:`xoa.coords.to_z`, :func:`xoa.coords.to_depth` and :func:`xoa.coords.reverse_dim` converters. :func:`xoa.coords.get_depth` and :func:`xoa.coords.get_z` use the other one when they do not find their own, with a sign change.
 - Add the :func:`xoa.core.plot.get_projection` function to get a map projection from an instance, or from the lower case name of any cartopy projection without mandatory parameters, or the aliases ``"merc"``, ``"pc"`` and ``"ortho"``, the latter being the default of :func:`xoa.plot.plot_grid` and centered on the grid.
 - The main ``xoa`` accessor is now registered when :mod:`xoa` is imported.
 - Add the :class:`xoa.core.interp.XYInterpolator` and :class:`xoa.core.regrid.XYRegridder` numba classes for horizontal bilinear, bicubic and conservative interpolation and regridding, with their kernels in the new :mod:`xoa.core.spline` and :mod:`xoa.core.conserv` modules.
@@ -29,6 +30,8 @@ New features
 
 Breaking changes
 ----------------
+- :func:`xoa.sigma.decode_sigma` and the ``ocean_*`` functions of :mod:`xoa.sigma` now return a ``z`` array, which is positive up, instead of a ``depth`` array that was negative. :func:`xoa.grid.dz2depth` and :func:`xoa.grid.decode_dz2depth` return a ``z`` array when ``positive="up"``, and :func:`xoa.grid.decode_dz2depth` no longer overwrites a dimension coordinate that has the same name. Use :func:`xoa.coords.get_depth` to get a depth.
+- :func:`xoa.coords.get_vertical` now uses the meta specs of its argument and looks for a depth, a ``z`` and then an altitude. The ``z`` name is no longer an alternative name of the ``level`` coordinate, and the ``z`` entry of the ``hycom`` configuration is now a ``depth`` entry.
 - :func:`xoa.grid.get_edges` now extrapolates the outer edges linearly by default (``mode="linear_extrap"``) instead of replicating the end values. Pass ``mode="edge"`` to recover the previous behaviour. This also changes the edges inferred by the ``cellave`` method of :func:`xoa.regrid.regrid1d`.
 - The minimal version of xarray is now 2024.6, which provides the ``on_missing_core_dim`` argument of :func:`xarray.apply_ufunc` used to interpolate and regrid datasets.
 - :func:`xoa.grid.to_rect` now relies on :func:`xoa.core.grid.check_grid_type` and converts a longitude and the latitude that shares its dimensions together, only if the grid is not curvilinear.
@@ -41,6 +44,7 @@ Deprecations
 
 Bug fixes
 ---------
+- :func:`xoa.coords.get_depth` no longer fails when it has to decode a dataset, and no longer warns when ``errors="ignore"``.
 - Fix the ``decode_sigma`` subaccessor of the ``xoa`` accessor of datasets, that returned ``None``.
 - Fix the meta appendix: the meta configurations are no longer called specifications, the specifications provided by the internal :file:`meta.ini` file have their own page, and the details pages of the configuration items are not listed in the left table of contents anymore.
 - Fix the bilinear and bicubic interpolation with ``skipna=True`` and ``na_thres=0``, that set isolated points to nan because of rounding errors in the sum of the weights of valid neighbours.

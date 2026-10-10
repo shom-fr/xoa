@@ -177,11 +177,118 @@ def is_lat(da, loc="any"):
     return meta.get_meta_specs(da).coords.match(da, "lat", loc=loc)
 
 
+def _search_z_depth_(da, name, **kwargs):
+    """Search for `name` ("z" or "depth"), else for the other one, converted if needed"""
+    metaspecs = meta.get_meta_specs(da)
+    other = "depth" if name == "z" else "z"
+    found = metaspecs.search(da, name, errors="ignore", **kwargs)
+    if found is not None:
+        return found
+    found = metaspecs.search(da, other, errors="ignore", **kwargs)
+    if found is not None:
+        if found.attrs.get("positive") == ("up" if name == "z" else "down"):
+            return found  # already in the requested convention, whatever its name
+        return to_z(found) if name == "z" else to_depth(found)
+
+
+def _get_z_depth_(da, name, errors, **kwargs):
+    """Common part of :func:`get_z` and :func:`get_depth`"""
+    errors = misc.ERRORS[errors]
+    ztype = meta.get_meta_specs(da)["vertical"]["type"]
+
+    # From variable, converted if needed
+    found = _search_z_depth_(da, name, **kwargs)
+    if found is not None:
+        return found
+
+    # Decode the dataset
+    if ztype != "z" and hasattr(da, "data_vars"):
+        decoders = []
+        if ztype in ("sigma", None):
+            from .sigma import decode_sigma
+
+            decoders.append(decode_sigma)
+        if ztype in ("dz", "layer", None):
+            from .grid import decode_dz2depth
+
+            decoders.append(decode_dz2depth)
+        for decoder in decoders:
+            decoded = decoder(da, errors="ignore" if ztype is None else errors)
+            found = _search_z_depth_(decoded, name, **kwargs)
+            if found is not None:
+                return found
+        msg = "Can't infer {} coordinate from dataset".format(name)
+    else:
+        msg = "No {} coordinate found".format(name)
+    if errors == "raise":
+        raise exceptions.XoaCoordsError(msg)
+    if errors == "warn":
+        exceptions.xoa_warn(msg)
+
+
+@misc.ERRORS.format_function_docstring
+def get_z(da, errors="raise", **kwargs):
+    """Get or compute the z coordinate, which is positive up
+
+    The z coordinate is negative in the ocean and increases from the bottom
+    to the surface, as opposed to the depth, which is positive in the ocean.
+    If a z variable cannot be found, it uses the depth, if any, with
+    :func:`to_z`, or tries to compute it either from sigma-like coordinates
+    or from layer thicknesses.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+    {errors}
+    kwargs:
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
+
+    Return
+    ------
+    xarray.DataArray or None
+
+    See also
+    --------
+    get_depth
+    get_vertical
+    to_z
+    to_depth
+    xoa.meta.MetaSpecs.search
+    xoa.sigma.decode_sigma
+    xoa.grid.decode_dz2depth
+    """
+    return _get_z_depth_(da, "z", errors, **kwargs)
+
+
+def is_z(da, loc="any"):
+    """Tell if a data array is identified as z, i.e. positive up
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+    loc: str
+        Staggered grid location
+
+    Return
+    ------
+    bool
+
+    See also
+    --------
+    is_depth
+    is_altitude
+    is_level
+    xoa.meta.MetaCoordSpecs.match
+    """
+    return meta.get_meta_specs(da).coords.match(da, "z", loc=loc)
+
+
 @misc.ERRORS.format_function_docstring
 def get_depth(da, errors="raise", **kwargs):
-    """Get or compute the depth coordinate
+    """Get or compute the depth coordinate, which is positive down
 
-    If a depth variable cannot be found, it tries to compute either
+    If a depth variable cannot be found, it uses the z coordinate, if any,
+    with :func:`to_depth`, or tries to compute it either
     from sigma-like coordinates or from layer thicknesses.
 
     Parameters
@@ -197,50 +304,20 @@ def get_depth(da, errors="raise", **kwargs):
 
     See also
     --------
+    get_z
     get_lon
     get_lat
     get_time
     get_altitude
     get_level
     get_vertical
+    to_depth
+    to_z
     xoa.meta.MetaSpecs.search
-    xoa.sigma.decode_meta_sigma
-    xoa.grid.decode_meta_dz2depth
+    xoa.sigma.decode_sigma
+    xoa.grid.decode_dz2depth
     """
-    metaspecs = meta.get_meta_specs(da)
-    errors = misc.ERRORS[errors]
-    ztype = metaspecs["vertical"]["type"]
-
-    # From variable
-    depth = metaspecs.search(da, 'depth', errors="ignore", **kwargs)
-    if depth is not None:
-        return depth
-    if ztype == "z" or not hasattr(da, "data_vars"):  # explicitly
-        msg = "No depth coordinate found"
-        if errors == "raise":
-            raise exceptions.XoaCoordsError(msg)
-        exceptions.xoa_warn(msg)
-        return
-
-    # Decode the dataset
-    if ztype == "sigma" or ztype is None:
-        err = "ignore" if ztype is None else errors
-        from .sigma import decode_meta_sigma
-
-        da = decode_meta_sigma(da, errors=err)
-        if "depth" in da:
-            return da.depth
-    if ztype == "dz2depth" or ztype is None:
-        err = "ignore" if ztype is None else errors
-        from .grid import decode_meta_dz2depth
-
-        da = decode_meta_dz2depth(da, errors=err)
-        if "depth" in da:
-            return da.depth
-    msg = "Can't infer depth coordinate from dataset"
-    if errors == "raise":
-        raise exceptions.XoaCoordsError(msg)
-    exceptions.xoa_warn(msg)
+    return _get_z_depth_(da, "depth", errors, **kwargs)
 
 
 def is_depth(da, loc="any"):
@@ -377,9 +454,10 @@ def is_level(da, loc="any"):
 
 @misc.ERRORS.format_function_docstring
 def get_vertical(da, errors="raise", **kwargs):
-    """Get either depth or altitude
+    """Get either z, depth or altitude
 
-    Tries to find a depth coordinate first, then falls back to altitude.
+    Tries to find a depth coordinate first, then a z and finally an altitude.
+    No conversion is performed: use :func:`get_z` or :func:`get_depth` for that.
 
     Parameters
     ----------
@@ -396,25 +474,129 @@ def get_vertical(da, errors="raise", **kwargs):
     --------
     get_lon
     get_lat
+    get_z
     get_depth
     get_altitude
     get_level
     get_time
     xoa.meta.MetaSpecs.search
     """
-    metaspecs = meta.get_meta_specs()
-    height = metaspecs.search(da, 'depth', errors="ignore", **kwargs)
-    if height is None:
-        height = metaspecs.search(da, 'altitude', errors="ignore", **kwargs)
+    metaspecs = meta.get_meta_specs(da)
+    for meta_name in ("depth", "z", "altitude"):
+        height = metaspecs.search(da, meta_name, errors="ignore", **kwargs)
+        if height is not None:
+            break
     if height is None:
         errors = misc.ERRORS[errors]
         msg = "No vertical coordinate found"
         if errors == "raise":
-            raise meta.XoaCoordsError(msg)
+            raise exceptions.XoaCoordsError(msg)
         elif errors == "warn":
             exceptions.xoa_warn(msg)
     else:
         return height
+
+
+def reverse_dim(da, dim=None):
+    """Reverse a data array along a dimension
+
+    This is a view for numpy arrays and a lazy operation for dask arrays.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+    dim: None, str
+        Dimension name, which defaults to the first one.
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    to_z
+    to_depth
+    """
+    dim = dim or da.dims[0]
+    return da.isel({dim: slice(None, None, -1)})
+
+
+def _flip_vertical_(da, name, positive, reverse):
+    """Common part of :func:`to_z` and :func:`to_depth`"""
+    out = 0 - da  # avoids negative zeros
+    if da.name in out.coords:  # stale copy of itself
+        out = out.drop_vars(da.name)
+    out.attrs = {k: v for k, v in da.attrs.items() if k == "units"}
+    out.attrs["positive"] = positive
+    out = out.rename(name)
+    return reverse_dim(out, None if reverse is True else reverse) if reverse else out
+
+
+def to_z(da, name="z", reverse=False):
+    """Convert a depth (positive down) to z (positive up) by changing its sign
+
+    Only the ``units`` attribute is kept, and the ``positive`` attribute
+    is set to ``"up"``. The array is lazily negated if it is a dask array.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Depths, i.e. positive in the ocean.
+    name: str
+        Name of the output array.
+    reverse: bool, str
+        Also reverse the array along its first dimension, or along the given
+        dimension, to switch from an order going from the surface to the bottom
+        to the opposite.
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    to_depth
+    reverse_dim
+    get_z
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> depth = xr.DataArray([0., 10, 50], dims="k", attrs={"units": "m"})
+        >>> to_z(depth, reverse=True).values
+        array([-50., -10.,   0.])
+    """
+    return _flip_vertical_(da, name, "up", reverse)
+
+
+def to_depth(da, name="depth", reverse=False):
+    """Convert a z (positive up) to depth (positive down) by changing its sign
+
+    This is the mirror of :func:`to_z`.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Heights, i.e. negative in the ocean.
+    name: str
+        Name of the output array.
+    reverse: bool, str
+        Also reverse the array along its first dimension, or along the given
+        dimension, to switch from an order going from the bottom to the surface
+        to the opposite.
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    to_z
+    reverse_dim
+    get_depth
+    """
+    return _flip_vertical_(da, name, "down", reverse)
 
 
 @misc.ERRORS.format_function_docstring

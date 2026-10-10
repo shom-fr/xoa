@@ -123,6 +123,8 @@ class TestDepthConversion:
         depth = grid.dz2depth(dz, positive, ref=ref, ref_type=ref_type)
         np.testing.assert_allclose(depth.isel(x=1), expected)
         assert depth.z[0] == -0.5
+        assert depth.name == ("z" if positive == "up" else "depth")
+        assert depth.attrs["positive"] == positive
 
         depth = grid.dz2depth(dz, positive, ref=ref, ref_type=ref_type, centered=True)
         assert depth[0, 0] == 0.5 * sum(expected[:2])
@@ -298,3 +300,20 @@ class TestGetFingerprint:
         mask = np.ones((4, 5), bool)
         ds["valid"] = (("lat", "lon"), mask)
         assert grid.get_fingerprint(ds, mask="valid") == grid.get_fingerprint(ds, mask=mask)
+
+    def test_decode_dz2depth(self):
+        """Test the output name of the decoding, and its conflict with a dimension"""
+        dz = xr.DataArray(
+            np.resize([100, 500, 1000.0], (2, 3)).T,
+            dims=("lev", "x"),
+            coords={"lev": ("lev", np.arange(3, dtype="d"), {"positive": "down"})},
+            name="dz",
+        )
+        ds = grid.decode_dz2depth(dz.to_dataset())
+        assert "depth" in ds.coords
+        dz = dz.rename(lev="z")
+        dz["z"].attrs["positive"] = "up"
+        ds = grid.decode_dz2depth(dz.to_dataset(), errors="ignore")
+        assert ds.z.dims == ("z",)
+        with pytest.raises(xoa.XoaError):
+            grid.decode_dz2depth(dz.to_dataset())

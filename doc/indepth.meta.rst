@@ -709,11 +709,17 @@ Available coordinate finder functions:
 
 - :func:`~xoa.coords.get_lon` / :func:`~xoa.coords.is_lon`: Longitude
 - :func:`~xoa.coords.get_lat` / :func:`~xoa.coords.is_lat`: Latitude
-- :func:`~xoa.coords.get_depth` / :func:`~xoa.coords.is_depth`: Depth
+- :func:`~xoa.coords.get_depth` / :func:`~xoa.coords.is_depth`: Depth, positive down
+- :func:`~xoa.coords.get_z` / :func:`~xoa.coords.is_z`: Height ``z``, positive up
 - :func:`~xoa.coords.get_altitude` / :func:`~xoa.coords.is_altitude`: Altitude
 - :func:`~xoa.coords.get_level` / :func:`~xoa.coords.is_level`: Generic vertical level
-- :func:`~xoa.coords.get_vertical`: Any vertical coordinate (depth, altitude, or level)
+- :func:`~xoa.coords.get_vertical`: Any vertical coordinate (depth, z, or altitude), without conversion
 - :func:`~xoa.coords.get_time` / :func:`~xoa.coords.is_time`: Time
+
+.. _indepth.meta.zdepth:
+
+The ``z`` coordinate is positive up and the ``depth`` is positive down:
+see :ref:`indepth.vertical`.
 
 Dimension finder functions:
 
