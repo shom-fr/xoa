@@ -38,7 +38,7 @@ The default configuration
 -------------------------
 
 .. note:: You can define your own specifications for each of your datasets.
-    Have a look to the :ref:`indepth.meta` section and to the :ref:`examples`.
+    Have a look to the :ref:`indepth.meta` section and to the :ref:`tutorials`.
 
 As a :file:`.cfg` file
 ^^^^^^^^^^^^^^^^^^^^^^

@@ -1,6 +1,6 @@
 name: CI
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build-linux:
@@ -33,3 +33,25 @@ jobs:
         pip install .
         pip install pytest
         pytest
+
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+    - name: Add conda to system path
+      run: |
+        echo $CONDA/bin >> $GITHUB_PATH
+    - name: Install dependencies
+      run: |
+        conda env update --file env/environment.rtd.yml --name base
+        pip install .
+    - name: Build the docs
+      run: |
+        sphinx-build -b html doc doc/_build/html
+    - name: Upload the docs
+      uses: actions/upload-artifact@v7
+      with:
+        name: docs-html
+        path: doc/_build/html
+        retention-days: 7

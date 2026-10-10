@@ -21,7 +21,7 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 
-from xoa.plot import plot_taylor
+from xoa.plot import plot_taylor, add_shadow
 from xoa.core import plot as cplot
 
 # %%
@@ -38,7 +38,7 @@ noise = [0.2, 0.5, 1.0, 1.5]
 scales = [1.0, 1.2, 0.7, 1.4]
 models = xr.concat(
     [s * ref + n * rng.normal(size=ref.shape) for s, n in zip(scales, noise)],
-    dim=xr.DataArray(["A", "B", "C", "D"], dims="model", name="model"),
+    dim=xr.DataArray(["MARS", "CROCO", "HYCOM", "NEMO"], dims="model", name="model"),
 )
 
 # %%
@@ -47,7 +47,13 @@ models = xr.concat(
 # The statistics are computed over ``time`` and ``x``. The remaining ``model``
 # dimension creates the points, whose labels are the coordinates.
 
-plot_taylor(models, ref, dim=("time", "x"), markers=["o", "s", "^", "D"])
+diagram = plot_taylor(models, ref, dim=("time", "x"), markers=["o", "s", "^", "D"])
+
+# %%
+# The markers can be given a blurred drop shadow with :func:`xoa.plot.add_shadow`.
+
+points = [line for line in diagram.ax.lines if line.get_marker() not in (None, "None", "")]
+add_shadow(points, width=4, xoffset=3, yoffset=-3, alpha=0.7, ax=diagram.ax)
 
 # %%
 # Normalized, with colored points
@@ -66,7 +72,7 @@ plot_taylor(
     xr.concat([models, -models.isel(model=[1])], dim="model"),
     ref,
     dim=("time", "x"),
-    labels=["A", "B", "C", "D", "-B"],
+    labels=["MARS", "CROCO", "HYCOM", "NEMO", "-CROCO"],
     normalize=True,
 )
 
@@ -76,4 +82,3 @@ plot_taylor(
 # Normalized statistics can be drawn directly, the reference standard deviation being 1.
 
 cplot.plot_taylor([0.9, 1.2, 0.7], [0.95, 0.8, -0.3], labels=["a", "b", "c"], rmax=1.5)
-plt.show()

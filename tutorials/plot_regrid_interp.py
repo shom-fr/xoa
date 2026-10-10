@@ -27,6 +27,7 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
+import cmocean
 
 import xoa
 from xoa import geo, interp, regrid, weights
@@ -93,11 +94,11 @@ print(results["bilinear"])
 
 extent = geo.get_extent(temp, margin=0.02)
 fig, axes = plt.subplots(
-    1, 4, figsize=(16, 3.5), subplot_kw={"projection": ccrs.Mercator()}, sharey=True
+    2, 2, figsize=(10, 7.5), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
 )
-kw = dict(vmin=float(temp.min()), vmax=float(temp.max()), cmap="Spectral_r", add_colorbar=False)
+kw = dict(vmin=float(temp.min()), vmax=float(temp.max()), cmap=cmocean.cm.thermal, add_colorbar=False)
 fields = {"source": temp, **results}
-for ax, (title, field) in zip(axes, fields.items()):
+for ax, (title, field) in zip(axes.flat, fields.items()):
     mappable = plot_field(
         field, ax=ax, title=title, map_kw={"gridlines_labels_on": ["bottom"]}, **kw
     )
@@ -170,11 +171,16 @@ print(on_rotated.dims, int(on_rotated.isnull().sum()), "missing points")
 
 src_grid = xr.Dataset(coords={"lon_rho": temp.lon_rho, "lat_rho": temp.lat_rho})
 back = regrid.Regridder(on_rotated, src_grid, "bilinear").regrid(on_rotated)
-fig, axes = plt.subplots(1, 3, figsize=(12, 3.5), subplot_kw={"projection": ccrs.Mercator()})
+fig, axes = plt.subplots(
+    1, 3, figsize=(14, 5.5), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
+)
 kw = dict(map_kw={"gridlines_labels_on": ["bottom"]}, add_colorbar=False)
-plot_field(on_rotated, ax=axes[0], title="rotated grid", cmap="Spectral_r", **kw)
-plot_field(back, ax=axes[1], title="back to the source grid", cmap="Spectral_r", **kw)
-diff = plot_field(back - temp, ax=axes[2], title="difference", cmap="RdBu_r", vmin=-1, vmax=1, **kw)
+plot_field(on_rotated, ax=axes[0], title="rotated grid", cmap=cmocean.cm.thermal, **kw)
+plot_field(back, ax=axes[1], title="back to the source grid", cmap=cmocean.cm.thermal, **kw)
+diff = plot_field(back - temp, ax=axes[2], title="difference", cmap=cmocean.cm.balance, vmin=-1, vmax=1, **kw)
+extent_rot = geo.get_extent(on_rotated, margin=0.05)
+for ax in axes:
+    ax.set_extent(extent_rot, crs=ccrs.PlateCarree())
 add_colorbar(diff, axes[2], label="Difference [Celsius]")
 
 # %%
@@ -193,11 +199,10 @@ print(transect.dims, transect.shape)
 # %%
 # The result is a section along the transect, for all levels at once.
 
-fig, ax = plt.subplots(figsize=(6, 3))
+fig, ax = plt.subplots(figsize=(7, 4), constrained_layout=True)
 ax.plot(lons, transect.isel(s_rho=-1))
 ax.set_xlabel("Longitude")
 ax.set_ylabel("Surface temperature")
-fig.tight_layout()
 
 # %%
 # Destination coordinates can also have their own dimensions, or be a grid.
@@ -267,5 +272,3 @@ print(temp.xoa.interp(lons, lats, method="bilinear").shape)
 #     :class:`~xoa.interp.Interpolator` object yourself, as shown above.
 #     The numba kernels they rely on are available in :mod:`xoa.core.interp` and
 #     :mod:`xoa.core.regrid` for use with plain numpy arrays.
-
-plt.show()

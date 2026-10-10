@@ -100,3 +100,13 @@ Callables
     :template: autosummary/accessor_callable.rst
 
     Dataset.decode_sigma
+
+
+Plotting
+~~~~~~~~
+
+The ``plot`` attribute of the ``xoa`` accessors, like ``da.xoa.plot.field()``,
+has the following methods.
+
+.. autoclass:: xoa.accessors.XoaPlotAccessor
+    :members:

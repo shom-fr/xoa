@@ -15,7 +15,7 @@
    :maxdepth: 1
    :hidden:
 
-   examples/index
+   tutorials/index
    indepth
    cli
 

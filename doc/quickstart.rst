@@ -7,8 +7,8 @@ Quick start guide
 Read the documentation
 -------------------------
 
-You should probably start with the :ref:`examples` section.
-This collection of examples will gradually be completed
+You should probably start with the :ref:`tutorials` section.
+This collection of tutorials will gradually be completed
 to cover almost all features of the library.
 
 Some of the modules that are special or of particular interest
@@ -21,4 +21,4 @@ Using the library
 Like most xarray-based projects, xoa provides not only
 a :ref:`library <api>` but also :ref:`accessors <accessors>` for convenient
 access to part of the functionality.
-Both uses are demonstrated in the practical examples.
+Both uses are demonstrated in the tutorials.
