@@ -50,6 +50,8 @@ CROCO section.
     import xarray as xr
     import xoa
     from xoa import coords
+    @suppress
+    xoa.meta.set_meta_specs("default")
 
 Sign and order are two different things
 =======================================

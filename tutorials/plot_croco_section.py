@@ -56,7 +56,7 @@ print(ds)
 
 # %%
 # Compute heights from s-coordinates
-# ---------------------------------
+# ----------------------------------
 #
 # Decode the dataset according to the CF conventions:
 #
@@ -85,7 +85,7 @@ lat_name = temp.xoa.lat.name
 
 # %%
 # Interpolate at regular heights
-# -----------------------------
+# ------------------------------
 #
 # We interpolate the temperature array from irregular to regular heights.
 #
