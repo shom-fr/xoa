@@ -756,6 +756,20 @@ def _get_meta_var_(obj, meta_name):
     return xmeta.get_meta_specs(obj).search(obj, meta_name, errors="ignore")
 
 
+def _get_map_axes_(ax, extent, transform, map_kw, projection=None):
+    """Create a map when there is no axes, or decorate the axes
+
+    ``projection`` is the default one, which can be overridden in ``map_kw``.
+    """
+    kw = dict(map_kw or {})
+    if ax is None:
+        if projection is not None:
+            kw.setdefault("projection", projection)
+        return create_base_map(extent, **kw)[1]
+    setup_map_axes(ax, extent, transform, **{k: v for k, v in kw.items() if k in _AX_SETUP_KEYS})
+    return ax
+
+
 def plot_field(
     field,
     ax=None,
@@ -830,13 +844,7 @@ def plot_field(
     lon = xcoords.get_lon(field)
     lat = xcoords.get_lat(field)
     extent = xgeo.get_extent(field, margin=margin)
-    kw = dict(map_kw or {})
-    if ax is None:
-        _, ax = create_base_map(extent, **kw)
-    else:
-        setup_map_axes(
-            ax, extent, transform, **{k: v for k, v in kw.items() if k in _AX_SETUP_KEYS}
-        )
+    ax = _get_map_axes_(ax, extent, transform, map_kw)
 
     if kwargs.get("add_colorbar", True):
         kwargs["cbar_kwargs"] = _get_cbar_kwargs_(field, kwargs.get("cbar_kwargs"))
@@ -991,13 +999,7 @@ def plot_grid(
     # Axes
     lon, lat = xgrid._get_lonlat_yx_(obj)
     extent = xgeo.get_extent((lon.values, lat.values), margin=0.05)
-    kw = dict(map_kw or {})
-    if ax is None:
-        _, ax = create_base_map(extent, **kw)
-    else:
-        setup_map_axes(
-            ax, extent, transform, **{k: v for k, v in kw.items() if k in _AX_SETUP_KEYS}
-        )
+    ax = _get_map_axes_(ax, extent, transform, map_kw, projection="ortho")
 
     # Background field
     if kind == "resolution":

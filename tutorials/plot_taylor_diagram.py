@@ -48,12 +48,14 @@ models = xr.concat(
 # The statistics are computed over ``time`` and ``x``. The remaining ``model``
 # dimension creates the points, whose labels are the coordinates.
 # A blurred drop shadow is added to the markers with :func:`xoa.plot.add_shadow`.
+# The artists of the diagram are available as attributes, like ``markers`` and ``reference``.
 # It must be called in the same cell as the plot, since the figure is captured
 # at the end of the cell.
 
 diagram = plot_taylor(models, ref, dim=("time", "x"), markers=["o", "s", "^", "D"])
-points = [line for line in diagram.ax.lines if line.get_marker() not in (None, "None", "")]
-add_shadow(points, width=3, xoffset=2, yoffset=-2, alpha=0.4, ax=diagram.ax)
+add_shadow(
+    diagram.markers + [diagram.reference], width=3, xoffset=2, yoffset=-2, alpha=0.4, ax=diagram.ax
+)
 
 # %%
 # Normalized, with colored points
@@ -68,17 +70,21 @@ plot_taylor(models, ref, dim=("time", "x"), normalize=True, values=cost, cmap="v
 # ---------------------
 # The diagram becomes a half circle when needed.
 
-plot_taylor(
+diagram = plot_taylor(
     xr.concat([models, -models.isel(model=[1])], dim="model"),
     ref,
     dim=("time", "x"),
     labels=["MARS", "CROCO", "HYCOM", "NEMO", "-CROCO"],
     normalize=True,
 )
+diagram.ax.figure.set_size_inches(8, 4.3)
+diagram.ax.figure.subplots_adjust(left=0.02, right=0.82, top=0.9, bottom=0.13)
 
 # %%
 # Without a reference array
 # -------------------------
 # Normalized statistics can be drawn directly, the reference standard deviation being 1.
 
-cplot.plot_taylor([0.9, 1.2, 0.7], [0.95, 0.8, -0.3], labels=["a", "b", "c"], rmax=1.5)
+diagram = cplot.plot_taylor([0.9, 1.2, 0.7], [0.95, 0.8, -0.3], labels=["a", "b", "c"], rmax=1.5)
+diagram.ax.figure.set_size_inches(8, 4.3)
+diagram.ax.figure.subplots_adjust(left=0.02, right=0.82, top=0.9, bottom=0.13)
