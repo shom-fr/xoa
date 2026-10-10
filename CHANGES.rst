@@ -6,7 +6,7 @@ Unreleased
 
 New features
 ------------
-- Add the :func:`xoa.core.plot.get_projection` function to get a map projection from the aliases ``"merc"``, ``"pc"`` and ``"ortho"``, the latter being the default of :func:`xoa.plot.plot_grid` and centered on the grid.
+- Add the :func:`xoa.core.plot.get_projection` function to get a map projection from an instance, or from the lower case name of any cartopy projection without mandatory parameters, or the aliases ``"merc"``, ``"pc"`` and ``"ortho"``, the latter being the default of :func:`xoa.plot.plot_grid` and centered on the grid.
 - The main ``xoa`` accessor is now registered when :mod:`xoa` is imported.
 - Add the :class:`xoa.core.interp.XYInterpolator` and :class:`xoa.core.regrid.XYRegridder` numba classes for horizontal bilinear, bicubic and conservative interpolation and regridding, with their kernels in the new :mod:`xoa.core.spline` and :mod:`xoa.core.conserv` modules.
 - Add the :class:`xoa.interp.Interpolator` and :class:`xoa.regrid.Regridder` xarray classes for horizontal (and temporal) interpolation and regridding, with the :func:`xoa.coords.geo_merge` and :func:`xoa.grid.ds2grid_dict` helpers.

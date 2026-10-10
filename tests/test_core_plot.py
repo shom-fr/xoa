@@ -301,10 +301,15 @@ def test_get_projection():
     proj = cplot.get_projection("ortho", [10, 20, -40, -30])
     assert isinstance(proj, ccrs.Orthographic)
     assert proj.proj4_params["lon_0"] == 15 and proj.proj4_params["lat_0"] == -35
+    assert isinstance(cplot.get_projection("robinson"), ccrs.Robinson)
+    proj = cplot.get_projection("stereographic", [10, 20, -40, -30])
+    assert isinstance(proj, ccrs.Stereographic) and proj.proj4_params["lat_0"] == -35
     crs = ccrs.PlateCarree()
     assert cplot.get_projection(crs) is crs
-    with pytest.raises(cplot.exceptions.XoaError):
+    with pytest.raises(cplot.exceptions.XoaError, match="Invalid projection name"):
         cplot.get_projection("unknown")
+    with pytest.raises(cplot.exceptions.XoaError, match="mandatory parameters"):
+        cplot.get_projection("utm")
 
 
 class TestTaylor:

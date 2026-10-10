@@ -19,6 +19,8 @@ They are used by the high level plotting functions of the :mod:`xoa.plot` module
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
+
 import matplotlib.collections as mcollections
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -43,46 +45,69 @@ def _import_cartopy_():
     return ccrs, cfeature
 
 
+#: Short names of the projections
+PROJ_ALIASES = {"merc": "mercator", "pc": "platecarree", "ortho": "orthographic"}
+
+
 def get_projection(projection=None, extent=None):
     """Get a cartopy projection from its name or alias
 
     Parameters
     ----------
-    projection: None, str, cartopy.crs.CRS
-        A projection, or one of the names ``"merc"`` (or ``"mercator"``),
-        ``"pc"`` (or ``"platecarree"``) and ``"ortho"`` (or ``"orthographic"``),
-        which is the default :class:`cartopy.crs.Mercator`.
+    projection: None, str, cartopy.crs.Projection
+        A projection instance, which is returned as is, or the lower case name of a
+        :mod:`cartopy.crs` projection class that has no mandatory parameter,
+        like ``"mercator"``, ``"platecarree"``, ``"orthographic"``, ``"stereographic"``
+        or ``"lambertazimuthalequalarea"``.
+        The aliases ``"merc"``, ``"pc"`` and ``"ortho"`` are also accepted.
+        The default is :class:`cartopy.crs.Mercator`.
         The orthographic projection shows the Earth as seen from above a point,
         which limits the deformation of the cells of regional grids.
     extent: None, list
-        Extent ``[xmin, xmax, ymin, ymax]`` in degrees, whose center is the center
-        of the orthographic projection
+        Extent ``[xmin, xmax, ymin, ymax]`` in degrees, whose center is used as the
+        ``central_longitude`` and ``central_latitude`` of the projections that accept
+        both, like the orthographic one.
 
     Return
     ------
-    cartopy.crs.CRS
+    cartopy.crs.Projection
     """
     ccrs, _ = _import_cartopy_()
     if projection is None:
-        projection = "merc"
+        projection = "mercator"
     if not isinstance(projection, str):
         return projection
-    name = projection.lower()
-    if name in ("merc", "mercator"):
-        return ccrs.Mercator()
-    if name in ("pc", "platecarree"):
-        return ccrs.PlateCarree()
-    if name in ("ortho", "orthographic"):
-        kw = {}
-        if extent is not None:
-            kw = dict(
-                central_longitude=0.5 * (extent[0] + extent[1]),
-                central_latitude=0.5 * (extent[2] + extent[3]),
-            )
-        return ccrs.Orthographic(**kw)
-    raise exceptions.XoaError(
-        f"Invalid projection name: {projection}. Choose among: merc, pc, ortho."
-    )
+    classes = {
+        name.lower(): cls
+        for name, cls in vars(ccrs).items()
+        if isinstance(cls, type)
+        and issubclass(cls, ccrs.Projection)
+        and cls is not ccrs.Projection
+        and not name.startswith("_")
+    }
+    name = PROJ_ALIASES.get(projection.lower(), projection.lower())
+    if name not in classes:
+        raise exceptions.XoaError(
+            f"Invalid projection name: {projection}. Choose among: "
+            + ", ".join(sorted(classes))
+            + ", or one of the aliases: "
+            + ", ".join(PROJ_ALIASES)
+        )
+    cls = classes[name]
+    kw = {}
+    params = inspect.signature(cls.__init__).parameters
+    if extent is not None and "central_longitude" in params and "central_latitude" in params:
+        kw = dict(
+            central_longitude=0.5 * (extent[0] + extent[1]),
+            central_latitude=0.5 * (extent[2] + extent[3]),
+        )
+    try:
+        return cls(**kw)
+    except TypeError as exc:
+        raise exceptions.XoaError(
+            f"The {cls.__name__} projection has mandatory parameters: "
+            "create an instance and pass it instead of its name."
+        ) from exc
 
 
 def add_land(ax, scale="110m", color=None, **kwargs):
