@@ -96,7 +96,7 @@ class MetaSpecs(categories._MetaBase_):
     a generic name, a categories name, alternates names, some properties
     and attributes like standard_name, long_name, axis.
 
-    Have a look to the :ref:`default specifications <appendix.meta_specs.default>`
+    Have a look to the :ref:`default configurations <appendix.meta.default>`
     and to the :ref:`indepth.meta` section.
 
 
@@ -123,7 +123,7 @@ class MetaSpecs(categories._MetaBase_):
     MetaVarSpecs
     SGLocator
     :ref:`indepth.meta`
-    :ref:`appendix.meta_specs.default`
+    :ref:`appendix.meta.default`
     """
 
     def __init__(self, cfg=None, default=True, user=True, name=None, cache=None):

@@ -952,6 +952,25 @@ class TestSkipnaRenormalization:
         assert not np.isnan(interp.interp(field, skipna=True, na_thres=missing + 0.01)).any()
         assert np.isnan(interp.interp(field, skipna=True, na_thres=missing - 0.01)).all()
 
+    @pytest.mark.parametrize("method", ["bilinear", "bicubic"])
+    def test_na_thres_zero_keeps_the_cells_with_all_valid_corners(self, method):
+        """The sum of the weights of valid corners is not lost by rounding errors"""
+        n = 30
+        lon, lat = np.meshgrid(np.arange(n, dtype=float), np.arange(n, dtype=float))
+        field = np.ones((n, n))
+        field[10:15, 12:20] = np.nan
+        rng = np.random.default_rng(0)
+        plon = rng.uniform(1, n - 2.001, 2000)
+        plat = rng.uniform(1, n - 2.001, 2000)
+        j, i = plat.astype(int), plon.astype(int)
+        valid = ~np.isnan(field)
+        corners_ok = valid[j, i] & valid[j, i + 1] & valid[j + 1, i] & valid[j + 1, i + 1]
+        out = XYInterpolator(
+            {"lon": lon, "lat": lat}, plon, plat, method=method
+        ).interp(field, skipna=True, na_thres=0)
+        assert corners_ok.any() and (~corners_ok).any()
+        np.testing.assert_array_equal(~np.isnan(out), corners_ok)
+
     def test_mask_is_equivalent_to_nan(self):
         lon, lat, plon, plat = GRIDS["regular"]
         mask = np.ones(lon.shape, bool)

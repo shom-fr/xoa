@@ -551,7 +551,7 @@ class TestPlotTaylor:
     def test_single_point_by_default(self):
         mod, ref = self.get_data()
         diagram = xplot.plot_taylor(mod.isel(model=0), ref)
-        assert len(diagram.artists) == 1
+        assert len(diagram.markers) == 1
         assert diagram.legend is None
         assert np.isclose(diagram.ref_std, float(ref.std()))
 
@@ -559,9 +559,9 @@ class TestPlotTaylor:
         mod, ref = self.get_data()
         diagram = xplot.plot_taylor(mod, ref, dim=("time", "x"), normalize=True)
         assert diagram.negative
-        assert len(diagram.artists) == 3
+        assert len(diagram.markers) == 3
         assert [t.get_text() for t in diagram.legend.get_texts()][1:] == ["a", "b", "c"]
-        theta, std = diagram.artists[2].get_data()
+        theta, std = diagram.markers[2].get_data()
         assert np.isclose(std[0], 2.0) and np.isclose(theta[0], 0)
         assert diagram.ref_std == 1.0
 
@@ -579,14 +579,14 @@ class TestPlotTaylor:
         diagram = xplot.plot_taylor(
             ds, ref, values=xr.DataArray([1.0, 2.0], attrs={"long_name": "Depth"})
         )
-        assert len(diagram.artists) == 1
+        assert len(diagram.markers) == 1
         assert diagram.colorbar.ax.get_ylabel() == "Depth"
 
     def test_dataset_reference_by_name(self):
         mod, ref = self.get_data(1)
         ds = xr.Dataset({"obs": ref, "mod": mod.isel(model=0, drop=True)})
         diagram = xplot.plot_taylor(ds, "obs")
-        assert len(diagram.artists) == 1
+        assert len(diagram.markers) == 1
 
     def test_errors(self):
         mod, ref = self.get_data()

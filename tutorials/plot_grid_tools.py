@@ -31,11 +31,6 @@ from xoa.plot import plot_grid
 xr.set_options(display_style="text")
 
 # %%
-# Register the :ref:`xoa <accessors>` accessors:
-
-xoa.register_accessors()
-
-# %%
 # Horizontal resolution
 # ---------------------
 #

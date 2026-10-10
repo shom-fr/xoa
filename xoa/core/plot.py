@@ -19,6 +19,8 @@ They are used by the high level plotting functions of the :mod:`xoa.plot` module
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
+
 import matplotlib.collections as mcollections
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -41,6 +43,71 @@ def _import_cartopy_():
             "cartopy is required for map plots. Install it with: pip install cartopy"
         ) from exc
     return ccrs, cfeature
+
+
+#: Short names of the projections
+PROJ_ALIASES = {"merc": "mercator", "pc": "platecarree", "ortho": "orthographic"}
+
+
+def get_projection(projection=None, extent=None):
+    """Get a cartopy projection from its name or alias
+
+    Parameters
+    ----------
+    projection: None, str, cartopy.crs.Projection
+        A projection instance, which is returned as is, or the lower case name of a
+        :mod:`cartopy.crs` projection class that has no mandatory parameter,
+        like ``"mercator"``, ``"platecarree"``, ``"orthographic"``, ``"stereographic"``
+        or ``"lambertazimuthalequalarea"``.
+        The aliases ``"merc"``, ``"pc"`` and ``"ortho"`` are also accepted.
+        The default is :class:`cartopy.crs.Mercator`.
+        The orthographic projection shows the Earth as seen from above a point,
+        which limits the deformation of the cells of regional grids.
+    extent: None, list
+        Extent ``[xmin, xmax, ymin, ymax]`` in degrees, whose center is used as the
+        ``central_longitude`` and ``central_latitude`` of the projections that accept
+        both, like the orthographic one.
+
+    Return
+    ------
+    cartopy.crs.Projection
+    """
+    ccrs, _ = _import_cartopy_()
+    if projection is None:
+        projection = "mercator"
+    if not isinstance(projection, str):
+        return projection
+    classes = {
+        name.lower(): cls
+        for name, cls in vars(ccrs).items()
+        if isinstance(cls, type)
+        and issubclass(cls, ccrs.Projection)
+        and cls is not ccrs.Projection
+        and not name.startswith("_")
+    }
+    name = PROJ_ALIASES.get(projection.lower(), projection.lower())
+    if name not in classes:
+        raise exceptions.XoaError(
+            f"Invalid projection name: {projection}. Choose among: "
+            + ", ".join(sorted(classes))
+            + ", or one of the aliases: "
+            + ", ".join(PROJ_ALIASES)
+        )
+    cls = classes[name]
+    kw = {}
+    params = inspect.signature(cls.__init__).parameters
+    if extent is not None and "central_longitude" in params and "central_latitude" in params:
+        kw = dict(
+            central_longitude=0.5 * (extent[0] + extent[1]),
+            central_latitude=0.5 * (extent[2] + extent[3]),
+        )
+    try:
+        return cls(**kw)
+    except TypeError as exc:
+        raise exceptions.XoaError(
+            f"The {cls.__name__} projection has mandatory parameters: "
+            "create an instance and pass it instead of its name."
+        ) from exc
 
 
 def add_land(ax, scale="110m", color=None, **kwargs):
@@ -151,8 +218,9 @@ def create_base_map(
         :func:`xoa.geo.get_extent`
     figsize: tuple
         Figure size in inches
-    projection: None, cartopy.crs.CRS
-        Projection of the map, which defaults to ``Mercator``
+    projection: None, str, cartopy.crs.CRS
+        Projection of the map, or its name as accepted by :func:`get_projection`,
+        which defaults to ``Mercator``
     transform: None, cartopy.crs.CRS
         Coordinate system of the extent, which defaults to ``PlateCarree``
     title: None, str
@@ -164,9 +232,7 @@ def create_base_map(
     matplotlib.figure.Figure
     cartopy.mpl.geoaxes.GeoAxes
     """
-    ccrs, _ = _import_cartopy_()
-    if projection is None:
-        projection = ccrs.Mercator()
+    projection = get_projection(projection, extent)
     fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111, projection=projection)
     setup_map_axes(ax, extent, transform, **kwargs)
@@ -515,8 +581,22 @@ class TaylorDiagram:
     Attributes
     ----------
     ax: matplotlib.projections.polar.PolarAxes
-    artists: list
-        Artists of the points that are added
+    reference: matplotlib.lines.Line2D
+        The marker of the reference
+    ref_arc: None, matplotlib.lines.Line2D
+        The arc of constant standard deviation of the reference
+    contours: None, matplotlib.contour.QuadContourSet
+        The contours of centered root mean square difference
+    contour_labels: list
+        The labels of the contours, as :class:`matplotlib.text.Text` objects
+    corr_label, std_label: matplotlib.text.Text
+        The axis labels
+    markers: list
+        Artists of the points that are added, to be customized quickly,
+        for instance with :func:`xoa.plot.add_shadow`
+    labels: list
+        The :class:`matplotlib.text.Annotation` objects of the labels written next
+        to the points, when ``values`` are given
     legend: None, matplotlib.legend.Legend
     colorbar: None, matplotlib.colorbar.Colorbar
     """
@@ -541,7 +621,11 @@ class TaylorDiagram:
         self.rmax = float(rmax) if rmax is not None else 1.25 * self.ref_std
         self.negative = bool(negative)
         self.thetamax = np.pi if negative else 0.5 * np.pi
-        self.artists = []
+        self.markers = []
+        self.labels = []
+        self.ref_arc = None
+        self.contours = None
+        self.contour_labels = []
         self.legend = None
         self.colorbar = None
         if fig is None:
@@ -557,7 +641,7 @@ class TaylorDiagram:
             ticks = np.unique(np.concatenate([ticks, -ticks]))
         ax.set_xticks(np.arccos(ticks))
         ax.set_xticklabels([f"{t + 0.0:g}" for t in ticks])
-        ax.text(
+        self.corr_label = ax.text(
             0.5 * self.thetamax,
             1.2 * self.rmax,
             corr_label,
@@ -565,7 +649,7 @@ class TaylorDiagram:
             ha="center",
             va="center",
         )
-        ax.annotate(
+        self.std_label = ax.annotate(
             std_label,
             (0, 0.5 * self.rmax),
             xytext=(0, -26),
@@ -588,8 +672,8 @@ class TaylorDiagram:
             if len(rms_levels):
                 kw = {"colors": "0.55", "linestyles": "--", "linewidths": 0.7}
                 kw.update(contour_kwargs or {})
-                cs = ax.contour(tt, rr, dist, levels=rms_levels, **kw)
-                ax.clabel(cs, fmt="%g", fontsize=7)
+                self.contours = ax.contour(tt, rr, dist, levels=rms_levels, **kw)
+                self.contour_labels = ax.clabel(self.contours, fmt="%g", fontsize=7)
 
         # Reference
         kw = {
@@ -603,14 +687,14 @@ class TaylorDiagram:
         kw.update(ref_kwargs or {})
         arc = kw.pop("arc", True)
         if arc:
-            ax.plot(
+            (self.ref_arc,) = ax.plot(
                 np.linspace(0, self.thetamax, 181),
                 np.full(181, self.ref_std),
                 color=kw["color"],
                 linestyle="--",
                 linewidth=0.8,
             )
-        ax.plot([0], [self.ref_std], label=ref_label or "_nolegend_", **kw)
+        (self.reference,) = ax.plot([0], [self.ref_std], label=ref_label or "_nolegend_", **kw)
 
     def add_points(
         self,
@@ -725,16 +809,18 @@ class TaylorDiagram:
                 )
             if labels is not None:
                 for i in range(n):
-                    ax.annotate(
-                        labels[i],
-                        (theta[i], std[i]),
-                        xytext=(5, 5),
-                        textcoords="offset points",
-                        fontsize=8,
+                    self.labels.append(
+                        ax.annotate(
+                            labels[i],
+                            (theta[i], std[i]),
+                            xytext=(5, 5),
+                            textcoords="offset points",
+                            fontsize=8,
+                        )
                     )
             if colorbar:
                 self.colorbar = add_colorbar(artists[0], ax, **(cbar_kwargs or {}))
-        self.artists.extend(artists)
+        self.markers.extend(artists)
 
         if legend and values is None and labels is not None:
             self.add_legend(**(legend_kwargs or {}))

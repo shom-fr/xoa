@@ -3,6 +3,11 @@
 Accessors API
 =============
 
+The main ``xoa`` accessor is registered when :mod:`xoa` is imported.
+The ``meta`` and ``decode_sigma`` accessors are available as subaccessors of it,
+like ``da.xoa.meta`` and ``ds.xoa.decode_sigma`` (the latter for datasets only),
+and can also be registered at the top level with :func:`xoa.register_accessors`,
+like ``ds.meta`` and ``ds.decode_sigma()``.
 
 .. currentmodule:: xarray
 

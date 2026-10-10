@@ -6,6 +6,8 @@ Unreleased
 
 New features
 ------------
+- Add the :func:`xoa.core.plot.get_projection` function to get a map projection from an instance, or from the lower case name of any cartopy projection without mandatory parameters, or the aliases ``"merc"``, ``"pc"`` and ``"ortho"``, the latter being the default of :func:`xoa.plot.plot_grid` and centered on the grid.
+- The main ``xoa`` accessor is now registered when :mod:`xoa` is imported.
 - Add the :class:`xoa.core.interp.XYInterpolator` and :class:`xoa.core.regrid.XYRegridder` numba classes for horizontal bilinear, bicubic and conservative interpolation and regridding, with their kernels in the new :mod:`xoa.core.spline` and :mod:`xoa.core.conserv` modules.
 - Add the :class:`xoa.interp.Interpolator` and :class:`xoa.regrid.Regridder` xarray classes for horizontal (and temporal) interpolation and regridding, with the :func:`xoa.coords.geo_merge` and :func:`xoa.grid.ds2grid_dict` helpers.
 - The methods of :class:`xoa.interp.Interpolator` and :class:`xoa.regrid.Regridder` are listed in the :class:`xoa.interp.xy_interp_methods` and :class:`xoa.regrid.xy_regrid_methods` enums, that accept aliases like ``"linear"``.
@@ -39,6 +41,9 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix the ``decode_sigma`` subaccessor of the ``xoa`` accessor of datasets, that returned ``None``.
+- Fix the meta appendix: the meta configurations are no longer called specifications, the specifications provided by the internal :file:`meta.ini` file have their own page, and the details pages of the configuration items are not listed in the left table of contents anymore.
+- Fix the bilinear and bicubic interpolation with ``skipna=True`` and ``na_thres=0``, that set isolated points to nan because of rounding errors in the sum of the weights of valid neighbours.
 - Fix the conservative weights of the cells that cross the dateline or that are on the other side of it, which were missing. Longitudes of the cells are made continuous before computing their overlaps, with :func:`xoa.core.poly.unwrap_longitudes` and :func:`xoa.core.grid.unwrap_grid_longitudes`.
 - Fix the points that are on the first and last lines of a regular source grid, that were NaN on the last one and extrapolated up to one cell before the first one, with the bilinear and bicubic methods. Cells are now closed and what is outside is NaN on all sides.
 - Fix the bicubic method that returned NaN for the points that are exactly on the second and last but one lines of a rectangular grid, whereas they are valid on a regular grid.

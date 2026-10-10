@@ -325,15 +325,12 @@ and sigma coordinates using CROCO model output:
     import xoa.regrid
     import numpy as np
     
-    # To have 'xoa' and 'decode_sigma' accessors
-    xoa.register_accessors()
-    
     # Load CROCO sample data
     ds = xoa.open_data_sample("MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.meridional.nc")
     
     # Set internal croco decoding rules and decode s-coordinate and dataset names
     xoa.meta.set_meta_specs('croco')
-    ds_decoded = ds.decode_sigma().xoa.decode()
+    ds_decoded = ds.xoa.decode_sigma().xoa.decode()
     
     # The sigma coordinate has been converted to depths
     # You can now regrid to regular depth levels if needed

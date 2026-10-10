@@ -33,7 +33,6 @@ how to use the low level routines. The tutorials show them at work, with figures
     import xoa
     from xoa import plot as xplot
     from xoa.core import plot as cplot
-    xoa.register_accessors()
 
 The main ``xoa`` accessors give access to the high level functions through the ``plot``
 subaccessor, with the array or dataset as the first argument:
@@ -150,6 +149,10 @@ when a map is drawn.
 
 - ``transform`` is the coordinate system of the data and defaults to ``PlateCarree``.
   The projection of the map, which defaults to ``Mercator``, is the one of the axes.
+  When a map is created, the ``projection`` can be a cartopy projection or its lower case name,
+  like ``"mercator"``, ``"stereographic"`` or ``"ortho"`` (see :func:`~xoa.core.plot.get_projection`).
+  :func:`~xoa.plot.plot_field` defaults to ``Mercator``, and :func:`~xoa.plot.plot_grid` to the
+  orthographic projection centered on the grid, which limits the deformation of the cells.
 - :func:`~xoa.plot.plot_field` and :func:`~xoa.plot.plot_grid` create the map when no axes is
   provided, from the extent of the data computed with :func:`xoa.geo.get_extent` (a
   ``margin`` can be added to the field). Their ``map_kw`` parameter holds the

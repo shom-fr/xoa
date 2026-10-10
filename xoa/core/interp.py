@@ -581,7 +581,7 @@ def interp_transect(
     n_dst = j_base.shape[0]
     K = data.shape[1]
     nan = np.nan
-    na_threshold = max(EPSILON, 1.0 - na_thres)
+    na_threshold = min(max(1.0 - na_thres, EPSILON), 1.0 - EPSILON)
 
     out = np.full((K, n_dst), nan)
 

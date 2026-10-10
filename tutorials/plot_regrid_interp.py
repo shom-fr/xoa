@@ -10,7 +10,7 @@ In this tutorial, we show :
   conservative methods,
 * how to reuse the weights, in memory and in a file,
 * how to interpolate to arbitrary points, such as a transect, with and without time,
-* how to handle land points with a mask and the ``skipna`` option,
+* how to handle land points with the ``skipna`` and ``na_thres`` options,
 * how to use the same tools from the ``xoa`` accessors.
 
 """
@@ -37,19 +37,16 @@ from xoa.core.grid import create_rotated_grid
 xr.set_options(display_style="text")
 
 # %%
-# Register the :ref:`xoa <accessors>` accessors:
-
-xoa.register_accessors()
-
-# %%
 # Read the source data
 # --------------------
 #
 # We use the surface temperature of a regional model on a staggered grid.
 # Longitudes and latitudes are 2D, and the temperature is defined at the "rho" points,
 # which are the coordinates it carries.
+# Land points are stored as zeros in the file: we set them to nan with the land-sea mask.
 
 ds = xoa.open_data_sample("MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.surf.nc")
+ds["temp"] = ds.temp.where(ds.mask_rho.astype(bool))
 temp = ds.temp.isel(time=0, s_rho=-1)
 print(temp)
 
@@ -212,6 +209,38 @@ pts_lon, pts_lat = np.meshgrid(np.linspace(17, 20, 4), np.linspace(-36.5, -35.5,
 print(interp.Interpolator(temp, pts_lon, pts_lat).interp(temp).dims)
 
 # %%
+# A map shows where the field is interpolated: along the transect and on the grid of points.
+
+fig, ax = plt.subplots(
+    figsize=(7, 5.5), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
+)
+mappable = plot_field(
+    temp,
+    ax=ax,
+    title="Interpolation points",
+    cmap=cmocean.cm.thermal,
+    map_kw={"gridlines_labels_on": ["bottom", "left"]},
+    add_colorbar=False,
+)
+ax.set_extent(extent, crs=ccrs.PlateCarree())
+pc = ccrs.PlateCarree()
+ax.plot(lons, lats, "-", color="w", lw=4, transform=pc)
+ax.plot(lons, lats, ".-", color="k", lw=1.5, ms=4, transform=pc, label="transect")
+ax.plot(
+    pts_lon.ravel(),
+    pts_lat.ravel(),
+    "o",
+    mfc="w",
+    mec="k",
+    ms=7,
+    ls="none",
+    transform=pc,
+    label="grid of points",
+)
+ax.legend(loc="lower right")
+add_colorbar(mappable, ax, da=temp)
+
+# %%
 # Interpolate in space and time
 # -----------------------------
 #
@@ -232,10 +261,13 @@ print(at_times.values)
 # Masks and missing values
 # ------------------------
 #
-# Land points here are set to zero, and they leak into the interpolated values near
-# the coast. Provide the mask of the source grid and use ``skipna`` to ignore them.
+# Land points are nan in the source field. By default, a destination point that has
+# at least one nan neighbour is nan too: the missing values contaminate the result near
+# the coast. Use ``skipna`` to ignore them and compute the interpolation from the
+# valid neighbours only.
+# When land is not nan but a fill value like zero, provide the mask of the source grid
+# with the ``src_mask`` parameter of the regridder instead.
 
-mask = ds.mask_rho.values.astype(bool)
 coast = xr.Dataset(
     coords={
         "lon": ("lon", np.linspace(18.3, 20.5, 45), lon_attrs),
@@ -243,18 +275,51 @@ coast = xr.Dataset(
     }
 )
 naive = regrid.Regridder(temp, coast, "bilinear").regrid(temp)
-masked = regrid.Regridder(temp, coast, "bilinear", src_mask=mask).regrid(temp, skipna=True)
-print("minimum without mask:", float(naive.min()), "- with mask:", float(masked.min()))
+masked = regrid.Regridder(temp, coast, "bilinear").regrid(temp, skipna=True)
+print("missing points by default:", int(naive.isnull().sum()), "- with skipna:", int(masked.isnull().sum()))
 
 # %%
-# The ``na_thres`` parameter controls how many missing neighbours are tolerated:
-# 1 means that a single valid neighbour is enough to get a value, and values closer
-# to 0 are stricter.
+# The ``na_thres`` parameter controls how many missing neighbours are tolerated.
+# With ``skipna``, the weights of the valid neighbours of a destination point are
+# renormalised, and the point is set to nan when they represent less than
+# ``1 - na_thres`` of the total weight:
+#
+# * ``na_thres=0``: all the neighbours must be valid, so that the result is nan
+#   as soon as one neighbour is on land,
+# * ``na_thres=0.5``: at least half of the weight must come from valid neighbours,
+# * ``na_thres=1``: a single valid neighbour is enough to get a value.
+#
+# Here is the effect of these three values on a fine grid that zooms on the coast,
+# next to the cells of the source grid.
 
-strict = regrid.Regridder(temp, coast, "bilinear", src_mask=mask).regrid(
-    temp, skipna=True, na_thres=0.5
+zoom = xr.Dataset(
+    coords={
+        "lon": ("lon", np.linspace(19.2, 20.6, 36), lon_attrs),
+        "lat": ("lat", np.linspace(-35.0, -34.5, 17), lat_attrs),
+    }
 )
-print(int(masked.isnull().sum()), "missing points against", int(strict.isnull().sum()))
+zoom_regridder = regrid.Regridder(temp, zoom, "bilinear")
+extent_zoom = [19.2, 20.6, -35.0, -34.5]
+fig, axes = plt.subplots(
+    2, 2, figsize=(10, 4.6), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
+)
+kw = dict(
+    vmin=float(temp.min()),
+    vmax=float(temp.max()),
+    cmap=cmocean.cm.thermal,
+    add_colorbar=False,
+    edgecolors="0.4",
+    linewidth=0.1,
+    map_kw={"gridlines_labels_on": ["bottom", "left"]},
+)
+fields = {"source cells": temp}
+for na_thres in 0, 0.5, 1:
+    fields[f"na_thres={na_thres}"] = zoom_regridder.regrid(temp, skipna=True, na_thres=na_thres)
+for ax, (title, field) in zip(axes.flat, fields.items()):
+    mappable = plot_field(field, ax=ax, title=title, **kw)
+    ax.set_extent(extent_zoom, crs=ccrs.PlateCarree())
+add_colorbar(mappable, axes, da=temp)
+print({title: int(field.notnull().sum()) for title, field in list(fields.items())[1:]})
 
 # %%
 # Use the accessors

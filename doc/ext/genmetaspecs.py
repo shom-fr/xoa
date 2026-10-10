@@ -1,4 +1,4 @@
-"""Generate files to declare and list default meta specifications"""
+"""Generate files to declare and list default meta configurations"""
 
 import os
 import logging
@@ -58,13 +58,11 @@ def genrst(app):
     comments = xoa.meta.general._get_cfgm_().specs.inline_comments
 
     rst_tables = {}
-    rst_toctrees = {}
 
     # Data vars and coordinates
     for meta_cat in ["data_vars", "coords"]:
 
         rst_tables[meta_cat] = ".. list-table::\n\n"
-        rst_toctrees[meta_cat] = ".. toctree::\n    :hidden:\n\n"
 
         logging.info(f"Generating rst files for xoa.meta {meta_cat} specs")
         for meta_name in meta_specs[meta_cat]:
@@ -78,7 +76,7 @@ def genrst(app):
             with open(os.path.join(decdir, meta_name + ".rst"), "w") as f:
                 title = f':attr:`~xoa.meta.MetaSpecs.{meta_cat}` [``"{meta_name}"``]'
                 title += "\n" + len(title) * "="
-                rst = title + "\n\n"
+                rst = ":orphan:\n\n" + title + "\n\n"
                 rst += f".. {role}:: {meta_name}\n\n"
                 rst = add_items(rst, meta_specs[meta_cat][meta_name], indent=1)
                 f.write(rst)
@@ -89,9 +87,6 @@ def genrst(app):
                 meta_specs[meta_cat][meta_name]["attrs"]["long_name"][0]
             )
 
-            # Append to toctree
-            rst_toctrees[meta_cat] += f"    genmetaspecs/{meta_cat}/{meta_name}\n"
-
     # Dimensions
     rst_tables["dims"] = ".. list-table::\n\n"
     for dim_type, dims in meta_specs["dims"].items():
@@ -100,14 +95,13 @@ def genrst(app):
 
     # Other sections
     rst_tables["sections"] = ".. list-table::\n\n"
-    rst_toctrees["sections"] = ".. toctree::\n    :hidden:\n\n"
     for section in "register", "sglocator", "vertical", "accessors":
 
         logging.info(f"Generating rst files for xoa.meta {section} specs")
         with open(os.path.join(gendir, section + ".rst"), "w") as f:
             title = f':class:`~xoa.meta.MetaSpecs` [``"{section}"``]'
             title += "\n" + len(title) * "="
-            rst = title + "\n\n"
+            rst = ":orphan:\n\n" + title + "\n\n"
             rst += f".. metasec:: {section}\n\n"
             rst = add_items(rst, meta_specs[section], indent=1)
             f.write(rst)
@@ -116,21 +110,14 @@ def genrst(app):
         rst_tables["sections"] += f"    * - :metasec:`{section}`\n"
         rst_tables["sections"] += "      - {}\n".format(comments[section].strip("# "))
 
-        # Append to toctree
-        rst_toctrees["sections"] += f"    genmetaspecs/{section}\n"
-
     # Write the index.txt
     with open(os.path.join(gendir, "index.txt"), "w") as f:
 
         for key, title in cat_titles.items():
 
             # Title
-            title = title + "\n" + len(title) * "^"
+            title = title + "\n" + len(title) * "\""
             f.write(f".. _appendix.meta.{key}:\n\n" + title + "\n\n")
-
-            # Hidden toctree
-            if key in rst_toctrees:
-                f.write(rst_toctrees[key] + "\n")
 
             # Table
             f.write(rst_tables[key] + "\n\n")
@@ -140,7 +127,7 @@ def genrst(app):
         fi.write(".. toctree::\n\n")
         for name in list(xoa.meta.configs.META_CONFIGS):
             logging.info(f"Generating rst file for xoa.meta.configs.META_CONFIGS[{name}]")
-            title = f"Meta specifications for ``{name}`` datasets"
+            title = f"Meta configuration for ``{name}`` datasets"
             title = title + "\n" + "=" * len(title)
             with open(os.path.join(gendir, name + ".rst"), "w") as f:
                 f.write(f".. _appendix.meta.specialized.{name}:\n\n{title}\n\n")

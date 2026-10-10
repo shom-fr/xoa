@@ -31,15 +31,6 @@ import xoa.meta as xmeta
 xr.set_options(display_style="text")
 
 # %%
-# Register the :meth:`xarray.Dataset.decode_sigma` callable accessor.
-
-xoa.register_accessors(decode_sigma=True)
-
-# %%
-# The :ref:`xoa <accessors>` accessor is also registered by default, and give access
-# to most of the functionalities of the other accessors.
-
-# %%
 # Register the internal CROCO naming specifications
 
 croco_cfg_file = xoa.get_meta_config_file("croco")
@@ -73,10 +64,10 @@ print(ds)
 # 2. Compute depths
 # 3. Assign depths as coordinates
 #
-# Note that the :meth:`xarray.Dataset.decode_sigma` callable accessor
+# Note that the ``decode_sigma`` subaccessor of the :ref:`xoa <accessors>` accessor
 # calls the :func:`xoa.sigma.decode_cf_sigma` function.
 
-ds = ds.decode_sigma()
+ds = ds.xoa.decode_sigma()
 print(ds.depth)
 
 # %%

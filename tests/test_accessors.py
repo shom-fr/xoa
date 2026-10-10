@@ -162,6 +162,14 @@ class TestXoaAccessorSubaccessors:
         # Since the return is based on the object state, just check it's accessible
         assert meta_accessor is not None or hasattr(self.ds.xoa, '_meta')
 
+    def test_xoa_decode_sigma_subaccessor(self):
+        """Test that .xoa.decode_sigma is a SigmaAccessor, cached on the xoa accessor"""
+        from xoa.accessors import SigmaAccessor
+
+        accessor = self.ds.xoa
+        assert isinstance(accessor.decode_sigma, SigmaAccessor)
+        assert accessor.decode_sigma is accessor.decode_sigma
+
     def test_xoa_cf_subaccessor_deprecated(self):
         """Test that .xoa.cf subaccessor issues deprecation warning"""
         with warnings.catch_warnings(record=True) as w:
@@ -305,3 +313,16 @@ class TestPlotAccessor:
         assert self.da.xoa.plot.grid() is not None
         assert self.da.xoa.plot.taylor(self.da) is not None
         plt.close("all")
+
+
+def test_xoa_accessor_is_registered_on_import():
+    """The main accessor is available without calling register_accessors"""
+    import subprocess
+    import sys
+
+    code = (
+        "import xarray as xr, xoa; "
+        "assert hasattr(xr.DataArray, 'xoa') and hasattr(xr.Dataset, 'xoa'); "
+        "assert not hasattr(xr.Dataset, 'meta')"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)

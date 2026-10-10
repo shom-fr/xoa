@@ -292,10 +292,42 @@ def test_auto_stride_uses_a_bounded_amount_of_memory():
     assert peak < 0.5 * lon.nbytes  # and not a full (ny, nx, 2) array
 
 
+def test_get_projection():
+    ccrs = pytest.importorskip("cartopy.crs")
+    assert isinstance(cplot.get_projection(), ccrs.Mercator)
+    assert isinstance(cplot.get_projection("MERC"), ccrs.Mercator)
+    assert isinstance(cplot.get_projection("pc"), ccrs.PlateCarree)
+    assert isinstance(cplot.get_projection("platecarree"), ccrs.PlateCarree)
+    proj = cplot.get_projection("ortho", [10, 20, -40, -30])
+    assert isinstance(proj, ccrs.Orthographic)
+    assert proj.proj4_params["lon_0"] == 15 and proj.proj4_params["lat_0"] == -35
+    assert isinstance(cplot.get_projection("robinson"), ccrs.Robinson)
+    proj = cplot.get_projection("stereographic", [10, 20, -40, -30])
+    assert isinstance(proj, ccrs.Stereographic) and proj.proj4_params["lat_0"] == -35
+    crs = ccrs.PlateCarree()
+    assert cplot.get_projection(crs) is crs
+    with pytest.raises(cplot.exceptions.XoaError, match="Invalid projection name"):
+        cplot.get_projection("unknown")
+    with pytest.raises(cplot.exceptions.XoaError, match="mandatory parameters"):
+        cplot.get_projection("utm")
+
+
 class TestTaylor:
+    def test_artists_attributes(self):
+        diagram = cplot.plot_taylor([0.5, 1.0], [0.0, 1.0], labels=["a", "b"])
+        assert diagram.reference.get_marker() == "*"
+        assert diagram.ref_arc is not None
+        assert diagram.contours is not None and len(diagram.contour_labels)
+        assert diagram.corr_label.get_text() == "Correlation"
+        assert diagram.std_label.get_text() == "Standard deviation"
+        assert len(diagram.markers) == 2
+        assert diagram.labels == []
+        diagram = cplot.plot_taylor([0.5, 1.0], [0.0, 1.0], labels=["a", "b"], values=[1, 2])
+        assert [t.get_text() for t in diagram.labels] == ["a", "b"]
+
     def test_positions(self):
         diagram = cplot.plot_taylor([0.5, 1.0], [0.0, 1.0])
-        x, y = diagram.artists[0].get_data()
+        x, y = diagram.markers[0].get_data()
         assert np.isclose(x[0], np.pi / 2) and np.isclose(y[0], 0.5)
         assert not diagram.negative
         assert np.isclose(diagram.ax.get_thetamax(), 90)
@@ -304,7 +336,7 @@ class TestTaylor:
         diagram = cplot.plot_taylor([0.5, 1.0], [-0.5, 1.0])
         assert diagram.negative
         assert np.isclose(diagram.ax.get_thetamax(), 180)
-        x, _ = diagram.artists[0].get_data()
+        x, _ = diagram.markers[0].get_data()
         assert np.isclose(x[0], np.arccos(-0.5))
         with pytest.raises(xoa.exceptions.XoaError):
             cplot.plot_taylor([1.0], [-0.5], diagram=cplot.TaylorDiagram())
@@ -321,7 +353,7 @@ class TestTaylor:
         )
         texts = [t.get_text() for t in diagram.legend.get_texts()]
         assert texts == ["Reference", "a", "b", "c"]
-        assert [a.get_marker() for a in diagram.artists] == ["o", "s", "o"]
+        assert [a.get_marker() for a in diagram.markers] == ["o", "s", "o"]
 
     def test_values_make_a_colorbar(self):
         diagram = cplot.plot_taylor(
@@ -329,7 +361,7 @@ class TestTaylor:
         )
         assert diagram.colorbar is not None
         assert diagram.legend is None
-        assert len(diagram.artists) == 2
+        assert len(diagram.markers) == 2
 
     def test_errors(self):
         with pytest.raises(xoa.exceptions.XoaError):

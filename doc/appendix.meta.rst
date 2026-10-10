@@ -1,24 +1,28 @@
 .. _appendix.meta:
 
-Default and specialized meta specs
-==================================
+Meta configurations and specifications
+======================================
 
-This appendix refers to the searching and formatting specifications
+This appendix refers to the searching and formatting configurations
 for data variables and coordinates, and related tools,
-available in the :mod:`xoa.meta` module.
+available in the :mod:`xoa.meta` module,
+and to the specifications that are used to validate them.
 Their usage is introduced in the :ref:`indepth.meta` section.
+
+Configurations
+--------------
 
 .. _appendix.meta.specialized:
 
 Specialized configurations
---------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A few configurations are made available internally for decoding specialized datasets.
 You can use them at your own risk.
 
 .. highlight:: python
 
-For instance, load the croco specs directly with::
+For instance, load the croco configuration directly with::
 
     import xoa.meta
     xoa.meta.set_meta_specs("croco")
@@ -35,35 +39,26 @@ You can access the associated `.cfg` file with :func:`xoa.meta.get_meta_config_f
 .. _appendix.meta.default:
 
 The default configuration
--------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. note:: You can define your own specifications for each of your datasets.
+.. note:: You can define your own configurations for each of your datasets.
     Have a look to the :ref:`indepth.meta` section and to the :ref:`tutorials`.
 
 As a :file:`.cfg` file
-^^^^^^^^^^^^^^^^^^^^^^
+""""""""""""""""""""""
 
 Look at :ref:`appendix.meta.specialized.default`.
 
 
 .. include:: genmetaspecs/index.txt
 
-The configuration syntax specifications
----------------------------------------
+Specifications
+--------------
 
-The syntax of all configurations is validated with these specifications.
+The syntax of all configurations is validated with the specifications
+provided by the internal :file:`meta.ini` file.
 
-See `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_.
+.. toctree::
+    :maxdepth: 1
 
-Details
-^^^^^^^
-
-.. include:: meta.txt
-
-File
-^^^^
-
-.. literalinclude:: ../xoa/meta/meta.ini
-    :language: ini
-
-
+    appendix.meta.specs

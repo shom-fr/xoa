@@ -36,10 +36,6 @@ mpl.rc("axes", grid=True)
 xr.set_options(display_style="text")
 
 # %%
-# Register the :ref:`xoa <accessors>` accessors :
-xoa.register_accessors()
-
-# %%
 # Register the Mercator and ARGO naming specifications
 mercator_cfg = xoa.get_meta_config_file("mercator")
 argo_cfg = xoa.get_meta_config_file("argo")

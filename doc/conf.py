@@ -28,7 +28,7 @@ author = 'Shom'
 import xoa
 
 release = xoa.__version__
-xoa.register_accessors(xoa=True, meta=True, decode_sigma=True)
+xoa.register_accessors(xoa=False, meta=True, decode_sigma=True)
 
 
 # %% General configuration
