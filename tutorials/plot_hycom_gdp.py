@@ -143,7 +143,11 @@ drifter = drifter.where(~drifter.lon.isnull() & ~drifter.lat.isnull(), drop=True
 # %%
 # We add a constant depth of 15 m.
 
-drifter.coords["depth"] = drifter.lon * 0 + 15
+drifter.coords["depth"] = (
+    "time",
+    np.full(drifter.sizes["time"], 15.0),
+    {"standard_name": "ocean_depth", "units": "m", "positive": "down"},
+)
 
 # %%
 # Here is what we obtain.
