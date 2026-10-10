@@ -227,8 +227,8 @@ def plot_ts(
     temp: xarray.DataArray
         Temperature. If not potential, it will be converted into potential
         if `potential=None` or `potential=False`.
-        Note that if temp is not potential and **contains a depth coordinate**, depth values must be negative
-        (to compute pres with `gsw.p_from_z` if necessary)
+        Note that if temp is not potential and **contains a z or depth coordinate**, it is
+        converted to z with :func:`xoa.coords.get_z` to compute pres with `gsw.p_from_z` if necessary
     sal: xarray.DataArray
         Salinity (practical or absolute). If not absolute, it will be converted into absolute salinity
         if the potential temperature needs to be computed.
@@ -306,9 +306,9 @@ def plot_ts(
 
         if pres is None:
             lat = xcoords.get_lat(temp)
-            depth = xcoords.get_depth(temp)
-            lat, depth = xr.broadcast(lat, depth)
-            pres = gsw.p_from_z(depth, lat)
+            z = xcoords.get_z(temp)
+            lat, z = xr.broadcast(lat, z)
+            pres = gsw.p_from_z(z, lat)
 
         if absolute is None:
             absolute = metaspecs.match_data_var(sal, "asal")
@@ -1055,7 +1055,7 @@ def plot_section(
 ):
     """Plot a vertical section
 
-    The depth is found with :func:`xoa.coords.get_depth` and may vary with the
+    The vertical coordinate, either z or depth, is found with :func:`xoa.coords.get_vertical` and may vary with the
     horizontal dimension, like with terrain-following coordinates.
     The vertical axis is inverted when depths are positive down,
     according to :func:`xoa.coords.get_positive_attr`.
@@ -1102,12 +1102,14 @@ def plot_section(
     hdim = hdims[0]
 
     # Depth
-    depth = xcoords.get_depth(da, errors="ignore")
+    depth = xcoords.get_vertical(da, errors="ignore")
+    if depth is None:
+        depth = xcoords.get_depth(da, errors="ignore")
     if depth is None:
         depth = (
             da[zdim] if zdim in da.coords else xr.DataArray(np.arange(da.sizes[zdim]), dims=zdim)
         )
-    positive = xcoords.get_positive_attr(da, zdim=zdim)
+    positive = depth.attrs.get("positive") or xcoords.get_positive_attr(da, zdim=zdim)
 
     # Horizontal axis
     lon = xcoords.get_lon(da, errors="ignore")

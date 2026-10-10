@@ -227,7 +227,7 @@ These include:
 Converting sigma to physical coordinates
 -----------------------------------------
 
-The main functionality is to decode sigma coordinates into physical depths (for ocean)
+The main functionality is to decode sigma coordinates into physical heights ``z`` (for ocean)
 or pressures (for atmosphere) using the appropriate formula terms.
 
 .. note:: The core sigma conversion functions use Numba's guvectorize decorator
@@ -241,7 +241,7 @@ or pressures (for atmosphere) using the appropriate formula terms.
 Ocean sigma coordinates
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-For ocean models, sigma coordinates are converted to depths using formulas that
+For ocean models, sigma coordinates are converted to ``z`` heights, positive up, using formulas that
 depend on:
 
 - **sigma** (σ): The sigma level (typically from -1 to 0)
@@ -260,12 +260,12 @@ depend on:
     # Check the sigma coordinate
     print(ds.s_rho.attrs.get('standard_name'))
 
-    # Decode sigma to depths using the sigma module
+    # Decode sigma to z heights, which are negative in the ocean, using the sigma module
     # The decode_cf_sigma function will automatically detect
     # the coordinate type and apply the correct formula
     from xoa.sigma import decode_sigma
     dsz = decode_sigma(ds)
-    print(dsz.depth)
+    print(dsz.z)
 
 Atmosphere sigma coordinates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -284,7 +284,7 @@ For atmospheric models, sigma coordinates are converted to pressure levels:
 Working with vertical sections
 -------------------------------
 
-Once sigma coordinates are decoded to physical depths, you can work with
+Once sigma coordinates are decoded to physical heights, you can work with
 vertical sections and perform operations like:
 
 - Extracting data at specific depth levels
@@ -332,14 +332,14 @@ and sigma coordinates using CROCO model output:
     xoa.meta.set_meta_specs('croco')
     ds_decoded = ds.xoa.decode_sigma().xoa.decode()
     
-    # The sigma coordinate has been converted to depths
-    # You can now regrid to regular depth levels if needed
+    # The sigma coordinate has been converted to z heights
+    # You can now regrid to regular z levels if needed
     
-    # Define regular depth levels
-    regular_depths = xr.DataArray(np.linspace(-100, 0, 20), dims='depth', attrs={'units': 'm', 'positive': 'up'})
+    # Define regular z levels
+    regular_z = xr.DataArray(np.linspace(-100, 0, 20), dims='z', attrs={'units': 'm', 'positive': 'up'})
     
-    # Regrid temperature to regular depths
-    temp_regular = xoa.regrid.regrid1d(ds_decoded.ptemp, regular_depths, extrap="top")
+    # Regrid temperature to regular z levels
+    temp_regular = xoa.regrid.regrid1d(ds_decoded.ptemp, regular_z, extrap="top")
     print(temp_regular[0, :, 0, 0])
 
 See also

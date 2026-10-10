@@ -74,12 +74,12 @@ ds_argo = xoa.open_data_sample("OBS/ARGO/argo-7900573.nc")
 ds_argo = ds_argo.xoa.decode()[["temp", "sal", "pres"]]
 
 # %%
-# We compute depths with the :mod:`gsw` package and assign them
-# as coordinates of the ARGO dataset.
+# We compute heights, that are negative, with the :mod:`gsw` package and assign them
+# as coordinates of the ARGO dataset, with their ``positive`` attribute.
 alat = ds_argo.lat.broadcast_like(ds_argo.pres)
 adepth = gsw.z_from_p(ds_argo.pres, alat)
 adepth = adepth.where(adepth.notnull(), adepth.min())
-adepth.attrs.update({"long_name": "Depth", "units": "m"})
+adepth.attrs.update({"long_name": "Depth", "units": "m", "positive": "up"})
 ds_argo = ds_argo.assign_coords(depth=adepth)
 ds_argo = ds_argo.isel(level=slice(None, None, -1))
 ds_argo = ds_argo.set_index(N_PROF="time").rename(N_PROF="time")
@@ -116,6 +116,7 @@ ds_argo_prof = ds_argo.isel(time=-1).squeeze(drop=True)
 ds_merc = xoa.open_data_sample("MODELS/CMEMS-IBI/ibi-argo-7900573.nc").xoa.decode()
 ds_merc = ds_merc.isel(depth=slice(None, None, -1))
 ds_merc = ds_merc.assign_coords(depth=-ds_merc.depth)
+ds_merc.depth.attrs.update(units="m", positive="up")
 print(ds_merc)
 
 # %%

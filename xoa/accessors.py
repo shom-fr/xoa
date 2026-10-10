@@ -313,10 +313,36 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         return self.meta_specs.encode(self._obj, **kwargs)
 
     @ERRORS.format_method_docstring
-    def get_depth(self, errors="ignore"):
-        """Get the depth as computed or recognized by the :meth:`~xoa.meta.MetaSpecs`
+    def get_z(self, errors="ignore"):
+        """Get the z, positive up, as computed or recognized by the :meth:`~xoa.meta.MetaSpecs`
 
-        If a depth variable cannot be found, it tries to compute either
+        If a z variable cannot be found, it uses the depth if any, or tries to compute either
+        from sigma-like coordinates or from layer thicknesses.
+
+        Parameters
+        ----------
+        {errors}
+
+        Return
+        ------
+        xarray.DataArray, None
+
+        See also
+        --------
+        :func:`xoa.coords.get_z`
+        :func:`xoa.coords.to_z`
+        :func:`xoa.sigma.decode_sigma`
+        :ref:`indepth.meta`
+        """
+        from .coords import get_z
+
+        return get_z(self._obj, errors=errors)
+
+    @ERRORS.format_method_docstring
+    def get_depth(self, errors="ignore"):
+        """Get the depth, positive down, as computed or recognized by the :meth:`~xoa.meta.MetaSpecs`
+
+        If a depth variable cannot be found, it uses the z if any, or tries to compute either
         from sigma-like coordinates or from layer thicknesses.
 
         Parameters
@@ -330,6 +356,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         See also
         --------
         :func:`xoa.coords.get_depth`
+        :func:`xoa.coords.to_depth`
         :func:`xoa.grid.decode_dz2depth`
         :func:`xoa.sigma.decode_sigma`
         :ref:`indepth.meta`

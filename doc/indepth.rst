@@ -9,6 +9,7 @@ In-depth guides
     indepth.meta
     indepth.cfgm
     indepth.grids
+    indepth.vertical
     indepth.regrid
     indepth.plot
     indepth.filtering

@@ -93,7 +93,7 @@ def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask
 
     # Format
     return meta.get_meta_specs(sig).format_data_var(
-        depth, "depth", format_coords=False, rename_dims=False
+        depth, "z", format_coords=False, rename_dims=False
     )
 
 
@@ -159,7 +159,7 @@ def atmosphere_sigma_coordinate(sig, ps, ptop, dask="parallelized", cache=None):
 
 
 def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
-    """Convert from sigma [-1, 0] to negative depths in an ocean model
+    """Convert from sigma [-1, 0] to z heights (positive up) in an ocean model
 
     .. note:: This function is dask-aware since it delegates the core computation to
         :func:`xarray.apply_ufunc`.
@@ -190,7 +190,7 @@ def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
     Returns
     -------
     xarray.DataArray
-        Negative depth below surface in m (:math:`z`)
+        Height relative to the surface in m, negative in the ocean and positive up (:math:`z`)
     """
     if cache is not None:
         exceptions.xoa_warn("The `cache` parameter is currently not used.")
@@ -215,7 +215,7 @@ def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
 
     # Format
     return meta.get_meta_specs(sig).format_data_var(
-        depth, "depth", format_coords=False, rename_dims=False
+        depth, "z", format_coords=False, rename_dims=False
     )
 
 
@@ -279,7 +279,7 @@ def ocean_s_coordinate(
     cache=None,
     dask="parallelized",
 ):
-    """Convert from s [-1, 0] to depths in an ocean model
+    """Convert from s [-1, 0] to z heights (positive up) in an ocean model
 
     .. note:: This function is dask-aware since it delegates the core computation to
         :func:`xarray.apply_ufunc`.
@@ -327,7 +327,7 @@ def ocean_s_coordinate(
     Returns
     -------
     xarray.DataArray
-        Negative depth below surface in m (:math:`z`)
+        Height relative to the surface in m, negative in the ocean and positive up (:math:`z`)
     """
     if cache is not None:
         exceptions.xoa_warn("The `cache` parameter is currently not used.")
@@ -347,7 +347,7 @@ def ocean_s_coordinate_g1(
     cache=None,
     dask="parallelized",
 ):
-    """Convert from s [-1, 0] generic form 1 to depths in an ocean model
+    """Convert from s [-1, 0] generic form 1 to z heights (positive up) in an ocean model
 
     .. note:: This function is dask-aware since it delegates the core computation to
         :func:`xarray.apply_ufunc`.
@@ -399,7 +399,7 @@ def ocean_s_coordinate_g1(
     Returns
     -------
     xarray.DataArray
-        Negative depth below surface in m (:math:`z`)
+        Height relative to the surface in m, negative in the ocean and positive up (:math:`z`)
     """
     if cache is not None:
         exceptions.xoa_warn("The `cache` parameter is currently not used.")
@@ -419,7 +419,7 @@ def ocean_s_coordinate_g2(
     cache=None,
     dask="parallelized",
 ):
-    """Convert from s [-1, 0] generic form 2 to depths in an ocean model
+    """Convert from s [-1, 0] generic form 2 to z heights (positive up) in an ocean model
 
     .. note:: This function is dask-aware since it delegates the core computation to
         :func:`xarray.apply_ufunc`.
@@ -469,7 +469,7 @@ def ocean_s_coordinate_g2(
     Returns
     -------
     xarray.DataArray
-        Negative depth below surface in m (:math:`z`)
+        Height relative to the surface in m, negative in the ocean and positive up (:math:`z`)
     """
     if cache is not None:
         exceptions.xoa_warn("The `cache` parameter is currently not used.")

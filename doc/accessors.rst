@@ -50,6 +50,7 @@ Methods
     DataArray.xoa.infer_coords
     DataArray.xoa.get
     DataArray.xoa.get_coord
+    DataArray.xoa.get_z
     DataArray.xoa.get_depth
     DataArray.xoa.interp
     DataArray.xoa.regrid
@@ -89,6 +90,7 @@ Methods
     Dataset.xoa.infer_coords
     Dataset.xoa.get
     Dataset.xoa.get_coord
+    Dataset.xoa.get_z
     Dataset.xoa.get_depth
     Dataset.xoa.interp
     Dataset.xoa.regrid

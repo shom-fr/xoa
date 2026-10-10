@@ -24,6 +24,20 @@ class TestMixedLayerDepth:
         assert mld.long_name == "Mixed layer depth"
         assert mld.dims == ()
 
+    @pytest.mark.parametrize("positive", ["up", "down"])
+    def test_z_or_depth_coord(self, positive):
+        """Test that the level order follows the native vertical coordinate"""
+        z = np.linspace(-50, 0.0, 6)
+        if positive == "down":
+            z = -z[::-1]
+        vert = xr.DataArray(z, dims="z", attrs={"positive": positive})
+        temp = np.linspace(10, 20.0, 6)
+        temp = temp if positive == "up" else temp[::-1]
+        name = "z" if positive == "up" else "depth"
+        temp = xr.DataArray(temp, dims="z", coords={name: vert}, name="temp")
+        mld = thermdyn.mixed_layer_depth(temp, method="deltatemp")
+        np.testing.assert_allclose(mld, 1)
+
     def test_implicit(self):
         """Test MLD method inference from temperature data"""
         depth = xr.DataArray(
