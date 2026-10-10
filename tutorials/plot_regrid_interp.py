@@ -172,14 +172,15 @@ print(on_rotated.dims, int(on_rotated.isnull().sum()), "missing points")
 src_grid = xr.Dataset(coords={"lon_rho": temp.lon_rho, "lat_rho": temp.lat_rho})
 back = regrid.Regridder(on_rotated, src_grid, "bilinear").regrid(on_rotated)
 fig, axes = plt.subplots(
-    1, 3, figsize=(14, 5), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
+    1, 3, figsize=(14, 5.5), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
 )
 kw = dict(map_kw={"gridlines_labels_on": ["bottom"]}, add_colorbar=False)
 plot_field(on_rotated, ax=axes[0], title="rotated grid", cmap=cmocean.cm.thermal, **kw)
 plot_field(back, ax=axes[1], title="back to the source grid", cmap=cmocean.cm.thermal, **kw)
 diff = plot_field(back - temp, ax=axes[2], title="difference", cmap=cmocean.cm.balance, vmin=-1, vmax=1, **kw)
+extent_rot = geo.get_extent(on_rotated, margin=0.05)
 for ax in axes:
-    ax.set_extent(extent, crs=ccrs.PlateCarree())
+    ax.set_extent(extent_rot, crs=ccrs.PlateCarree())
 add_colorbar(diff, axes[2], label="Difference [Celsius]")
 
 # %%

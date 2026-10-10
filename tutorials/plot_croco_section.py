@@ -119,7 +119,7 @@ tempz = regrid1d(temp, depth, extrap="top")
 
 deltatemp = 0.2
 mld = -mixed_layer_depth(temp, deltatemp=deltatemp)
-mldz = -mixed_layer_depth(temp, deltatemp=deltatemp)
+mldz = -mixed_layer_depth(tempz, deltatemp=deltatemp)
 
 # %%
 # Plots
@@ -129,7 +129,8 @@ mldz = -mixed_layer_depth(temp, deltatemp=deltatemp)
 # Plot the full section with :func:`xoa.plot.plot_section`, that finds the depths and
 # labels the axes from the meta-data.
 
-fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10, 4))
+fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(13, 5),
+                        constrained_layout=True)
 kw = dict(levels=np.arange(0, 23), x="lat")
 plot_section(temp, ax=axs[0], method="contourf", cmap="cmo.thermal", **kw)
 plot_section(
@@ -145,17 +146,18 @@ axs[1].set_title("Interpolated")
 # %%
 # Plot a zoom near the surface and add the mixed layer depth isoline.
 
-fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10, 3))
+fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(13, 4.5),
+                        constrained_layout=True)
 plot_section(temp, ax=axs[0], method="contourf", cmap="cmo.thermal", **kw)
 plot_section(
     temp, ax=axs[0], method="contour", colors="k", linewidths=0.3, add_colorbar=False, **kw
 )
-mld.plot.line(x=lat_name, color="k", linewidth=2, linestyle="--", ax=axs[0])
+axs[0].plot(mld[lat_name], mld, color="k", linewidth=2, linestyle="--")
 plot_section(tempz, ax=axs[1], method="contourf", cmap="cmo.thermal", **kw)
 plot_section(
     tempz, ax=axs[1], method="contour", colors="k", linewidths=0.3, add_colorbar=False, **kw
 )
-mldz.plot.line(x=lat_name, color="k", linewidth=2, linestyle="--", ax=axs[1])
+axs[1].plot(mldz[lat_name], mldz, color="k", linewidth=2, linestyle="--")
 axs[0].set_ylim(-300, 0)
 axs[0].set_title("Original")
 axs[1].set_title("Interpolated")

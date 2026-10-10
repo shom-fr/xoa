@@ -90,7 +90,7 @@ ds_argo = ds_argo.set_index(N_PROF="time").rename(N_PROF="time")
 
 # %%
 # Quick plot of the salinity that highligths the mediterranean water.
-fig, axs = plt.subplots(ncols=2, figsize=(14, 6))
+fig, axs = plt.subplots(ncols=2, figsize=(14, 6), constrained_layout=True)
 ds_argo.sal.plot.contourf("time", "depth", cmap="cmo.haline", levels=20, ax=axs[0])
 ds_argo.sal.plot.contour("time", "depth", levels=[35.65], linewidths=1, colors="k", ax=axs[0])
 xplot.plot_ts(
@@ -158,7 +158,7 @@ pcar = ccrs.PlateCarree()
 fig, ax = plt.subplots(subplot_kw={"projection": pmerc}, figsize=(8, 8))
 ax.set_extent(xgeo.get_extent(ds_merc, margin=1, square=True))
 ax.gridlines(draw_labels=True)
-ax.add_wms("https://ows.emodnet-bathymetry.eu/wms", "emodnet:mean_atlas_land", alpha=0.5)
+ax.add_wms("https://wms.gebco.net/mapserv?", "GEBCO_LATEST", alpha=0.5)
 kws = dict(c="C3", s=15, marker="s", transform=pcar)
 ax.scatter(ds_merc_ens_rect.lon, ds_merc_ens_rect.lat, label="Rejected", alpha=0.15, **kws)
 ax.scatter(ds_merc_ens.lon, ds_merc_ens.lat, label='Mercator', **kws)
@@ -180,7 +180,7 @@ ds_merc_prof = ds_merc.interp(time=ds_argo_prof.time, lon=ds_argo_prof.lon, lat=
 
 # %%
 # We plot now the model, its simulated uncertainty and the observations.
-plt.figure(figsize=(4, 7))
+plt.figure(figsize=(5, 7), constrained_layout=True)
 plt.fill_betweenx(
     ds_merc_prof.sal.depth,
     ds_merc_prof.sal - 1.96 * ds_merc_ens_std.sal,

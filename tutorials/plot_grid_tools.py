@@ -114,15 +114,15 @@ world = xr.Dataset(
     }
 )
 wdx, wdy = grid.get_resolution(world)
-fig, ax = plt.subplots(figsize=(5, 3))
+fig, ax = plt.subplots(figsize=(6, 4), constrained_layout=True)
 ax.plot(wdx.isel(lon=0) / 1e3, world.lat[:], label="along x")
 ax.plot(
     wdy.isel(lon=0) / 1e3, 0.5 * (world.lat[1:].values + world.lat[:-1].values), label="along y"
 )
 ax.set_xlabel("Resolution (km)")
 ax.set_ylabel("Latitude")
+ax.grid(alpha=0.3)
 ax.legend()
-fig.tight_layout()
 
 # %%
 # Edge extents
@@ -202,5 +202,3 @@ sst = temp.isel(eta_rho=slice(0, 3), xi_rho=slice(0, 4))
 padded = grid.pad(sst, {"eta_rho": 1, "xi_rho": (0, 2)}, mode="linear_extrap")
 print(sst.shape, "->", padded.shape)
 print(sst.lon_rho.values[0], padded.lon_rho.values[0])
-
-plt.show()
