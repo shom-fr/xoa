@@ -178,7 +178,7 @@ def is_lat(da, loc="any"):
 
 
 def _search_z_depth_(da, name, **kwargs):
-    """Search for `name` ("z" or "depth"), else for the other one, converted"""
+    """Search for `name` ("z" or "depth"), else for the other one, converted if needed"""
     metaspecs = meta.get_meta_specs(da)
     other = "depth" if name == "z" else "z"
     found = metaspecs.search(da, name, errors="ignore", **kwargs)
@@ -186,6 +186,8 @@ def _search_z_depth_(da, name, **kwargs):
         return found
     found = metaspecs.search(da, other, errors="ignore", **kwargs)
     if found is not None:
+        if found.attrs.get("positive") == ("up" if name == "z" else "down"):
+            return found  # already in the requested convention, whatever its name
         return to_z(found) if name == "z" else to_depth(found)
 
 

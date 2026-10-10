@@ -50,8 +50,6 @@ CROCO section.
     import xarray as xr
     import xoa
     from xoa import coords
-    @suppress
-    xoa.meta.set_meta_specs("default")
 
 Sign and order are two different things
 =======================================
@@ -84,7 +82,7 @@ Finding z and depth
 ===================
 
 The :func:`~xoa.coords.get_z` and :func:`~xoa.coords.get_depth` functions look for
-the coordinate with :mod:`xoa.meta`, and fall back on the other one, with the sign changed:
+the coordinate with :mod:`xoa.meta`, and fall back on the other one, with the sign changed when its ``positive`` attribute says so:
 
 .. ipython:: python
 
@@ -115,7 +113,9 @@ Computing z and depth
 =====================
 
 Sigma coordinates give a ``z``, since the formulas of the CF conventions give
-heights that are negative in the ocean:
+heights that are negative in the ocean.
+The meta specs are inferred from the dataset, and here they are explicitly set
+to the default ones with :func:`xoa.meta.assign_meta_specs`:
 
 .. ipython:: python
 
@@ -130,6 +130,7 @@ heights that are negative in the ocean:
             "bathy": ("x", [50., 100.]),
         },
     )
+    ds = xoa.meta.assign_meta_specs(ds, "default")
     dsz = sigma.decode_sigma(ds)
     dsz.z.isel(x=1).values
     coords.get_depth(ds).isel(x=1).values
@@ -167,10 +168,12 @@ What uses them
 Pitfalls
 ========
 
-- **Trust the attribute, not the name.** A coordinate is returned as found, so a variable
-  named ``depth`` whose ``positive`` attribute is ``"up"`` is returned as is by
-  :func:`~xoa.coords.get_depth`. Fix the attribute of such a dataset, or convert
-  it explicitly.
+- **Trust the attribute, not the name.** A coordinate is returned as found, and a variable
+  named ``depth`` whose ``positive`` attribute is ``"up"`` is already a ``z``:
+  :func:`~xoa.coords.get_z` returns it as is, without changing its sign, and
+  :func:`~xoa.coords.get_depth` returns it as is too. Without this attribute, the
+  ``depth`` name is taken as positive down. Set the attribute of your coordinates when
+  their sign is not the usual one.
 - **Mixing signs in a regridding or an isoline.** Values and bounds must have the same sign:
   ``-15`` m is a ``z``, ``15`` m is a ``depth``.
 - **A dimension called** ``z``. A vertical dimension named like the ``z`` coordinate,

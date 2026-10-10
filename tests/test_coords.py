@@ -146,6 +146,14 @@ class TestZDepth:
         assert zz.name == "z"
         np.testing.assert_array_equal(zz, [0, -10, -50])
 
+    def test_positive_attribute_is_trusted(self):
+        """A depth that is positive up is already a z, and conversely"""
+        depth = self.get_depth()
+        for positive, sign in (("up", 1), ("down", -1)):
+            depth.attrs["positive"] = positive
+            da = xr.DataArray(np.ones(3), dims="k", coords={"depth": depth})
+            np.testing.assert_array_equal(coords.get_z(da), sign * depth.values)
+
     def test_get_z_errors(self):
         da = xr.DataArray(np.ones(3), dims="k")
         with pytest.raises(xoa.XoaError):
