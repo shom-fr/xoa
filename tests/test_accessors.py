@@ -300,6 +300,7 @@ class TestPlotAccessor:
 
         for obj in self.da, self.da.to_dataset():
             assert isinstance(obj.xoa.plot, accessors.XoaPlotAccessor)
+        pytest.importorskip("cartopy")
         assert self.da.xoa.plot.field() is not None
         assert self.da.xoa.plot.grid() is not None
         assert self.da.xoa.plot.taylor(self.da) is not None
