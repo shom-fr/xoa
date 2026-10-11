@@ -7,7 +7,7 @@ Introduction
 ============
 
 :mod:`xoa.dyn` computes the usual kinematic diagnostics of ocean currents from the velocities
-and the sea surface height, and :func:`xoa.grid.get_polygon_mask` tells which cells of a
+and the sea surface height, and :func:`xoa.mask.get_polygon_mask` tells which cells of a
 grid are inside polygons. Both are numba accelerated and keep the missing values.
 
 .. list-table::
@@ -140,7 +140,7 @@ Pitfalls
 Polygon masks
 =============
 
-:func:`xoa.grid.get_polygon_mask` tells which cells of a grid are inside one or several
+:func:`xoa.mask.get_polygon_mask` tells which cells of a grid are inside one or several
 polygons, which are given as arrays of ``(lon, lat)`` points, a list of them, or shapely
 polygons and multi-polygons (their holes are ignored).
 The cells are the ones delimited by the edges that are half way between the grid points.
@@ -166,7 +166,7 @@ polygon for the cell to be inside:
 
 .. ipython:: python
 
-    import xoa.grid
+    import xoa.mask
     da = xr.DataArray(
         np.zeros((4, 5)), dims=("lat", "lon"),
         coords={"lon": ("lon", np.arange(5.0), {"standard_name": "longitude"}),
@@ -174,7 +174,7 @@ polygon for the cell to be inside:
     )
     polygon = [(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)]
     for threshold in None, 0.0, 0.5, 1.0:
-        print(threshold, int(xoa.grid.get_polygon_mask(da, polygon, threshold).sum()))
+        print(threshold, int(xoa.mask.get_polygon_mask(da, polygon, threshold).sum()))
 
 - The covered fraction is the ratio of areas computed in longitude and latitude coordinates:
   cells that are cut in half by a polygon edge have exactly a fraction of one half.
@@ -182,7 +182,7 @@ polygon for the cell to be inside:
   are only selected if one of them covers enough of them: polygons are not merged before.
 - A polygon may be concave and cross the dateline, but must not span more than 180° of
   longitude.
-- The numba functions of :mod:`xoa.core.poly` are available for numpy arrays:
-  :func:`~xoa.core.poly.point_in_polygon` and :func:`~xoa.core.poly.points_in_polygon`
-  for points, and :func:`~xoa.core.poly.polygon_cell_fraction` and
-  :func:`~xoa.core.poly.polygon_mask` for cells.
+- The numba functions are available for numpy arrays:
+  :func:`xoa.core.poly.point_in_polygon` and :func:`xoa.core.poly.points_in_polygon`
+  for points, and :func:`xoa.core.mask.polygon_cell_fraction` and
+  :func:`xoa.core.mask.polygon_mask` for cells.

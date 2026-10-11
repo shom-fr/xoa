@@ -19,6 +19,7 @@ Package API
     xoa.core.geo
     xoa.core.grid
     xoa.core.interp
+    xoa.core.mask
     xoa.core.num
     xoa.core.plot
     xoa.core.poly
@@ -33,6 +34,7 @@ Package API
     xoa.geo
     xoa.grid
     xoa.krig
+    xoa.mask
     xoa.meta
     xoa.misc
     xoa.plot

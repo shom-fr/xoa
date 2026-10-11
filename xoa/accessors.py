@@ -809,8 +809,8 @@ class _GridMixin_:
     """Provide the grid methods"""
 
     def get_polygon_mask(self, polygon, threshold=0.5):
-        """Get a mask of the cells that are inside polygons, see :func:`xoa.grid.get_polygon_mask`"""
-        from .grid import get_polygon_mask
+        """Get a mask of the cells that are inside polygons, see :func:`xoa.mask.get_polygon_mask`"""
+        from .mask import get_polygon_mask
 
         return get_polygon_mask(self._obj, polygon, threshold=threshold)
 

@@ -33,6 +33,7 @@ import xoa
 import xoa.meta as xmeta
 import xoa.dyn as xdyn
 import xoa.grid as xgrid
+import xoa.mask as xmask
 from xoa.core.poly import points_in_polygon
 from xoa.plot import plot_field, plot_vectors, add_colorbar
 
@@ -231,14 +232,14 @@ polygon = lines[inside.index(True)]
 print(f"The polygon has {len(polygon)} vertices")
 
 # %%
-# :func:`xoa.grid.get_polygon_mask` tells which cells are inside the polygon.
+# :func:`xoa.mask.get_polygon_mask` tells which cells are inside the polygon.
 # A cell is selected when the fraction of its area that is covered by the polygon
 # is at least the ``threshold`` parameter, so that cells that are cut by the polygon
 # can be kept or not. A null threshold selects all the cells that touch the polygon.
 # With a ``None`` threshold, only the position of the centers matters.
 
 thresholds = [None, 0.0, 0.5, 1.0]
-masks = {t: xgrid.get_polygon_mask(rossby, polygon, threshold=t) for t in thresholds}
+masks = {t: xmask.get_polygon_mask(rossby, polygon, threshold=t) for t in thresholds}
 x0, y0 = polygon.min(axis=0) - 0.35
 x1, y1 = polygon.max(axis=0) + 0.35
 fig, axes = new_map(2, 2, figsize=(9.5, 7.6))
