@@ -3,7 +3,8 @@ Routines related to ocean dynamics.
 
 Provides :func:`get_sea_level` for identifying sea level variables,
 :func:`flow2d` for 2D Lagrangian particle advection, and the kinematic diagnostics
-computed from velocities on collocated grids: :func:`get_relvort`, :func:`get_div`,
+computed from velocities on collocated grids, that may have levels with a variable vertical
+coordinate: :func:`get_relvort`, :func:`get_rossby`, :func:`get_div`,
 :func:`get_strain`, :func:`get_okuboweiss`, as well as :func:`get_coriolis` and
 :func:`get_geos`.
 """
@@ -22,6 +23,8 @@ computed from velocities on collocated grids: :func:`get_relvort`, :func:`get_di
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+import textwrap
 
 import numpy as np
 import pandas as pd
@@ -274,38 +277,36 @@ def _get_dx_dy_(u, dx, dy):
     return dx, dy
 
 
-def _set_attrs_(da, ref, name, long_name, units):
-    """Set the attributes of an output and restore the ones of the coordinates
-
-    :func:`xarray.apply_ufunc` drops the attributes of the coordinates, which are needed
-    to find the longitudes and latitudes.
-    """
-    for cname, coord in ref.coords.items():
-        if cname in da.coords:
-            da.coords[cname].attrs.update(coord.attrs)
+def _name_(da, ref, name, long_name, units):
+    """Name an output and give it clean attributes, while its coordinates keep theirs"""
+    da = xcoords.copy_coord_attrs(da, ref)
     da.name = name
     da.attrs = {"long_name": long_name, "units": units}
     return da
 
 
-def _apply_kinematics_(func, nout, u, v, dx, dy, names, long_names, units, dtypes=None):
+def _apply_kinematics_(func, nout, u, v, dx, dy, z, names, long_names, units):
     """Apply a core function to velocities and set the attributes of its outputs"""
     xdim = xcoords.get_xdim(u, errors="raise")
     ydim = xcoords.get_ydim(u, errors="raise")
     dx, dy = _get_dx_dy_(u, dx, dy)
     dx = xr.DataArray(dx) if np.ndim(dx) == 0 else dx
     dy = xr.DataArray(dy) if np.ndim(dy) == 0 else dy
-    core_dims = [[ydim, xdim]]
+    hdims = [ydim, xdim]
+    args = [u, v, dx, dy]
+    in_dims = [hdims, hdims] + [hdims if np.ndim(d) else [] for d in (dx, dy)]
+    out_dims = hdims
+    if z is not None:
+        zdim = xcoords.get_zdim(u, errors="raise")
+        out_dims = [zdim] + hdims
+        in_dims = [out_dims] * 2 + in_dims[2:] + [out_dims]
+        args.append(z)
     res = xr.apply_ufunc(
         func,
-        u,
-        v,
-        dx,
-        dy,
+        *args,
         join="override",
-        input_core_dims=[core_dims[0], core_dims[0]]
-        + [core_dims[0] if np.ndim(d) else [] for d in (dx, dy)],
-        output_core_dims=core_dims * nout,
+        input_core_dims=in_dims,
+        output_core_dims=[out_dims] * nout,
         dask="parallelized",
         output_dtypes=[float] * nout,
         dask_gufunc_kwargs={"allow_rechunk": True},
@@ -314,7 +315,7 @@ def _apply_kinematics_(func, nout, u, v, dx, dy, names, long_names, units, dtype
         res = (res,)
     out = []
     for da, name, long_name, unit in zip(res, names, long_names, units):
-        out.append(_set_attrs_(da.transpose(*u.dims), u, name, long_name, unit))
+        out.append(_name_(da.transpose(*u.dims), u, name, long_name, unit))
     return out[0] if nout == 1 else tuple(out)
 
 
@@ -327,16 +328,24 @@ _DOC_UV_ = """
     dx, dy: None, float, xarray.DataArray
         Resolutions along X and Y in meters, which default to the ones computed
         from the coordinates with :func:`xoa.grid.get_dx_dy`.
+    z: None, xarray.DataArray
+        Vertical coordinate of the levels, like the depths or heights of the sigma levels.
+        The horizontal derivatives are then computed at constant z instead of along the
+        levels, which are sloping. The velocities must then have a vertical dimension,
+        which is the one of `z`, and the sign convention of `z` does not matter.
+        See :ref:`indepth.dyn`.
+
 """
 
 
 def _format_uv_doc_(func):
-    func.__doc__ = func.__doc__.replace("{parameters}", _DOC_UV_)
+    # The indentation of docstrings is already removed
+    func.__doc__ = func.__doc__.replace("{parameters}", textwrap.dedent(_DOC_UV_))
     return func
 
 
 @_format_uv_doc_
-def get_relvort(u, v, dx=None, dy=None):
+def get_relvort(u, v, dx=None, dy=None, z=None):
     """Compute the relative vorticity, in s-1
 
     It is :math:`\\partial_x v - \\partial_y u`, which is positive for a counter-clockwise
@@ -351,12 +360,34 @@ def get_relvort(u, v, dx=None, dy=None):
     xoa.core.dyn.relvort
     """
     return _apply_kinematics_(
-        cdyn.relvort, 1, u, v, dx, dy, ["relvort"], ["Relative vorticity"], ["s-1"]
+        cdyn.relvort, 1, u, v, dx, dy, z, ["relvort"], ["Relative vorticity"], ["s-1"]
     )
 
 
 @_format_uv_doc_
-def get_div(u, v, dx=None, dy=None):
+def get_rossby(u, v, dx=None, dy=None, z=None):
+    """Compute the Rossby number, which is dimensionless
+
+    It is the relative vorticity divided by the Coriolis parameter, that is positive for
+    a cyclonic rotation, and negative for an anticyclonic one, in both hemispheres.
+    {parameters}
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    get_relvort
+    get_coriolis
+    """
+    relvort = get_relvort(u, v, dx=dx, dy=dy, z=z)
+    corio = get_coriolis(xgrid._get_lonlat_yx_(u)[1])
+    rossby = relvort / corio
+    return _name_(rossby.transpose(*u.dims), u, "rossby", "Rossby number", "1")
+
+
+@_format_uv_doc_
+def get_div(u, v, dx=None, dy=None, z=None):
     """Compute the horizontal divergence, in s-1
 
     It is :math:`\\partial_x u + \\partial_y v`.
@@ -370,12 +401,12 @@ def get_div(u, v, dx=None, dy=None):
     xoa.core.dyn.div
     """
     return _apply_kinematics_(
-        cdyn.div, 1, u, v, dx, dy, ["div"], ["Horizontal divergence"], ["s-1"]
+        cdyn.div, 1, u, v, dx, dy, z, ["div"], ["Horizontal divergence"], ["s-1"]
     )
 
 
 @_format_uv_doc_
-def get_strain(u, v, dx=None, dy=None):
+def get_strain(u, v, dx=None, dy=None, z=None):
     """Compute the normal and shear strains, in s-1
 
     They are :math:`\\partial_x u - \\partial_y v` and :math:`\\partial_x v + \\partial_y u`.
@@ -398,6 +429,7 @@ def get_strain(u, v, dx=None, dy=None):
         v,
         dx,
         dy,
+        z,
         ["strain_normal", "strain_shear"],
         ["Normal strain", "Shear strain"],
         ["s-1", "s-1"],
@@ -405,7 +437,7 @@ def get_strain(u, v, dx=None, dy=None):
 
 
 @_format_uv_doc_
-def get_okuboweiss(u, v, dx=None, dy=None):
+def get_okuboweiss(u, v, dx=None, dy=None, z=None):
     """Compute the Okubo-Weiss parameter, in s-2
 
     It is the squared strain minus the squared vorticity: it is negative where
@@ -426,6 +458,7 @@ def get_okuboweiss(u, v, dx=None, dy=None):
         v,
         dx,
         dy,
+        z,
         ["okuboweiss"],
         ["Okubo-Weiss parameter"],
         ["s-2"],
@@ -477,8 +510,11 @@ def get_geos(ssh, dx=None, dy=None):
     xdim = xcoords.get_xdim(ssh, errors="raise")
     ydim = xcoords.get_ydim(ssh, errors="raise")
     dx, dy = _get_dx_dy_(ssh, dx, dy)
+    dx = xr.DataArray(dx) if np.ndim(dx) == 0 else dx
+    dy = xr.DataArray(dy) if np.ndim(dy) == 0 else dy
     lon, lat = xgrid._get_lonlat_yx_(ssh)
     corio = get_coriolis(lat)
+    core_dims = [ydim, xdim]
     ug, vg = xr.apply_ufunc(
         cdyn.geos,
         ssh,
@@ -486,7 +522,7 @@ def get_geos(ssh, dx=None, dy=None):
         dy,
         corio,
         join="override",
-        input_core_dims=[[ydim, xdim]] * 4,
+        input_core_dims=[core_dims] + [core_dims if np.ndim(d) else [] for d in (dx, dy)] + [core_dims],
         output_core_dims=[[ydim, xdim]] * 2,
         dask="parallelized",
         output_dtypes=[float] * 2,
@@ -498,5 +534,96 @@ def get_geos(ssh, dx=None, dy=None):
         ("ugeos", "vgeos"),
         ("Zonal geostrophic current", "Meridional geostrophic current"),
     ):
-        out.append(_set_attrs_(da.transpose(*ssh.dims), ssh, name, long_name, "m s-1"))
+        out.append(_name_(da.transpose(*ssh.dims), ssh, name, long_name, "m s-1"))
+    return tuple(out)
+
+
+def get_cyclogeos(
+    ssh, dx=None, dy=None, terms="full", smooth=None, niter=300, tol=1e-4, relax=0.5, fmin=1e-5
+):
+    """Compute the cyclogeostrophic currents from the sea surface height, in m s-1
+
+    They include the advection terms of the momentum equations on top of the geostrophic
+    balance, which is needed where the currents are curved like in eddies and meanders.
+    They are found with an iterative method like the one of Penven et al. (2014), see
+    :func:`xoa.core.dyn.cyclogeos` for the details.
+
+    Parameters
+    ----------
+    ssh: xarray.DataArray
+        Sea surface height in meters
+    dx, dy: None, float, xarray.DataArray
+        Resolutions along X and Y in meters, which default to the ones computed
+        from the coordinates with :func:`xoa.grid.get_dx_dy`.
+    terms: {"full", "penven"}
+        Advection terms of the correction: the four terms of the complete advection,
+        or the two terms that are taught as the ones of Penven et al. (2014).
+        See :func:`xoa.core.dyn.cyclogeos`.
+    smooth: None, int
+        Number of smoothings of the advection terms at each iteration, which prevents
+        the iterations from diverging. See :func:`xoa.core.dyn.cyclogeos`.
+    niter: int
+        Maximal number of iterations
+    tol: float
+        The iterations stop when the currents change by less than this value, in m s-1
+    relax: float
+        Relaxation factor between 0 and 1
+    fmin: float
+        Minimal absolute value of the Coriolis parameter, in s-1, below which the currents
+        are missing, which is close to the equator
+
+    Return
+    ------
+    xarray.DataArray
+        Zonal cyclogeostrophic current
+    xarray.DataArray
+        Meridional cyclogeostrophic current
+
+    Currents are missing where the iterations did not converge, like in very strong
+    anticyclones that have no cyclogeostrophic solution.
+
+    References
+    ----------
+    Penven, P., Halo, I., Pous, S., Marié, L. (2014), Cyclogeostrophic balance in the
+    Mozambique Channel, J. Geophys. Res. Oceans, 119, 1054-1067, doi:10.1002/2013JC009528.
+
+    See also
+    --------
+    get_geos
+    xoa.core.dyn.cyclogeos
+    """
+    xdim = xcoords.get_xdim(ssh, errors="raise")
+    ydim = xcoords.get_ydim(ssh, errors="raise")
+    dx, dy = _get_dx_dy_(ssh, dx, dy)
+    if np.ndim(dx) == 0:
+        dx = xr.DataArray(dx)
+    if np.ndim(dy) == 0:
+        dy = xr.DataArray(dy)
+    ug, vg = get_geos(ssh, dx=dx, dy=dy)
+    corio = get_coriolis(xgrid._get_lonlat_yx_(ssh)[1])
+    core_dims = [ydim, xdim]
+    uc, vc = xr.apply_ufunc(
+        cdyn.cyclogeos,
+        ug,
+        vg,
+        dx,
+        dy,
+        corio,
+        join="override",
+        input_core_dims=[core_dims, core_dims]
+        + [core_dims if np.ndim(d) else [] for d in (dx, dy)]
+        + [core_dims],
+        output_core_dims=[core_dims] * 2,
+        dask="parallelized",
+        output_dtypes=[float] * 2,
+        dask_gufunc_kwargs={"allow_rechunk": True},
+        kwargs={"terms": terms, "smooth": smooth, "niter": niter, "tol": tol, "relax": relax, "fmin": fmin},
+    )
+    out = []
+    for da, name, long_name in zip(
+        (uc, vc),
+        ("ucgeos", "vcgeos"),
+        ("Zonal cyclogeostrophic current", "Meridional cyclogeostrophic current"),
+    ):
+        out.append(_name_(da.transpose(*ssh.dims), ssh, name, long_name, "m s-1"))
     return tuple(out)

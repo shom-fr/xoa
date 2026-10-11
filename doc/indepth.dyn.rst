@@ -20,6 +20,9 @@ grid are inside polygons. Both are numba accelerated and keep the missing values
     * - :func:`xoa.dyn.get_relvort`
       - Relative vorticity :math:`\partial_x v - \partial_y u`
       - s-1
+    * - :func:`xoa.dyn.get_rossby`
+      - Rossby number, which is the relative vorticity over the Coriolis parameter
+      - 1
     * - :func:`xoa.dyn.get_div`
       - Horizontal divergence :math:`\partial_x u + \partial_y v`
       - s-1
@@ -35,9 +38,14 @@ grid are inside polygons. Both are numba accelerated and keep the missing values
     * - :func:`xoa.dyn.get_geos`
       - Geostrophic currents from the sea surface height
       - m s-1
+    * - :func:`xoa.dyn.get_cyclogeos`
+      - Cyclogeostrophic currents from the sea surface height
+      - m s-1
 
-The tutorial :ref:`sphx_glr_tutorials_plot_croco_dynamics.py` applies them to the surface
-currents of a CROCO simulation, and this guide explains the conventions and the pitfalls.
+The tutorials :ref:`sphx_glr_tutorials_plot_gulfstream_dynamics.py` and
+:ref:`sphx_glr_tutorials_plot_croco_rossby.py` apply them to the surface currents of a GLORYS
+reanalysis of the Gulf Stream, and to the sigma levels of a CROCO simulation.
+This guide explains the conventions and the pitfalls.
 
 Two layers
 ==========
@@ -99,6 +107,90 @@ Conventions
   A value is missing when a point it depends on is missing, so land points
   erode the diagnostics of their neighbors.
 
+Levels with a variable z
+========================
+
+On sigma or hybrid vertical coordinates, the levels follow the topography, so the depth of
+a level varies in space. Horizontal derivatives that are taken along the levels then
+mix in the vertical shear of the currents, since
+
+.. math::
+
+    \partial_x u|_z = \partial_x u|_s - \partial_x z|_s \, \partial_z u
+
+where :math:`|_s` stands for the derivative along the level and :math:`|_z` for the one at
+constant depth, which is the one that is wanted. The error is large where the levels are
+tilted and the currents are sheared, typically over shelf breaks and continental slopes,
+and it is invisible on flat levels.
+
+All the diagnostics that need horizontal derivatives accept a ``z`` parameter:
+:func:`~xoa.dyn.get_relvort`, :func:`~xoa.dyn.get_rossby`, :func:`~xoa.dyn.get_div`,
+:func:`~xoa.dyn.get_strain` and :func:`~xoa.dyn.get_okuboweiss`.
+It is the vertical coordinate of each level, with the same dimensions as the velocities,
+possibly without the extra ones like time. Its sign convention does not matter, since both
+:math:`\partial_x z` and :math:`\partial_z` change sign with it.
+
+.. code-block:: python
+
+    rossby = xoa.dyn.get_rossby(ds.u, ds.v, z=ds.depth)
+    rossby = ds.xoa.get_rossby(z=ds.depth)  # with the accessor
+
+- The results are still on the model levels, which have different depths at different points.
+  Interpolate them to regular depths afterwards with :func:`xoa.regrid.regrid1d`.
+- The vertical derivative is centered, and one-sided at the first and last levels.
+- The velocities must be at the same points, like for 2D arrays. Staggered grids must be
+  handled first, for instance with
+  `pycroco <https://github.com/shom-fr/pycroco>`_ for CROCO outputs.
+- The tutorial :ref:`sphx_glr_tutorials_plot_croco_rossby.py` validates the Rossby number
+  at constant depth against the one computed from currents that the model interpolated
+  to regular depths.
+
+Cyclogeostrophic currents
+=========================
+
+The geostrophic currents ignore the advection terms of the momentum equations, which are
+significant where the flow is strongly curved, like in eddies and meanders. The
+cyclogeostrophic currents :math:`\mathbf{u}` satisfy
+
+.. math::
+
+    f \mathbf{k} \times \mathbf{u} + (\mathbf{u} \cdot \nabla) \mathbf{u}
+    = f \mathbf{k} \times \mathbf{u}_g
+
+for the same sea surface height as the geostrophic currents :math:`\mathbf{u}_g`.
+:func:`xoa.dyn.get_cyclogeos` solves it with an iterative method like the one of
+Penven et al. (2014), see :ref:`references`, that starts from the geostrophic currents
+and corrects them with the advection terms of the previous iteration until they stop changing:
+
+.. math::
+
+    u_{n+1} = u_g - \frac{u_n \partial_x v_n + v_n \partial_y v_n}{f}, \quad
+    v_{n+1} = v_g + \frac{u_n \partial_x u_n + v_n \partial_y u_n}{f}
+
+.. code-block:: python
+
+    ucg, vcg = xoa.dyn.get_cyclogeos(ssh)
+    ucg, vcg = ssh.xoa.get_cyclogeos()  # with the accessor
+
+- These are the four terms of the complete advection, which reproduce the gradient wind
+  balance of an axisymmetric vortex. With ``terms="penven"``, only the two terms
+  :math:`v \partial_y v` and :math:`u \partial_x u` are kept, as in the formulation that is
+  usually taught, which makes a smaller correction since the dropped cross terms
+  carry the curvature of the flow in an eddy.
+  Cyclones are slower than what geostrophy says, and anticyclones are faster.
+- The iterations amplify the shortest scales when the currents are strong compared to the
+  Coriolis parameter times the resolution, which makes the complete advection diverge,
+  even where a solution exists, as soon as the resolution is fine enough.
+  The ``smooth`` parameter damps these scales by smoothing the advection terms at each
+  iteration, which is the default with the complete advection.
+- Some strong anticyclones have no solution at all, like when the Rossby number of the
+  geostrophic currents gets below about -1/2. The currents are then missing where the
+  iterations diverge or do not converge in ``niter`` iterations, to the tolerance ``tol``.
+- The currents are also missing where the geostrophic ones or one of their neighbors are,
+  and where the Coriolis parameter is smaller than ``fmin``, like close to the equator.
+- The tutorial :ref:`sphx_glr_tutorials_plot_gulfstream_dynamics.py` compares them with the
+  currents of a reanalysis.
+
 Resolution of the grid
 ======================
 
@@ -121,7 +213,7 @@ Pitfalls
     The velocities must be on the same points, which are the ones the diagnostics are
     computed at. On an Arakawa C grid, like the CROCO or NEMO ones, ``u`` and ``v`` must
     first be interpolated to the same points, for instance with :meth:`xarray.DataArray.interp`
-    or with :func:`xoa.grid.shift`. The tutorial shows how to do it.
+    or with :func:`xoa.grid.shift`. Staggered grids are not handled by :mod:`xoa.dyn`.
 
 **Land.**
     Mask the land before computing diagnostics: velocities that are zero on land give

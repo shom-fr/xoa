@@ -63,6 +63,31 @@ def ensure_ns_datetime(da):
 
 
 @misc.ERRORS.format_function_docstring
+def copy_coord_attrs(da, ref):
+    """Copy the attributes of the coordinates of a reference to those of an array
+
+    This is useful after :func:`xarray.apply_ufunc`, which drops the attributes of the
+    coordinates, like the ``standard_name`` that is needed to find
+    the longitudes and latitudes.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+        Object whose coordinates are updated in place
+    ref: xarray.DataArray, xarray.Dataset
+        Object whose coordinate attributes are copied, for the coordinates they share
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+        The same object as `da`
+    """
+    for name, coord in ref.coords.items():
+        if name in da.coords:
+            da.coords[name].attrs.update(coord.attrs)
+    return da
+
+
 def get_lon(da, errors="raise", **kwargs):
     """Get the longitude coordinate
 

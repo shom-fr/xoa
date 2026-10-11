@@ -366,6 +366,10 @@ class TestDynGridAccessor:
         ref_ug, ref_vg = dyn.get_geos(self.ds.ssh)
         np.testing.assert_allclose(ug, ref_ug)
         np.testing.assert_allclose(vg, ref_vg)
+        uc, vc = self.ds.ssh.xoa.get_cyclogeos(niter=10)
+        ref_uc, ref_vc = dyn.get_cyclogeos(self.ds.ssh, niter=10)
+        np.testing.assert_allclose(uc, ref_uc, equal_nan=True)
+        np.testing.assert_allclose(vc, ref_vc, equal_nan=True)
 
     def test_get_polygon_mask(self):
         poly = [(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)]

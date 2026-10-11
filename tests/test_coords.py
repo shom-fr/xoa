@@ -48,6 +48,22 @@ def test_is_lon():
     assert not coords.is_lon(temp.lat)
 
 
+def test_copy_coord_attrs():
+    ref = xr.DataArray(
+        np.zeros(3),
+        dims="x",
+        coords={"lon": ("x", np.arange(3.0), {"standard_name": "longitude"})},
+    )
+    res = (ref + 1).copy(deep=True)
+    res.lon.attrs.clear()
+    assert coords.copy_coord_attrs(res, ref) is res
+    assert res.lon.attrs == {"standard_name": "longitude"}
+    assert coords.get_lon(res).name == "lon"
+    # Only the shared coordinates are concerned
+    other = xr.DataArray(np.zeros(3), dims="x")
+    assert coords.copy_coord_attrs(other, ref).coords.keys() == set()
+
+
 def test_get_depth_from_variable():
     """Test depth coordinate functions"""
     da = xr.DataArray(
