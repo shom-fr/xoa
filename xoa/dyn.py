@@ -4,7 +4,7 @@ Routines related to ocean dynamics.
 Provides :func:`get_sea_level` for identifying sea level variables,
 :func:`flow2d` for 2D Lagrangian particle advection, and the kinematic diagnostics
 computed from velocities on collocated grids, that may have levels with a variable vertical
-coordinate: :func:`get_relvort`, :func:`get_rossby`, :func:`get_div`,
+coordinate (see also :class:`VerticalModes` for the vertical modes): :func:`get_relvort`, :func:`get_rossby`, :func:`get_div`,
 :func:`get_strain`, :func:`get_okuboweiss`, as well as :func:`get_coriolis` and
 :func:`get_geos`.
 """
@@ -38,6 +38,7 @@ from . import misc as xmisc
 from . import interp
 from . import geo
 from .core import dyn as cdyn
+from .core import modes as cmodes
 
 
 SEA_LEVEL_VARIANTS = xmisc.Choices(
@@ -627,3 +628,259 @@ def get_cyclogeos(
     ):
         out.append(_name_(da.transpose(*ssh.dims), ssh, name, long_name, "m s-1"))
     return tuple(out)
+
+
+def _mode_dims_(res, ref, *drop):
+    """Order the dimensions of a result: the mode, the ones of the reference and the others"""
+    dims = [d for d in res.dims if d not in drop]
+    first = ["mode"] if "mode" in res.dims else []
+    ordered = [d for d in ref.dims if d in dims and d != "mode"]
+    return res.transpose(*first, *ordered, *[d for d in dims if d not in ordered and d != "mode"])
+
+
+class VerticalModes:
+    """Vertical modes of water columns, to decompose and recompose profiles
+
+    The quasi-geostrophic vertical modes :math:`F_n(z)` are computed from the stratification
+    of each water column, with :mod:`xoa.core.modes`: the first one is the barotropic mode,
+    and the next ones are the baroclinic modes, that have more and more nodes and are slower
+    and slower. Profiles of the currents, of the pressure or of the temperature
+    are then split into the amplitudes of the modes with :meth:`decomp`
+    and put back together with :meth:`recomp`.
+
+    Everything works with extra dimensions, like time or horizontal ones, and with dask,
+    since the computations are done with :func:`xarray.apply_ufunc`.
+    The levels may vary in space, like with sigma coordinates, the levels that are below
+    the bottom are missing, and the columns that have different depths have
+    different modes.
+
+    Parameters
+    ----------
+    n2: xarray.DataArray
+        Squared Brunt-Vaisala frequency in s-2 at the levels, with a vertical dimension.
+        See :func:`xoa.thermdyn.get_n2`.
+    z: None, xarray.DataArray
+        Vertical coordinate of the levels, which defaults to the one of `n2`.
+        It may vary in space, and its sign convention is given by its ``positive``
+        attribute, see :func:`xoa.coords.as_z`.
+    nmodes: int
+        Number of modes, including the barotropic one
+    bc: {"rigid", "free"}
+        Boundary condition at the surface: either a rigid lid, which has no
+        speed for the barotropic mode, or a free surface.
+    lat: None, float, xarray.DataArray
+        Latitudes, to compute the deformation radii. They default to the ones
+        of the coordinates, if any.
+    zrange: None, tuple(float)
+        Focus on a layer: only the levels between these two values, in the convention
+        of `z`, are used, and the modes have no flux through the limits of the layer.
+        Everything is missing outside of it.
+    n2min: float
+        Minimal stratification in s-2, which is used in the unstable or mixed layers
+    fmin: float
+        The deformation radii are missing where the absolute value of
+        the Coriolis parameter is smaller than this value in s-1, like close to the equator.
+
+    Attributes
+    ----------
+    modes: xarray.DataArray
+        The modes, whose mean square over the water column is one,
+        and which are positive at the surface, with the ``mode`` dimension first.
+    c: xarray.DataArray
+        Speeds of the modes in m s-1, which are missing for the barotropic mode of
+        the rigid lid.
+    rd: None, xarray.DataArray
+        Deformation radii in meters, which are the speeds divided by the Coriolis parameter,
+        if the latitudes are known.
+    dz: xarray.DataArray
+        Thickness of the layers, that are the weights of the integrals.
+
+    Example
+    -------
+    .. code-block:: python
+
+        n2 = xoa.thermdyn.get_n2(ds.temp, ds.sal)
+        vm = xoa.dyn.VerticalModes(n2, nmodes=5)
+        amps = vm.decomp(ds.u)  # Amplitudes of the modes
+        baroclinic = vm.recomp(amps, modes=[1, 2])  # Part of the first baroclinic modes
+        vm.rd.isel(mode=1)  # First deformation radius
+
+    See also
+    --------
+    xoa.core.modes.vertical_modes
+    xoa.thermdyn.get_n2
+    """
+
+    def __init__(
+        self, n2, z=None, nmodes=5, bc="rigid", lat=None, zrange=None, n2min=1e-9, fmin=1e-5
+    ):
+        nmodes = int(nmodes)
+        if nmodes < 1:
+            raise ValueError("nmodes must be a positive integer")
+        if bc not in ("rigid", "free"):
+            raise ValueError(f"bc must be 'rigid' or 'free', not {bc!r}")
+        self.nmodes = nmodes
+        self.bc = bc
+        self.zrange = None if zrange is None else tuple(float(v) for v in zrange)
+        self.zdim = zdim = xcoords.get_zdim(n2, errors="raise")
+        self.n2 = n2
+
+        # Vertical coordinate, which is positive up
+        if z is None:
+            z = xcoords.get_z(n2)
+            positive = xcoords.get_positive_attr(n2, zdim)
+        else:
+            positive = z.attrs.get("positive")
+            if positive not in ("up", "down"):
+                positive = "up" if not bool((z > 0).any()) else "down"
+            z = xcoords.as_z(z)
+        self.z = z
+
+        # Layer, in the convention of the vertical coordinate
+        zmin, zmax = -np.inf, np.inf
+        if self.zrange is not None:
+            bounds = sorted(self.zrange)
+            zmin, zmax = bounds if positive == "up" else (-bounds[1], -bounds[0])
+
+        modes, c, dz = xr.apply_ufunc(
+            cmodes.vertical_modes,
+            n2,
+            z,
+            input_core_dims=[[zdim], [zdim]],
+            output_core_dims=[["mode", zdim], ["mode"], [zdim]],
+            kwargs={
+                "nmodes": nmodes,
+                "free_surface": bc == "free",
+                "zmin": zmin,
+                "zmax": zmax,
+                "n2min": n2min,
+            },
+            join="override",
+            dask="parallelized",
+            output_dtypes=[float] * 3,
+            dask_gufunc_kwargs={"output_sizes": {"mode": nmodes}, "allow_rechunk": True},
+        )
+        specs = (
+            (modes, "vmodes", "Vertical modes", "1"),
+            (c, "c", "Speed of the vertical modes", "m s-1"),
+            (dz, "dz", "Thickness of the layers", "m"),
+        )
+        out = []
+        for da, name, long_name, units in specs:
+            da = _mode_dims_(da, n2)
+            if "mode" in da.dims:
+                da = da.assign_coords(mode=np.arange(nmodes))
+            out.append(_name_(da, n2, name, long_name, units))
+        self.modes, self.c, self.dz = out
+
+        # Deformation radii
+        self.rd = None
+        if lat is None:
+            lat = xcoords.get_lat(n2, errors="ignore")
+        if lat is not None:
+            corio = abs(get_coriolis(float(lat) if np.ndim(lat) == 0 else lat))
+            with np.errstate(divide="ignore", invalid="ignore"):
+                rd = xr.where(corio >= fmin, self.c / corio, np.nan)
+            self.rd = _name_(rd, n2, "rd", "Deformation radius of the vertical modes", "m")
+            self.rd = _mode_dims_(self.rd, self.c)
+
+    def __repr__(self):
+        zrange = "" if self.zrange is None else f", zrange={self.zrange}"
+        return (
+            f"<VerticalModes: {self.nmodes} modes, bc={self.bc!r}, zdim={self.zdim!r}{zrange}>"
+        )
+
+    def decomp(self, da, nmodes=None):
+        """Decompose profiles into the amplitudes of the vertical modes
+
+        The amplitude of the barotropic mode is the vertical mean of the profile.
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Profiles, with the vertical dimension of the modes and possibly other dimensions,
+            that are broadcast with the ones of the modes. It must be defined at all
+            the levels of the water columns, or the amplitudes are missing.
+        nmodes: None, int
+            Number of modes to keep, which defaults to all of them.
+
+        Return
+        ------
+        xarray.DataArray
+            The amplitudes, with the ``mode`` dimension first and the other dimensions
+            of the profiles, without the vertical one.
+
+        See also
+        --------
+        recomp
+        """
+        modes = self.modes if nmodes is None else self.modes.isel(mode=slice(0, nmodes))
+        amps = xr.apply_ufunc(
+            cmodes.project,
+            da,
+            modes,
+            self.dz,
+            input_core_dims=[[self.zdim], ["mode", self.zdim], [self.zdim]],
+            output_core_dims=[["mode"]],
+            join="override",
+            dask="parallelized",
+            output_dtypes=[float],
+            dask_gufunc_kwargs={"output_sizes": {"mode": modes.sizes["mode"]}, "allow_rechunk": True},
+        )
+        amps = amps.assign_coords(mode=modes.mode.values)
+        amps = _mode_dims_(amps, da)
+        amps = xcoords.copy_coord_attrs(amps, da)
+        amps.name = "amps"
+        amps.attrs = {"long_name": "Amplitude of the vertical modes", "units": da.attrs.get("units", "")}
+        return amps
+
+    def recomp(self, amps, modes=None):
+        """Recompose profiles from the amplitudes of the vertical modes
+
+        Parameters
+        ----------
+        amps: xarray.DataArray
+            Amplitudes as returned by :meth:`decomp`, that may have less modes
+            than the object.
+        modes: None, int, list(int)
+            Modes to use: the first ones if it is an integer, else the ones of the list,
+            the other amplitudes being null. All the modes of `amps` by default.
+
+        Return
+        ------
+        xarray.DataArray
+            Profiles, with the vertical dimension at the same place as in the
+            stratification, and the other dimensions after them. They are missing
+            outside of the layer of the zoom.
+
+        See also
+        --------
+        decomp
+        """
+        available = amps.mode.values
+        if modes is not None:
+            wanted = np.arange(modes) if np.ndim(modes) == 0 else np.asarray(modes)
+            missing = [int(m) for m in wanted if m not in available]
+            if missing:
+                raise ValueError(f"The modes {missing} are not available in the amplitudes")
+            amps = amps.where(amps.mode.isin(wanted), 0.0)
+        basis = self.modes.sel(mode=available)
+        rec = xr.apply_ufunc(
+            cmodes.reconstruct,
+            amps,
+            basis,
+            input_core_dims=[["mode"], ["mode", self.zdim]],
+            output_core_dims=[[self.zdim]],
+            join="override",
+            dask="parallelized",
+            output_dtypes=[float],
+            dask_gufunc_kwargs={"allow_rechunk": True},
+        )
+        rec = _mode_dims_(rec, self.n2)
+        rec = xcoords.copy_coord_attrs(rec, amps)
+        rec.name = "recomp"
+        rec.attrs = {
+            "long_name": "Profile recomposed from its vertical modes",
+            "units": amps.attrs.get("units", ""),
+        }
+        return rec

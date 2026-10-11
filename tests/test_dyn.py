@@ -9,6 +9,7 @@ import xarray as xr
 
 from xoa import dyn
 from xoa import grid as xgrid
+from xoa.core import modes as cmodes
 from xoa.exceptions import XoaError
 
 
@@ -360,3 +361,248 @@ class TestVariableZ:
         u, v, z = self.get_data()
         with pytest.raises(XoaError, match="No dimension found"):
             dyn.get_relvort(u.isel(depth=0), v.isel(depth=0), z=z, dx=self.res, dy=self.res)
+
+
+class TestVerticalModes:
+    nz = 40
+    depth = 4000.0
+
+    def get_profile(self, nz=None, positive="up", name="z"):
+        """Exponential stratification, on levels that are finer close to the surface"""
+        nz = nz or self.nz
+        s = (np.arange(nz) + 0.5) / nz
+        z = -self.depth * (1 - s) ** 1.5  # From the surface to the bottom would be reversed
+        z = np.sort(z)  # From the bottom to the surface
+        n2 = 1e-6 + 2e-4 * np.exp(z / 300.0)
+        coord = {"standard_name": "altitude" if positive == "up" else "depth", "positive": positive}
+        zz = z if positive == "up" else -z
+        n2 = xr.DataArray(n2, dims=name, coords={name: (name, zz, coord)}, name="n2")
+        return n2
+
+    def get_cube(self, nt=2, ny=3, nx=4, nz=None):
+        """Stratification with extra dimensions, whose scale height varies"""
+        n2 = self.get_profile(nz)
+        z = n2.z
+        scale = xr.DataArray(
+            np.linspace(200.0, 500.0, nt * ny * nx).reshape(nt, ny, nx), dims=("time", "lat", "lon")
+        )
+        cube = (1e-6 + 2e-4 * np.exp(z / scale)).transpose("time", "z", "lat", "lon")
+        lon = xr.DataArray(np.arange(nx) * 0.1, dims="lon", attrs={"standard_name": "longitude"})
+        lat = xr.DataArray(
+            45.0 + np.arange(ny) * 0.1, dims="lat", attrs={"standard_name": "latitude"}
+        )
+        return cube.assign_coords(lon=lon, lat=lat).rename("n2")
+
+    def test_profile(self):
+        n2 = self.get_profile()
+        vm = dyn.VerticalModes(n2)
+        assert vm.nmodes == 5 and vm.bc == "rigid" and vm.zdim == "z"
+        assert vm.modes.dims == ("mode", "z") and vm.modes.shape == (5, self.nz)
+        assert vm.c.dims == ("mode",) and vm.dz.dims == ("z",)
+        assert np.isnan(vm.c[0]) and (vm.c[1:] > 0).all() and (np.diff(vm.c[1:]) < 0).all()
+        np.testing.assert_allclose(vm.dz.sum(), self.depth, rtol=0.02)
+        np.testing.assert_allclose(vm.modes[0], 1.0)
+        assert vm.c.attrs["units"] == "m s-1"
+        assert vm.rd is None
+        # Same as the numpy routine
+        F, c, dz = cmodes.vertical_modes(n2.values, n2.z.values, nmodes=5)
+        np.testing.assert_allclose(vm.modes, F)
+        np.testing.assert_allclose(vm.c, c, equal_nan=True)
+        assert "5 modes" in repr(vm) and "rigid" in repr(vm)
+
+    def test_deformation_radius(self):
+        n2 = self.get_profile()
+        lat = xr.DataArray(45.0, name="lat", attrs={"standard_name": "latitude"})
+        vm = dyn.VerticalModes(n2, lat=lat)
+        f = float(dyn.get_coriolis(45.0))
+        assert vm.rd.dims == ("mode",) and vm.rd.attrs["units"] == "m"
+        assert np.isnan(vm.rd[0])
+        np.testing.assert_allclose(vm.rd[1:], vm.c[1:] / f)
+        assert 5e3 < float(vm.rd[1]) < 100e3
+        # Not defined at the equator
+        assert np.isnan(dyn.VerticalModes(n2, lat=0.0).rd).all()
+        # The latitude of the coordinates is used when it is not provided
+        cube = self.get_cube()
+        vm = dyn.VerticalModes(cube)
+        assert vm.rd.dims == ("mode", "time", "lat", "lon")
+
+    def test_free_surface(self):
+        n2 = self.get_profile()
+        vm = dyn.VerticalModes(n2, bc="free")
+        np.testing.assert_allclose(vm.c[0], np.sqrt(9.81 * self.depth), rtol=0.05)
+        rigid = dyn.VerticalModes(n2)
+        np.testing.assert_allclose(vm.c[1:], rigid.c[1:], rtol=0.02)
+        with pytest.raises(ValueError, match="bc"):
+            dyn.VerticalModes(n2, bc="other")
+
+    def test_extra_dimensions(self):
+        cube = self.get_cube()
+        vm = dyn.VerticalModes(cube, nmodes=4)
+        assert vm.modes.dims == ("mode", "time", "z", "lat", "lon")
+        assert vm.c.dims == ("mode", "time", "lat", "lon")
+        assert vm.dz.dims == ("time", "z", "lat", "lon")
+        column = dyn.VerticalModes(cube.isel(time=1, lat=2, lon=3), nmodes=4)
+        np.testing.assert_allclose(vm.modes.isel(time=1, lat=2, lon=3), column.modes)
+        np.testing.assert_allclose(vm.c.isel(time=1, lat=2, lon=3), column.c, equal_nan=True)
+        # The coordinates and their attributes are kept
+        assert vm.c.lat.attrs == cube.lat.attrs and vm.modes.lon.attrs == cube.lon.attrs
+        assert (vm.c.mode == np.arange(4)).all()
+
+    def test_variable_z(self):
+        """The depths of the levels vary in space, like with sigma coordinates"""
+        cube = self.get_cube(nt=1, ny=2, nx=3)
+        n2 = cube.isel(time=0)
+        h = xr.DataArray([[0.4, 0.7, 1.0], [0.5, 0.8, 0.9]], dims=("lat", "lon"))
+        z = (n2.z * h).transpose("z", "lat", "lon").rename("z")
+        z.attrs["positive"] = "up"
+        vm = dyn.VerticalModes(n2, z=z, nmodes=3)
+        assert vm.modes.dims == ("mode", "z", "lat", "lon")
+        for j, i in ((0, 0), (1, 2), (0, 2)):
+            ref = dyn.VerticalModes(
+                n2.isel(lat=j, lon=i).drop_vars(["lat", "lon"]), z=z.isel(lat=j, lon=i), nmodes=3
+            )
+            np.testing.assert_allclose(vm.modes.isel(lat=j, lon=i), ref.modes)
+            np.testing.assert_allclose(vm.c.isel(lat=j, lon=i), ref.c, equal_nan=True)
+        # Shallower columns have shallower modes: smaller speeds
+        assert float(vm.c.isel(mode=1, lat=0, lon=0)) < float(vm.c.isel(mode=1, lat=0, lon=2))
+
+    def test_missing_levels_below_the_bottom(self):
+        cube = self.get_cube(nt=1, ny=1, nx=2)
+        n2 = cube.isel(time=0).copy()
+        n2[:10, 0, 1] = np.nan
+        vm = dyn.VerticalModes(n2, nmodes=3)
+        assert np.isnan(vm.modes.isel(z=slice(0, 10), lat=0, lon=1)).all()
+        assert np.isfinite(vm.modes.isel(z=slice(10, None), lat=0, lon=1)).all()
+        assert np.isfinite(vm.c.isel(mode=1, lat=0, lon=1))
+        ref = dyn.VerticalModes(n2.isel(z=slice(10, None), lat=0, lon=1), nmodes=3)
+        np.testing.assert_allclose(vm.c.isel(lat=0, lon=1), ref.c, equal_nan=True)
+
+    def test_depth_positive_down(self):
+        up = self.get_profile()
+        down = self.get_profile(positive="down", name="depth")
+        a, b = dyn.VerticalModes(up, nmodes=3), dyn.VerticalModes(down, nmodes=3)
+        np.testing.assert_allclose(a.c, b.c, equal_nan=True)
+        np.testing.assert_allclose(a.modes, b.modes)
+        # From the surface to the bottom
+        rev = down.isel(depth=slice(None, None, -1))
+        c = dyn.VerticalModes(rev, nmodes=3)
+        np.testing.assert_allclose(c.c, a.c, equal_nan=True)
+        np.testing.assert_allclose(c.modes.isel(depth=slice(None, None, -1)), a.modes)
+
+    def test_decomp(self):
+        n2 = self.get_profile()
+        vm = dyn.VerticalModes(n2, nmodes=6)
+        field = np.exp(n2.z / 800.0)
+        a = vm.decomp(field)
+        assert a.dims == ("mode",) and a.shape == (6,)
+        np.testing.assert_allclose(a[0], float((field * vm.dz).sum() / vm.dz.sum()))
+        assert a.name == "amps" and a.attrs["long_name"].startswith("Amplitude")
+        assert vm.decomp(field, nmodes=3).shape == (3,)
+        # A mode is projected on itself
+        np.testing.assert_allclose(vm.decomp(1.5 * vm.modes.isel(mode=2)), np.eye(6)[2] * 1.5, atol=1e-10)
+
+    def test_decomp_extra_dimensions(self):
+        cube = self.get_cube()
+        vm = dyn.VerticalModes(cube, nmodes=4)
+        # A field with an extra dimension that the stratification does not have
+        field = (np.exp(cube.z / 800.0) * xr.DataArray([1.0, 2.0], dims="member")).transpose(
+            "member", ...
+        )
+        field = field.broadcast_like(cube)
+        amps = vm.decomp(field)
+        # The dimensions of the profiles come after the mode, in their order
+        assert amps.dims == ("mode",) + tuple(d for d in field.dims if d != "z")
+        assert set(amps.dims) == {"mode", "member", "time", "lat", "lon"}
+        np.testing.assert_allclose(amps.isel(member=1), 2 * amps.isel(member=0))
+        # A single dimension of the stratification
+        amps = vm.decomp(np.exp(cube.z / 800.0))
+        assert amps.dims == ("mode", "time", "lat", "lon")
+        col = dyn.VerticalModes(cube.isel(time=1, lat=2, lon=3), nmodes=4)
+        np.testing.assert_allclose(
+            amps.isel(time=1, lat=2, lon=3), col.decomp(np.exp(cube.z / 800.0)), atol=1e-12
+        )
+
+    def test_recomp(self):
+        n2 = self.get_profile()
+        vm = dyn.VerticalModes(n2, nmodes=self.nz)
+        field = xr.DataArray(
+            np.random.default_rng(0).normal(size=self.nz), dims="z", coords={"z": n2.z}, name="u"
+        )
+        amps = vm.decomp(field)
+        rec = vm.recomp(amps)
+        assert rec.dims == ("z",)
+        np.testing.assert_allclose(rec, field, atol=1e-9)
+        # Truncation: the error decreases when modes are added
+        smooth = np.tanh((n2.z + 300.0) / 100.0)
+        amps = vm.decomp(smooth)
+        err = [float(abs(vm.recomp(amps, modes=n) - smooth).mean()) for n in (1, 3, 8, 20)]
+        assert (np.diff(err) < 0).all()
+        # A selection of modes
+        only1 = vm.recomp(amps, modes=[1])
+        np.testing.assert_allclose(only1, amps.isel(mode=1) * vm.modes.isel(mode=1), atol=1e-12)
+        both = vm.recomp(amps, modes=[0, 1])
+        np.testing.assert_allclose(both, only1 + amps.isel(mode=0) * vm.modes.isel(mode=0))
+        # Fewer amplitudes than modes
+        np.testing.assert_allclose(vm.recomp(vm.decomp(smooth, nmodes=3)), vm.recomp(amps, modes=3))
+
+    def test_recomp_extra_dimensions_and_order(self):
+        cube = self.get_cube()
+        vm = dyn.VerticalModes(cube, nmodes=cube.sizes["z"])
+        field = (np.exp(cube.z / 500.0) * (1 + cube.lat / 90.0)).broadcast_like(cube)
+        field = field.transpose("time", "z", "lat", "lon")
+        rec = vm.recomp(vm.decomp(field))
+        assert rec.dims == ("time", "z", "lat", "lon")
+        np.testing.assert_allclose(rec, field, atol=1e-9)
+
+    def test_vertical_zoom(self):
+        n2 = self.get_profile()
+        zoom = dyn.VerticalModes(n2, nmodes=4, zrange=(-1000.0, -100.0))
+        inside = (n2.z >= -1000.0) & (n2.z <= -100.0)
+        assert zoom.zrange == (-1000.0, -100.0)
+        assert np.isnan(zoom.modes.isel(z=np.where(~inside.values)[0])).all()
+        assert np.isfinite(zoom.modes.isel(z=np.where(inside.values)[0])).all()
+        ref = dyn.VerticalModes(n2.where(inside, drop=True), nmodes=4)
+        np.testing.assert_allclose(zoom.c, ref.c, equal_nan=True)
+        np.testing.assert_allclose(zoom.modes.where(inside, drop=True), ref.modes)
+        # Only the layer is decomposed and recomposed
+        field = np.exp(n2.z / 800.0)
+        amps = zoom.decomp(field)
+        np.testing.assert_allclose(amps, ref.decomp(field.where(inside, drop=True)), atol=1e-12)
+        full = dyn.VerticalModes(n2, nmodes=self.nz)
+        zoomed = dyn.VerticalModes(n2, nmodes=int(inside.sum()), zrange=(-1000.0, -100.0))
+        rec = zoomed.recomp(zoomed.decomp(field))
+        np.testing.assert_allclose(rec.where(inside), field.where(inside), atol=1e-9)
+        assert np.isnan(rec.where(~inside)).all() and full.zrange is None
+
+    def test_depths_for_the_zoom_follow_the_convention_of_z(self):
+        up = self.get_profile()
+        down = self.get_profile(positive="down", name="depth")
+        a = dyn.VerticalModes(up, nmodes=3, zrange=(-1000.0, -100.0))
+        b = dyn.VerticalModes(down, nmodes=3, zrange=(100.0, 1000.0))
+        np.testing.assert_allclose(a.c, b.c, equal_nan=True)
+
+    def test_dask(self):
+        pytest.importorskip("dask")
+        cube = self.get_cube()
+        vm = dyn.VerticalModes(cube, nmodes=4)
+        vmd = dyn.VerticalModes(cube.chunk({"time": 1, "lat": 2}), nmodes=4)
+        assert vmd.modes.chunks is not None
+        np.testing.assert_allclose(vmd.modes.compute(), vm.modes)
+        np.testing.assert_allclose(vmd.c.compute(), vm.c, equal_nan=True)
+        field = np.exp(cube.z / 800.0).broadcast_like(cube)
+        amps = vmd.decomp(field.chunk({"time": 1, "lat": 2}))
+        assert amps.chunks is not None
+        np.testing.assert_allclose(amps.compute(), vm.decomp(field))
+        rec = vmd.recomp(amps)
+        assert rec.chunks is not None
+        np.testing.assert_allclose(rec.compute(), vm.recomp(vm.decomp(field)))
+
+    def test_errors(self):
+        n2 = self.get_profile()
+        with pytest.raises(ValueError, match="nmodes"):
+            dyn.VerticalModes(n2, nmodes=0)
+        with pytest.raises(XoaError):
+            dyn.VerticalModes(n2.isel(z=0))
+        vm = dyn.VerticalModes(n2, nmodes=3)
+        with pytest.raises(ValueError, match="mode"):
+            vm.recomp(vm.decomp(np.exp(n2.z / 800.0)), modes=[7])

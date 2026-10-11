@@ -20,6 +20,7 @@ Package API
     xoa.core.grid
     xoa.core.interp
     xoa.core.mask
+    xoa.core.modes
     xoa.core.num
     xoa.core.plot
     xoa.core.poly

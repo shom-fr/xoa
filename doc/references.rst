@@ -28,3 +28,27 @@ The methods that xoa implements are described in the following publications.
     *Physica D: Nonlinear Phenomena*, 48, 273-294,
     `doi:10.1016/0167-2789(91)90088-Q <https://doi.org/10.1016/0167-2789(91)90088-Q>`_, 1991.
     Used by :func:`xoa.dyn.get_okuboweiss`.
+
+.. _ref.chelton1998:
+
+**Chelton et al. (1998)**
+    Chelton, D. B., deSzoeke, R. A., Schlax, M. G., El Naggar, K., and Siwertz, N.:
+    Geographical variability of the first baroclinic Rossby radius of deformation,
+    *Journal of Physical Oceanography*, 28, 433-460,
+    `doi <https://doi.org/10.1175/1520-0485(1998)028%3C0433:GVOTFB%3E2.0.CO;2>`_, 1998.
+    About the deformation radii of :class:`xoa.dyn.VerticalModes`.
+
+.. _ref.wunsch1997:
+
+**Wunsch (1997)**
+    Wunsch, C.: The vertical partition of oceanic horizontal kinetic energy,
+    *Journal of Physical Oceanography*, 27, 1770-1794,
+    `doi <https://doi.org/10.1175/1520-0485(1997)027%3C1770:TVPOOH%3E2.0.CO;2>`_, 1997.
+    About the decomposition of currents on the vertical modes of :class:`xoa.dyn.VerticalModes`.
+
+.. _ref.gill1982:
+
+**Gill (1982)**
+    Gill, A. E.: *Atmosphere-Ocean Dynamics*, International Geophysics Series, 30,
+    Academic Press, 1982.
+    About the vertical modes of the stratified ocean.

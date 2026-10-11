@@ -41,6 +41,10 @@ grid are inside polygons. Both are numba accelerated and keep the missing values
     * - :func:`xoa.dyn.get_cyclogeos`
       - Cyclogeostrophic currents from the sea surface height
       - m s-1
+    * - :class:`xoa.dyn.VerticalModes`
+      - Vertical modes of the water columns, their speeds and deformation radii, and the
+        decomposition of profiles on them
+      - 1, m s-1, m
 
 The tutorials :ref:`sphx_glr_tutorials_plot_gulfstream_dynamics.py` and
 :ref:`sphx_glr_tutorials_plot_croco_rossby.py` apply them to the surface currents of a GLORYS
@@ -190,6 +194,65 @@ and corrects them with the advection terms of the previous iteration until they 
   and where the Coriolis parameter is smaller than ``fmin``, like close to the equator.
 - The tutorial :ref:`sphx_glr_tutorials_plot_gulfstream_dynamics.py` compares them with the
   currents of a reanalysis.
+
+Vertical modes
+==============
+
+The quasi-geostrophic vertical modes are the solutions :math:`F_n(z)` of the problem
+
+.. math::
+
+    -\frac{d}{dz} \left( \frac{1}{N^2} \frac{dF}{dz} \right) = \frac{1}{c^2} F
+
+for the stratification :math:`N^2(z)` of a water column, with :math:`dF/dz = 0` at the bottom,
+and either :math:`dF/dz = 0` (rigid lid) or :math:`g \, dF/dz + N^2 F = 0` (free surface)
+at the surface. The eigenvalues give the speeds :math:`c_n` of the modes, and the
+deformation radii :math:`R_n = c_n / |f|`. The first mode is the barotropic one, that is
+constant along the vertical, and the next ones are the baroclinic modes, that have more and
+more nodes and that are slower and slower. They are orthogonal, so that profiles can be split
+into the amplitudes of the modes, which is a compact description of the vertical structure
+of currents, and of the partition of their energy. See the tutorial
+:ref:`sphx_glr_tutorials_plot_vertical_modes.py`.
+
+The :class:`xoa.dyn.VerticalModes` class computes the modes of all the water columns at once
+from the squared Brunt-Vaisala frequency, that :func:`xoa.thermdyn.get_n2` computes from the
+temperature and the salinity, and decomposes and recomposes profiles:
+
+.. code-block:: python
+
+    n2 = xoa.thermdyn.get_n2(ds.temp, ds.sal)
+    vm = xoa.dyn.VerticalModes(n2, nmodes=5)
+    amps = vm.decomp(ds.u)                 # amplitudes of the modes
+    part = vm.recomp(amps, modes=[1, 2])   # contribution of the first baroclinic modes
+    vm.rd.isel(mode=1)                     # first deformation radius, in meters
+
+- The object is a class since the modes are computed once, and then used to decompose and
+  recompose any number of fields. They are computed by the numba routines of
+  :mod:`xoa.core.modes`, in parallel over the columns, and everything works with extra
+  dimensions, like time and horizontal ones, and with dask, through :func:`xarray.apply_ufunc`.
+  The problem is tridiagonal: the few lowest modes are found with bisection and inverse
+  iteration, so that the cost is proportional to the number of levels and not to its cube,
+  which makes it practical for models with hundreds of levels and millions of columns.
+- The normalization is such that the mean of the squares of the modes over the water column
+  is one, so that the amplitude of the barotropic mode is the vertical mean of the profile
+  and that the mean of the squares of a profile is the sum of the squares of its amplitudes.
+  Modes are positive at the surface.
+- The rigid lid is the default: the barotropic mode then has no speed, and the speeds
+  of the baroclinic modes are hardly modified by the free surface (``bc="free"``),
+  that gives the barotropic mode the speed :math:`\sqrt{gH}`.
+- The levels may vary in space, like with sigma coordinates, and the levels that are missing,
+  like below the bottom, are not used, so that each column has the modes of its own depth.
+  The profiles to decompose must be defined at the levels of the stratification.
+- The modes are the ones of the water column that is described by the data: if it stops at
+  2000 m in a deeper ocean, the barotropic mode is the mean of the upper 2000 m.
+- The stratification is clipped to a small positive value, ``n2min``, in the unstable and mixed
+  layers. In a column that is entirely mixed, there is no baroclinic mode and its speed vanishes.
+- The deformation radii are missing where the Coriolis parameter is smaller than ``fmin``, which
+  is the case close to the equator, where the equatorial beta-plane radius is the appropriate one.
+- To focus on a layer, like the upper ocean, use ``zrange=(zmin, zmax)``, in the convention
+  of the vertical coordinate: the modes of the layer have no flux through its limits, and only
+  the layer is decomposed. The modes of the thermocline are faster to oscillate, and have
+  smaller deformation radii than the ones of the whole water column.
 
 Resolution of the grid
 ======================

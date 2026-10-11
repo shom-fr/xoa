@@ -90,21 +90,28 @@ rossby_s = xdyn.get_rossby(u, v)
 rossby_z = xdyn.get_rossby(u, v, z=z)
 
 # %%
-# Here is a west-east section at 35°N, across a steep slope, with the two estimates.
-# They are close where the levels are flat, and they differ over the slope, where the
-# levels are tilted and the currents are sheared.
+# Here is a west-east section at 36.7°N, across steep slopes, with the two estimates and
+# their difference. They are close where the levels are flat, and they differ along the walls,
+# where the levels are tilted and the currents are sheared.
 
-jsec = int(abs(ds.lat_rho.isel(x_rho=0) - 35.0).argmin())
-kw = {"method": "contourf", "levels": np.linspace(-1, 1, 21), "cmap": "cmo.balance", "extend": "both", "x": "lon"}
-fig, axes = plt.subplots(1, 2, figsize=(13, 4.5), sharey=True, constrained_layout=True)
-for ax, da, title in zip(
-    axes, (rossby_s, rossby_z), ("Along the levels", "At constant depth")
-):
+jsec = int(abs(ds.lat_rho.isel(x_rho=0) - 36.7).argmin())
+kw = {"method": "contourf", "cmap": "cmo.balance", "extend": "both", "x": "lon"}
+fig, axes = plt.subplots(
+    1, 3, figsize=(15, 4.2), sharey=True, constrained_layout=True,
+    gridspec_kw={"width_ratios": [1, 1, 1.15]},
+)
+for ax, da, title in zip(axes[:2], (rossby_s, rossby_z), ("Along the levels", "At constant depth")):
     mappable = plot_section(
-        da.isel(y_rho=jsec), ax=ax, add_colorbar=False, **kw
+        da.isel(y_rho=jsec), ax=ax, add_colorbar=False, levels=np.linspace(-1, 1, 21), **kw
     )
     ax.set_title(title)
-add_colorbar(mappable, axes, da=rossby_z)
+add_colorbar(mappable, axes[:2], da=rossby_z)
+diff = (rossby_z - rossby_s).rename("rossby")
+diff.attrs["long_name"] = "Difference of Rossby number"
+plot_section(diff.isel(y_rho=jsec), ax=axes[2], levels=np.linspace(-0.3, 0.3, 21), **kw)
+axes[2].set_title("Difference")
+for ax in axes[1:]:
+    ax.set_ylabel("")
 
 # %%
 # Interpolate to a regular depth
