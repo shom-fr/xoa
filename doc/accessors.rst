@@ -54,6 +54,8 @@ Methods
     DataArray.xoa.get_depth
     DataArray.xoa.interp
     DataArray.xoa.regrid
+    DataArray.xoa.get_geos
+    DataArray.xoa.get_polygon_mask
 
 
 Dataset
@@ -94,6 +96,11 @@ Methods
     Dataset.xoa.get_depth
     Dataset.xoa.interp
     Dataset.xoa.regrid
+    Dataset.xoa.get_relvort
+    Dataset.xoa.get_div
+    Dataset.xoa.get_strain
+    Dataset.xoa.get_okuboweiss
+    Dataset.xoa.get_polygon_mask
     Dataset.decode_sigma.decode
     Dataset.decode_sigma.get_sigma_terms
 

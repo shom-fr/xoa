@@ -26,11 +26,11 @@ so that regridding a dataset is a one-liner.
 Oceanographic grid operators
 ----------------------------
 
-Implement classical differential operators on ocean grids:
-vorticity, divergence, Okubo-Weiss parameter,
-and other derived diagnostics commonly used in physical oceanography.
-These operators will handle staggered grids natively
-and be accelerated with :mod:`numba`.
+Classical differential operators on ocean grids are available in :mod:`xoa.dyn`:
+vorticity, divergence, strain, Okubo-Weiss parameter and geostrophic currents,
+accelerated with :mod:`numba` for collocated grids.
+They will be extended to handle staggered grids natively,
+and to other diagnostics commonly used in physical oceanography.
 
 Graphics
 --------

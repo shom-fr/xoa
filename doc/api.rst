@@ -15,6 +15,7 @@ Package API
     xoa.coords
     xoa.core
     xoa.core.conserv
+    xoa.core.dyn
     xoa.core.geo
     xoa.core.grid
     xoa.core.interp

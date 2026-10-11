@@ -805,7 +805,60 @@ class _PlotMixin_:
         return XoaPlotAccessor(self._obj)
 
 
-class XoaDataArrayAccessor(_PlotMixin_, _InterpRegridMixin_, MetaDataArrayAccessor):
+class _GridMixin_:
+    """Provide the grid methods"""
+
+    def get_polygon_mask(self, polygon, threshold=0.5):
+        """Get a mask of the cells that are inside polygons, see :func:`xoa.grid.get_polygon_mask`"""
+        from .grid import get_polygon_mask
+
+        return get_polygon_mask(self._obj, polygon, threshold=threshold)
+
+
+class _DynDataArrayMixin_:
+    """Provide the dynamics methods that work on a sea surface height"""
+
+    def get_geos(self, dx=None, dy=None):
+        """Get the geostrophic currents, see :func:`xoa.dyn.get_geos`"""
+        from .dyn import get_geos
+
+        return get_geos(self._obj, dx=dx, dy=dy)
+
+
+class _DynDatasetMixin_:
+    """Provide the dynamics methods that work on the velocities of a dataset"""
+
+    def _get_uv_(self):
+        return self.get("u", errors="raise"), self.get("v", errors="raise")
+
+    def get_relvort(self, dx=None, dy=None):
+        """Get the relative vorticity, see :func:`xoa.dyn.get_relvort`"""
+        from .dyn import get_relvort
+
+        return get_relvort(*self._get_uv_(), dx=dx, dy=dy)
+
+    def get_div(self, dx=None, dy=None):
+        """Get the horizontal divergence, see :func:`xoa.dyn.get_div`"""
+        from .dyn import get_div
+
+        return get_div(*self._get_uv_(), dx=dx, dy=dy)
+
+    def get_strain(self, dx=None, dy=None):
+        """Get the normal and shear strains, see :func:`xoa.dyn.get_strain`"""
+        from .dyn import get_strain
+
+        return get_strain(*self._get_uv_(), dx=dx, dy=dy)
+
+    def get_okuboweiss(self, dx=None, dy=None):
+        """Get the Okubo-Weiss parameter, see :func:`xoa.dyn.get_okuboweiss`"""
+        from .dyn import get_okuboweiss
+
+        return get_okuboweiss(*self._get_uv_(), dx=dx, dy=dy)
+
+
+class XoaDataArrayAccessor(
+    _PlotMixin_, _InterpRegridMixin_, _GridMixin_, _DynDataArrayMixin_, MetaDataArrayAccessor
+):
     """Main xoa accessor registered on :class:`xarray.DataArray`"""
 
     @property
@@ -832,7 +885,9 @@ class XoaDataArrayAccessor(_PlotMixin_, _InterpRegridMixin_, MetaDataArrayAccess
         return self.meta
 
 
-class XoaDatasetAccessor(_PlotMixin_, _InterpRegridMixin_, MetaDatasetAccessor):
+class XoaDatasetAccessor(
+    _PlotMixin_, _InterpRegridMixin_, _GridMixin_, _DynDatasetMixin_, MetaDatasetAccessor
+):
     """Main xoa accessor registered on :class:`xarray.Dataset`"""
 
     @property

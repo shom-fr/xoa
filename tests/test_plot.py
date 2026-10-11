@@ -10,6 +10,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.collections as mcollections
+import matplotlib.quiver as mquiver
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -450,6 +451,66 @@ class TestPlotStick:
             xplot.plot_stick(xr.Dataset({"x": u}))
         with pytest.raises(xoa.XoaError, match="single dimension"):
             xplot.plot_stick(u.expand_dims(y=2), v.expand_dims(y=2))
+
+
+class TestPlotVectors:
+    @staticmethod
+    def get_uv(nx=11, ny=9):
+        temp = get_temp(nx, ny)
+        u = (0 * temp + 0.5).rename("u")
+        v = (0.1 * (temp.lon - 12.5)).broadcast_like(temp).transpose("lat", "lon").rename("v")
+        u.attrs["units"] = v.attrs["units"] = "m s-1"
+        return u, v
+
+    def test_default(self):
+        u, v = self.get_uv()
+        quiver = xplot.plot_vectors(u, v, stride=1)
+        assert quiver.U.size == u.size
+        # Reference arrow
+        keys = [c for c in quiver.axes.get_children() if isinstance(c, mquiver.QuiverKey)]
+        assert len(keys) == 1
+        assert "m s-1" in keys[0].text.get_text()
+
+    def test_stride_and_own_axes(self):
+        u, v = self.get_uv()
+        mappable = xplot.plot_field(u)
+        quiver = xplot.plot_vectors(u, v, ax=mappable.axes, stride=(2, 5))
+        assert quiver.axes is mappable.axes
+        assert quiver.U.size == len(range(0, 9, 2)) * len(range(0, 11, 5))
+        auto = xplot.plot_vectors(u, v, ax=mappable.axes)
+        assert 0 < auto.U.size <= u.size
+
+    def test_transposed_dims(self):
+        u, v = self.get_uv()
+        quiver = xplot.plot_vectors(u.transpose("lon", "lat"), v.transpose("lon", "lat"), stride=1)
+        assert quiver.U.size == u.size
+
+    def test_color_by_speed(self):
+        u, v = self.get_uv()
+        quiver = xplot.plot_vectors(u, v, color="speed", stride=1, cmap="magma")
+        np.testing.assert_allclose(quiver.get_array(), np.hypot(u, v).values.ravel())
+        assert quiver.cmap.name == "magma"
+        fig = quiver.axes.figure
+        assert len(fig.axes) == 2  # With a colorbar
+        quiver = xplot.plot_vectors(u, v, color="speed", add_colorbar=False, key=False)
+        assert len(quiver.axes.figure.axes) == 1
+
+    def test_no_key_and_title(self):
+        u, v = self.get_uv()
+        quiver = xplot.plot_vectors(u, v, key=False, title="Currents", color="tab:red")
+        keys = [c for c in quiver.axes.get_children() if isinstance(c, mquiver.QuiverKey)]
+        assert not keys
+        assert quiver.axes.get_title() == "Currents"
+
+    def test_scale_can_be_forced(self):
+        u, v = self.get_uv()
+        assert xplot.plot_vectors(u, v, scale=3.0).scale == 3.0
+        assert xplot.plot_vectors(u, v).scale > 0
+
+    def test_key_value(self):
+        assert xplot._get_quiver_key_value_(np.array([0.9, 0.2])) == 0.5
+        assert xplot._get_quiver_key_value_(np.array([4.0, np.nan])) == 2.0
+        assert xplot._get_quiver_key_value_(np.zeros(3)) == 1.0
 
 
 class TestPlotTs:

@@ -223,6 +223,39 @@ def compute_resolution(lon, lat, radius=EARTH_RADIUS):
     return dx * radius, dy * radius
 
 
+def compute_centered_resolution(lon, lat, radius=EARTH_RADIUS):
+    """Compute the grid resolution at the grid points along x and y
+
+    It is the mean of the resolutions between the adjacent points, and the
+    resolution of the only adjacent point on the edges.
+    See :func:`compute_resolution` for the resolutions between adjacent points.
+
+    Parameters
+    ----------
+    lon, lat: array_like(ny, nx)
+        Longitudes and latitudes in degrees
+    radius: float
+        Radius of the sphere in meters, which defaults to the earth radius
+
+    Return
+    ------
+    array(ny, nx)
+        Resolution in meters along x
+    array(ny, nx)
+        Resolution in meters along y
+    """
+    dxe, dye = compute_resolution(lon, lat, radius=radius)
+    dx = np.empty(np.shape(lon))
+    dx[:, 1:-1] = 0.5 * (dxe[:, :-1] + dxe[:, 1:])
+    dx[:, 0] = dxe[:, 0]
+    dx[:, -1] = dxe[:, -1]
+    dy = np.empty(np.shape(lon))
+    dy[1:-1] = 0.5 * (dye[:-1] + dye[1:])
+    dy[0] = dye[0]
+    dy[-1] = dye[-1]
+    return dx, dy
+
+
 def median_resolution_deg(lon, lat):
     """Compute the median grid resolution in degrees
 

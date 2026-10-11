@@ -28,6 +28,7 @@ from . import meta
 from . import coords as xcoords
 from . import geo as xgeo
 from .core import grid as cgrid
+from .core import poly as cpoly
 
 def apply_along_dim(
     ds,
@@ -813,6 +814,53 @@ def get_resolution(obj, radius=xgeo.EARTH_RADIUS):
     )
 
 
+def get_dx_dy(obj, radius=xgeo.EARTH_RADIUS):
+    """Compute the horizontal grid resolution at the grid points
+
+    Contrary to :func:`get_resolution`, the resolutions have the shape
+    of the grid since they are centered on the grid points. They are suited
+    for centered finite differences, like in :mod:`xoa.dyn`.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D
+    radius: float
+        Radius of the sphere in meters, which defaults to the earth radius
+
+    Return
+    ------
+    xarray.DataArray
+        Resolution in meters along x
+    xarray.DataArray
+        Resolution in meters along y
+
+    See also
+    --------
+    get_resolution
+    xoa.core.grid.compute_centered_resolution
+    """
+    lon, lat = _get_lonlat_yx_(obj)
+    dx, dy = cgrid.compute_centered_resolution(lon.values, lat.values, radius=radius)
+    attrs = {"units": "m"}
+    return (
+        xr.DataArray(
+            dx,
+            dims=lon.dims,
+            coords=lon.coords,
+            name="dx",
+            attrs={"long_name": "Resolution along x", **attrs},
+        ),
+        xr.DataArray(
+            dy,
+            dims=lon.dims,
+            coords=lon.coords,
+            name="dy",
+            attrs={"long_name": "Resolution along y", **attrs},
+        ),
+    )
+
+
 def get_median_resolution(obj):
     """Compute the median horizontal grid resolution in degrees
 
@@ -923,3 +971,69 @@ def get_fingerprint(obj, mask=None):
     """
     grid = obj if isinstance(obj, dict) else ds2grid_dict(obj, mask)
     return misc.get_array_fingerprint(grid["lon"], grid["lat"], grid.get("mask"))
+
+
+def _as_polygons_(polygon):
+    """Convert polygons to a list of (lon, lat) arrays of shape (n, 2)"""
+    if hasattr(polygon, "geoms"):  # Multi-geometry
+        return [p for g in polygon.geoms for p in _as_polygons_(g)]
+    if hasattr(polygon, "exterior"):  # Polygon, whose holes are ignored
+        return [np.asarray(polygon.exterior.coords, dtype="d")[:, :2]]
+    if isinstance(polygon, (list, tuple)) and len(polygon) and not np.ndim(polygon[0]) == 1:
+        return [p for g in polygon for p in _as_polygons_(g)]
+    poly = np.asarray(polygon, dtype="d")
+    if poly.ndim != 2 or poly.shape[1] != 2 or len(poly) < 3:
+        raise exceptions.XoaError("A polygon must be an array of at least 3 (lon, lat) pairs")
+    return [poly]
+
+
+def get_polygon_mask(obj, polygon, threshold=0.5):
+    """Get a mask of the grid cells that are inside polygons
+
+    A cell is inside a polygon when the fraction of its area covered by the polygon
+    is at least `threshold`. The cells are delimited by edges that are
+    half way between the grid points.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D
+    polygon: array_like(n, 2), list, shapely.Polygon
+        Polygon vertices as (lon, lat) pairs in degrees, or a list of them,
+        or a shapely polygon or multi-polygon whose holes are ignored.
+        The mask is the union of all the polygons.
+        A polygon may cross the dateline but must not span more than 180° of longitude.
+    threshold: float, None
+        Minimal covered fraction of a cell, between 0 and 1.
+        A null threshold selects all the cells that touch the polygon,
+        and a threshold of 1 only those that are entirely inside.
+        With ``None``, a cell is inside if its center is, which is faster.
+
+    Return
+    ------
+    xarray.DataArray
+        Boolean array with the horizontal dimensions of the longitudes and latitudes
+
+    See also
+    --------
+    xoa.core.poly.polygon_mask
+    """
+    lon, lat = _get_lonlat_yx_(obj)
+    lonv, latv = lon.values, lat.values
+    kwargs = {}
+    if threshold is not None:
+        kwargs = dict(
+            lon_bounds=cgrid.edges2bounds(cgrid.centers2edges(lonv)),
+            lat_bounds=cgrid.edges2bounds(cgrid.centers2edges(latv)),
+            threshold=threshold,
+        )
+    mask = np.zeros(lonv.shape, dtype=bool)
+    for poly in _as_polygons_(polygon):
+        mask |= cpoly.polygon_mask(poly, lonv, latv, **kwargs)
+    return xr.DataArray(
+        mask,
+        dims=lon.dims,
+        coords=lon.coords,
+        name="mask",
+        attrs={"long_name": "Inside polygons"},
+    )

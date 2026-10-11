@@ -222,6 +222,30 @@ class TestPlotSticks:
         assert quiver.headlength == 5
 
 
+class TestPlotVectors:
+    def test_values_and_stride(self):
+        fig, ax = plt.subplots()
+        lon, lat = np.meshgrid(np.arange(6.0), np.arange(4.0))
+        u, v = lon + 1.0, lat - 1.0
+        quiver = cplot.plot_vectors(ax, lon, lat, u, v)
+        assert quiver.U.size == lon.size
+        np.testing.assert_allclose(quiver.U, u.ravel())
+        assert quiver.pivot == "middle"
+        quiver = cplot.plot_vectors(ax, lon, lat, u, v, stride=(2, 3))
+        np.testing.assert_allclose(quiver.X, lon[::2, ::3].ravel())
+        np.testing.assert_allclose(quiver.V, v[::2, ::3].ravel())
+
+    def test_missing_values_and_colors(self):
+        fig, ax = plt.subplots()
+        lon, lat = np.meshgrid(np.arange(3.0), np.arange(3.0))
+        u = np.ones((3, 3))
+        u[1, 1] = np.nan
+        speed = np.hypot(u, 1.0)
+        quiver = cplot.plot_vectors(ax, lon, lat, u, u, c=speed, cmap="viridis")
+        assert np.ma.is_masked(quiver.get_array()[4])
+        assert quiver.get_array().size == 9
+
+
 class TestCenterResolution:
     def test_regular_grid_on_the_equator(self):
         lon, lat = np.meshgrid(np.arange(5.0), np.arange(4.0) * 0)
