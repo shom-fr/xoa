@@ -29,7 +29,7 @@ silently flips a section or shifts a mixed layer depth.
       - ``altitude``
       - ``ocean_layer_depth``
     * - Produced by
-      - :func:`xoa.sigma.decode_sigma`, :func:`xoa.grid.dz2depth` with ``positive="up"``
+      - :func:`xoa.sigma.decode_sigma`, :func:`xoa.grid.dz2z`, :func:`xoa.grid.dz2depth` with ``positive="up"``
       - :func:`xoa.grid.dz2depth` with ``positive="down"``
 
 ``z`` is the same thing as ``depth`` with the opposite sign: ``z = -depth``.
@@ -96,7 +96,7 @@ the coordinate with :mod:`xoa.meta`, and fall back on the other one. The sign is
 When neither is found in a dataset, they are computed, depending on the ``type`` of the
 ``[vertical]`` section of the meta configuration: from sigma-like coordinates with
 :func:`xoa.sigma.decode_sigma`, or from layer thicknesses with
-:func:`xoa.grid.decode_dz2depth`.
+:func:`xoa.grid.decode_dz2z`.
 Like the other finders, they take an ``errors`` argument, with ``"raise"`` as default
 and ``"ignore"`` that returns ``None`` silently.
 The ``xoa`` accessors have the same ``get_z`` and ``get_depth`` methods, and the
@@ -138,8 +138,11 @@ to the default ones with :func:`xoa.meta.assign_meta_specs`:
 Note that ``depth`` is also the name of the bathymetry term of the formulas, which
 is positive down but is not a coordinate.
 
-Layer thicknesses are integrated by :func:`xoa.grid.dz2depth`, which returns
-a ``z`` when ``positive="up"`` and a ``depth`` otherwise. The ``positive`` argument is
+Layer thicknesses are integrated by :func:`xoa.grid.dz2z`, which always returns a ``z``.
+The surface of the water column is at zero by default, or at the ``top`` argument,
+or the bottom is at the ``bottom`` argument, with ``z`` values. The :func:`xoa.grid.dz2depth`
+function is a variant that returns a ``z`` when ``positive="up"`` and a ``depth`` otherwise.
+The ``positive`` argument is
 also what decides which end of the levels is the surface, as well as the
 ``[vertical] positive`` option of the configuration or the ``positive`` attribute
 of the vertical dimension coordinate when it is inferred.
@@ -149,8 +152,20 @@ of the vertical dimension coordinate when it is inferred.
     from xoa import grid
     dz = xr.DataArray(np.full((3, 2), 10.), dims=("lev", "x"), name="dz")
     grid.dz2depth(dz, "down").isel(x=0).values
-    z = grid.dz2depth(dz, "up")
+    z = grid.dz2z(dz, "up")
     z.name, z.isel(x=0).values
+
+Layer thicknesses can also be recovered from a ``z`` or a ``depth``, at the center of the layers,
+by :func:`xoa.grid.z2dz`. Interfaces are the middle of consecutive levels and the
+outer ones are extrapolated, unless ``top`` and ``bottom`` are given. This is exact for
+evenly spaced levels and approximate otherwise. :func:`xoa.grid.get_dz` does the whole job:
+it returns the thickness variable if there is one, else it computes them from what
+:func:`~xoa.coords.get_z` finds. Weighted statistics rely on it, see :ref:`indepth.stataccum`.
+
+.. ipython:: python
+
+    zc = grid.dz2z(dz, "up", centered=True)
+    grid.z2dz(zc).isel(x=0).values
 
 What uses them
 ==============
@@ -179,8 +194,8 @@ Pitfalls
 - **A dimension called** ``z``. A vertical dimension named like the ``z`` coordinate,
   or a dimension coordinate holding level indices, is read as a ``z`` coordinate.
   A 2D ``z`` computed from the thicknesses cannot be assigned to a dataset with a ``z``
-  dimension: :func:`xoa.grid.decode_dz2depth` then raises an error, or leaves the dataset
-  unchanged with ``errors="ignore"``, and you have to use :func:`xoa.grid.dz2depth`
+  dimension: :func:`xoa.grid.decode_dz2z` then raises an error, or leaves the dataset
+  unchanged with ``errors="ignore"``, and you have to use :func:`xoa.grid.dz2z`
   and give it another name.
 - **Staggered locations.** With a configuration like ``croco``, ``z`` gets the location
   suffix of its grid, like ``z_w``, as the other coordinates.

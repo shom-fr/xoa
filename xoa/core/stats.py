@@ -3,6 +3,13 @@ Low level statistics
 
 The numerical inputs and outputs of all these routines are of scalar
 or numpy.ndarray type.
+
+The accumulation of statistics relies on additive "moments", which are stored
+in arrays of shape ``(NMOM, ...)`` whose first axis is indexed by the
+``N``, ``SW``, ... constants. They are centered (weighted means, and sums of
+squared and cross deviations), and they are merged with the pairwise update of
+Chan et al., which is free of the cancellation errors of raw sums of squares. See :func:`get_moments`, :func:`merge_moments`
+and :func:`moments2stats`.
 """
 
 # Copyright 2020-2026 Shom
@@ -98,3 +105,195 @@ def taylor_stats(model, ref):
     ref = np.asarray(ref, dtype="d")
     ref = np.ascontiguousarray(np.broadcast_to(ref, model.shape))
     return _taylor_stats_(np.ascontiguousarray(model), ref)
+
+
+#: Indices of the moments along the first axis of moment arrays
+N, SW, MX, MY, M2X, M2Y, CXY, M2D, XMIN, XMAX, YMIN, YMAX = range(12)
+
+#: Number of moments
+NMOM = 12
+
+#: Names of the moments, in the order of their indices
+MOMENT_NAMES = ("n", "sw", "mx", "my", "m2x", "m2y", "cxy", "m2d", "xmin", "xmax", "ymin", "ymax")
+
+
+@numba.njit(cache=NOT_CI, parallel=True)
+def _get_moments_(x, y, w, dual, weighted):
+    n, m = x.shape
+    out = np.zeros((NMOM, n))
+    for i in numba.prange(n):
+        xmin = ymin = np.inf
+        xmax = ymax = -np.inf
+        cnt = 0
+        sw = sx = sy = 0.0
+        for j in range(m):
+            xv = x[i, j]
+            if not np.isfinite(xv):
+                continue
+            yv = 0.0
+            if dual:
+                yv = y[i, j]
+                if not np.isfinite(yv):
+                    continue
+            wv = 1.0
+            if weighted:
+                wv = w[i, j]
+                # Also discards nans
+                if not (wv > 0 and np.isfinite(wv)):
+                    continue
+            cnt += 1
+            sw += wv
+            sx += wv * xv
+            xmin = min(xmin, xv)
+            xmax = max(xmax, xv)
+            if dual:
+                sy += wv * yv
+                ymin = min(ymin, yv)
+                ymax = max(ymax, yv)
+        mx = sx / sw if cnt else 0.0
+        my = sy / sw if cnt else 0.0
+        # Second pass on deviations
+        m2x = m2y = cxy = m2d = 0.0
+        for j in range(m):
+            xv = x[i, j]
+            if not np.isfinite(xv):
+                continue
+            yv = 0.0
+            if dual:
+                yv = y[i, j]
+                if not np.isfinite(yv):
+                    continue
+            wv = 1.0
+            if weighted:
+                wv = w[i, j]
+                if not (wv > 0 and np.isfinite(wv)):
+                    continue
+            dx = xv - mx
+            m2x += wv * dx * dx
+            if dual:
+                dy = yv - my
+                m2y += wv * dy * dy
+                cxy += wv * dx * dy
+                dd = dy - dx
+                m2d += wv * dd * dd
+        out[N, i] = cnt
+        out[SW, i] = sw
+        out[MX, i] = mx
+        out[MY, i] = my
+        out[M2X, i] = m2x
+        out[M2Y, i] = m2y
+        out[CXY, i] = cxy
+        out[M2D, i] = m2d
+        out[XMIN, i] = xmin
+        out[XMAX, i] = xmax
+        out[YMIN, i] = ymin
+        out[YMAX, i] = ymax
+    return out
+
+
+def get_moments(x, y=None, w=None):
+    """Get the moments of series, along the last axis
+
+    A sample is used only if it is finite in `x` and `y`, and if its weight
+    is finite and strictly positive.
+
+    Parameters
+    ----------
+    x: array_like(n, m)
+        ``n`` series of ``m`` samples.
+    y: None, array_like(n, m)
+        Second variable, for comparative statistics.
+    w: None, array_like(n, m)
+        Weights, which default to 1.
+
+    Return
+    ------
+    numpy.ndarray(NMOM, n)
+        Count, sum of weights, weighted means of ``x`` and ``y``, weighted sums of
+        squared deviations of ``x``, ``y`` and ``y - x`` and of the product ``x * y``, then minima and
+        maxima of ``x`` and ``y``.
+        The minima and maxima of empty series are respectively ``inf`` and ``-inf``.
+    """
+    x = np.ascontiguousarray(x, dtype="d")
+    dummy = np.empty((0, 0))
+    dual = y is not None
+    weighted = w is not None
+    y = np.ascontiguousarray(y, dtype="d") if dual else dummy
+    w = np.ascontiguousarray(w, dtype="d") if weighted else dummy
+    return _get_moments_(x, y, w, dual, weighted)
+
+
+def merge_moments(mom0, mom1):
+    """Merge two arrays of moments of the same shape, which are obtained
+    from independent samples, with the pairwise update of Chan et al."""
+    out = np.empty_like(mom0)
+    out[N] = mom0[N] + mom1[N]
+    sw0, sw1 = mom0[SW], mom1[SW]
+    sw = sw0 + sw1
+    out[SW] = sw
+    ratio = np.divide(sw1, sw, out=np.zeros(np.shape(sw)), where=sw > 0)
+    dx = mom1[MX] - mom0[MX]
+    dy = mom1[MY] - mom0[MY]
+    cross = sw0 * ratio
+    out[MX] = mom0[MX] + dx * ratio
+    out[MY] = mom0[MY] + dy * ratio
+    out[M2X] = mom0[M2X] + mom1[M2X] + dx * dx * cross
+    out[M2Y] = mom0[M2Y] + mom1[M2Y] + dy * dy * cross
+    out[CXY] = mom0[CXY] + mom1[CXY] + dx * dy * cross
+    dd = dy - dx
+    out[M2D] = mom0[M2D] + mom1[M2D] + dd * dd * cross
+    for i, func in ((XMIN, np.minimum), (XMAX, np.maximum), (YMIN, np.minimum), (YMAX, np.maximum)):
+        out[i] = func(mom0[i], mom1[i])
+    return out
+
+
+def _div_(a, b):
+    out = np.full(np.shape(a), np.nan)
+    return np.divide(a, b, out=out, where=np.asarray(b) > 0)
+
+
+def moments2stats(mom, dual=False, ddof=0):
+    """Compute weighted statistics from moments
+
+    Parameters
+    ----------
+    mom: numpy.ndarray(NMOM, ...)
+        Moments as returned by :func:`get_moments` and :func:`merge_moments`.
+    dual: bool
+        Compute comparative statistics.
+    ddof: int
+        Delta degrees of freedom of variances and covariances, which are
+        divided by ``sw - ddof``.
+
+    Return
+    ------
+    dict
+        Statistics ``count``, ``mean``, ``var``, ``std``, ``min`` and ``max``,
+        suffixed with ``0`` and ``1`` when `dual` is True, and in this case
+        ``bias`` (second minus first), ``rms``, ``crms``, ``cov`` and ``corr``.
+    """
+    mom = np.asarray(mom, dtype="d")
+    sw = mom[SW]
+    valid = mom[N] > 0
+    dsw = sw - ddof
+    stats = {"count": mom[N]}
+    parts = [("0", MX, M2X, XMIN, XMAX)]
+    if dual:
+        parts.append(("1", MY, M2Y, YMIN, YMAX))
+    for suf, imean, im2, imin, imax in parts:
+        if not dual:
+            suf = ""
+        var = _div_(mom[im2], dsw)
+        stats["mean" + suf] = np.where(valid, mom[imean], np.nan)
+        stats["var" + suf] = var
+        stats["std" + suf] = np.sqrt(var)
+        stats["min" + suf] = np.where(valid, mom[imin], np.nan)
+        stats["max" + suf] = np.where(valid, mom[imax], np.nan)
+    if dual:
+        bias = stats["mean1"] - stats["mean0"]
+        stats["bias"] = bias
+        stats["crms"] = np.sqrt(_div_(mom[M2D], dsw))
+        stats["rms"] = np.sqrt(_div_(mom[M2D], sw) + bias**2)
+        stats["cov"] = _div_(mom[CXY], dsw)
+        stats["corr"] = _div_(mom[CXY], np.sqrt(mom[M2X] * mom[M2Y]))
+    return stats
