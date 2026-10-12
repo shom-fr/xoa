@@ -4,13 +4,16 @@
 Compare Mercator to ARGO
 ========================
 
-In this notebook, we show:
+In this tutorial, we show how to:
 
-* how to easily rename variables and coordinates in an ARGO and a Mercator datasets,
-* how to plot a T-S diagram,
-* how to stack geographical coordinates,
-* how to compute a geographical distance between two datasets with coordinates,
-* how to interpolate a vertical profile with different methods.
+* easily rename variables and coordinates in an ARGO and a Mercator datasets,
+* plot a T-S diagram,
+* stack geographical coordinates,
+* compute a geographical distance between two datasets with coordinates,
+* interpolate a vertical profile with different methods.
+
+The concepts are explained in the :ref:`indepth.meta` guide.
+See also: :ref:`sphx_glr_tutorials_evaluation_plot_hycom_gdp.py`.
 """
 
 

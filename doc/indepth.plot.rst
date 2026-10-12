@@ -13,9 +13,9 @@ from xarray objects, and finds what to draw with :mod:`xoa.meta`. The lower leve
 This guide explains how the functions find their inputs, what their options mean, and
 how to use the low level routines. The tutorials show them at work, with figures:
 
-- :ref:`sphx_glr_tutorials_plot_grid_tools.py`: grids, resolutions and edges,
-- :ref:`sphx_glr_tutorials_plot_regrid_interp.py`: maps of regridded fields,
-- :ref:`sphx_glr_tutorials_plot_croco_section.py`: sections.
+- :ref:`sphx_glr_tutorials_grids_plot_grid_tools.py`: grids, resolutions and edges,
+- :ref:`sphx_glr_tutorials_grids_plot_regrid_interp.py`: maps of regridded fields,
+- :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`: sections.
 
 .. ipython:: python
 

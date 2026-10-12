@@ -12,6 +12,8 @@ In this tutorial, we show how to:
 * handle negative correlations,
 * draw already normalized statistics without a reference array.
 
+The concepts are explained in the :ref:`indepth.plot` guide.
+See also: :ref:`sphx_glr_tutorials_evaluation_plot_stataccum.py`.
 """
 
 # %%

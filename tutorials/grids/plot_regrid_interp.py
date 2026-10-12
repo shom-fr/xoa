@@ -4,15 +4,17 @@
 Regrid and interpolate horizontally
 ===================================
 
-In this tutorial, we show :
+In this tutorial, we show how to:
 
-* how to regrid data to another regular or curvilinear grid with the bilinear, bicubic and
+* regrid data to another regular or curvilinear grid with the bilinear, bicubic and
   conservative methods,
-* how to reuse the weights, in memory and in a file,
-* how to interpolate to arbitrary points, such as a transect, with and without time,
-* how to handle land points with the ``skipna`` and ``na_thres`` options,
-* how to use the same tools from the ``xoa`` accessors.
+* reuse the weights, in memory and in a file,
+* interpolate to arbitrary points, such as a transect, with and without time,
+* handle land points with the ``skipna`` and ``na_thres`` options,
+* use the same tools from the ``xoa`` accessors.
 
+The concepts are explained in the :ref:`indepth.horizontal` guide.
+See also: :ref:`sphx_glr_tutorials_grids_plot_grid_tools.py`.
 """
 
 # %%

@@ -14,6 +14,7 @@ import os
 import sys
 from matplotlib import MatplotlibDeprecationWarning
 import warnings
+from sphinx_gallery.sorting import ExplicitOrder
 
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ext'))
 
@@ -143,6 +144,14 @@ warnings.simplefilter("ignore", MatplotlibDeprecationWarning)
 sphinx_gallery_conf = {
     "examples_dirs": "../tutorials",
     "gallery_dirs": "tutorials",
+    "subsection_order": ExplicitOrder(
+        [
+            "../tutorials/grids",
+            "../tutorials/dynamics",
+            "../tutorials/evaluation",
+            "../tutorials/graphics",
+        ]
+    ),
     "binder": {
         'org': 'shom-fr',
         'repo': 'xoa',

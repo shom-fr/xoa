@@ -7,7 +7,9 @@ Quick start guide
 Read the documentation
 -------------------------
 
-You should probably start with the :ref:`tutorials` section.
+You should probably start with the :ref:`tutorials` section, which is organized by theme:
+grids and regridding, ocean dynamics, comparison with observations and statistics,
+and graphics.
 This collection of tutorials will gradually be completed
 to cover almost all features of the library.
 

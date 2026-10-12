@@ -8,12 +8,13 @@ New features
 ------------
 - Add the :ref:`indepth.dyn` guide and the :mod:`xoa.dyn` diagnostics :func:`~xoa.dyn.get_relvort`, :func:`~xoa.dyn.get_div`, :func:`~xoa.dyn.get_strain`, :func:`~xoa.dyn.get_okuboweiss`, :func:`~xoa.dyn.get_coriolis` and :func:`~xoa.dyn.get_geos`, also available as ``xoa`` accessor methods, with numba kernels in the new :mod:`xoa.core.dyn` module. Grid resolution comes from :func:`xoa.grid.get_dx_dy`.
 - Add :func:`xoa.dyn.get_cyclogeos`, an iterative cyclogeostrophic solver after Penven et al. (2014), with full (smoothed) advection terms or the two classic ones with ``terms="penven"``.
-- The :mod:`xoa.dyn` diagnostics accept a variable vertical coordinate ``z`` to compute horizontal derivatives at constant depth. See the :ref:`sphx_glr_tutorials_plot_croco_rossby.py` tutorial.
-- Add :class:`xoa.dyn.VerticalModes` to compute vertical modes, speeds and deformation radii, and to decompose and recompose profiles, based on the new :mod:`xoa.core.modes` module. See :ref:`sphx_glr_tutorials_plot_vertical_modes.py`.
+- The :mod:`xoa.dyn` diagnostics accept a variable vertical coordinate ``z`` to compute horizontal derivatives at constant depth. See the :ref:`sphx_glr_tutorials_dynamics_plot_croco_rossby.py` tutorial.
+- Add :class:`xoa.dyn.VerticalModes` to compute vertical modes, speeds and deformation radii, and to decompose and recompose profiles, based on the new :mod:`xoa.core.modes` module. See :ref:`sphx_glr_tutorials_dynamics_plot_vertical_modes.py`.
 - Add :func:`xoa.thermdyn.get_n2` for the squared Brunt-Vaisala frequency, and :func:`xoa.coords.as_z` to get a vertical coordinate as z, positive up.
-- Add the :mod:`xoa.numbers` module with :func:`~xoa.numbers.get_rossby`, :func:`~xoa.numbers.get_burger`, :func:`~xoa.numbers.get_froude` and :func:`~xoa.numbers.get_ekman`. ``xoa.dyn.get_rossby`` moved to it, without backward compatibility. See :ref:`sphx_glr_tutorials_plot_dimensionless_numbers.py`.
+- Add the :mod:`xoa.numbers` module with :func:`~xoa.numbers.get_rossby`, :func:`~xoa.numbers.get_burger`, :func:`~xoa.numbers.get_froude` and :func:`~xoa.numbers.get_ekman`. ``xoa.dyn.get_rossby`` moved to it, without backward compatibility. See :ref:`sphx_glr_tutorials_dynamics_plot_dimensionless_numbers.py`.
 - Add :class:`xoa.stats.StatAccum` to accumulate temporal and spatial statistics, with automatic vertical and horizontal weights, dump and restart, based on numba moments in :mod:`xoa.core.stats`. See :ref:`indepth.stataccum`.
 - Add :func:`xoa.grid.dz2z`, :func:`xoa.grid.z2dz`, :func:`xoa.grid.get_dz`, :func:`xoa.grid.get_dz_terms` and :func:`xoa.grid.decode_dz2z`, and the ``positive`` and ``errors`` arguments of :func:`xoa.coords.get_positive_attr`. :func:`xoa.coords.get_z` now relies on :func:`~xoa.grid.decode_dz2z`. Fix :func:`xoa.grid.decode_dz2depth` with a bathymetry or a sea surface height and ``positive="down"``.
+- Group the tutorials in categories: grids, dynamics, evaluation and graphics.
 - Add the :ref:`references` page.
 - Add :func:`xoa.mask.get_polygon_mask`, also an ``xoa`` accessor method, to flag grid cells inside polygons with a coverage threshold, based on the new :mod:`xoa.core.mask` and :mod:`xoa.core.poly` numba functions.
 - Add :func:`xoa.plot.plot_fields` to plot several fields on maps of a single figure, with a shared colorbar if needed.
@@ -21,7 +22,7 @@ New features
 - Add :func:`xoa.mask.get_common_mask`, :func:`xoa.stats.rms` and :func:`xoa.poly.get_contour_polygons`, with the new :mod:`xoa.stats` and :mod:`xoa.poly` modules.
 - Add the :meth:`~xoa.dyn.VerticalModes.energy_share` and :meth:`~xoa.dyn.VerticalModes.truncation_error` methods to :class:`xoa.dyn.VerticalModes`.
 - Add :func:`xoa.plot.plot_vectors` and :func:`xoa.core.plot.plot_vectors` to draw currents as under-sampled arrows.
-- Add the :ref:`sphx_glr_tutorials_plot_gulfstream_dynamics.py` tutorial, based on a new GLORYS data sample.
+- Add the :ref:`sphx_glr_tutorials_dynamics_plot_gulfstream_dynamics.py` tutorial, based on a new GLORYS data sample.
 - The ``mercator`` naming specifications are also used for GLORYS.
 - Add :func:`xoa.coords.copy_coord_attrs` to restore coordinate attributes after :func:`xarray.apply_ufunc`.
 - Add the :ref:`indepth.vertical` guide and the ``z`` coordinate (positive up) as distinct from ``depth`` (positive down): ``z`` meta spec, :func:`xoa.coords.get_z`, :func:`~xoa.coords.is_z`, :func:`~xoa.coords.to_z`, :func:`~xoa.coords.to_depth`, :func:`~xoa.coords.reverse_dim` and the ``xoa.get_z`` accessor method. :func:`~xoa.coords.get_depth` and :func:`~xoa.coords.get_z` fall back on each other and flip the sign when needed.
@@ -212,8 +213,8 @@ Bug fixes
 
 Documentation
 -------------
-- Add an example of `xoa.plot.plot_double_minimap` to :ref:`sphx_glr_tutorials_plot_mercator_argo.py` and :ref:`sphx_glr_tutorials_plot_hycom_gdp.py` examples [:pull:`73`].
-- Add an example of `xoa.thermdyn.mixed_layer_depth` to :ref:`sphx_glr_tutorials_plot_croco_section.py` example [:pull:`67`].
+- Add an example of `xoa.plot.plot_double_minimap` to :ref:`sphx_glr_tutorials_evaluation_plot_mercator_argo.py` and :ref:`sphx_glr_tutorials_evaluation_plot_hycom_gdp.py` examples [:pull:`73`].
+- Add an example of `xoa.thermdyn.mixed_layer_depth` to :ref:`sphx_glr_tutorials_grids_plot_croco_section.py` example [:pull:`67`].
 
 
 0.6.1 (2022-02-24)
@@ -249,7 +250,7 @@ Bug fixes
 
 Documentation
 -------------
-- Add the :ref:`Compare Mercator to ARGO <sphx_glr_tutorials_plot_mercator_argo.py>` example.
+- Add the :ref:`Compare Mercator to ARGO <sphx_glr_tutorials_evaluation_plot_mercator_argo.py>` example.
 
 
 0.6.0 (2022-02-24)
@@ -319,7 +320,7 @@ Bug fixes
 
 Documentation
 -------------
-- The :ref:`indepth.meta` section and :ref:`sphx_glr_tutorials_plot_hycom_gdp.py` example are adapted to reflect changes.
+- The :ref:`indepth.meta` section and :ref:`sphx_glr_tutorials_evaluation_plot_hycom_gdp.py` example are adapted to reflect changes.
 
 
 v0.3.1 (2021-05-21)

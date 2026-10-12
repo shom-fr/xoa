@@ -13,6 +13,9 @@ In this tutorial, we show how to:
 
 The data are synthetic: a temperature that is linear with depth, on sigma layers
 over a sloping bottom, whose thickness varies with time.
+
+The concepts are explained in the :ref:`indepth.stataccum` guide.
+See also: :ref:`sphx_glr_tutorials_graphics_plot_taylor_diagram.py`.
 """
 
 # %%

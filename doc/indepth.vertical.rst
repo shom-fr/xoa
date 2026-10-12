@@ -37,7 +37,7 @@ The ``altitude`` coordinate is something else: it belongs to the atmosphere, in 
 hPa.
 
 This guide explains how the two are found, converted and produced, and what to watch for.
-The tutorial :ref:`sphx_glr_tutorials_plot_croco_section.py` shows them at work on a
+The tutorial :ref:`sphx_glr_tutorials_grids_plot_croco_section.py` shows them at work on a
 CROCO section.
 
 .. ipython:: python
