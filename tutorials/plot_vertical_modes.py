@@ -23,14 +23,13 @@ averaged over 2 x 2 grid cells, on the 1st of October 2019, in the region of the
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
 import cmocean  # noqa
 
 import xoa
 import xoa.meta as xmeta
 import xoa.dyn as xdyn
 import xoa.thermdyn as xthermdyn
-from xoa.plot import plot_field, add_colorbar
+from xoa.plot import plot_fields
 
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
@@ -127,20 +126,17 @@ rd1.attrs = {"long_name": "First deformation radius", "units": "km"}
 print(f"Median first radius: {float(rd1.median()):.1f} km")
 
 MAP_KW = {"gridlines_labels_on": ["bottom", "left"], "land": True}
-fig, ax = plt.subplots(
-    figsize=(7.5, 5.8), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
-)
-plot_field(
-    rd1,
-    ax=ax,
+speed0 = np.hypot(u, v).isel(depth=0)
+fig, axes = plot_fields(
+    {"First baroclinic deformation radius": rd1},
+    figsize=(7.5, 5.8),
     method="contourf",
     cmap="cmo.matter",
     levels=np.linspace(18, 34, 17),
     extend="both",
     map_kw=MAP_KW,
-    title="First baroclinic deformation radius",
     overlay_contours=[
-        {"field": np.hypot(u, v).isel(depth=0), "levels": [0.8, 1.2], "colors": ["0.35", "k"], "linewidths": 0.8}
+        {"field": speed0, "levels": [0.8, 1.2], "colors": ["0.35", "k"], "linewidths": 0.8}
     ],
 )
 
@@ -163,37 +159,36 @@ print(au.dims, au.shape)
 
 # %%
 # By orthogonality, the mean kinetic energy over the water column is the sum of the squared
-# amplitudes. Here is how it is shared between the modes, for the open ocean.
+# amplitudes. :meth:`xoa.dyn.VerticalModes.energy_share` gives the share of each mode,
+# that is averaged here for the open ocean.
 
-ke = (au**2 + av**2).where(open_ocean)
-total = ((u**2 + v**2) * vm.dz).sum("depth") / vm.dz.sum("depth")
-share = (ke / total).where(open_ocean).mean(("lat", "lon"))
-fig, axes = plt.subplots(
-    1, 3, figsize=(15, 4.6), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
-)
-fig.delaxes(axes[0])
-# Bars on a regular axes at the place of the first map
-bar_ax = fig.add_subplot(1, 3, 1)
-bar_ax.bar(share.mode, share * 100, color=cmocean.cm.deep(np.linspace(0.15, 0.85, 5)))
+share = vm.energy_share(u, v).where(open_ocean).mean(("lat", "lon"))
+fig, ax = plt.subplots(figsize=(5, 4.6), constrained_layout=True)
+ax.bar(share.mode, share * 100, color=cmocean.cm.deep(np.linspace(0.15, 0.85, 5)))
 for k, value in enumerate(share.values):
-    bar_ax.text(k, value * 100 + 1.5, f"{value * 100:.0f}%", ha="center", fontsize=8)
-bar_ax.set_xlabel("Mode")
-bar_ax.set_ylabel("Share of the kinetic energy [%]")
-bar_ax.set_title("Kinetic energy")
-bar_ax.set_ylim(0, 80)
-for ax, k, vmax in zip(axes[1:], (0, 1), (1.2, 0.8)):
+    ax.text(k, value * 100 + 1.5, f"{value * 100:.0f}%", ha="center", fontsize=8)
+ax.set_xlabel("Mode")
+ax.set_ylabel("Share of the kinetic energy [%]")
+ax.set_title("Kinetic energy")
+ax.set_ylim(0, 80)
+
+# %%
+# The speed of the barotropic mode and of the first baroclinic mode are mapped.
+
+amps = {}
+for k, title, vmax in (0, "Barotropic mode", 1.2), (1, "Baroclinic mode 1", 0.8):
     amp = np.hypot(au.isel(mode=k), av.isel(mode=k)).where(open_ocean).rename("amp")
     amp.attrs = {"long_name": f"Speed of mode {k}", "units": "m s-1"}
-    plot_field(
-        amp,
-        ax=ax,
-        method="contourf",
-        cmap="cmo.tempo",
-        levels=np.linspace(0, vmax, 17),
-        extend="max",
-        map_kw=MAP_KW,
-        title=("Barotropic mode" if k == 0 else f"Baroclinic mode {k}"),
-    )
+    amps[title] = (amp, {"levels": np.linspace(0, vmax, 17)})
+fig, axes = plot_fields(
+    list(amps.values()),
+    titles=list(amps),
+    figsize=(10, 4.6),
+    method="contourf",
+    cmap="cmo.tempo",
+    extend="max",
+    map_kw=MAP_KW,
+)
 
 # %%
 # The currents of the stream are mostly barotropic and first baroclinic: the first two modes
@@ -214,7 +209,10 @@ axes[0].plot(u.sel(**STREAM), depth, color="k", lw=2.2, label="Reanalysis")
 colors = cmocean.cm.matter(np.linspace(0.2, 0.85, 3))
 for n, color in zip((1, 2, 3), colors):
     axes[0].plot(
-        vm.recomp(au, modes=n).sel(**STREAM), depth, color=color, lw=1.6,
+        vm.recomp(au, modes=n).sel(**STREAM),
+        depth,
+        color=color,
+        lw=1.6,
         label=f"{n} mode" + ("s" if n > 1 else ""),
     )
 axes[0].invert_yaxis()
@@ -225,12 +223,8 @@ axes[0].legend(frameon=False)
 
 # Error over the domain, as a function of the number of modes
 vm_all = xdyn.VerticalModes(n2, nmodes=n2.sizes["depth"])
-au_all = vm_all.decomp(u)
-nmodes = [1, 2, 3, 5, 8, 12, 20]
-errors = [
-    float(np.sqrt(((vm_all.recomp(au_all, modes=n) - u) ** 2).mean())) for n in nmodes
-]
-axes[1].plot(nmodes, errors, "o-", color="0.2")
+errors = vm_all.truncation_error(u, [1, 2, 3, 5, 8, 12, 20])
+axes[1].plot(errors.nmodes, errors, "o-", color="0.2")
 axes[1].set_xscale("log")
 axes[1].set_yscale("log")
 axes[1].set_xlabel("Number of modes")
@@ -253,15 +247,19 @@ axes[1].grid(True, which="both", alpha=0.3)
 
 zoom = xdyn.VerticalModes(n2, nmodes=5, zrange=(0, 500))
 rd1z = (zoom.rd.isel(mode=1) * 1e-3).where(open_ocean)
-print(f"Median first radius: {float(rd1.median()):.1f} km for the water column, "
-      f"{float(rd1z.median()):.1f} km for the upper 500 m")
+print(
+    f"Median first radius: {float(rd1.median()):.1f} km for the water column, "
+    f"{float(rd1z.median()):.1f} km for the upper 500 m"
+)
 
 fig, axes = plt.subplots(1, 2, figsize=(7.5, 5), constrained_layout=True)
 for ax, obj, title, ylim in zip(
     axes, (vm, zoom), ("Whole water column", "Upper 500 m"), ((2000, 0), (500, 0))
 ):
     for mode, color in zip(range(1, 4), colors):
-        ax.plot(obj.modes.sel(**point).isel(mode=mode), depth, color=color, lw=1.8, label=f"Mode {mode}")
+        ax.plot(
+            obj.modes.sel(**point).isel(mode=mode), depth, color=color, lw=1.8, label=f"Mode {mode}"
+        )
     ax.axvline(0, color="0.8", lw=0.8, zorder=0)
     ax.set_title(title)
     ax.set_xlabel("Vertical structure [1]")
@@ -284,6 +282,8 @@ print(f"Error of the first 3 modes of the upper 500 m: {error:.3f} m/s")
 # With a free surface, the barotropic mode also gets a speed, that is close to
 # :math:`\sqrt{g H}`: ``VerticalModes(n2, bc="free")``.
 free = xdyn.VerticalModes(n2, nmodes=2, bc="free")
-print(f"Barotropic speed: {float(free.c.sel(**point).isel(mode=0)):.0f} m/s for a depth of "
-      f"{float(free.dz.sel(**point).sum()):.0f} m")
+print(
+    f"Barotropic speed: {float(free.c.sel(**point).isel(mode=0)):.0f} m/s for a depth of "
+    f"{float(free.dz.sel(**point).sum()):.0f} m"
+)
 plt.show()
