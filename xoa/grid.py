@@ -406,6 +406,109 @@ class dz2depth_ref_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     bathy = -1
 
 
+def dz2z(dz, positive=None, zdim=None, top=None, bottom=None, centered=False):
+    """Integrate layer thicknesses to compute z, which is positive up
+
+    The output z are the coordinates at the interfaces of the layers
+    and the top is at zero by default. Thus, the output array has
+    one more level than the input array, along the vertical dimension, unless `centered`
+    is True.
+
+    Parameters
+    ----------
+    dz: xarray.DataArray
+        Layer thicknesses
+    positive: str, int, None
+        Direction over which the levels of `dz` are increasing:
+        {xcoords.positive_attr.rst_with_links}
+        When "up", the first level is supposed to be the bottom.
+        When "down", the first level is supposed to be the top.
+        When "guess", the dz array must have an axis coordinate
+        of the same name as the z dimension, and this coordinate must have
+        a valid positive attribute.
+    zdim: str
+        Name of the vertical dimension.
+        If not set, it is inferred with :func:`~xoa.coords.get_meta_dims`.
+    top: None, float, xarray.DataArray
+        The z of the top interface, i.e. the sea surface height. It defaults to zero
+        when `bottom` is not provided.
+    bottom: None, float, xarray.DataArray
+        The z of the bottom interface, i.e. minus the bathymetry.
+        It cannot be provided with `top`, since the layer thicknesses already
+        give the total thickness.
+    centered: bool
+        Get z at the middle of layers instead of at their edge
+
+    Return
+    ------
+    xarray.DataArray
+        Output z, which are negative in the ocean.
+
+    See also
+    --------
+    z2dz
+    dz2depth
+    get_dz
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        from xoa.grid import dz2z
+        @suppress
+        import xarray as xr
+        dz = xr.DataArray([1., 3., 4.], dims="nz")
+
+        # First level at the top
+        print(dz2z(dz, "down"))
+
+        # First level at the bottom, with a sea surface height
+        print(dz2z(dz, "up", top=0.5))
+    """
+    # Vertical dimension
+    if zdim is None:
+        zdim = xcoords.get_zdim(dz, errors="raise")
+    positive = xcoords.get_positive_attr(dz, zdim, positive, errors="raise")
+    if top is not None and bottom is not None:
+        raise exceptions.XoaGridError(
+            "top and bottom cannot be both provided, since the total thickness is known"
+        )
+
+    # Integrate
+    cum = dz.cumsum(dim=zdim)
+    cum = pad(cum, {zdim: (1, 0)}, mode="constant", constant_values=0)
+    total = cum.isel({zdim: -1})
+    if positive == "up":
+        if bottom is None:
+            bottom = (0 if top is None else top) - total
+        z = cum + bottom
+    else:
+        if top is None:
+            top = 0 if bottom is None else bottom + total
+        z = top - cum
+
+    # Fix index
+    if zdim in z.indexes:
+        dnz = z[zdim].diff(zdim).pad({zdim: (0, 1)}, mode="edge")
+        z = xcoords.change_index(z, zdim, z[zdim] + 0.5 * dnz.data)
+
+    # Centered
+    if centered:
+        z = get_centers(z, zdim)
+        if zdim in z.indexes:
+            z = z.assign_coords({zdim: dz[zdim]})
+
+    # Finalize
+    z.attrs["positive"] = "up"
+    return meta.get_meta_specs(dz).format_coord(
+        z, "z", rename=True, format_coords=False, rename_dims=False
+    )
+
+
+dz2z.__doc__ = dz2z.__doc__.format(**locals())
+
+
 def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=False):
     """Integrate layer thicknesses to compute depths
 
@@ -421,7 +524,7 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
         Direction over which coordinates are increasing:
         {xcoords.positive_attr.rst_with_links}
         When "up", the first level is supposed to be the bottom
-        and the output coordinates are negative.
+        and the output coordinates are negative, as with :func:`dz2z`.
         When "down", first level is supposed to be the top
         and the output coordinates are positive.
         When "guess", the dz array must have an axis coordinate
@@ -431,13 +534,13 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
         Name of the vertical dimension.
         If not set, it is inferred with :func:`~xoa.coords.get_meta_dims`.
     ref: xarray.DataArray
-        Reference array converting layer thicknesses to depth:
-
-        - If **positive up**, it is expected to be the **SSH** (sea surface height)
-          by default
-        - If **positive down**, it is expected to be by default the depth of ground
-          also known as **bathymetry**, which should be positive.
-
+        Reference array converting layer thicknesses to depth.
+        When it is not provided, the top is at zero.
+        The type of reference is given by `ref_type`, and, if it is not set,
+        it is inferred from the meta specs of `ref` or, by default,
+        it is a **bathymetry** if **positive up** and a **top** if **positive down**.
+        A bathymetry is always positive, and a top is the sea surface height if positive up
+        and its depth if positive down.
     ref_type: str, int
         Type of `ref`:
         {dz2depth_ref_types.rst_with_links}
@@ -448,6 +551,10 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
     ------
     xarray.DataArray
         Output depths with the same dimensions as input array.
+
+    See also
+    --------
+    dz2z
 
     Example
     -------
@@ -465,63 +572,128 @@ def dz2depth(dz, positive=None, zdim=None, ref=None, ref_type="infer", centered=
         # Positive up
         print(dz2depth(dz, "up"))
     """
-    # Vertical dimension
     if zdim is None:
         zdim = xcoords.get_zdim(dz, errors="raise")
+    positive = xcoords.get_positive_attr(dz, zdim, positive, errors="raise")
 
-    # Positive attribute
-    positive = xcoords.positive_attr[positive].name
-    if positive == "infer":
-        positive = xcoords.get_positive_attr(dz, zdim)
-        if positive is None:
-            raise exceptions.XoaGridError("Can't infer positive attribute from data array/dataset")
-
-    # Integrate
-    depth = dz.cumsum(dim=zdim)
-    depth = pad(depth, {zdim: (1, 0)}, mode="constant", constant_values=0)
-    ref_type = dz2depth_ref_types[ref_type].name
-    meta_specs = meta.get_meta_specs(dz)
-    if ref is None and ref_type == "infer":
-        if meta_specs.data_vars.match(ref, "bathy"):
-            ref_type = "bottom"
-        elif meta_specs.data_vars.match(ref, "ssh"):
-            ref_type = "top"
+    # Reference as top and bottom
+    top = bottom = None
+    if ref is not None:
+        ref_type = dz2depth_ref_types[ref_type].name
+        if ref_type == "infer":
+            specs = meta.get_meta_specs(dz).data_vars
+            if isinstance(ref, xr.DataArray) and specs.match(ref, "bathy"):
+                ref_type = "bottom"
+            elif isinstance(ref, xr.DataArray) and specs.match(ref, "ssh"):
+                ref_type = "top"
+            else:
+                ref_type = "bottom" if positive == "up" else "top"
+        if ref_type == "bottom":
+            bottom = -ref
         else:
-            ref_type = "top" if positive == "down" else "bottom"
+            top = ref if positive == "up" else -ref
+
+    z = dz2z(dz, positive, zdim, top=top, bottom=bottom, centered=centered)
     if positive == "up":
-        if ref is None:
-            ref = depth.isel({zdim: -1})
-        elif ref is not None and ref_type == "top":
-            ref = depth.isel({zdim: -1}) - ref
-        depth[:] -= ref
-    else:
-        if ref is not None:
-            if ref_type == "bottom":
-                depth[:] -= depth.isel({zdim: -1})
-            depth[:] += ref
-
-    # Fix index
-    if zdim in depth.indexes:
-        dnz = depth[zdim].diff(zdim).pad({zdim: (0, 1)}, mode="edge")
-        depth = xcoords.change_index(depth, zdim, depth[zdim] + 0.5 * dnz.data)
-
-    # Centered
-    if centered:
-        depth = get_centers(depth, zdim)
-        if zdim in depth.indexes:
-            depth = depth.assign_coords({zdim: dz[zdim]})
-
-    # Finalize
-    depth.attrs["positive"] = positive
-    depth = meta_specs.format_coord(
-        depth, "z" if positive == "up" else "depth", rename=True, format_coords=False,
-        rename_dims=False
+        return z
+    depth = 0 - z
+    depth.attrs["positive"] = "down"
+    return meta.get_meta_specs(dz).format_coord(
+        depth, "depth", rename=True, format_coords=False, rename_dims=False
     )
-
-    return depth
 
 
 dz2depth.__doc__ = dz2depth.__doc__.format(**locals())
+
+
+@misc.ERRORS.format_function_docstring
+def get_dz_terms(ds, errors="raise"):
+    """Search a dataset for the layer thicknesses and what is needed to integrate them
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+    {errors}
+
+    Return
+    ------
+    tuple or None
+        The thicknesses, the vertical dimension, the positive attribute,
+        the sea surface height and the bathymetry, the last two being None when not found
+
+    See also
+    --------
+    decode_dz2z
+    decode_dz2depth
+    xoa.sigma.get_sigma_terms
+    """
+    errors = misc.ERRORS[errors]
+    meta_specs = meta.get_meta_specs(ds)
+    dz = meta_specs.search(ds, "dz", errors=errors)
+    if dz is None:
+        return
+    zdim = xcoords.get_meta_dims(dz, "z", errors=errors)
+    if zdim is None:
+        return
+    positive = xcoords.get_positive_attr(
+        ds, zdim, meta_specs["vertical"]["positive"], errors=errors
+    )
+    if positive is None:
+        return
+    ssh = meta_specs.search(ds, "ssh", errors="ignore")
+    bathy = meta_specs.search(ds, "bathy", errors="ignore")
+    return dz, zdim, positive, ssh, bathy
+
+
+@misc.ERRORS.format_function_docstring
+def decode_dz2z(ds, errors="raise", **kwargs):
+    """Compute z from layer thickness in a dataset
+
+    This makes use of the :meth:`~xoa.meta.MetaSpecs` instance that is retrieved
+    with :func:`xoa.meta.get_meta_specs` with ds as an argument in order to
+    find needed variables.
+    The integration starts from the bathymetry if the first level is the bottom,
+    else from the sea surface height, with a fallback on the other one.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        Dataset that contains everything
+    {errors}
+    kwargs: dict
+        Extra keywords are passed to :func:`dz2z`
+
+    Return
+    ------
+    xarray.Dataset
+        A new dataset with a z coordinate
+
+    See also
+    --------
+    dz2z
+    decode_dz2depth
+    xoa.meta.get_meta_specs
+    """
+    ds = ds.copy()
+    errors = misc.ERRORS[errors]
+    found = get_dz_terms(ds, errors)
+    if found is None:
+        return ds
+    dz, zdim, positive, ssh, bathy = found
+    top = bottom = None
+    for ref, ref_type in [(bathy, "bottom"), (ssh, "top")][:: 1 if positive == "up" else -1]:
+        if ref is not None:
+            top, bottom = (ref, None) if ref_type == "top" else (None, -ref)
+            break
+    z = dz2z(dz, positive=positive, zdim=zdim, top=top, bottom=bottom, centered=True, **kwargs)
+    if z.name in ds.dims:
+        msg = f"Can't assign the {z.name} coordinate since a dimension has the same name"
+        if errors == "raise":
+            raise exceptions.XoaGridError(msg)
+        if errors == "warn":
+            exceptions.xoa_warn(msg)
+        return ds
+    return ds.assign_coords({z.name: z})
 
 
 @misc.ERRORS.format_function_docstring
@@ -548,36 +720,21 @@ def decode_dz2depth(ds, errors="raise", **kwargs):
     See also
     --------
     dz2depth
+    decode_dz2z
     xoa.meta.get_meta_specs
     """
     ds = ds.copy()
     errors = misc.ERRORS[errors]
-
-    # Find needed stuff
-    meta_specs = meta.get_meta_specs(ds)
-    dz = meta_specs.search(ds, "dz", errors=errors)
-    if dz is None:
+    found = get_dz_terms(ds, errors)
+    if found is None:
         return ds
-    zdim = xcoords.get_meta_dims(dz, "z", errors=errors)
-    if zdim is None:
-        return ds
-    positive = meta_specs["vertical"]["positive"]
-    if positive is None:
-        positive = xcoords.get_positive_attr(ds, zdim)
-    if positive is None:
-        msg = "Can't infer positive attribute from data dataset"
-        if errors == "raise":
-            raise exceptions.XoaGridError(msg)
-        exceptions.xoa_warn(msg)
-        return ds
-    ssh = meta_specs.search(ds, "ssh", errors="ignore")
-    bathy = meta_specs.search(ds, "bathy", errors="ignore")
+    dz, zdim, positive, ssh, bathy = found
 
     # Make choices
     if ssh is None and bathy is None:
         ref, ref_type = None, "infer"
     else:
-        for ref, ref_type in [(bathy, "bathy"), (ssh, "ssh")][:: int(positive)]:
+        for ref, ref_type in [(bathy, "bathy"), (ssh, "ssh")][:: 1 if positive == "up" else -1]:
             if ref is not None:
                 break
 
@@ -589,13 +746,10 @@ def decode_dz2depth(ds, errors="raise", **kwargs):
         ref=ref,
         ref_type=ref_type,
         centered=True,
+        **kwargs,
     )
-
-    # Assign to dataset
     if depth.name in ds.dims:
-        msg = "Can't assign the {} coordinate since a dimension has the same name".format(
-            depth.name
-        )
+        msg = f"Can't assign the {depth.name} coordinate since a dimension has the same name"
         if errors == "raise":
             raise exceptions.XoaGridError(msg)
         if errors == "warn":
@@ -609,6 +763,95 @@ def decode_cf_dz2depth(*args, **kwargs):
         "decode_cf_dz2depth is deprecated. Please use decode_dz2depth instead", "deprecation"
     )
     return decode_dz2depth(*args, **kwargs)
+
+
+def z2dz(z, zdim=None, top=None, bottom=None):
+    """Compute layer thicknesses from the z or depth of the layers
+
+    The interfaces are the middle of consecutive levels, and the outer ones are
+    extrapolated with :func:`get_edges`, unless `top` and `bottom` are provided.
+    The coordinates may vary along the other dimensions, like with sigma coordinates.
+
+    .. note:: This is exact for evenly spaced levels, like uniform sigma layers. Otherwise
+        the inner interfaces are approximate, and the total thickness is exact
+        only if both `top` and `bottom` are provided.
+
+    Parameters
+    ----------
+    z: xarray.DataArray
+        Coordinates at the center of the layers, either positive up or down
+        as given by the ``positive`` attribute, or guessed from the values like in
+        :func:`~xoa.coords.as_z`.
+    zdim: str
+        Name of the vertical dimension.
+        If not set, it is inferred with :func:`~xoa.coords.get_meta_dims`.
+    top: None, float, xarray.DataArray
+        The z of the top interface, i.e. the sea surface height,
+        instead of the extrapolated one.
+    bottom: None, float, xarray.DataArray
+        The z of the bottom interface, i.e. minus the bathymetry,
+        instead of the extrapolated one.
+
+    Return
+    ------
+    xarray.DataArray
+        Positive layer thicknesses, with the dimensions of `z`
+
+    See also
+    --------
+    dz2z
+    get_dz
+    get_edges
+    """
+    z = xcoords.as_z(z)
+    if zdim is None:
+        zdim = xcoords.get_zdim(z, errors="raise")
+    edges = get_edges(z, zdim)
+    if top is not None or bottom is not None:
+        # The orientation of the axis tells where the top is
+        up = float((z.isel({zdim: -1}) - z.isel({zdim: 0})).mean()) > 0
+        edges = edges.copy()
+        for value, last in ((top, up), (bottom, not up)):
+            if value is not None:
+                edges[{zdim: -1 if last else 0}] = value
+    dz = abs(edges.isel({zdim: slice(1, None)}).data - edges.isel({zdim: slice(None, -1)}).data)
+    attrs = {"long_name": "Layer thickness"}
+    if "units" in z.attrs:
+        attrs["units"] = z.attrs["units"]
+    return z.copy(data=dz).rename("dz").assign_attrs(attrs)
+
+
+@misc.ERRORS.format_function_docstring
+def get_dz(obj, errors="raise", **kwargs):
+    """Get or compute the layer thicknesses
+
+    A thickness variable is searched first. Else it is computed from the z or depth
+    coordinate that is returned by :func:`~xoa.coords.get_z` with :func:`z2dz`.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+    {errors}
+    kwargs:
+        Extra parameters are passed to :func:`z2dz`
+
+    Return
+    ------
+    xarray.DataArray or None
+
+    See also
+    --------
+    z2dz
+    dz2z
+    xoa.coords.get_z
+    """
+    errors = misc.ERRORS[errors]
+    dz = meta.get_meta_specs(obj).search(obj, "dz", errors="ignore")
+    if dz is not None:
+        return dz
+    z = xcoords.get_z(obj, errors=errors)
+    if z is not None:
+        return z2dz(z, **kwargs)
 
 
 @misc.ERRORS.format_function_docstring

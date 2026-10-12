@@ -12,6 +12,8 @@ New features
 - Add :class:`xoa.dyn.VerticalModes` to compute vertical modes, speeds and deformation radii, and to decompose and recompose profiles, based on the new :mod:`xoa.core.modes` module. See :ref:`sphx_glr_tutorials_plot_vertical_modes.py`.
 - Add :func:`xoa.thermdyn.get_n2` for the squared Brunt-Vaisala frequency, and :func:`xoa.coords.as_z` to get a vertical coordinate as z, positive up.
 - Add the :mod:`xoa.numbers` module with :func:`~xoa.numbers.get_rossby`, :func:`~xoa.numbers.get_burger`, :func:`~xoa.numbers.get_froude` and :func:`~xoa.numbers.get_ekman`. ``xoa.dyn.get_rossby`` moved to it, without backward compatibility. See :ref:`sphx_glr_tutorials_plot_dimensionless_numbers.py`.
+- Add :class:`xoa.stats.StatAccum` to accumulate temporal and spatial statistics, with automatic vertical and horizontal weights, dump and restart, based on numba moments in :mod:`xoa.core.stats`. See :ref:`indepth.stataccum`.
+- Add :func:`xoa.grid.dz2z`, :func:`xoa.grid.z2dz`, :func:`xoa.grid.get_dz`, :func:`xoa.grid.get_dz_terms` and :func:`xoa.grid.decode_dz2z`, and the ``positive`` and ``errors`` arguments of :func:`xoa.coords.get_positive_attr`. :func:`xoa.coords.get_z` now relies on :func:`~xoa.grid.decode_dz2z`. Fix :func:`xoa.grid.decode_dz2depth` with a bathymetry or a sea surface height and ``positive="down"``.
 - Add the :ref:`references` page.
 - Add :func:`xoa.mask.get_polygon_mask`, also an ``xoa`` accessor method, to flag grid cells inside polygons with a coverage threshold, based on the new :mod:`xoa.core.mask` and :mod:`xoa.core.poly` numba functions.
 - Add :func:`xoa.plot.plot_fields` to plot several fields on maps of a single figure, with a shared colorbar if needed.

@@ -241,9 +241,9 @@ def _get_z_depth_(da, name, errors, **kwargs):
 
             decoders.append(decode_sigma)
         if ztype in ("dz", "layer", None):
-            from .grid import decode_dz2depth
+            from .grid import decode_dz2z
 
-            decoders.append(decode_dz2depth)
+            decoders.append(decode_dz2z)
         for decoder in decoders:
             decoded = decoder(da, errors="ignore" if ztype is None else errors)
             found = _search_z_depth_(decoded, name, **kwargs)
@@ -289,7 +289,7 @@ def get_z(da, errors="raise", **kwargs):
     to_depth
     xoa.meta.MetaSpecs.search
     xoa.sigma.decode_sigma
-    xoa.grid.decode_dz2depth
+    xoa.grid.decode_dz2z
     """
     return _get_z_depth_(da, "z", errors, **kwargs)
 
@@ -351,7 +351,7 @@ def get_depth(da, errors="raise", **kwargs):
     to_z
     xoa.meta.MetaSpecs.search
     xoa.sigma.decode_sigma
-    xoa.grid.decode_dz2depth
+    xoa.grid.decode_dz2z
     """
     return _get_z_depth_(da, "depth", errors, **kwargs)
 
@@ -1252,7 +1252,8 @@ class positive_attr(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     down = -1
 
 
-def get_positive_attr(da, zdim=None):
+@misc.ERRORS.format_function_docstring
+def get_positive_attr(da, zdim=None, positive=None, errors="ignore"):
     """Get the positive attribute of a dataset or data array
 
     Searches for the ``positive`` attribute in the vertical coordinate
@@ -1264,6 +1265,10 @@ def get_positive_attr(da, zdim=None):
     zdim: None, str
         The index coordinate name that is supposed to have this attribute,
         which is usually the vertical dimension.
+    positive: None, str, int
+        Explicit value, which is returned as a name if it is not the "infer" one.
+        See :class:`positive_attr`.
+    {errors}
 
     Return
     ------
@@ -1274,12 +1279,18 @@ def get_positive_attr(da, zdim=None):
     .. code-block:: python
 
         >>> depth = xr.DataArray([-100., -50., 0.], dims="z",
-        ...     attrs={"positive": "up"})
+        ...     attrs={{"positive": "up"}})
         >>> da = xr.DataArray([1, 2, 3], dims="z",
-        ...     coords={"depth": depth})
+        ...     coords={{"depth": depth}})
         >>> get_positive_attr(da)
         'up'
     """
+    # Explicit
+    positive = positive_attr[positive].name
+    if positive != "infer":
+        return positive
+    errors = misc.ERRORS[errors]
+
     # Targets
     if zdim is None:
         zdim = get_meta_dims(da, "z", errors="ignore")
@@ -1299,8 +1310,14 @@ def get_positive_attr(da, zdim=None):
             return positive_attr[positive].name
 
     # Fall back to current MetaSpecs
-    metaspecs = meta.get_meta_specs(da)
-    return metaspecs["vertical"]["positive"]
+    positive = meta.get_meta_specs(da)["vertical"]["positive"]
+    if positive is None:
+        msg = "Can't infer the positive attribute from the data"
+        if errors == "raise":
+            raise exceptions.XoaCoordsError(msg)
+        if errors == "warn":
+            exceptions.xoa_warn(msg)
+    return positive
 
 
 def get_binding_data_vars(ds, coord, as_names=False):

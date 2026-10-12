@@ -2,6 +2,7 @@
 """
 Test the :mod:`xoa.grid` module
 """
+
 import functools
 import warnings
 import numpy as np
@@ -330,3 +331,89 @@ class TestGetFingerprint:
         assert ds.z.dims == ("z",)
         with pytest.raises(xoa.XoaError):
             grid.decode_dz2depth(dz.to_dataset())
+
+
+class TestDz2z:
+    """Test z and thickness conversions"""
+
+    dz = xr.DataArray([1.0, 3.0, 4.0], dims="nz")
+
+    @pytest.mark.parametrize(
+        "positive, kwargs, expected",
+        [
+            ["down", {}, [0, -1, -4, -8]],
+            ["up", {}, [-8, -7, -4, 0]],
+            ["up", {"top": 0.5}, [-7.5, -6.5, -3.5, 0.5]],
+            ["up", {"bottom": -10}, [-10, -9, -6, -2]],
+            ["down", {"top": 2}, [2, 1, -2, -6]],
+            ["down", {"bottom": -10}, [-2, -3, -6, -10]],
+        ],
+    )
+    def test_dz2z(self, positive, kwargs, expected):
+        z = grid.dz2z(self.dz, positive, zdim="nz", **kwargs)
+        np.testing.assert_allclose(z, expected)
+        assert z.name == "z" and z.attrs["positive"] == "up"
+        zc = grid.dz2z(self.dz, positive, zdim="nz", centered=True, **kwargs)
+        np.testing.assert_allclose(zc, 0.5 * (np.array(expected)[1:] + np.array(expected)[:-1]))
+
+    def test_dz2z_errors(self):
+        with pytest.raises(xoa.XoaError):
+            grid.dz2z(self.dz, "up", zdim="nz", top=0, bottom=-8)
+        with pytest.raises(xoa.XoaError):
+            grid.dz2z(self.dz, zdim="nz")
+
+    def test_dz2depth_is_minus_dz2z(self):
+        z = grid.dz2z(self.dz, "down", zdim="nz", top=2)
+        np.testing.assert_allclose(grid.dz2depth(self.dz, "down", zdim="nz", ref=-2), -z)
+
+    @pytest.mark.parametrize("positive", ["up", "down"])
+    def test_z2dz_round_trip_with_varying_z(self, positive):
+        # Sigma-like layers whose thickness varies in space
+        h = xr.DataArray([10.0, 40.0, 90.0], dims="x")
+        dz = xr.DataArray(np.full(5, 0.2), dims="nz") * h
+        zc = grid.dz2z(dz, "up", zdim="nz", centered=True)
+        if positive == "down":
+            zc = zc.isel(nz=slice(None, None, -1))
+        out = grid.z2dz(zc, zdim="nz")
+        assert out.name == "dz" and out.dims == zc.dims
+        np.testing.assert_allclose(
+            out, dz.transpose(*out.dims).isel(nz=slice(None, None, 1 if positive == "up" else -1))
+        )
+
+    def test_z2dz_depth_and_outer_edges(self):
+        # Stretched layers: the inner interfaces are the middle of the centers, hence approximate,
+        # but the total thickness is exact when the outer ones are provided
+        dz = xr.DataArray([1.0, 3.0, 4.0], dims="nz")
+        z = grid.dz2z(dz, "up", zdim="nz", centered=True)
+        assert not np.isclose(grid.z2dz(z, zdim="nz").sum(), 8.0)
+        out = grid.z2dz(z, zdim="nz", top=0, bottom=-8)
+        assert np.isclose(out.sum(), 8.0)
+        # Depth, which is positive down
+        depth = (0 - z).assign_attrs(positive="down").rename("depth")
+        np.testing.assert_allclose(grid.z2dz(depth, zdim="nz", top=0, bottom=-8), out)
+
+    def test_get_dz(self):
+        dz = xr.DataArray(np.resize([100.0, 300.0], (3, 2)), dims=("lev", "x"), name="dz")
+        dz["lev"] = ("lev", np.arange(3.0), {"positive": "down"})
+        # From a thickness variable
+        np.testing.assert_allclose(grid.get_dz(dz.to_dataset()), dz)
+        # From z, which is exact for evenly spaced levels
+        z = grid.dz2z(dz, "down", zdim="lev", centered=True)
+        da = xr.DataArray(np.zeros(z.shape), dims=z.dims, coords={"z": z})
+        np.testing.assert_allclose(grid.get_dz(da).transpose(*dz.dims), dz)
+        # Nothing
+        assert grid.get_dz(xr.DataArray([1.0], dims="foo"), errors="ignore") is None
+        with pytest.raises(xoa.XoaError):
+            grid.get_dz(xr.DataArray([1.0], dims="foo"))
+
+    def test_get_dz_terms_and_decode_dz2z(self):
+        dz = xr.DataArray(
+            np.resize([100, 500, 1000.0], (2, 3)).T,
+            dims=("lev", "x"),
+            coords={"lev": ("lev", np.arange(3, dtype="d"), {"positive": "down"})},
+            name="dz",
+        )
+        assert grid.get_dz_terms(dz.to_dataset())[1] == "lev"
+        assert grid.get_dz_terms(xr.Dataset(), errors="ignore") is None
+        ds = grid.decode_dz2z(dz.to_dataset())
+        np.testing.assert_allclose(ds.z.isel(x=0), [-50, -350, -1100])

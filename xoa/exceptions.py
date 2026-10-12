@@ -73,6 +73,12 @@ class XoaSigmaError(XoaError):
     pass
 
 
+class XoaStatsError(XoaError):
+    """Statistics error"""
+
+    pass
+
+
 class XoaThermdynError(XoaError):
     """Thermodynamics error"""
 
