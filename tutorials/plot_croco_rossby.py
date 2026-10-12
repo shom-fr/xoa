@@ -30,7 +30,7 @@ import cmocean  # noqa
 
 import xoa
 import xoa.meta as xmeta
-import xoa.dyn as xdyn
+import xoa.numbers as xnum
 import xoa.coords as xcoords
 import xoa.mask as xmask
 import xoa.stats as xstats
@@ -78,10 +78,10 @@ print(
 #
 # The Rossby number is the relative vorticity divided by the Coriolis parameter.
 # It is positive for a cyclonic rotation and negative for an anticyclonic one.
-# :func:`xoa.dyn.get_rossby` computes it for each level.
+# :func:`xoa.numbers.get_rossby` computes it for each level.
 # Without the ``z`` parameter, the horizontal derivatives are taken along the levels.
 
-rossby_s = xdyn.get_rossby(u, v)
+rossby_s = xnum.get_rossby(u, v)
 
 # %%
 # Over a slope, the levels are not horizontal and the derivatives along them
@@ -90,7 +90,7 @@ rossby_s = xdyn.get_rossby(u, v)
 # With the ``z`` parameter, the derivatives are taken at constant depth, by correcting
 # the ones along the levels with the slope of the levels and the vertical shear.
 
-rossby_z = xdyn.get_rossby(u, v, z=z)
+rossby_z = xnum.get_rossby(u, v, z=z)
 
 # %%
 # Here is a west-east section at 36.7°N, across steep slopes, with the two estimates and
@@ -147,7 +147,7 @@ rossby_z100 = at_depth(rossby_z).rename("rossby")
 # The reference is the Rossby number of the currents that the model interpolated
 # at the same depth, whose derivatives are at constant depth by construction.
 
-rossby_ref = xdyn.get_rossby(ref.xoa.get("u").sel(depth=DEPTH), ref.xoa.get("v").sel(depth=DEPTH))
+rossby_ref = xnum.get_rossby(ref.xoa.get("u").sel(depth=DEPTH), ref.xoa.get("v").sel(depth=DEPTH))
 
 # %%
 # Compare them. The land and the points closer than three cells from the edges are not used.

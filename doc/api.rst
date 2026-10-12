@@ -38,6 +38,7 @@ Package API
     xoa.mask
     xoa.meta
     xoa.misc
+    xoa.numbers
     xoa.plot
     xoa.poly
     xoa.regrid

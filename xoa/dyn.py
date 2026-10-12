@@ -4,7 +4,7 @@ Routines related to ocean dynamics.
 Provides :func:`get_sea_level` for identifying sea level variables,
 :func:`flow2d` for 2D Lagrangian particle advection, and the kinematic diagnostics
 computed from velocities on collocated grids, that may have levels with a variable vertical
-coordinate (see also :class:`VerticalModes` for the vertical modes): :func:`get_relvort`, :func:`get_rossby`, :func:`get_div`,
+coordinate (see also :class:`VerticalModes` for the vertical modes): :func:`get_relvort`, :func:`get_div`,
 :func:`get_strain`, :func:`get_okuboweiss`, as well as :func:`get_coriolis` and
 :func:`get_geos`.
 """
@@ -381,28 +381,6 @@ def get_relvort(u, v, dx=None, dy=None, z=None):
     return _apply_kinematics_(
         cdyn.relvort, 1, u, v, dx, dy, z, ["relvort"], ["Relative vorticity"], ["s-1"]
     )
-
-
-@_format_uv_doc_
-def get_rossby(u, v, dx=None, dy=None, z=None):
-    """Compute the Rossby number, which is dimensionless
-
-    It is the relative vorticity divided by the Coriolis parameter, that is positive for
-    a cyclonic rotation, and negative for an anticyclonic one, in both hemispheres.
-    {parameters}
-    Return
-    ------
-    xarray.DataArray
-
-    See also
-    --------
-    get_relvort
-    get_coriolis
-    """
-    relvort = get_relvort(u, v, dx=dx, dy=dy, z=z)
-    corio = get_coriolis(xgrid._get_lonlat_yx_(u)[1])
-    rossby = relvort / corio
-    return _name_(rossby.transpose(*u.dims), u, "rossby", "Rossby number", "1")
 
 
 @_format_uv_doc_
