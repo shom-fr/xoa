@@ -1,7 +1,8 @@
 """
 Masks of grid cells
 
-Tell which cells of a grid are inside polygons, see :func:`get_polygon_mask`.
+Tell which cells of a grid are inside polygons, see :func:`get_polygon_mask`,
+or where several arrays are all valid, see :func:`get_common_mask`.
 """
 
 # Copyright 2020-2026 Shom
@@ -20,6 +21,7 @@ Tell which cells of a grid are inside polygons, see :func:`get_polygon_mask`.
 import numpy as np
 import xarray as xr
 
+from . import coords as xcoords
 from . import exceptions
 from . import grid as xgrid
 from .core import grid as cgrid
@@ -90,3 +92,42 @@ def get_polygon_mask(obj, polygon, threshold=0.5):
         name="mask",
         attrs={"long_name": "Inside polygons"},
     )
+
+
+def get_common_mask(*das, edge=0):
+    """Get a mask of the points where all the arrays are finite
+
+    Parameters
+    ----------
+    das: xarray.DataArray
+        Arrays that are broadcast together
+    edge: int
+        Number of cells to discard along the borders of the horizontal dimensions,
+        where derivatives are not reliable.
+
+    Return
+    ------
+    xarray.DataArray
+        Boolean array
+
+    Example
+    -------
+    .. code-block:: python
+
+        valid = get_common_mask(rossby_ref, rossby_s, rossby_z, edge=3)
+        rossby_z.where(valid)
+    """
+    if not das:
+        raise exceptions.XoaError("At least one array is needed")
+    mask = np.isfinite(das[0])
+    for da in das[1:]:
+        mask = mask & np.isfinite(da)
+    if edge:
+        for dim in (
+            xcoords.get_ydim(mask, errors="ignore"),
+            xcoords.get_xdim(mask, errors="ignore"),
+        ):
+            if dim is not None:
+                index = xr.DataArray(np.arange(mask.sizes[dim]), dims=dim)
+                mask = mask & (index >= edge) & (index < mask.sizes[dim] - edge)
+    return mask.rename("mask").assign_attrs(long_name="Valid points")

@@ -67,6 +67,11 @@ currents are a method of the accessor of the sea surface height:
     relvort = ds.xoa.get_relvort()
     ug, vg = ds.ssh.xoa.get_geos()
 
+The divergence, the strains and the Okubo-Weiss parameter accept ``normalize=True`` to make
+them dimensionless, by dividing them by the Coriolis parameter (its absolute value for the
+strains) or, for the Okubo-Weiss parameter, by its standard deviation. The normalized
+vorticity is the Rossby number, :func:`xoa.dyn.get_rossby`.
+
 Conventions
 ===========
 
@@ -226,6 +231,9 @@ temperature and the salinity, and decomposes and recomposes profiles:
     part = vm.recomp(amps, modes=[1, 2])   # contribution of the first baroclinic modes
     vm.rd.isel(mode=1)                     # first deformation radius, in meters
 
+- :meth:`~xoa.dyn.VerticalModes.energy_share` gives the share of the kinetic energy of each
+  mode, and :meth:`~xoa.dyn.VerticalModes.truncation_error` the error of recomposing profiles
+  with a given number of modes.
 - The object is a class since the modes are computed once, and then used to decompose and
   recompose any number of fields. They are computed by the numba routines of
   :mod:`xoa.core.modes`, in parallel over the columns, and everything works with extra
@@ -331,6 +339,11 @@ polygon for the cell to be inside:
     for threshold in None, 0.0, 0.5, 1.0:
         print(threshold, int(xoa.mask.get_polygon_mask(da, polygon, threshold).sum()))
 
+- :func:`xoa.poly.get_contour_polygons` extracts the closed contours of a field as polygons,
+  for instance the one of the Okubo-Weiss parameter that surrounds an eddy
+  (``containing="min"``), and :func:`xoa.mask.get_common_mask` the points where several
+  arrays are finite, to compare them. :func:`xoa.stats.rms` computes root mean square errors,
+  in regions if needed.
 - The covered fraction is the ratio of areas computed in longitude and latitude coordinates:
   cells that are cut in half by a polygon edge have exactly a fraction of one half.
 - The union of several polygons is returned, so cells that are partly covered by two polygons

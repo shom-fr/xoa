@@ -849,23 +849,23 @@ class _DynDatasetMixin_:
 
         return get_rossby(*self._get_uv_(), dx=dx, dy=dy, z=z)
 
-    def get_div(self, dx=None, dy=None, z=None):
+    def get_div(self, dx=None, dy=None, z=None, normalize=False):
         """Get the horizontal divergence, see :func:`xoa.dyn.get_div`"""
         from .dyn import get_div
 
-        return get_div(*self._get_uv_(), dx=dx, dy=dy, z=z)
+        return get_div(*self._get_uv_(), dx=dx, dy=dy, z=z, normalize=normalize)
 
-    def get_strain(self, dx=None, dy=None, z=None):
+    def get_strain(self, dx=None, dy=None, z=None, normalize=False):
         """Get the normal and shear strains, see :func:`xoa.dyn.get_strain`"""
         from .dyn import get_strain
 
-        return get_strain(*self._get_uv_(), dx=dx, dy=dy, z=z)
+        return get_strain(*self._get_uv_(), dx=dx, dy=dy, z=z, normalize=normalize)
 
-    def get_okuboweiss(self, dx=None, dy=None, z=None):
+    def get_okuboweiss(self, dx=None, dy=None, z=None, normalize=False):
         """Get the Okubo-Weiss parameter, see :func:`xoa.dyn.get_okuboweiss`"""
         from .dyn import get_okuboweiss
 
-        return get_okuboweiss(*self._get_uv_(), dx=dx, dy=dy, z=z)
+        return get_okuboweiss(*self._get_uv_(), dx=dx, dy=dy, z=z, normalize=normalize)
 
 
 class XoaDataArrayAccessor(

@@ -876,6 +876,103 @@ def plot_field(
     return mappable
 
 
+def plot_fields(
+    fields,
+    ncols=None,
+    projection=None,
+    figsize=None,
+    titles=None,
+    colorbar="each",
+    cbar_kwargs=None,
+    map_kw=None,
+    **kwargs,
+):
+    """Plot several fields on maps of a single figure
+
+    Each field is drawn with :func:`plot_field` on its own map.
+
+    Parameters
+    ----------
+    fields: dict, list
+        Fields to plot. A dict maps the titles to the fields.
+        An item of a list is either a field or a ``(field, kwargs)`` tuple,
+        where `kwargs` override the common ones for this field only.
+    ncols: None, int
+        Number of columns, which defaults to the number of fields up to three.
+    projection: None, str, cartopy.crs.Projection
+        Projection of the maps, see :func:`xoa.core.plot.get_projection`.
+        The default is Mercator.
+    figsize: None, tuple
+        Size of the figure, which defaults to a size that depends on the grid of axes.
+    titles: None, list(str)
+        Titles, which default to the keys of `fields`, if it is a dict.
+    colorbar: {"each", "shared", None}
+        One colorbar per map, or a single one shared by all the maps,
+        that is labelled and scaled like the first one, or no colorbar.
+    cbar_kwargs: None, dict
+        Parameters of the colorbars, see :func:`add_colorbar`
+    map_kw: None, dict
+        Parameters that decorate the maps, see :func:`plot_field`
+    kwargs:
+        Extra parameters that are passed to :func:`plot_field`, like ``cmap`` or ``levels``
+
+    Return
+    ------
+    matplotlib.figure.Figure
+    list(cartopy.mpl.geoaxes.GeoAxes)
+        Axes of the fields
+
+    Example
+    -------
+    .. code-block:: python
+
+        fig, axes = plot_fields(
+            {"Reanalysis": speed, "Geostrophy": speed_g}, cmap="cmo.tempo", colorbar="shared"
+        )
+        plot_vectors(u, v, ax=axes[0])
+
+    See also
+    --------
+    plot_field
+    """
+    if colorbar not in ("each", "shared", None):
+        raise exceptions.XoaError("colorbar must be 'each', 'shared' or None")
+    if isinstance(fields, dict):
+        titles = list(fields) if titles is None else titles
+        fields = list(fields.values())
+    fields = [f if isinstance(f, tuple) else (f, {}) for f in fields]
+    nfields = len(fields)
+    ncols = min(nfields, 3) if ncols is None else min(ncols, nfields)
+    nrows = -(-nfields // ncols)
+    if figsize is None:
+        figsize = (5.5 * ncols, 4.8 * nrows)
+    projection = cplot.get_projection(projection)
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=figsize,
+        subplot_kw={"projection": projection},
+        constrained_layout=True,
+        squeeze=False,
+    )
+    axes = list(axes.ravel())
+    for ax in axes[nfields:]:
+        fig.delaxes(ax)
+    axes = axes[:nfields]
+
+    kwargs.setdefault("map_kw", map_kw)
+    kwargs["add_colorbar"] = colorbar == "each"
+    if colorbar == "each":
+        kwargs["cbar_kwargs"] = cbar_kwargs
+    mappables = []
+    for i, (ax, (field, fkwargs)) in enumerate(zip(axes, fields)):
+        title = None if titles is None else titles[i]
+        mappables.append(plot_field(field, ax=ax, title=title, **{**kwargs, **fkwargs}))
+    if colorbar == "shared":
+        add_colorbar(mappables[0], axes, da=fields[0][0], **(cbar_kwargs or {}))
+    return fig, axes
+
+
 def plot_grid(
     obj,
     ax=None,

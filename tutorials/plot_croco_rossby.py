@@ -26,14 +26,15 @@ so that the diagnostics of :mod:`xoa.dyn` can be applied.
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
 import cmocean  # noqa
 
 import xoa
 import xoa.meta as xmeta
 import xoa.dyn as xdyn
 import xoa.coords as xcoords
-from xoa.plot import plot_field, plot_section, add_colorbar
+import xoa.mask as xmask
+import xoa.stats as xstats
+from xoa.plot import plot_fields, plot_section, add_colorbar
 from xoa.regrid import regrid1d
 
 xr.set_options(display_style="text")
@@ -66,8 +67,10 @@ ds.depth.attrs["positive"] = "up"
 u, v = ds.xoa.get("u"), ds.xoa.get("v")
 z = ds.depth
 print(u.dims, z.dims)
-print(f"The first level is at {float(z.isel(sig_rho=0).min()):.0f} to "
-      f"{float(z.isel(sig_rho=0).max()):.0f} m")
+print(
+    f"The first level is at {float(z.isel(sig_rho=0).min()):.0f} to "
+    f"{float(z.isel(sig_rho=0).max()):.0f} m"
+)
 
 # %%
 # Rossby number on the levels
@@ -97,7 +100,11 @@ rossby_z = xdyn.get_rossby(u, v, z=z)
 jsec = int(abs(ds.lat_rho.isel(x_rho=0) - 36.7).argmin())
 kw = {"method": "contourf", "cmap": "cmo.balance", "extend": "both", "x": "lon"}
 fig, axes = plt.subplots(
-    1, 3, figsize=(15, 4.2), sharey=True, constrained_layout=True,
+    1,
+    3,
+    figsize=(15, 4.2),
+    sharey=True,
+    constrained_layout=True,
     gridspec_kw={"width_ratios": [1, 1, 1.15]},
 )
 for ax, da, title in zip(axes[:2], (rossby_s, rossby_z), ("Along the levels", "At constant depth")):
@@ -126,7 +133,9 @@ depth = xr.DataArray([DEPTH], dims="depth", name="depth")
 
 
 def at_depth(da):
-    out = regrid1d(da.assign_coords(depth=z), depth, dim=("sig_rho", "depth"), coord_in_name="depth")
+    out = regrid1d(
+        da.assign_coords(depth=z), depth, dim=("sig_rho", "depth"), coord_in_name="depth"
+    )
     # The regridding drops the attributes of the coordinates, that are needed to find the longitudes
     return xcoords.copy_coord_attrs(out.isel(depth=0), da)
 
@@ -148,47 +157,41 @@ estimates = {
     "Along the levels": rossby_s100,
     "At constant depth": rossby_z100,
 }
-valid = np.isfinite(rossby_ref)
-for da in estimates.values():
-    valid &= np.isfinite(da)
-valid[:3] = valid[-3:] = False
-valid[:, :3] = valid[:, -3:] = False
+valid = xmask.get_common_mask(*estimates.values(), edge=3)
 
 MAP_KW = {"gridlines_labels_on": ["bottom", "left"], "land": True}
-fig, axes = plt.subplots(
-    1, 3, figsize=(15, 5), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
-)
 kw = {
     "method": "contourf",
     "cmap": "cmo.balance",
     "levels": np.linspace(-1, 1, 21),
     "extend": "both",
     "map_kw": MAP_KW,
-    "add_colorbar": False,
+    "colorbar": "shared",
 }
-for ax, (name, da) in zip(axes, estimates.items()):
-    mappable = plot_field(da.where(valid), ax=ax, title=name, **kw)
-add_colorbar(mappable, axes, da=rossby_z100)
+fig, axes = plot_fields(
+    {name: da.where(valid) for name, da in estimates.items()}, figsize=(15, 5), **kw
+)
 
 # %%
 # The estimate along the levels is noisy over the slopes, where the levels are the most
 # tilted, while the one at constant depth is much closer to the reference.
 # Let's see where, with the differences with the reference.
 
-fig, axes = plt.subplots(
-    1, 2, figsize=(10, 5), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
+kw.update(
+    {
+        "levels": np.linspace(-0.3, 0.3, 21),
+        "cbar_kwargs": {"label": "Difference with the reference"},
+    }
 )
-kw.update({"levels": np.linspace(-0.3, 0.3, 21)})
-for ax, name in zip(axes, ("Along the levels", "At constant depth")):
-    mappable = plot_field((estimates[name] - rossby_ref).where(valid), ax=ax, title=name, **kw)
-add_colorbar(mappable, axes, label="Difference with the reference")
-rms = {
-    name: float(np.sqrt(((da - rossby_ref) ** 2).where(valid).mean()))
-    for name, da in list(estimates.items())[1:]
-}
+estimates.pop("Reference")
+fig, axes = plot_fields(
+    {name: (da - rossby_ref).where(valid) for name, da in estimates.items()}, figsize=(10, 5), **kw
+)
 print(f"Standard deviation of the reference: {float(rossby_ref.where(valid).std()):.3f}")
-for name, value in rms.items():
-    print(f"Root mean square error {name.lower()}: {value:.3f}")
+for name, da in estimates.items():
+    print(
+        f"Root mean square error {name.lower()}: {float(xstats.rms(da, rossby_ref, mask=valid)):.3f}"
+    )
 
 # %%
 # The correction reduces the error, which remains because the vertical interpolation is not

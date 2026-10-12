@@ -30,15 +30,15 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cmocean  # noqa
-import contourpy
 
 import xoa
 import xoa.meta as xmeta
 import xoa.dyn as xdyn
 import xoa.grid as xgrid
 import xoa.mask as xmask
-from xoa.core.poly import points_in_polygon
-from xoa.plot import plot_field, plot_vectors, add_colorbar
+import xoa.poly as xpoly
+import xoa.stats as xstats
+from xoa.plot import plot_field, plot_fields, plot_vectors
 
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
@@ -68,7 +68,6 @@ print(ds)
 # The speed is added for plotting.
 
 u, v, ssh = ds.xoa.get("u"), ds.xoa.get("v"), ds.xoa.get("ssh")
-lon, lat = u.lon, u.lat
 for da, name in (u, "Zonal velocity"), (v, "Meridional velocity"):
     da.attrs["long_name"] = name
 speed = np.hypot(u, v).rename("speed")
@@ -101,17 +100,8 @@ SPEED_KW = {
     "extend": "max",
 }
 
-
-def new_map(nrows=1, ncols=1, **kwargs):
-    kwargs.setdefault("constrained_layout", True)
-    kwargs.setdefault("subplot_kw", {"projection": ccrs.Mercator()})
-    return plt.subplots(nrows, ncols, **kwargs)
-
-
-fig, ax = new_map(figsize=(8.5, 6.2))
-plot_field(speed, ax=ax, map_kw=MAP_KW, **SPEED_KW)
+fig, (ax,) = plot_fields({"Surface currents": speed}, figsize=(8.5, 6.2), map_kw=MAP_KW, **SPEED_KW)
 plot_vectors(u, v, ax=ax, color="0.15", stride=2)
-ax.set_title("Surface currents")
 
 # %%
 # Diagnostics
@@ -123,45 +113,42 @@ ax.set_title("Surface currents")
 # and dask arrays.
 
 uv = xr.Dataset({"u": u, "v": v})
-relvort = uv.xoa.get_relvort()
-div = uv.xoa.get_div()
-sn, ss = uv.xoa.get_strain()
-ow = uv.xoa.get_okuboweiss()
-print(relvort)
+rossby = uv.xoa.get_rossby()
+print(rossby)
 
 # %%
-# These quantities are best compared when normalized by the Coriolis parameter,
-# which is given by :func:`xoa.dyn.get_coriolis`.
+# These quantities are best compared when normalized, which is what the ``normalize``
+# parameter does: by the Coriolis parameter for the divergence and the strains,
+# and by its standard deviation for the Okubo-Weiss parameter.
 # The normalized relative vorticity is the Rossby number, which is positive for cyclonic
 # rotation and negative for anticyclonic rotation in both hemispheres.
-# The Okubo-Weiss parameter is normalized by its standard deviation.
-# Rotation dominates strain where it is lower than a negative threshold, classically
-# -0.2 times its standard deviation, which is where the eddy cores are.
+# Rotation dominates strain where the Okubo-Weiss parameter is lower than a negative threshold,
+# classically -0.2 times its standard deviation, which is where the eddy cores are.
 
-f = xdyn.get_coriolis(lat)
-rossby = (relvort / f).rename("rossby")
-rossby.attrs = {"long_name": "Rossby number"}
-div_n = (div / f).rename("div")
-div_n.attrs = {"long_name": "Divergence / f"}
-strain_n = (np.hypot(sn, ss) / abs(f)).rename("strain")
-strain_n.attrs = {"long_name": "Strain / |f|"}
-ow_n = (ow / ow.std()).rename("ow")
-ow_n.attrs = {"long_name": "Okubo-Weiss / std"}
+div_n = uv.xoa.get_div(normalize=True)
+sn, ss = uv.xoa.get_strain(normalize=True)
+strain_n = np.hypot(sn, ss).rename("strain").assign_attrs(long_name="Strain / |f|")
+ow_n = uv.xoa.get_okuboweiss(normalize=True)
 OW_THRESHOLD = -0.2
 core = [
     {"field": ow_n, "levels": [OW_THRESHOLD], "colors": "k", "linewidths": 0.9, "linestyles": "-"}
 ]
 
-fig, axes = new_map(2, 2, figsize=(12, 9))
-kw = {"map_kw": MAP_KW, "method": "contourf", "extend": "both"}
-panels = [
-    (rossby, {"cmap": "cmo.balance", "levels": np.linspace(-0.6, 0.6, 25), "title": "Rossby number"}),
-    (div_n, {"cmap": "cmo.balance", "levels": np.linspace(-0.06, 0.06, 25), "title": "Divergence"}),
-    (strain_n, {"cmap": "cmo.amp", "levels": np.linspace(0, 0.5, 21), "title": "Strain"}),
-    (ow_n, {"cmap": "cmo.curl_r", "levels": np.linspace(-3, 3, 25), "title": "Okubo-Weiss"}),
-]
-for ax, (field, pkw) in zip(axes.ravel(), panels):
-    plot_field(field, ax=ax, overlay_contours=core, **kw, **pkw)
+fig, axes = plot_fields(
+    [
+        (rossby, {"cmap": "cmo.balance", "levels": np.linspace(-0.6, 0.6, 25)}),
+        (div_n, {"cmap": "cmo.balance", "levels": np.linspace(-0.06, 0.06, 25)}),
+        (strain_n, {"cmap": "cmo.amp", "levels": np.linspace(0, 0.5, 21)}),
+        (ow_n, {"cmap": "cmo.curl_r", "levels": np.linspace(-3, 3, 25)}),
+    ],
+    titles=["Rossby number", "Divergence", "Strain", "Okubo-Weiss"],
+    ncols=2,
+    figsize=(12, 9),
+    map_kw=MAP_KW,
+    method="contourf",
+    extend="both",
+    overlay_contours=core,
+)
 
 # %%
 # The black lines enclose the cells where Okubo-Weiss is lower than the threshold.
@@ -181,13 +168,15 @@ speed_g.attrs = speed.attrs
 ageos = np.hypot(u - ug, v - vg).rename("ageos")
 ageos.attrs = {"long_name": "Ageostrophic speed", "units": "m s-1"}
 
-fig, axes = new_map(1, 2, figsize=(14, 6))
-for ax, title, (fu, fv, fs) in zip(
-    axes, ("Reanalysis", "Geostrophy"), ((u, v, speed), (ug, vg, speed_g))
-):
-    mappable = plot_field(fs, ax=ax, title=title, map_kw=MAP_KW, add_colorbar=False, **SPEED_KW)
-    plot_vectors(fu, fv, ax=ax, color="0.15", stride=2, key=title == "Reanalysis")
-add_colorbar(mappable, axes, da=speed)
+fig, axes = plot_fields(
+    {"Reanalysis": speed, "Geostrophy": speed_g},
+    colorbar="shared",
+    figsize=(14, 6),
+    map_kw=MAP_KW,
+    **SPEED_KW,
+)
+for ax, (fu, fv), key in zip(axes, ((u, v), (ug, vg)), (True, False)):
+    plot_vectors(fu, fv, ax=ax, color="0.15", stride=2, key=key)
 
 # %%
 # The currents are mostly geostrophic, but the flow is strongly curved in the meanders and the
@@ -210,8 +199,10 @@ add_colorbar(mappable, axes, da=speed)
 
 ucf, vcf = xdyn.get_cyclogeos(ssh)
 ucg, vcg = xdyn.get_cyclogeos(ssh, terms="penven")
-print(f"Missing points: {int(ucf.isnull().sum())} and {int(ucg.isnull().sum())},"
-      f" against {int(ug.isnull().sum())} for geostrophy")
+print(
+    f"Missing points: {int(ucf.isnull().sum())} and {int(ucg.isnull().sum())},"
+    f" against {int(ug.isnull().sum())} for geostrophy"
+)
 
 # %%
 # The error of each estimate is the norm of its difference with the currents of the reanalysis.
@@ -222,9 +213,7 @@ estimates = {
     "Cyclogeostrophy (two terms)": (ucg, vcg),
     "Cyclogeostrophy (full advection)": (ucf, vcf),
 }
-valid = u.notnull() & v.notnull()
-for eu, ev in estimates.values():
-    valid &= eu.notnull() & ev.notnull()
+valid = xmask.get_common_mask(u, v, *[comp for est in estimates.values() for comp in est])
 errors = {
     name: np.hypot(eu - u, ev - v).where(valid).rename("error")
     for name, (eu, ev) in estimates.items()
@@ -232,18 +221,16 @@ errors = {
 for da in errors.values():
     da.attrs = {"long_name": "Speed error", "units": "m s-1"}
 
-fig, axes = new_map(1, 3, figsize=(15, 5.2))
-kw = {
-    "method": "contourf",
-    "cmap": "cmo.matter",
-    "levels": np.linspace(0, 0.4, 17),
-    "extend": "max",
-    "map_kw": MAP_KW,
-    "add_colorbar": False,
-}
-for ax, (name, err) in zip(axes, errors.items()):
-    mappable = plot_field(err, ax=ax, title=name, **kw)
-add_colorbar(mappable, axes, da=errors["Geostrophy"])
+fig, axes = plot_fields(
+    errors,
+    colorbar="shared",
+    figsize=(15, 5.2),
+    map_kw=MAP_KW,
+    method="contourf",
+    cmap="cmo.matter",
+    levels=np.linspace(0, 0.4, 17),
+    extend="max",
+)
 
 # %%
 # The errors are the largest along the stream and in the rings, where the advection terms of
@@ -256,21 +243,14 @@ add_colorbar(mappable, axes, da=errors["Geostrophy"])
 # Note that the reanalysis currents have other ageostrophic components, like the Ekman
 # drift, that are not in these balances, so that the errors do not vanish.
 
-ow_core = (ow / ow.std()) < -0.2
 regions = {
     "Everywhere": valid,
-    "Vortex cores": valid & ow_core,
+    "Vortex cores": valid & (ow_n < OW_THRESHOLD),
     "Cyclonic": valid & (rossby > 0.15),
     "Anticyclonic": valid & (rossby < -0.15),
 }
 table = pd.DataFrame(
-    {
-        name: {
-            region: float(np.sqrt((err**2).where(mask_).mean()))
-            for region, mask_ in regions.items()
-        }
-        for name, err in errors.items()
-    }
+    {name: xstats.rms(err, by=regions).to_series() for name, err in errors.items()}
 )
 print("Root mean square of the speed error [m/s]")
 print(table.round(3).to_string())
@@ -288,14 +268,10 @@ print(table.round(3).to_string())
 #
 # Let's average the diagnostics inside the strongest vortex, whose outline is the closed
 # Okubo-Weiss contour that surrounds the most negative value.
-# The outline is extracted with :mod:`contourpy` from the longitudes and latitudes.
+# The outline is extracted with :func:`xoa.poly.get_contour_polygons`, which keeps
+# the closed contour that surrounds the lowest value.
 
-imin = np.unravel_index(np.nanargmin(ow_n.values), ow_n.shape)
-xmin, ymin = float(lon.values[imin[1]]), float(lat.values[imin[0]])
-generator = contourpy.contour_generator(lon.values, lat.values, ow_n.fillna(0).values)
-lines = [line for line in generator.lines(OW_THRESHOLD) if np.allclose(line[0], line[-1])]
-inside = [bool(points_in_polygon(xmin, ymin, line)) for line in lines]
-polygon = lines[inside.index(True)]
+polygon = xpoly.get_contour_polygons(ow_n, OW_THRESHOLD, containing="min")
 print(f"The polygon has {len(polygon)} vertices")
 
 # %%
@@ -309,15 +285,31 @@ thresholds = [None, 0.0, 0.5, 1.0]
 masks = {t: xmask.get_polygon_mask(rossby, polygon, threshold=t) for t in thresholds}
 x0, y0 = polygon.min(axis=0) - 0.35
 x1, y1 = polygon.max(axis=0) + 0.35
-fig, axes = new_map(2, 2, figsize=(10, 6))
-kw = {"cmap": "cmo.balance", "vmin": -0.6, "vmax": 0.6, "map_kw": MAP_KW, "add_colorbar": False}
-for ax, (t, m) in zip(axes.ravel(), masks.items()):
-    label = "center inside" if t is None else "touching" if t == 0 else f"fraction >= {t:g}"
-    plot_field(rossby, ax=ax, alpha=0.25, **kw)
-    mappable = plot_field(rossby.where(m), ax=ax, title=f"{label}: {int(m.sum())} cells", **kw)
+labels = {None: "center inside", 0.0: "touching", 0.5: "fraction >= 0.5", 1.0: "fraction >= 1"}
+fig, axes = plot_fields(
+    {f"{labels[t]}: {int(m.sum())} cells": rossby.where(m) for t, m in masks.items()},
+    ncols=2,
+    colorbar="shared",
+    figsize=(10, 6),
+    map_kw=MAP_KW,
+    cmap="cmo.balance",
+    vmin=-0.6,
+    vmax=0.6,
+)
+for ax in axes:
+    plot_field(
+        rossby,
+        ax=ax,
+        alpha=0.25,
+        zorder=0,
+        add_colorbar=False,
+        map_kw=MAP_KW,
+        cmap="cmo.balance",
+        vmin=-0.6,
+        vmax=0.6,
+    )
     ax.plot(*polygon.T, color="k", lw=1.6, transform=ccrs.PlateCarree())
     ax.set_extent([x0, x1, y0, y1], crs=ccrs.PlateCarree())
-add_colorbar(mappable, axes, da=rossby)
 
 # %%
 # The more demanding the threshold, the smaller the mask: from all the cells that touch

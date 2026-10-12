@@ -213,23 +213,21 @@ and labelled with :func:`~xoa.plot.get_label`, so that they do not dwarf the map
 - The functions that make a colorbar accept ``cbar_kwargs`` (:func:`~xoa.plot.plot_field`,
   :func:`~xoa.plot.plot_section`) or ``colorbar_kwargs`` (:func:`~xoa.plot.plot_ts`), which
   override the defaults, and ``add_colorbar=False`` to skip it.
-- For several panels, skip the colorbars and add a single shared one with
-  :func:`~xoa.plot.add_colorbar`, which takes the axes and the array that gives the label:
+- For several panels, :func:`~xoa.plot.plot_fields` makes the figure of maps from a dict
+  of titles and fields, or a list of fields, and ``colorbar="shared"`` adds a single colorbar.
+  Per-field parameters are given as ``(field, kwargs)`` tuples:
 
 .. ipython:: python
 
-    import cartopy.crs as ccrs
-    fields = [ds.temp + d for d in (-2, 0, 2)]
+    fields = {f"{d:+d}": ds.temp + d for d in (-2, 0, 2)}
 
-    fig, axes = plt.subplots(
-        1, 3, figsize=(11, 3.6), subplot_kw={"projection": ccrs.Mercator()},
-        constrained_layout=True,
-    )
-    for ax, da in zip(axes, fields):
-        mappable = xplot.plot_field(da, ax=ax, add_colorbar=False, vmin=8, vmax=18,
-                                  cmap=cmocean.cm.thermal)
     @savefig indepth.plot.colorbar.png width=6in
-    xplot.add_colorbar(mappable, axes, da=fields[0])
+    fig, axes = xplot.plot_fields(fields, colorbar="shared", figsize=(11, 3.6), vmin=8, vmax=18,
+                                  cmap=cmocean.cm.thermal)
+
+- To lay out the axes yourself, skip the colorbars of :func:`~xoa.plot.plot_field` and add
+  a shared one with :func:`~xoa.plot.add_colorbar`, which takes the axes and the array that
+  gives the label.
 
 The adaptive grid stride
 ========================

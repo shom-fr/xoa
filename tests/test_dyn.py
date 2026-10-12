@@ -154,6 +154,25 @@ class TestKinematics:
         assert np.isnan(dyn.get_relvort(u, v)[5, 5])
         assert not np.isnan(dyn.get_relvort(u, v)[10, 10])
 
+    def test_normalize(self):
+        u, v = _rotation(self.omega)
+        rng = np.random.default_rng(0)
+        u = u + rng.normal(scale=0.1, size=u.shape)
+        corio = dyn.get_coriolis(u.lat)
+        div = dyn.get_div(u, v)
+        divn = dyn.get_div(u, v, normalize=True)
+        assert divn.attrs["units"] == "1"
+        np.testing.assert_allclose(divn, div / corio)
+        _, ss = dyn.get_strain(u, v)
+        snn, ssn = dyn.get_strain(u, v, normalize=True)
+        assert snn.name == "strain_normal" and ssn.attrs["units"] == "1"
+        np.testing.assert_allclose(ssn, ss / abs(corio))
+        ow = dyn.get_okuboweiss(u, v)
+        own = dyn.get_okuboweiss(u, v, normalize=True)
+        np.testing.assert_allclose(own, ow / ow.std())
+        ds = xr.Dataset({"u": u, "v": v})
+        np.testing.assert_allclose(ds.xoa.get_okuboweiss(normalize=True), own)
+
 
 class TestGeostrophy:
     def test_get_coriolis(self):
@@ -606,3 +625,26 @@ class TestVerticalModes:
         vm = dyn.VerticalModes(n2, nmodes=3)
         with pytest.raises(ValueError, match="mode"):
             vm.recomp(vm.decomp(np.exp(n2.z / 800.0)), modes=[7])
+
+    def test_energy_share(self):
+        n2 = self.get_profile()
+        vm = dyn.VerticalModes(n2, nmodes=self.nz)
+        u = np.exp(n2.z / 800.0)
+        v = 0.5 * u
+        share = vm.energy_share(u, v)
+        assert share.dims == ("mode",)
+        np.testing.assert_allclose(share.sum(), 1.0, rtol=1e-2)
+        # The mean current is the barotropic mode, and v only scales the total
+        np.testing.assert_allclose(vm.energy_share(u), share, rtol=1e-12)
+        amps = vm.decomp(u)
+        total = float((u**2 * vm.dz).sum() / vm.dz.sum())
+        np.testing.assert_allclose(share[0], float(amps[0]) ** 2 / total)
+
+    def test_truncation_error(self):
+        n2 = self.get_profile()
+        vm = dyn.VerticalModes(n2, nmodes=self.nz)
+        u = np.exp(n2.z / 800.0)
+        errors = vm.truncation_error(u, [1, 3, 10, self.nz])
+        assert errors.dims == ("nmodes",)
+        assert (np.diff(errors.values) < 0).all()
+        assert float(errors[-1]) < 1e-8

@@ -664,3 +664,32 @@ class TestPlotTaylor:
         mod, ref = self.get_data()
         with pytest.raises(xoa.exceptions.XoaError):
             xplot.plot_taylor(mod, ref, dim="lon")
+
+
+class TestPlotFields:
+    def get_fields(self, n=3):
+        temp = get_temp()
+        return {f"t{i}": temp + i for i in range(n)}
+
+    def test_dict(self):
+        fig, axes = xplot.plot_fields(self.get_fields(4), ncols=2)
+        assert len(axes) == 4
+        assert [ax.get_title() for ax in axes] == ["t0", "t1", "t2", "t3"]
+        assert len(fig.axes) == 8  # One colorbar per map
+
+    def test_shared_colorbar(self):
+        fig, _ = xplot.plot_fields(self.get_fields(), colorbar="shared")
+        assert len(fig.axes) == 4
+
+    def test_no_colorbar_and_unused_axes(self):
+        fig, axes = xplot.plot_fields(list(self.get_fields(3).values()), ncols=2, colorbar=None)
+        assert len(axes) == 3 and len(fig.axes) == 3
+
+    def test_per_field_kwargs(self):
+        fields = [(f, {"vmax": 20 + i}) for i, f in enumerate(self.get_fields(2).values())]
+        _, axes = xplot.plot_fields(fields, titles=["a", "b"], vmin=0)
+        assert axes[1].get_title() == "b"
+
+    def test_bad_colorbar(self):
+        with pytest.raises(xoa.exceptions.XoaError):
+            xplot.plot_fields(self.get_fields(), colorbar="bad")
