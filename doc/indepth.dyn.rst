@@ -20,9 +20,6 @@ grid are inside polygons. Both are numba accelerated and keep the missing values
     * - :func:`xoa.dyn.get_relvort`
       - Relative vorticity :math:`\partial_x v - \partial_y u`
       - s-1
-    * - :func:`xoa.dyn.get_rossby`
-      - Rossby number, which is the relative vorticity over the Coriolis parameter
-      - 1
     * - :func:`xoa.dyn.get_div`
       - Horizontal divergence :math:`\partial_x u + \partial_y v`
       - s-1
@@ -70,7 +67,7 @@ currents are a method of the accessor of the sea surface height:
 The divergence, the strains and the Okubo-Weiss parameter accept ``normalize=True`` to make
 them dimensionless, by dividing them by the Coriolis parameter (its absolute value for the
 strains) or, for the Okubo-Weiss parameter, by its standard deviation. The normalized
-vorticity is the Rossby number, :func:`xoa.dyn.get_rossby`.
+vorticity is the Rossby number, :func:`xoa.numbers.get_rossby`.
 
 Conventions
 ===========
@@ -133,7 +130,7 @@ tilted and the currents are sheared, typically over shelf breaks and continental
 and it is invisible on flat levels.
 
 All the diagnostics that need horizontal derivatives accept a ``z`` parameter:
-:func:`~xoa.dyn.get_relvort`, :func:`~xoa.dyn.get_rossby`, :func:`~xoa.dyn.get_div`,
+:func:`~xoa.dyn.get_relvort`, :func:`~xoa.numbers.get_rossby`, :func:`~xoa.dyn.get_div`,
 :func:`~xoa.dyn.get_strain` and :func:`~xoa.dyn.get_okuboweiss`.
 It is the vertical coordinate of each level, with the same dimensions as the velocities,
 possibly without the extra ones like time. Its sign convention does not matter, since both
@@ -141,7 +138,7 @@ possibly without the extra ones like time. Its sign convention does not matter, 
 
 .. code-block:: python
 
-    rossby = xoa.dyn.get_rossby(ds.u, ds.v, z=ds.depth)
+    rossby = xoa.numbers.get_rossby(ds.u, ds.v, z=ds.depth)
     rossby = ds.xoa.get_rossby(z=ds.depth)  # with the accessor
 
 - The results are still on the model levels, which have different depths at different points.
@@ -261,6 +258,22 @@ temperature and the salinity, and decomposes and recomposes profiles:
   of the vertical coordinate: the modes of the layer have no flux through its limits, and only
   the layer is decomposed. The modes of the thermocline are faster to oscillate, and have
   smaller deformation radii than the ones of the whole water column.
+
+Dimensionless numbers
+=====================
+
+:mod:`xoa.numbers` provides the dimensionless numbers, that compare the terms of the
+equations: :func:`~xoa.numbers.get_rossby`, :func:`~xoa.numbers.get_burger`,
+:func:`~xoa.numbers.get_froude` and :func:`~xoa.numbers.get_ekman`.
+See :ref:`sphx_glr_tutorials_plot_dimensionless_numbers.py`.
+
+- The Rossby number is signed, whereas the others use the absolute value of the Coriolis
+  parameter, and are missing where it vanishes, like at the equator.
+- The Burger number :math:`(R_d/L)^2` is best computed from the deformation radius of
+  :class:`xoa.dyn.VerticalModes`. The :math:`N H / |f|` approximation, from `n2` and `h`,
+  is about :math:`\pi^2` times larger than that of the first baroclinic mode.
+- The squared stratification is missing where it is not positive in the Froude number and
+  in the approximated Burger number.
 
 Resolution of the grid
 ======================

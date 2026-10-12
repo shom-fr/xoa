@@ -844,8 +844,8 @@ class _DynDatasetMixin_:
         return get_relvort(*self._get_uv_(), dx=dx, dy=dy, z=z)
 
     def get_rossby(self, dx=None, dy=None, z=None):
-        """Get the Rossby number, see :func:`xoa.dyn.get_rossby`"""
-        from .dyn import get_rossby
+        """Get the Rossby number, see :func:`xoa.numbers.get_rossby`"""
+        from .numbers import get_rossby
 
         return get_rossby(*self._get_uv_(), dx=dx, dy=dy, z=z)
 

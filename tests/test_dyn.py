@@ -327,20 +327,6 @@ class TestVariableZ:
         # Along the levels, it is wrong
         assert float(abs(dyn.get_relvort(u, v, **kw) - 2 * self.omega).max()) > 0.1 * self.omega
 
-    def test_rossby(self):
-        u, v, z = self.get_data()
-        kw = {"dx": self.res, "dy": self.res}
-        rossby = dyn.get_rossby(u, v, z=z, **kw)
-        assert rossby.name == "rossby" and rossby.dims == u.dims
-        assert rossby.attrs["long_name"] == "Rossby number"
-        f = dyn.get_coriolis(u.lat)
-        np.testing.assert_allclose(rossby, 2 * self.omega / f.values[:, None] + 0 * rossby, rtol=1e-9)
-        assert u.lat.attrs == rossby.lat.attrs
-        # Without z, it is the vorticity over the Coriolis parameter, level by level
-        np.testing.assert_allclose(
-            dyn.get_rossby(u, v, **kw), dyn.get_relvort(u, v, **kw) / f, rtol=1e-12
-        )
-
     def test_extra_dims_transpose_and_dask(self):
         u, v, z = self.get_data(nt=3)
         kw = {"dx": self.res, "dy": self.res}
@@ -371,7 +357,7 @@ class TestVariableZ:
         u, v, z = self.get_data()
         ds = xr.Dataset({"u": u, "v": v})
         kw = {"dx": self.res, "dy": self.res, "z": z}
-        for name in "relvort", "rossby", "div", "okuboweiss":
+        for name in "relvort", "div", "okuboweiss":
             res = getattr(ds.xoa, f"get_{name}")(**kw)
             ref = getattr(dyn, f"get_{name}")(u, v, **kw)
             np.testing.assert_allclose(res, ref)

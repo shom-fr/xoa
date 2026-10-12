@@ -6,11 +6,12 @@ Unreleased
 
 New features
 ------------
-- Add the :ref:`indepth.dyn` guide and the :mod:`xoa.dyn` diagnostics :func:`~xoa.dyn.get_relvort`, :func:`~xoa.dyn.get_rossby`, :func:`~xoa.dyn.get_div`, :func:`~xoa.dyn.get_strain`, :func:`~xoa.dyn.get_okuboweiss`, :func:`~xoa.dyn.get_coriolis` and :func:`~xoa.dyn.get_geos`, also available as ``xoa`` accessor methods, with numba kernels in the new :mod:`xoa.core.dyn` module. Grid resolution comes from :func:`xoa.grid.get_dx_dy`.
+- Add the :ref:`indepth.dyn` guide and the :mod:`xoa.dyn` diagnostics :func:`~xoa.dyn.get_relvort`, :func:`~xoa.dyn.get_div`, :func:`~xoa.dyn.get_strain`, :func:`~xoa.dyn.get_okuboweiss`, :func:`~xoa.dyn.get_coriolis` and :func:`~xoa.dyn.get_geos`, also available as ``xoa`` accessor methods, with numba kernels in the new :mod:`xoa.core.dyn` module. Grid resolution comes from :func:`xoa.grid.get_dx_dy`.
 - Add :func:`xoa.dyn.get_cyclogeos`, an iterative cyclogeostrophic solver after Penven et al. (2014), with full (smoothed) advection terms or the two classic ones with ``terms="penven"``.
 - The :mod:`xoa.dyn` diagnostics accept a variable vertical coordinate ``z`` to compute horizontal derivatives at constant depth. See the :ref:`sphx_glr_tutorials_plot_croco_rossby.py` tutorial.
 - Add :class:`xoa.dyn.VerticalModes` to compute vertical modes, speeds and deformation radii, and to decompose and recompose profiles, based on the new :mod:`xoa.core.modes` module. See :ref:`sphx_glr_tutorials_plot_vertical_modes.py`.
 - Add :func:`xoa.thermdyn.get_n2` for the squared Brunt-Vaisala frequency, and :func:`xoa.coords.as_z` to get a vertical coordinate as z, positive up.
+- Add the :mod:`xoa.numbers` module with :func:`~xoa.numbers.get_rossby`, :func:`~xoa.numbers.get_burger`, :func:`~xoa.numbers.get_froude` and :func:`~xoa.numbers.get_ekman`. ``xoa.dyn.get_rossby`` moved to it, without backward compatibility. See :ref:`sphx_glr_tutorials_plot_dimensionless_numbers.py`.
 - Add the :ref:`references` page.
 - Add :func:`xoa.mask.get_polygon_mask`, also an ``xoa`` accessor method, to flag grid cells inside polygons with a coverage threshold, based on the new :mod:`xoa.core.mask` and :mod:`xoa.core.poly` numba functions.
 - Add :func:`xoa.plot.plot_fields` to plot several fields on maps of a single figure, with a shared colorbar if needed.
