@@ -4,12 +4,15 @@
 Interpolate a meridional section of CROCO outputs to regular heights
 ====================================================================
 
-In this notebook, we show:
+In this tutorial, we show how to:
 
-* how to compute the z heights from s-coordinates,
-* how to easily find the name of variables and coordinates,
-* how to interpolate a 3D field with varying heights to regular heights,
-* how to compute the mixed layer depth from temperature.
+* compute the z heights from s-coordinates,
+* easily find the name of variables and coordinates,
+* interpolate a 3D field with varying heights to regular heights,
+* compute the mixed layer depth from temperature.
+
+The concepts are explained in the :ref:`indepth.vertical` guide.
+See also: :ref:`sphx_glr_tutorials_grids_plot_grid_tools.py`, :ref:`sphx_glr_tutorials_dynamics_plot_croco_rossby.py`.
 """
 
 # %%

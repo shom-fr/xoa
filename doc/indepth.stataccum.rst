@@ -5,7 +5,7 @@ Accumulating statistics
 
 The :class:`xoa.stats.StatAccum` class computes statistics step by step, for data
 that are too large to be loaded at once, or that are produced along a run.
-See :ref:`sphx_glr_tutorials_plot_stataccum.py` for a walkthrough.
+See :ref:`sphx_glr_tutorials_evaluation_plot_stataccum.py` for a walkthrough.
 
 Principle
 =========

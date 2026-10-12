@@ -43,8 +43,8 @@ grid are inside polygons. Both are numba accelerated and keep the missing values
         decomposition of profiles on them
       - 1, m s-1, m
 
-The tutorials :ref:`sphx_glr_tutorials_plot_gulfstream_dynamics.py` and
-:ref:`sphx_glr_tutorials_plot_croco_rossby.py` apply them to the surface currents of a GLORYS
+The tutorials :ref:`sphx_glr_tutorials_dynamics_plot_gulfstream_dynamics.py` and
+:ref:`sphx_glr_tutorials_dynamics_plot_croco_rossby.py` apply them to the surface currents of a GLORYS
 reanalysis of the Gulf Stream, and to the sigma levels of a CROCO simulation.
 This guide explains the conventions and the pitfalls.
 
@@ -147,7 +147,7 @@ possibly without the extra ones like time. Its sign convention does not matter, 
 - The velocities must be at the same points, like for 2D arrays. Staggered grids must be
   handled first, for instance with
   `pycroco <https://github.com/shom-fr/pycroco>`_ for CROCO outputs.
-- The tutorial :ref:`sphx_glr_tutorials_plot_croco_rossby.py` validates the Rossby number
+- The tutorial :ref:`sphx_glr_tutorials_dynamics_plot_croco_rossby.py` validates the Rossby number
   at constant depth against the one computed from currents that the model interpolated
   to regular depths.
 
@@ -194,7 +194,7 @@ and corrects them with the advection terms of the previous iteration until they 
   iterations diverge or do not converge in ``niter`` iterations, to the tolerance ``tol``.
 - The currents are also missing where the geostrophic ones or one of their neighbors are,
   and where the Coriolis parameter is smaller than ``fmin``, like close to the equator.
-- The tutorial :ref:`sphx_glr_tutorials_plot_gulfstream_dynamics.py` compares them with the
+- The tutorial :ref:`sphx_glr_tutorials_dynamics_plot_gulfstream_dynamics.py` compares them with the
   currents of a reanalysis.
 
 Vertical modes
@@ -214,7 +214,7 @@ constant along the vertical, and the next ones are the baroclinic modes, that ha
 more nodes and that are slower and slower. They are orthogonal, so that profiles can be split
 into the amplitudes of the modes, which is a compact description of the vertical structure
 of currents, and of the partition of their energy. See the tutorial
-:ref:`sphx_glr_tutorials_plot_vertical_modes.py`.
+:ref:`sphx_glr_tutorials_dynamics_plot_vertical_modes.py`.
 
 The :class:`xoa.dyn.VerticalModes` class computes the modes of all the water columns at once
 from the squared Brunt-Vaisala frequency, that :func:`xoa.thermdyn.get_n2` computes from the
@@ -265,7 +265,7 @@ Dimensionless numbers
 :mod:`xoa.numbers` provides the dimensionless numbers, that compare the terms of the
 equations: :func:`~xoa.numbers.get_rossby`, :func:`~xoa.numbers.get_burger`,
 :func:`~xoa.numbers.get_froude` and :func:`~xoa.numbers.get_ekman`.
-See :ref:`sphx_glr_tutorials_plot_dimensionless_numbers.py`.
+See :ref:`sphx_glr_tutorials_dynamics_plot_dimensionless_numbers.py`.
 
 - The Rossby number is signed, whereas the others use the absolute value of the Coriolis
   parameter, and are missing where it vanishes, like at the equator.

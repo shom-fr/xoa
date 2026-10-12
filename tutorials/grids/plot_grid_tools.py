@@ -4,15 +4,17 @@
 Inspect and manipulate horizontal and vertical grids
 ====================================================
 
-In this tutorial, we show :
+In this tutorial, we show how to:
 
-* how to compute the horizontal resolution of a regular or curvilinear grid,
-* how to plot the edges and centers of a grid, with an adaptive under-sampling,
-* how to get the geographic extent of the strips along the edges of a grid,
-* how to convert a 2D longitude and latitude to 1D axes when the grid allows it,
-* how to compute the edges of cells from their centers, with extrapolation at the ends,
-* how to pad an array and its coordinates.
+* compute the horizontal resolution of a regular or curvilinear grid,
+* plot the edges and centers of a grid, with an adaptive under-sampling,
+* get the geographic extent of the strips along the edges of a grid,
+* convert a 2D longitude and latitude to 1D axes when the grid allows it,
+* compute the edges of cells from their centers, with extrapolation at the ends,
+* pad an array and its coordinates.
 
+The concepts are explained in the :ref:`indepth.grids` guide.
+See also: :ref:`sphx_glr_tutorials_grids_plot_regrid_interp.py`, :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`.
 """
 
 # %%

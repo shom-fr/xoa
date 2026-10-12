@@ -17,6 +17,9 @@ The data are 3D averaged outputs of a CROCO simulation of the eastern Mediterran
 at 1/60 degree, south of Crete, where the topography is steep.
 The currents are already at the same points as the sea surface height,
 so that the diagnostics of :mod:`xoa.dyn` can be applied.
+
+The concepts are explained in the :ref:`indepth.dyn` guide.
+See also: :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`, :ref:`sphx_glr_tutorials_dynamics_plot_gulfstream_dynamics.py`.
 """
 
 # %%

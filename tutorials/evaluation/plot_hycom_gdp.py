@@ -4,14 +4,16 @@
 Compare Hycom3d with a GDP drifter
 ==================================
 
-In this notebook, we show :
+In this tutorial, we show how to:
 
-* how to decode dataset so that it is easy to access generic coordinates and variables,
-* how to compute depths from layer thicknesses,
-* how to interpolate currents from U and V positions to T position on an arakawa C grid,
-* how to perform a 4D interpolation with a variable depth coordinate to random positions,
-* how to make an horizontal slice of a 4D variable with a variable depth coordinate.
+* decode dataset so that it is easy to access generic coordinates and variables,
+* compute depths from layer thicknesses,
+* interpolate currents from U and V positions to T position on an arakawa C grid,
+* perform a 4D interpolation with a variable depth coordinate to random positions,
+* make an horizontal slice of a 4D variable with a variable depth coordinate.
 
+The concepts are explained in the :ref:`indepth.meta` guide.
+See also: :ref:`sphx_glr_tutorials_evaluation_plot_mercator_argo.py`, :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`.
 """
 # %%
 # Initialisations

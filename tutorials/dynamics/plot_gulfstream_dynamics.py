@@ -18,6 +18,9 @@ In this tutorial, we show how to:
 The data are surface fields of the GLORYS12 reanalysis of the Copernicus Marine Service,
 averaged over 2 x 2 grid cells, on the 1st of October 2019, in the region of the Gulf Stream
 where the current meanders and sheds rings.
+
+The concepts are explained in the :ref:`indepth.dyn` guide.
+See also: :ref:`sphx_glr_tutorials_dynamics_plot_dimensionless_numbers.py`, :ref:`sphx_glr_tutorials_dynamics_plot_vertical_modes.py`.
 """
 
 # %%
