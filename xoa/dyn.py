@@ -35,11 +35,11 @@ from . import coords as xcoords
 from . import grid as xgrid
 from . import meta as xmeta
 from . import misc as xmisc
+from . import stats as xstats
 from . import interp
 from . import geo
 from .core import dyn as cdyn
 from .core import modes as cmodes
-
 
 SEA_LEVEL_VARIANTS = xmisc.Choices(
     {
@@ -286,6 +286,11 @@ def _name_(da, ref, name, long_name, units):
     return da
 
 
+def _normalize_(da, u, divisor, name, long_name):
+    """Divide a diagnostic by a scale to make it dimensionless"""
+    return _name_((da / divisor).transpose(*u.dims), u, name, long_name, "1")
+
+
 def _apply_kinematics_(func, nout, u, v, dx, dy, z, names, long_names, units):
     """Apply a core function to velocities and set the attributes of its outputs"""
     xdim = xcoords.get_xdim(u, errors="raise")
@@ -335,13 +340,26 @@ _DOC_UV_ = """
         levels, which are sloping. The velocities must then have a vertical dimension,
         which is the one of `z`, and the sign convention of `z` does not matter.
         See :ref:`indepth.dyn`.
-
+{normalize}
 """
+
+_DOC_NORMALIZE_ = {
+    "div": "the Coriolis parameter",
+    "strain": "the absolute value of the Coriolis parameter",
+    "okuboweiss": "its standard deviation",
+}
 
 
 def _format_uv_doc_(func):
     # The indentation of docstrings is already removed
-    func.__doc__ = func.__doc__.replace("{parameters}", textwrap.dedent(_DOC_UV_))
+    scale = _DOC_NORMALIZE_.get(func.__name__[4:])
+    normalize = (
+        ""
+        if scale is None
+        else f"    normalize: bool\n        Divide the result by {scale} to make it dimensionless.\n"
+    )
+    doc = _DOC_UV_.replace("{normalize}", normalize)
+    func.__doc__ = func.__doc__.replace("{parameters}", textwrap.dedent(doc))
     return func
 
 
@@ -388,7 +406,7 @@ def get_rossby(u, v, dx=None, dy=None, z=None):
 
 
 @_format_uv_doc_
-def get_div(u, v, dx=None, dy=None, z=None):
+def get_div(u, v, dx=None, dy=None, z=None, normalize=False):
     """Compute the horizontal divergence, in s-1
 
     It is :math:`\\partial_x u + \\partial_y v`.
@@ -401,13 +419,17 @@ def get_div(u, v, dx=None, dy=None, z=None):
     --------
     xoa.core.dyn.div
     """
-    return _apply_kinematics_(
+    div = _apply_kinematics_(
         cdyn.div, 1, u, v, dx, dy, z, ["div"], ["Horizontal divergence"], ["s-1"]
     )
+    if normalize:
+        corio = get_coriolis(xgrid._get_lonlat_yx_(u)[1])
+        div = _normalize_(div, u, corio, "div", "Divergence / f")
+    return div
 
 
 @_format_uv_doc_
-def get_strain(u, v, dx=None, dy=None, z=None):
+def get_strain(u, v, dx=None, dy=None, z=None, normalize=False):
     """Compute the normal and shear strains, in s-1
 
     They are :math:`\\partial_x u - \\partial_y v` and :math:`\\partial_x v + \\partial_y u`.
@@ -423,7 +445,7 @@ def get_strain(u, v, dx=None, dy=None, z=None):
     --------
     xoa.core.dyn.strain
     """
-    return _apply_kinematics_(
+    strains = _apply_kinematics_(
         cdyn.strain,
         2,
         u,
@@ -435,10 +457,16 @@ def get_strain(u, v, dx=None, dy=None, z=None):
         ["Normal strain", "Shear strain"],
         ["s-1", "s-1"],
     )
+    if normalize:
+        corio = abs(get_coriolis(xgrid._get_lonlat_yx_(u)[1]))
+        strains = tuple(
+            _normalize_(da, u, corio, da.name, da.long_name + " / |f|") for da in strains
+        )
+    return strains
 
 
 @_format_uv_doc_
-def get_okuboweiss(u, v, dx=None, dy=None, z=None):
+def get_okuboweiss(u, v, dx=None, dy=None, z=None, normalize=False):
     """Compute the Okubo-Weiss parameter, in s-2
 
     It is the squared strain minus the squared vorticity: it is negative where
@@ -452,7 +480,7 @@ def get_okuboweiss(u, v, dx=None, dy=None, z=None):
     --------
     xoa.core.dyn.okuboweiss
     """
-    return _apply_kinematics_(
+    ow = _apply_kinematics_(
         cdyn.okuboweiss,
         1,
         u,
@@ -464,6 +492,9 @@ def get_okuboweiss(u, v, dx=None, dy=None, z=None):
         ["Okubo-Weiss parameter"],
         ["s-2"],
     )
+    if normalize:
+        ow = _normalize_(ow, u, ow.std(), "okuboweiss", "Okubo-Weiss / std")
+    return ow
 
 
 def get_coriolis(lat):
@@ -523,7 +554,9 @@ def get_geos(ssh, dx=None, dy=None):
         dy,
         corio,
         join="override",
-        input_core_dims=[core_dims] + [core_dims if np.ndim(d) else [] for d in (dx, dy)] + [core_dims],
+        input_core_dims=[core_dims]
+        + [core_dims if np.ndim(d) else [] for d in (dx, dy)]
+        + [core_dims],
         output_core_dims=[[ydim, xdim]] * 2,
         dask="parallelized",
         output_dtypes=[float] * 2,
@@ -618,7 +651,14 @@ def get_cyclogeos(
         dask="parallelized",
         output_dtypes=[float] * 2,
         dask_gufunc_kwargs={"allow_rechunk": True},
-        kwargs={"terms": terms, "smooth": smooth, "niter": niter, "tol": tol, "relax": relax, "fmin": fmin},
+        kwargs={
+            "terms": terms,
+            "smooth": smooth,
+            "niter": niter,
+            "tol": tol,
+            "relax": relax,
+            "fmin": fmin,
+        },
     )
     out = []
     for da, name, long_name in zip(
@@ -786,9 +826,7 @@ class VerticalModes:
 
     def __repr__(self):
         zrange = "" if self.zrange is None else f", zrange={self.zrange}"
-        return (
-            f"<VerticalModes: {self.nmodes} modes, bc={self.bc!r}, zdim={self.zdim!r}{zrange}>"
-        )
+        return f"<VerticalModes: {self.nmodes} modes, bc={self.bc!r}, zdim={self.zdim!r}{zrange}>"
 
     def decomp(self, da, nmodes=None):
         """Decompose profiles into the amplitudes of the vertical modes
@@ -825,13 +863,19 @@ class VerticalModes:
             join="override",
             dask="parallelized",
             output_dtypes=[float],
-            dask_gufunc_kwargs={"output_sizes": {"mode": modes.sizes["mode"]}, "allow_rechunk": True},
+            dask_gufunc_kwargs={
+                "output_sizes": {"mode": modes.sizes["mode"]},
+                "allow_rechunk": True,
+            },
         )
         amps = amps.assign_coords(mode=modes.mode.values)
         amps = _mode_dims_(amps, da)
         amps = xcoords.copy_coord_attrs(amps, da)
         amps.name = "amps"
-        amps.attrs = {"long_name": "Amplitude of the vertical modes", "units": da.attrs.get("units", "")}
+        amps.attrs = {
+            "long_name": "Amplitude of the vertical modes",
+            "units": da.attrs.get("units", ""),
+        }
         return amps
 
     def recomp(self, amps, modes=None):
@@ -884,3 +928,59 @@ class VerticalModes:
             "units": amps.attrs.get("units", ""),
         }
         return rec
+
+    def energy_share(self, u, v=None):
+        """Get the share of the kinetic energy of each mode
+
+        The mean kinetic energy over the water column is the sum of the squared amplitudes
+        of the modes, by orthogonality. This is the ratio of each of them to the total.
+
+        Parameters
+        ----------
+        u: xarray.DataArray
+            Profiles of the currents, or of a single component
+        v: None, xarray.DataArray
+            Profiles of the other component
+
+        Return
+        ------
+        xarray.DataArray
+            Shares between 0 and 1, with the ``mode`` dimension first
+
+        See also
+        --------
+        decomp
+        """
+        comps = [u] if v is None else [u, v]
+        energy = sum(self.decomp(c) ** 2 for c in comps)
+        total = sum((c**2 * self.dz).sum(self.zdim) / self.dz.sum(self.zdim) for c in comps)
+        share = energy / total
+        return _name_(share, u, "energy_share", "Share of the kinetic energy", "1")
+
+    def truncation_error(self, da, nmodes):
+        """Get the error of recomposing profiles with a limited number of modes
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Profiles
+        nmodes: list(int)
+            Numbers of modes to test, which must not exceed the ones of the object
+
+        Return
+        ------
+        xarray.DataArray
+            Root mean square error over all the points, with an ``nmodes`` dimension
+
+        See also
+        --------
+        recomp
+        """
+        amps = self.decomp(da)
+        errors = [float(xstats.rms(self.recomp(amps, modes=n), ref=da)) for n in nmodes]
+        errors = xr.DataArray(errors, dims="nmodes", coords={"nmodes": list(nmodes)}, name="rms")
+        errors.attrs = {
+            "long_name": "Truncation error of the vertical modes",
+            "units": da.attrs.get("units", ""),
+        }
+        return errors

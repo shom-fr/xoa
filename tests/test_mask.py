@@ -72,3 +72,27 @@ class TestGetPolygonMask:
     def test_bad_polygon(self):
         with pytest.raises(XoaError):
             xmask.get_polygon_mask(self.get_da(), [(0, 0), (1, 1)])
+
+
+class TestGetCommonMask:
+    def get_da(self):
+        ds = _lonlat_ds()
+        return xr.DataArray(np.ones((4, 5)), dims=("lat", "lon"), coords=ds.coords)
+
+    def test_finite_everywhere(self):
+        a, b = self.get_da(), self.get_da()
+        a[0, 1] = np.nan
+        b[2, 3] = np.inf
+        mask = xmask.get_common_mask(a, b)
+        assert mask.dtype == bool and mask.dims == ("lat", "lon")
+        assert int(mask.sum()) == 18
+        assert not mask[0, 1] and not mask[2, 3]
+
+    def test_edge(self):
+        mask = xmask.get_common_mask(self.get_da(), edge=1)
+        assert int(mask.sum()) == 2 * 3
+        assert not mask[0].any() and not mask[:, -1].any()
+
+    def test_no_array(self):
+        with pytest.raises(XoaError):
+            xmask.get_common_mask()

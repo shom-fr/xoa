@@ -39,7 +39,9 @@ Package API
     xoa.meta
     xoa.misc
     xoa.plot
+    xoa.poly
     xoa.regrid
+    xoa.stats
     xoa.thermdyn
     xoa.weights
     xoa.sigma
