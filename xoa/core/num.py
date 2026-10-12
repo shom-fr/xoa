@@ -224,3 +224,129 @@ def csr_spmm_skipna_unified(
                         s += w * v
                         w_valid += w
                 out[i, k] = np.nan if w_valid < thres else s / w_valid
+
+
+@numba.njit(cache=NOT_CI, nogil=True)
+def sturm_count(d, e2, x):
+    """Number of eigenvalues of a symmetric tridiagonal matrix below x, with a Sturm sequence"""
+    tiny = 1e-100
+    count = 0
+    q = d[0] - x
+    if q < 0:
+        count += 1
+    for k in range(1, d.size):
+        if q == 0.0:
+            q = tiny
+        q = d[k] - x - e2[k - 1] / q
+        if q < 0:
+            count += 1
+    return count
+
+
+@numba.njit(cache=NOT_CI, nogil=True)
+def tridisolve(dl, d, du, b):
+    """Solve a tridiagonal system in place, with partial pivoting, like LAPACK dgtsv
+
+    The diagonals are modified, and `b` is replaced by the solution.
+    """
+    tiny = 1e-100
+    n = d.size
+    du2 = np.zeros(max(n - 2, 1))
+    for i in range(n - 1):
+        if abs(d[i]) >= abs(dl[i]):
+            if d[i] == 0.0:
+                d[i] = tiny
+            fact = dl[i] / d[i]
+            d[i + 1] -= fact * du[i]
+            b[i + 1] -= fact * b[i]
+        else:
+            fact = d[i] / dl[i]
+            d[i] = dl[i]
+            temp = d[i + 1]
+            d[i + 1] = du[i] - fact * temp
+            if i < n - 2:
+                du2[i] = du[i + 1]
+                du[i + 1] = -fact * du2[i]
+            du[i] = temp
+            temp = b[i]
+            b[i] = b[i + 1]
+            b[i + 1] = temp - fact * b[i + 1]
+    if d[n - 1] == 0.0:
+        d[n - 1] = tiny
+    b[n - 1] /= d[n - 1]
+    if n > 1:
+        b[n - 2] = (b[n - 2] - du[n - 2] * b[n - 1]) / d[n - 2]
+    for i in range(n - 3, -1, -1):
+        b[i] = (b[i] - du[i] * b[i + 1] - du2[i] * b[i + 2]) / d[i]
+
+
+@numba.njit(cache=NOT_CI, nogil=True)
+def trideigh(d, e, nmax):
+    """Lowest eigenpairs of a symmetric tridiagonal matrix
+
+    The eigenvalues are found by bisection with Sturm sequences and the eigenvectors by
+    inverse iteration, which costs a number of operations proportional to the size
+    of the matrix and to the number of eigenpairs.
+    """
+    m = d.size
+    e2 = e * e
+    values = np.empty(nmax)
+    vectors = np.empty((m, nmax))
+
+    # Bounds of the spectrum, from Gershgorin discs
+    lo = np.inf
+    hi = -np.inf
+    for k in range(m):
+        radius = 0.0
+        if k > 0:
+            radius += abs(e[k - 1])
+        if k < m - 1:
+            radius += abs(e[k])
+        lo = min(lo, d[k] - radius)
+        hi = max(hi, d[k] + radius)
+    scale = max(abs(lo), abs(hi))
+    lower = lo
+    for n in range(nmax):
+        a = lower
+        b = hi
+        for _ in range(200):
+            mid = 0.5 * (a + b)
+            if sturm_count(d, e2, mid) > n:
+                b = mid
+            else:
+                a = mid
+            if b - a <= 2.0 * 2.2e-16 * (abs(a) + abs(b)) + 1e-300:
+                break
+        values[n] = 0.5 * (a + b)
+        lower = a
+
+        # Inverse iteration, with a shift that is a hair below the eigenvalue
+        shift = values[n] - 1e-12 * scale
+        x = np.empty(m)
+        for k in range(m):
+            x[k] = 1.0 + 0.1 * np.sin(1.7 * (k + 1) * (n + 1))
+        for _ in range(3):
+            dl = e.copy()
+            du = e.copy()
+            dd = d - shift
+            tridisolve(dl, dd, du, x)
+            norm = 0.0
+            for k in range(m):
+                norm += x[k] * x[k]
+            norm = np.sqrt(norm)
+            for k in range(m):
+                x[k] /= norm
+        # Orthogonalize against the previous ones, which matters for close eigenvalues
+        for j in range(n):
+            dot = 0.0
+            for k in range(m):
+                dot += x[k] * vectors[k, j]
+            for k in range(m):
+                x[k] -= dot * vectors[k, j]
+        norm = 0.0
+        for k in range(m):
+            norm += x[k] * x[k]
+        norm = np.sqrt(norm)
+        for k in range(m):
+            vectors[k, n] = x[k] / norm
+    return values, vectors

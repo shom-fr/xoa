@@ -533,6 +533,45 @@ def plot_sticks(ax, x, u, v, scale=None, color="steelblue", **kwargs):
     return quiver
 
 
+def plot_vectors(ax, lon, lat, u, v, stride=(1, 1), c=None, transform=None, **kwargs):
+    """Plot vectors on a grid as arrows, possibly under-sampled
+
+    Parameters
+    ----------
+    ax: matplotlib.axes.Axes
+    lon, lat: array_like(ny, nx)
+        Positions of the vectors
+    u, v: array_like(ny, nx)
+        Components of the vectors
+    stride: int, tuple(int)
+        Under-sampling strides along y and x, see :func:`get_strides`
+    c: None, array_like(ny, nx)
+        Values that are used to color the arrows
+    transform: None, cartopy.crs.CRS
+        Coordinate system of the positions, in which the vectors are also defined
+    kwargs:
+        Extra parameters are passed to :meth:`matplotlib.axes.Axes.quiver`.
+        The arrows are centered on their position and thin by default.
+
+    Return
+    ------
+    matplotlib.quiver.Quiver
+    """
+    sy, sx = (stride, stride) if np.isscalar(stride) else stride
+    sub = (slice(None, None, sy), slice(None, None, sx))
+    args = [np.ma.masked_invalid(np.asarray(a, dtype=np.float64)[sub]) for a in (lon, lat, u, v)]
+    if c is not None:
+        args.append(np.ma.masked_invalid(np.asarray(c, dtype=np.float64)[sub]))
+    if transform is not None:
+        kwargs["transform"] = transform
+    kwargs.setdefault("pivot", "mid")
+    kwargs.setdefault("width", 0.0025)
+    kwargs.setdefault("headwidth", 3.5)
+    kwargs.setdefault("headlength", 4.5)
+    kwargs.setdefault("headaxislength", 4.0)
+    return ax.quiver(*args, **kwargs)
+
+
 # %% Taylor diagrams
 
 #: Default ticks of the correlation axis

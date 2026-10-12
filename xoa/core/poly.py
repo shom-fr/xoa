@@ -327,3 +327,68 @@ def compute_overlap_area(src_bounds_lat, src_bounds_lon, dst_bounds_lat, dst_bou
     if clip_area < EPSILON:
         return 0.0
     return clip_area
+
+
+# %% Polygon masks
+
+
+@nb.njit(cache=NOT_CI, nogil=True)
+def point_in_polygon(x, y, poly):
+    """Test if a point is inside a polygon, with the ray casting algorithm
+
+    Parameters
+    ----------
+    x, y: float
+        Coordinates of the point
+    poly: array(n, 2)
+        Vertices of the polygon as (x, y) pairs, which may be concave and need not be closed
+
+    Return
+    ------
+    bool
+    """
+    n = poly.shape[0]
+    inside = False
+    x0, y0 = poly[n - 1, 0], poly[n - 1, 1]
+    for k in range(n):
+        x1, y1 = poly[k, 0], poly[k, 1]
+        if (y1 > y) != (y0 > y) and x < x0 + (y - y0) * (x1 - x0) / (y1 - y0):
+            inside = not inside
+        x0, y0 = x1, y1
+    return inside
+
+
+@nb.njit(cache=NOT_CI, nogil=True, parallel=True)
+def _points_in_polygon_(x, y, poly):
+    inside = np.zeros(x.size, dtype=np.bool_)
+    xmin, xmax = poly[:, 0].min(), poly[:, 0].max()
+    ymin, ymax = poly[:, 1].min(), poly[:, 1].max()
+    for k in nb.prange(x.size):
+        if xmin <= x[k] <= xmax and ymin <= y[k] <= ymax:
+            inside[k] = point_in_polygon(x[k], y[k], poly)
+    return inside
+
+
+def points_in_polygon(x, y, poly):
+    """Test if points are inside a polygon
+
+    Parameters
+    ----------
+    x, y: array_like
+        Coordinates of the points, that have the same shape
+    poly: array_like(n, 2)
+        Vertices of the polygon as (x, y) pairs
+
+    Return
+    ------
+    array(bool)
+        Same shape as `x`
+
+    See also
+    --------
+    point_in_polygon
+    """
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    poly = np.ascontiguousarray(poly, dtype=np.float64)
+    return _points_in_polygon_(x.ravel(), y.ravel(), poly).reshape(x.shape)

@@ -83,3 +83,17 @@ def test_unwrap_grid_longitudes():
     # Already continuous: unchanged
     lon = np.array([[0.0, 1.0, 2.0], [0.0, 1.0, 2.0]])
     np.testing.assert_array_equal(grid.unwrap_grid_longitudes(lon), lon)
+
+
+def test_compute_centered_resolution():
+    lon, lat = np.meshgrid(np.linspace(0, 2, 3), np.linspace(0, 3, 4))
+    dx, dy = grid.compute_centered_resolution(lon, lat)
+    assert dx.shape == dy.shape == lon.shape
+    ref = np.deg2rad(1.0) * 6371e3
+    np.testing.assert_allclose(dy, ref)
+    np.testing.assert_allclose(dx[0], ref)
+    # Resolution between the adjacent points on the edges, and their mean elsewhere
+    dxe, _ = grid.compute_resolution(lon, lat)
+    np.testing.assert_allclose(dx[:, 0], dxe[:, 0])
+    np.testing.assert_allclose(dx[:, 1], dxe[:, 0])
+    np.testing.assert_allclose(dx[:, -1], dxe[:, -1])

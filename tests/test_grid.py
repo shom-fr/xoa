@@ -225,6 +225,19 @@ def test_get_resolution():
     np.testing.assert_allclose(dx2, dx)
 
 
+def test_get_dx_dy():
+    ds = _lonlat_ds()
+    dx, dy = grid.get_dx_dy(ds)
+    assert dx.dims == dy.dims == ("lat", "lon")
+    assert dx.shape == dy.shape == (4, 5)
+    assert dx.attrs["units"] == "m"
+    ref = np.deg2rad(1.0) * 6371e3
+    np.testing.assert_allclose(dy, ref)
+    np.testing.assert_allclose(dx[0], ref)
+    # Smaller x resolution at high latitudes
+    assert dx[-1, 0] < dx[0, 0]
+
+
 def test_get_median_resolution():
     np.testing.assert_allclose(grid.get_median_resolution(_lonlat_ds()), 1.0)
 

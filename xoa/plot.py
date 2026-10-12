@@ -1233,6 +1233,148 @@ def plot_stick(u, v=None, ax=None, scale=None, color="steelblue", **kwargs):
     return quiver
 
 
+def _get_quiver_key_value_(speed):
+    """Get a round reference speed that is about half of the maximal one"""
+    ref = 0.5 * float(np.nanmax(speed))
+    if not ref > 0:
+        return 1.0
+    mag = 10 ** np.floor(np.log10(ref))
+    return float(min((1, 2, 5, 10), key=lambda m: abs(m * mag - ref)) * mag)
+
+
+def plot_vectors(
+    u,
+    v,
+    ax=None,
+    stride="auto",
+    min_spacing=16,
+    color="k",
+    key=True,
+    key_pos=(0.25, 0.07),
+    transform=None,
+    margin=0.0,
+    map_kw=None,
+    title=None,
+    **kwargs,
+):
+    """Plot currents on a map as arrows, under-sampled to stay readable
+
+    Longitudes and latitudes are found with :func:`xoa.coords.get_lon` and
+    :func:`xoa.coords.get_lat`. The arrows are drawn in geographic directions
+    whatever the projection and the orientation of the grid.
+
+    Parameters
+    ----------
+    u, v: xarray.DataArray
+        Zonal and meridional velocities on the same grid, with no other dimension
+        than the horizontal ones.
+    ax: None, cartopy.mpl.geoaxes.GeoAxes
+        Axes to plot on, that may already hold a field. A map is created if not provided.
+    stride: str, int, tuple(int)
+        Under-sampling of the arrows, either one value for both directions
+        or a ``(y, x)`` tuple. With ``"auto"``, the stride is adapted to the size of the axes
+        so that there are at least `min_spacing` pixels between consecutive arrows.
+    min_spacing: float
+        Minimal spacing in pixels between arrows in the ``"auto"`` stride mode.
+    color: color, "speed"
+        Color of the arrows, or ``"speed"`` to color them with the speed, in which case
+        a colorbar is added unless ``add_colorbar=False`` is passed.
+    key: bool, str, None
+        Add a reference arrow that is labelled with its speed. A string is used as the
+        label units, which default to the ones of `u`.
+    key_pos: tuple(float)
+        Position of the reference arrow in axes coordinates
+    transform: None, cartopy.crs.CRS
+        Coordinate system of the field, which defaults to ``PlateCarree``
+    margin: float
+        Margin added to the extent of a new map. See :func:`xoa.geo.get_extent`.
+    map_kw: None, dict
+        Parameters that decorate the map. See :func:`plot_field`.
+    title: None, str
+    kwargs:
+        Extra parameters are passed to :func:`xoa.core.plot.plot_vectors`, like
+        ``scale``, ``width``, ``cmap`` or ``alpha``. The scale is adapted by default
+        to the spacing between arrows. With ``color="speed"``,
+        ``add_colorbar`` and ``cbar_kwargs`` are also accepted.
+
+    Return
+    ------
+    matplotlib.quiver.Quiver
+
+    Example
+    -------
+    .. code-block:: python
+
+        ax = plot_field(speed, cmap="cmo.speed")
+        plot_vectors(u, v, ax=ax, color="w", scale=20)
+
+    See also
+    --------
+    plot_field
+    plot_flow
+    xoa.core.plot.plot_vectors
+    """
+    from . import grid as xgrid
+
+    ccrs, _ = _import_cartopy_()
+    if transform is None:
+        transform = ccrs.PlateCarree()
+    lon, lat = xgrid._get_lonlat_yx_(u)
+    extent = xgeo.get_extent((lon.values, lat.values), margin=margin)
+    ax = _get_map_axes_(ax, extent, transform, map_kw)
+    dims = lon.dims
+    uu, vv = u.transpose(*dims).values, v.transpose(*dims).values
+    sy, sx = cplot.get_strides(stride, lon.values, lat.values, ax, transform, min_spacing)
+
+    speed = np.hypot(uu, vv)
+    if "scale" not in kwargs and np.isfinite(speed).any():
+        # The strongest arrows are about twice as long as the spacing between arrows
+        narrows = np.ceil(speed.shape[1] / sx)
+        kwargs["scale"] = float(np.nanpercentile(speed, 95)) * narrows / 2
+        kwargs.setdefault("scale_units", "width")
+    add_cbar = kwargs.pop("add_colorbar", True)
+    cbar_kwargs = kwargs.pop("cbar_kwargs", None)
+    by_speed = isinstance(color, str) and color == "speed"
+    if by_speed:
+        kwargs.setdefault("cmap", "viridis")
+        kwargs.setdefault("clim", (0, float(np.nanmax(speed))))
+    else:
+        kwargs["color"] = color
+    quiver = cplot.plot_vectors(
+        ax,
+        lon.values,
+        lat.values,
+        uu,
+        vv,
+        (sy, sx),
+        c=speed if by_speed else None,
+        transform=transform,
+        **kwargs,
+    )
+
+    if by_speed and add_cbar:
+        label = xr.DataArray(speed, attrs={"long_name": "Speed", "units": u.attrs.get("units")})
+        add_colorbar(quiver, ax, da=label, **(cbar_kwargs or {}))
+    if key:
+        units = key if isinstance(key, str) else u.attrs.get("units", "")
+        ref = _get_quiver_key_value_(speed[::sy, ::sx])
+        qkey = ax.quiverkey(
+            quiver,
+            *key_pos,
+            ref,
+            f"{ref:g} {units}".strip(),
+            labelpos="E",
+            coordinates="axes",
+            color="k" if by_speed else color,
+            labelcolor="k",
+            fontproperties={"size": "small"},
+        )
+        qkey.text.set_bbox({"facecolor": "w", "alpha": 0.7, "edgecolor": "none", "pad": 2})
+    if title:
+        ax.set_title(title)
+    return quiver
+
+
 def _taylor_points_(da, ref, dim):
     """Statistics of the points of a single data array, and their labels"""
     da, ref = xr.broadcast(da, ref)

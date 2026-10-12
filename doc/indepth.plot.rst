@@ -60,6 +60,9 @@ Two layers
     * - :func:`~xoa.plot.plot_stick`
       - :func:`~xoa.core.plot.plot_sticks`
       - A current time series as sticks
+    * - :func:`~xoa.plot.plot_vectors`
+      - :func:`~xoa.core.plot.plot_vectors`
+      - Currents on a map as under-sampled arrows, with a reference arrow
     * - :func:`~xoa.plot.plot_taylor`
       - :func:`~xoa.core.plot.plot_taylor`
       - A Taylor diagram of arrays against a reference
@@ -99,6 +102,8 @@ attributes with the specifications of :mod:`xoa.meta`.
         longitude and latitude
     * - :func:`~xoa.plot.plot_stick`
       - The ``u`` and ``v`` variables of a dataset, and the time
+    * - :func:`~xoa.plot.plot_vectors`
+      - Longitude and latitude of the grid of ``u``
     * - overlays of :func:`~xoa.plot.plot_field`
       - Any generic name that is given as a string, like ``"bathy"``
 

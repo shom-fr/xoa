@@ -48,6 +48,36 @@ def test_is_lon():
     assert not coords.is_lon(temp.lat)
 
 
+def test_copy_coord_attrs():
+    ref = xr.DataArray(
+        np.zeros(3),
+        dims="x",
+        coords={"lon": ("x", np.arange(3.0), {"standard_name": "longitude"})},
+    )
+    res = (ref + 1).copy(deep=True)
+    res.lon.attrs.clear()
+    assert coords.copy_coord_attrs(res, ref) is res
+    assert res.lon.attrs == {"standard_name": "longitude"}
+    assert coords.get_lon(res).name == "lon"
+    # Only the shared coordinates are concerned
+    other = xr.DataArray(np.zeros(3), dims="x")
+    assert coords.copy_coord_attrs(other, ref).coords.keys() == set()
+
+
+def test_as_z():
+    heights = xr.DataArray([-30.0, -10.0, 0.0], dims="k", attrs={"units": "m"})
+    depths = xr.DataArray([0.0, 10.0, 30.0], dims="k", attrs={"units": "m"})
+    # Guessed from the values
+    assert coords.as_z(heights) is heights
+    np.testing.assert_allclose(coords.as_z(depths), -depths)
+    assert coords.as_z(depths).attrs["positive"] == "up"
+    # Given by the attribute, even when the values say otherwise
+    assert coords.as_z(heights.assign_attrs(positive="up")).equals(heights.assign_attrs(positive="up"))
+    flat = xr.DataArray([0.0, 0.0], dims="k", attrs={"positive": "down"})
+    np.testing.assert_allclose(coords.as_z(flat), 0.0)
+    np.testing.assert_allclose(coords.as_z(heights.assign_attrs(positive="down")), -heights)
+
+
 def test_get_depth_from_variable():
     """Test depth coordinate functions"""
     da = xr.DataArray(

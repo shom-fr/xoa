@@ -83,3 +83,36 @@ class TestCsr:
             mat.indptr, mat.indices, mat.data, mat.data, num.EMPTY_OFFSETS, np.ones((2, 1)), out
         )
         np.testing.assert_allclose(out, 1.0)
+
+
+def _random_tridiagonal(n, seed=0):
+    rng = np.random.default_rng(seed)
+    return rng.uniform(1, 3, n), rng.uniform(0.2, 1, n - 1)
+
+
+def test_tridisolve_matches_dense():
+    n = 30
+    rng = np.random.default_rng(1)
+    dl, d, du = rng.normal(size=n - 1), rng.normal(size=n), rng.normal(size=n - 1)
+    a = np.diag(d) + np.diag(dl, -1) + np.diag(du, 1)
+    b = rng.normal(size=n)
+    x = b.copy()
+    num.tridisolve(dl.copy(), d.copy(), du.copy(), x)
+    np.testing.assert_allclose(a @ x, b, atol=1e-10)
+
+
+def test_sturm_count():
+    d, e = _random_tridiagonal(20)
+    w = np.linalg.eigvalsh(np.diag(d) + np.diag(e, 1) + np.diag(e, -1))
+    for k in range(1, 20):
+        x = 0.5 * (w[k - 1] + w[k])
+        assert num.sturm_count(d, e * e, x) == k
+
+
+def test_trideigh_matches_dense():
+    d, e = _random_tridiagonal(40)
+    a = np.diag(d) + np.diag(e, 1) + np.diag(e, -1)
+    w, v = np.linalg.eigh(a)
+    values, vectors = num.trideigh(d, e, 5)
+    np.testing.assert_allclose(values, w[:5], rtol=1e-10)
+    np.testing.assert_allclose(np.abs(np.sum(vectors * v[:, :5], axis=0)), 1.0, atol=1e-8)

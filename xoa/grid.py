@@ -813,6 +813,53 @@ def get_resolution(obj, radius=xgeo.EARTH_RADIUS):
     )
 
 
+def get_dx_dy(obj, radius=xgeo.EARTH_RADIUS):
+    """Compute the horizontal grid resolution at the grid points
+
+    Contrary to :func:`get_resolution`, the resolutions have the shape
+    of the grid since they are centered on the grid points. They are suited
+    for centered finite differences, like in :mod:`xoa.dyn`.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D
+    radius: float
+        Radius of the sphere in meters, which defaults to the earth radius
+
+    Return
+    ------
+    xarray.DataArray
+        Resolution in meters along x
+    xarray.DataArray
+        Resolution in meters along y
+
+    See also
+    --------
+    get_resolution
+    xoa.core.grid.compute_centered_resolution
+    """
+    lon, lat = _get_lonlat_yx_(obj)
+    dx, dy = cgrid.compute_centered_resolution(lon.values, lat.values, radius=radius)
+    attrs = {"units": "m"}
+    return (
+        xr.DataArray(
+            dx,
+            dims=lon.dims,
+            coords=lon.coords,
+            name="dx",
+            attrs={"long_name": "Resolution along x", **attrs},
+        ),
+        xr.DataArray(
+            dy,
+            dims=lon.dims,
+            coords=lon.coords,
+            name="dy",
+            attrs={"long_name": "Resolution along y", **attrs},
+        ),
+    )
+
+
 def get_median_resolution(obj):
     """Compute the median horizontal grid resolution in degrees
 

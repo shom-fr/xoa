@@ -63,6 +63,31 @@ def ensure_ns_datetime(da):
 
 
 @misc.ERRORS.format_function_docstring
+def copy_coord_attrs(da, ref):
+    """Copy the attributes of the coordinates of a reference to those of an array
+
+    This is useful after :func:`xarray.apply_ufunc`, which drops the attributes of the
+    coordinates, like the ``standard_name`` that is needed to find
+    the longitudes and latitudes.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+        Object whose coordinates are updated in place
+    ref: xarray.DataArray, xarray.Dataset
+        Object whose coordinate attributes are copied, for the coordinates they share
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+        The same object as `da`
+    """
+    for name, coord in ref.coords.items():
+        if name in da.coords:
+            da.coords[name].attrs.update(coord.attrs)
+    return da
+
+
 def get_lon(da, errors="raise", **kwargs):
     """Get the longitude coordinate
 
@@ -579,6 +604,35 @@ def to_z(da, name="z", reverse=False):
         array([-50., -10.,   0.])
     """
     return _flip_vertical_(da, name, "up", reverse)
+
+
+def as_z(da, name="z"):
+    """Get a vertical coordinate as z, which is positive up, whatever its convention
+
+    The convention is given by the ``positive`` attribute, and is guessed from the values
+    when there is none: negative or null values are heights, and positive ones are depths.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Heights or depths
+    name: str
+        Name of the output array, when it is converted
+
+    Return
+    ------
+    xarray.DataArray
+        The same array if it already is z, else the converted one, see :func:`to_z`.
+
+    See also
+    --------
+    to_z
+    get_z
+    """
+    positive = da.attrs.get("positive")
+    if positive not in ("up", "down"):
+        positive = "up" if not bool((da > 0).any()) else "down"
+    return da if positive == "up" else to_z(da, name=name)
 
 
 def to_depth(da, name="depth", reverse=False):

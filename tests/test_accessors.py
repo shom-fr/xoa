@@ -325,6 +325,61 @@ class TestPlotAccessor:
         plt.close("all")
 
 
+class TestDynGridAccessor:
+    def setup_method(self):
+        xoa.register_accessors()
+        lon = xr.DataArray(
+            np.arange(6.0), dims="lon", attrs={"standard_name": "longitude"}, name="lon"
+        )
+        lat = xr.DataArray(
+            np.arange(5.0), dims="lat", attrs={"standard_name": "latitude"}, name="lat"
+        )
+        coords = {"lon": lon, "lat": lat}
+        self.ds = xr.Dataset(
+            {
+                "u": (("lat", "lon"), -np.arange(5.0)[:, None] + np.zeros(6)),
+                "v": (("lat", "lon"), np.zeros((5, 1)) + np.arange(6.0)),
+                "ssh": (("lat", "lon"), np.arange(6.0) + np.arange(5.0)[:, None]),
+            },
+            coords=coords,
+        )
+
+    def test_dataset_methods(self):
+        from xoa import dyn
+
+        ds = self.ds
+        np.testing.assert_allclose(ds.xoa.get_relvort(), dyn.get_relvort(ds.u, ds.v))
+        np.testing.assert_allclose(ds.xoa.get_div(), dyn.get_div(ds.u, ds.v))
+        np.testing.assert_allclose(ds.xoa.get_okuboweiss(), dyn.get_okuboweiss(ds.u, ds.v))
+        for res, ref in zip(ds.xoa.get_strain(), dyn.get_strain(ds.u, ds.v)):
+            np.testing.assert_allclose(res, ref)
+        assert ds.xoa.get_relvort(dx=1e5, dy=1e5).shape == ds.u.shape
+
+    def test_dataset_without_velocities(self):
+        with pytest.raises(Exception):
+            self.ds[["ssh"]].xoa.get_relvort()
+
+    def test_dataarray_methods(self):
+        from xoa import dyn
+
+        ug, vg = self.ds.ssh.xoa.get_geos()
+        ref_ug, ref_vg = dyn.get_geos(self.ds.ssh)
+        np.testing.assert_allclose(ug, ref_ug)
+        np.testing.assert_allclose(vg, ref_vg)
+        uc, vc = self.ds.ssh.xoa.get_cyclogeos(niter=10)
+        ref_uc, ref_vc = dyn.get_cyclogeos(self.ds.ssh, niter=10)
+        np.testing.assert_allclose(uc, ref_uc, equal_nan=True)
+        np.testing.assert_allclose(vc, ref_vc, equal_nan=True)
+
+    def test_get_polygon_mask(self):
+        poly = [(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)]
+        for obj in self.ds, self.ds.ssh:
+            mask = obj.xoa.get_polygon_mask(poly)
+            assert mask.dtype == bool
+            assert int(mask.sum()) == 5
+            assert int(obj.xoa.get_polygon_mask(poly, threshold=1.0).sum()) == 1
+
+
 def test_xoa_accessor_is_registered_on_import():
     """The main accessor is available without calling register_accessors"""
     import subprocess

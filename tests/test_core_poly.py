@@ -39,3 +39,24 @@ def test_compute_overlap_area_across_the_dateline():
             wrap = lambda lon: ((lon + 180.0) % 360.0) - 180.0
             area = poly.compute_overlap_area(lats, wrap(lon0 + sa), lats + 1.0, wrap(lon1 + sb))
             np.testing.assert_allclose(area, ref, rtol=1e-9)
+
+
+RECT = np.array([[1.5, 1.5], [5.5, 1.5], [5.5, 4.5], [1.5, 4.5]])
+
+
+def test_point_in_polygon():
+    concave = np.array([[0, 0], [4, 0], [4, 4], [2, 1], [0, 4]], dtype="d")
+    assert poly.point_in_polygon(1.0, 1.0, concave)
+    assert poly.point_in_polygon(3.5, 1.0, concave)
+    assert not poly.point_in_polygon(2.0, 3.0, concave)  # In the notch
+    assert not poly.point_in_polygon(5.0, 1.0, concave)
+    # Same result for both orientations
+    assert poly.point_in_polygon(1.0, 1.0, concave[::-1])
+
+
+def test_points_in_polygon():
+    x, y = np.meshgrid(np.arange(8.0), np.arange(6.0))
+    inside = poly.points_in_polygon(x, y, RECT)
+    assert inside.shape == x.shape
+    assert inside.sum() == 4 * 3
+    assert inside[2, 2] and not inside[0, 0]

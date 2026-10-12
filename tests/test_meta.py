@@ -8,6 +8,7 @@ import pytest
 import numpy as np
 import xarray as xr
 
+import xoa
 from xoa import meta
 from xoa.meta.sglocator import SGLocator
 from xoa.meta.general import MetaSpecs
@@ -681,6 +682,17 @@ class TestMetaConfigs:
             config_name = list(META_CONFIGS.keys())[0]
             specs = MetaSpecs(META_CONFIGS[config_name])
             assert isinstance(specs, MetaSpecs)
+
+
+    @pytest.mark.parametrize(
+        "source", ["IBI-MFC (PdE Production Center)", "MERCATOR GLORYS12V1"]
+    )
+    def test_mercator_config_is_inferred_from_the_source(self, source):
+        """The Mercator specs match the IBI and GLORYS products"""
+        meta.register_meta_specs(xoa.get_meta_config_file("mercator"))
+        ds = xr.Dataset({"uo": ("x", [1.0])}, attrs={"source": source})
+        assert meta.infer_meta_specs(ds, named=True).name == "mercator"
+        assert ds.xoa.get("u").name == "uo"
 
 
 class TestCoordSpecs:

@@ -442,3 +442,86 @@ def mixed_layer_depth(
 #         if method is None:
 #             mld = meta_specs.search_data_var(ds, "mld", errors="ignore")
 #             if mld is None:
+
+
+def _n2_at_levels_(temp, sal, z, lat, lon, ptemp):
+    """Squared Brunt-Vaisala frequency at the levels of arrays whose last axis is the vertical"""
+    import gsw
+
+    lat = np.asarray(lat, dtype="d")[..., None]
+    lon = np.asarray(lon, dtype="d")[..., None]
+    p = gsw.p_from_z(z, lat)
+    sa = gsw.SA_from_SP(sal, p, lon, lat)
+    ct = gsw.CT_from_pt(sa, temp) if ptemp else gsw.CT_from_t(sa, temp, p)
+    mid, _ = gsw.Nsquared(sa, ct, p, lat, axis=-1)
+    out = np.empty(np.shape(temp), dtype="d")
+    out[..., 1:-1] = 0.5 * (mid[..., :-1] + mid[..., 1:])
+    out[..., 0] = mid[..., 0]
+    out[..., -1] = mid[..., -1]
+    return out
+
+
+def get_n2(temp, sal, z=None, lat=None, lon=None, ptemp=True):
+    """Compute the squared Brunt-Vaisala frequency, or buoyancy frequency, in s-2
+
+    It is computed with :func:`gsw.Nsquared` between the levels, and averaged
+    to the levels, so that it can be used with the data that are defined at the levels,
+    like in :class:`xoa.dyn.VerticalModes`.
+
+    Parameters
+    ----------
+    temp: xarray.DataArray
+        Potential temperature in degrees Celsius, or in-situ temperature when `ptemp`
+        is False. It must have a vertical dimension.
+    sal: xarray.DataArray
+        Practical salinity
+    z: None, xarray.DataArray
+        Vertical coordinate of the levels, that may vary in space, like with sigma
+        coordinates. It defaults to the z or depth of `temp`.
+        See :func:`xoa.coords.as_z` for the sign convention.
+    lat, lon: None, float, xarray.DataArray
+        Latitudes and longitudes, that default to the coordinates of `temp`.
+        The latitude is needed to compute the pressure from the depth, and the longitude,
+        that defaults to 0, only slightly modifies the absolute salinity.
+    ptemp: bool
+        The temperature is the potential one, as in most models, and not the in-situ one.
+
+    Return
+    ------
+    xarray.DataArray
+        With the same dimensions as `temp`. It is missing next to the missing values.
+
+    See also
+    --------
+    xoa.dyn.VerticalModes
+    """
+    zdim = xcoords.get_zdim(temp, errors="raise")
+    z = xcoords.get_z(temp) if z is None else xcoords.as_z(z)
+    if lat is None:
+        lat = xcoords.get_lat(temp, errors="ignore")
+        if lat is None:
+            raise exceptions.XoaError("The latitude is needed to compute the pressure: pass lat=")
+    if lon is None:
+        lon = xcoords.get_lon(temp, errors="ignore")
+        if lon is None:
+            lon = 0.0
+    n2 = xr.apply_ufunc(
+        _n2_at_levels_,
+        temp,
+        sal,
+        z,
+        lat,
+        lon,
+        input_core_dims=[[zdim], [zdim], [zdim], [], []],
+        output_core_dims=[[zdim]],
+        kwargs={"ptemp": ptemp},
+        join="override",
+        dask="parallelized",
+        output_dtypes=[float],
+        dask_gufunc_kwargs={"allow_rechunk": True},
+    )
+    n2 = n2.transpose(*[d for d in temp.dims if d in n2.dims], ...)
+    n2 = xcoords.copy_coord_attrs(n2, temp)
+    n2.name = "n2"
+    n2.attrs = {"long_name": "Squared Brunt-Vaisala frequency", "units": "s-2"}
+    return n2
