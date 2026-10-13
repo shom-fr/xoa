@@ -3,6 +3,7 @@
 """
 Geographic utilities
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,10 +22,10 @@ import math
 import numpy as np
 import xarray as xr
 
+from . import exceptions
 from . import misc
 from . import coords as xcoords
 from .core import geo as _geo
-
 
 #: Earth radius in meters
 EARTH_RADIUS = _geo.EARTH_RADIUS
@@ -491,3 +492,249 @@ def m2deg(met, lat=None, radius=EARTH_RADIUS):
     if lat is not None:
         dd /= np.cos(np.radians(lat))
     return dd
+
+
+def _get_lonlat_(obj):
+    """Get broadcasted longitudes and latitudes as a pair of data arrays"""
+    if isinstance(obj, (tuple, list)):
+        lon, lat = (np.asarray(o, dtype="d") for o in obj)
+        if lon.ndim > 1:
+            raise exceptions.XoaError("Longitudes and latitudes must be scalars or 1D arrays")
+        dims = () if lon.ndim == 0 else ("target",)
+        lon = xr.DataArray(lon, dims=dims)
+        lat = xr.DataArray(lat, dims=dims)
+        return lon, lat
+    lon = xcoords.get_lon(obj)
+    lat = xcoords.get_lat(obj)
+    lat, lon = xr.broadcast(lat, lon)
+    return lon, lat
+
+
+def _check_output_(output):
+    if output not in ("index", "dist", "mask"):
+        raise exceptions.XoaError(f"Invalid output: {output!r}. Use 'index', 'dist' or 'mask'")
+
+
+def _get_scale_(units):
+    """Factor to convert meters to `units`"""
+    return 1e-3 if distance_units[units] == distance_units.km else 1.0
+
+
+def _scale_units_(scale):
+    return "km" if scale == 1e-3 else "m"
+
+
+class GeoKDTree:
+    """A KD-tree of the points of a geographic object, to make several queries
+
+    The tree is built once, from the longitudes and latitudes of `obj`, and used by
+    :meth:`query` and :meth:`query_radius`. Distances are great circle distances.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D,
+        defining a grid or a set of unstructured points.
+    radius: float
+        Radius of the sphere in meters, which defaults to the earth radius
+    leafsize: int
+        Number of points at which the tree switches to a brute force search
+
+    See also
+    --------
+    get_neighbors
+    xoa.core.geo.SphericalKDTree
+    """
+
+    def __init__(self, obj, radius=EARTH_RADIUS, leafsize=16):
+        self.lon, self.lat = _get_lonlat_(obj)
+        self.tree = _geo.SphericalKDTree(
+            self.lon.values, self.lat.values, radius=radius, leafsize=leafsize
+        )
+
+    def _as_indices_(self, idx, dims, coords):
+        """Convert flat indices to a dict of data arrays, with -1 for missing ones"""
+        missing = idx < 0
+        out = {}
+        for dim, ii in zip(
+            self.lon.dims, np.unravel_index(np.where(missing, 0, idx), self.lon.shape)
+        ):
+            out[dim] = xr.DataArray(np.where(missing, -1, ii), dims=dims, coords=coords)
+        return out
+
+    def _as_grid_(self, idx, dist, output, scale):
+        """Get the distance to the closest target, or a mask, on the points of the tree"""
+        idx = np.ravel(idx)
+        dist = np.ravel(dist)
+        valid = idx >= 0
+        field = np.full(self.lon.size, np.inf)
+        np.minimum.at(field, idx[valid], dist[valid])
+        field[np.isinf(field)] = np.nan
+        field = field.reshape(self.lon.shape)
+        kwargs = dict(dims=self.lon.dims, coords=self.lon.coords)
+        if output == "mask":
+            return xr.DataArray(
+                ~np.isnan(field),
+                name="mask",
+                attrs={"long_name": "Neighbors of targets"},
+                **kwargs,
+            )
+        return xr.DataArray(
+            field * scale,
+            name="distance",
+            attrs={"long_name": "Distance to the closest target", "units": _scale_units_(scale)},
+            **kwargs,
+        )
+
+    def query(self, target, k=1, max_dist=None, units="m", output="index", workers=1):
+        """Find the nearest neighbors of target points
+
+        Parameters
+        ----------
+        target: xarray.DataArray, xarray.Dataset, tuple
+            Object with longitude and latitude coordinates, or a (lon, lat) pair
+            of scalars or 1D arrays
+        k: int
+            Number of neighbors
+        max_dist: float, None
+            Maximal distance
+        units: int, str, distance_units
+            Units of `max_dist` and of the returned distances, as one of:
+            {distance_units.rst_with_links}
+        output: {{"index", "dist", "mask"}}
+            Return the distances and indices of the neighbors of each target,
+            or a distance or mask array on the points of `obj`.
+        workers: int
+            Number of threads, -1 for all
+
+        Return
+        ------
+        xarray.DataArray, dict
+            With ``output="index"``, the distances, with the dimensions of the target and
+            a trailing ``neighbor`` dimension if `k` is greater than 1, which are inf for
+            missing neighbors. Then, indices as data arrays with the same dimensions,
+            for each dimension of the longitudes and latitudes of `obj`,
+            which are -1 for missing neighbors.
+            They are suited for pointwise selection with :meth:`xarray.DataArray.isel`.
+        xarray.DataArray
+            With ``output="dist"``, the distance to the closest target on the points of `obj`
+            that are neighbors of at least one target, and nan elsewhere.
+            With ``output="mask"``, the boolean array of these points.
+        """
+        _check_output_(output)
+        lon, lat = _get_lonlat_(target)
+        scale = _get_scale_(units)
+        if max_dist is not None:
+            max_dist = max_dist / scale
+        dist, idx = self.tree.query(lon.values, lat.values, k=k, max_dist=max_dist, workers=workers)
+        if output != "index":
+            return self._as_grid_(idx, dist, output, scale)
+        dims = lon.dims
+        if k > 1:
+            dims = dims + ("neighbor",)
+        shape = lon.shape + ((k,) if k > 1 else ())
+        dist = xr.DataArray(
+            dist.reshape(shape) * scale,
+            dims=dims,
+            coords=lon.coords,
+            name="distance",
+            attrs={"long_name": "Distance to neighbors", "units": _scale_units_(scale)},
+        )
+        return dist, self._as_indices_(idx.reshape(shape), dims, lon.coords)
+
+    def query_radius(self, target, radius, units="m", output="index", workers=1):
+        """Find the neighbors of target points within a distance
+
+        Parameters
+        ----------
+        target: xarray.DataArray, xarray.Dataset, tuple
+            Object with longitude and latitude coordinates, or a (lon, lat) pair
+            of scalars or 1D arrays
+        radius: float
+            Maximal distance
+        units: int, str, distance_units
+            Units of `radius` and of the returned distances, as one of:
+            {distance_units.rst_with_links}
+        output: {{"index", "dist", "mask"}}
+            Return the indices of the neighbors of each target,
+            or a distance or mask array on the points of `obj`.
+        workers: int
+            Number of threads, -1 for all
+
+        Return
+        ------
+        list
+            With ``output="index"``, a list with one item per target point, in the
+            flattened order, which is a dict of indices along a ``neighbor`` dimension
+            for each dimension of the longitudes and latitudes of `obj`.
+            They are suited for pointwise selection with :meth:`xarray.DataArray.isel`.
+        xarray.DataArray
+            With ``output="dist"``, the distance to the closest target on the points of `obj`
+            that are within `radius` of at least one target, and nan elsewhere.
+            With ``output="mask"``, the boolean array of these points.
+        """
+        _check_output_(output)
+        lon, lat = _get_lonlat_(target)
+        scale = _get_scale_(units)
+        found = self.tree.query_ball_point(lon.values, lat.values, radius / scale, workers=workers)
+        if output == "index":
+            return [self._as_indices_(ff, "neighbor", None) for ff in found]
+        idx = np.concatenate(found) if found else np.array([], dtype="i8")
+        counts = [len(ff) for ff in found]
+        dist = _geo.haversine(
+            np.repeat(lon.values.ravel(), counts),
+            np.repeat(lat.values.ravel(), counts),
+            self.lon.values.ravel()[idx],
+            self.lat.values.ravel()[idx],
+        )
+        return self._as_grid_(idx, dist * self.tree.radius, output, scale)
+
+
+GeoKDTree.query.__doc__ = GeoKDTree.query.__doc__.format(**locals())
+GeoKDTree.query_radius.__doc__ = GeoKDTree.query_radius.__doc__.format(**locals())
+
+
+def _pop_tree_kwargs_(kwargs):
+    """Pop the :class:`GeoKDTree` parameters from query ones, `radius` being `sphere_radius`"""
+    tkw = {name: kwargs.pop(name) for name in ("leafsize",) if name in kwargs}
+    if "sphere_radius" in kwargs:
+        tkw["radius"] = kwargs.pop("sphere_radius")
+    return tkw
+
+
+def get_neighbors(obj, target, k=None, radius=None, units="m", output="index", **kwargs):
+    """Find the nearest neighbors of target points, or those within a distance
+
+    This builds a :class:`GeoKDTree` for a single query. Build it once instead
+    to make several queries on the same points.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset, GeoKDTree
+        Object with longitude and latitude coordinates, that may be 1D or 2D,
+        or an already built tree
+    target: xarray.DataArray, xarray.Dataset, tuple
+        Object with longitude and latitude coordinates, or a (lon, lat) pair
+    k: int, None
+        Number of neighbors, see :meth:`GeoKDTree.query`
+    radius: float, None
+        Maximal distance, see :meth:`GeoKDTree.query_radius`.
+        With `k`, it is the maximal distance of the neighbors.
+    units: int, str, distance_units
+        Distance units
+    output: {"index", "dist", "mask"}
+        Return the neighbors of each target, or a distance or mask array on the points of `obj`
+    kwargs:
+        ``sphere_radius`` and ``leafsize`` are passed to :class:`GeoKDTree`,
+        and ``workers`` to the query.
+
+    Return
+    ------
+    See :meth:`GeoKDTree.query` with `k`, :meth:`GeoKDTree.query_radius` otherwise.
+    """
+    if k is None and radius is None:
+        raise exceptions.XoaError("Either k or radius must be given")
+    tree = obj if isinstance(obj, GeoKDTree) else GeoKDTree(obj, **_pop_tree_kwargs_(kwargs))
+    if k is not None:
+        return tree.query(target, k=k, max_dist=radius, units=units, output=output, **kwargs)
+    return tree.query_radius(target, radius, units=units, output=output, **kwargs)

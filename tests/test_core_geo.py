@@ -171,3 +171,75 @@ class TestClosestPointFastOnLargeGrids:
         lat = np.where(mask, lat, np.nan)
         x, y = lon[51, 52], lat[51, 52]
         assert geo.closest_point_fast(lon, lat, x, y) == (52, 51)
+
+
+class TestSphericalKDTree:
+    """Test the spherical KD-tree against a brute force search"""
+
+    @pytest.fixture(scope="class")
+    def points(self):
+        rng = np.random.default_rng(0)
+        n = 2000
+        lon = rng.uniform(-180, 180, n)
+        lat = np.degrees(np.arcsin(rng.uniform(-1, 1, n)))
+        lon[3] = np.nan
+        # Close to the poles and the dateline
+        lon[:3], lat[:3] = [179.9, -179.9, 0.0], [0.0, 0.0, 89.99]
+        return lon, lat
+
+    @staticmethod
+    def brute_force(lon, lat, tlon, tlat):
+        dist = geo.haversine(tlon[:, None], tlat[:, None], lon[None], lat[None])
+        return np.where(np.isnan(dist), np.inf, dist * geo.EARTH_RADIUS)
+
+    def test_chord_dist(self):
+        dist = np.array([0.0, 1e3, 1e6, np.pi * geo.EARTH_RADIUS])
+        chord = geo.dist2chord(dist, geo.EARTH_RADIUS)
+        np.testing.assert_allclose(geo.chord2dist(chord, geo.EARTH_RADIUS), dist, atol=1e-6)
+        assert np.isinf(geo.chord2dist(np.inf, 1.0))
+
+    def test_query(self, points):
+        lon, lat = points
+        tlon, tlat = np.array([180.0, 0.0, 12.0, -170.0]), np.array([0.0, 90.0, -45.0, 30.0])
+        tree = geo.SphericalKDTree(lon, lat)
+        dist, idx = tree.query(tlon, tlat, k=4)
+        ref = self.brute_force(lon, lat, tlon, tlat)
+        assert dist.shape == idx.shape == (4, 4)
+        np.testing.assert_allclose(dist, np.sort(ref, axis=1)[:, :4], atol=1e-3)
+        np.testing.assert_array_equal(idx[:, 0], ref.argmin(axis=1))
+        dist, idx = tree.query(tlon, tlat)
+        assert dist.shape == idx.shape == (4,)
+
+    def test_query_missing(self, points):
+        lon, lat = points
+        tree = geo.SphericalKDTree(lon, lat)
+        dist, idx = tree.query([0.0, np.nan], [0.0, 0.0], max_dist=1.0)
+        assert np.isinf(dist).all() and (idx == -1).all()
+        small = geo.SphericalKDTree([0.0, 1.0], [0.0, 0.0])
+        dist, idx = small.query([0.0], [0.0], k=3)
+        assert idx[0, 0] == 0 and idx[0, 1] == 1 and idx[0, 2] == -1 and np.isinf(dist[0, 2])
+
+    def test_query_ball_point(self, points):
+        lon, lat = points
+        tlon, tlat = np.array([180.0, 0.0, np.nan]), np.array([0.0, 90.0, 0.0])
+        tree = geo.SphericalKDTree(lon, lat)
+        found = tree.query_ball_point(tlon, tlat, 2e6, workers=-1)
+        ref = self.brute_force(lon, lat, tlon[:2], tlat[:2])
+        for ff, rr in zip(found[:2], ref):
+            np.testing.assert_array_equal(ff, np.flatnonzero(rr <= 2e6))
+        assert found[2].size == 0
+        found2, dists = tree.query_ball_point(tlon, tlat, 2e6, return_dist=True)
+        for f0, f1, dd, rr in zip(found, found2, dists, ref):
+            np.testing.assert_array_equal(f0, f1)
+            np.testing.assert_allclose(dd, rr[f1], atol=1e-3)
+        assert dists[2].size == 0
+        assert 3 not in np.concatenate(found)  # nan point
+
+    def test_radius(self):
+        tree = geo.SphericalKDTree([0.0, 90.0], [0.0, 0.0], radius=1.0)
+        dist, idx = tree.query([0.0], [0.0], k=2)
+        np.testing.assert_allclose(dist, [[0.0, np.pi / 2]])
+
+    def test_no_valid_point(self):
+        with pytest.raises(ValueError):
+            geo.SphericalKDTree([np.nan], [0.0])

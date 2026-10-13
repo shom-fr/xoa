@@ -3,6 +3,7 @@
 """
 Geographic utilities
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +23,7 @@ import os
 
 import numba
 import numpy as np
+from scipy.spatial import cKDTree
 
 from .num import EPSILON
 
@@ -359,3 +361,155 @@ def relative_cell_coords(x1, x2, x3, x4, y1, y2, y3, y4, x, y):
         return -1.0, -1.0
 
     return p, q
+
+
+@numba.njit(cache=NOT_CI)
+def lonlat2xyz(lon, lat):
+    """Convert longitudes and latitudes to cartesian coordinates on the unit sphere
+
+    Parameters
+    ----------
+    lon: array_like(n)
+        Longitudes in degrees
+    lat: array_like(n)
+        Latitudes in degrees
+
+    Return
+    ------
+    array_like(n, 3)
+    """
+    n = lon.size
+    xyz = np.empty((n, 3))
+    for i in range(n):
+        lo = DEG2RAD * lon[i]
+        la = DEG2RAD * lat[i]
+        coslat = math.cos(la)
+        xyz[i, 0] = coslat * math.cos(lo)
+        xyz[i, 1] = coslat * math.sin(lo)
+        xyz[i, 2] = math.sin(la)
+    return xyz
+
+
+@numba.vectorize(cache=NOT_CI)
+def dist2chord(dist, radius):
+    """Convert great circle distances to straight line distances through the sphere"""
+    return 2.0 * math.sin(0.5 * min(dist / radius, math.pi))
+
+
+@numba.vectorize(cache=NOT_CI)
+def chord2dist(chord, radius):
+    """Convert straight line distances through the sphere to great circle distances"""
+    if math.isinf(chord):
+        return chord
+    return 2.0 * radius * math.asin(min(0.5 * chord, 1.0))
+
+
+class SphericalKDTree:
+    """A KD-tree of points on a sphere, defined by their longitudes and latitudes
+
+    The points are converted to cartesian coordinates, which is exact since the
+    straight line distance through the sphere is an increasing function of the
+    great circle distance. The neighbors are thus the same, and the great circle
+    distances are recovered from the straight line ones.
+    There is no problem at the poles or across the dateline.
+
+    Parameters
+    ----------
+    lon: array_like
+        Longitudes in degrees. Points with a nan longitude or latitude are ignored.
+    lat: array_like
+        Latitudes in degrees
+    radius: float
+        Radius of the sphere, which also sets the unit of distances.
+        It defaults to the earth radius in meters.
+    leafsize: int
+        Number of points at which the tree switches to a brute force search
+
+    Note
+    ----
+    The indices refer to the flattened input arrays, and are -1 for missing neighbors.
+    """
+
+    def __init__(self, lon, lat, radius=EARTH_RADIUS, leafsize=16):
+        lon = np.asarray(lon, dtype="d").ravel()
+        lat = np.asarray(lat, dtype="d").ravel()
+        valid = np.flatnonzero(np.isfinite(lon) & np.isfinite(lat))
+        if valid.size == 0:
+            raise ValueError("No valid point to build the tree")
+        self.radius = radius
+        self.size = lon.size
+        self._lon = lon[valid]
+        self._lat = lat[valid]
+        # With a trailing -1 to translate missing neighbors
+        self._index = np.append(valid, -1)
+        self.tree = cKDTree(lonlat2xyz(self._lon, self._lat), leafsize=leafsize)
+
+    def _get_targets_(self, lon, lat):
+        lon = np.asarray(lon, dtype="d").ravel()
+        lat = np.asarray(lat, dtype="d").ravel()
+        valid = np.isfinite(lon) & np.isfinite(lat)
+        return lonlat2xyz(np.where(valid, lon, 0.0), np.where(valid, lat, 0.0)), valid
+
+    def query(self, lon, lat, k=1, max_dist=None, workers=1):
+        """Find the nearest neighbors of points
+
+        Parameters
+        ----------
+        lon: array_like(m)
+        lat: array_like(m)
+        k: int
+            Number of neighbors
+        max_dist: float, None
+            Maximal distance
+        workers: int
+            Number of threads, -1 for all
+
+        Return
+        ------
+        array_like(m) or array_like(m, k)
+            Great circle distances, which are inf for missing neighbors
+        array_like(m) or array_like(m, k)
+            Indices of neighbors
+        """
+        xyz, valid = self._get_targets_(lon, lat)
+        bound = np.inf if max_dist is None else float(dist2chord(max_dist, self.radius))
+        chord, idx = self.tree.query(xyz, k=k, distance_upper_bound=bound, workers=workers)
+        chord[~valid] = np.inf
+        idx[~valid] = len(self._index) - 1
+        return chord2dist(chord, self.radius), self._index[idx]
+
+    def query_ball_point(self, lon, lat, r, return_dist=False, workers=1):
+        """Find the neighbors of points within a distance
+
+        Parameters
+        ----------
+        lon: array_like(m)
+        lat: array_like(m)
+        r: float
+            Maximal distance
+        return_dist: bool
+            Also return the distances
+        workers: int
+            Number of threads, -1 for all
+
+        Return
+        ------
+        list
+            One array of indices per point, sorted by increasing indices
+        list
+            One array of great circle distances per point, if `return_dist`
+        """
+        xyz, valid = self._get_targets_(lon, lat)
+        found = self.tree.query_ball_point(
+            xyz, float(dist2chord(r, self.radius)), workers=workers, return_sorted=True
+        )
+        empty = np.array([], dtype="i8")
+        found = [f if ok else empty for f, ok in zip(found, valid)]
+        if not return_dist:
+            return [self._index[f] for f in found]
+        lon, lat = np.ravel(lon), np.ravel(lat)
+        dists = [
+            haversine(lon[i], lat[i], self._lon[f], self._lat[f]) * self.radius
+            for i, f in enumerate(found)
+        ]
+        return [self._index[f] for f in found], dists

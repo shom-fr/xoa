@@ -107,6 +107,34 @@ Grid location information can be encoded in variable names using the staggered g
 locator (see :ref:`indepth.meta` for more details on the :class:`~xoa.meta.SGLocator`).
 
 
+Neighbors with :mod:`xoa.geo`
+-----------------------------
+
+The :class:`xoa.geo.GeoKDTree` class finds the nearest points of a grid or of unstructured points,
+or those within a distance, for target points given as an object or a ``(lon, lat)`` pair.
+The tree is built once and can be queried several times, with :meth:`~xoa.geo.GeoKDTree.query`
+for the k nearest neighbors and :meth:`~xoa.geo.GeoKDTree.query_radius` for those within a distance.
+Both return the neighbors of each target (``output="index"``), or an array on the points of the tree
+with the distance to the closest target and nan elsewhere (``"dist"``), or its boolean version (``"mask"``).
+The :func:`xoa.geo.get_neighbors` function is a one-shot wrapper, and the ``xoa`` accessor
+method of the same name caches the tree.
+
+.. code-block:: python
+
+    tree = GeoKDTree(ds)
+    dist, idx = tree.query(obs, k=3, units="km")
+    nearest = ds.isel(idx)  # pointwise selection
+    dist = tree.query_radius(obs, 30, units="km", output="dist")  # nan beyond 30 km
+    mask = tree.query_radius(obs, 30, units="km", output="mask")
+
+Longitudes and latitudes are converted to cartesian coordinates on the sphere, so
+neighbors are right at the poles and across the dateline, and distances are great circle ones
+(:class:`xoa.core.geo.SphericalKDTree` is the numeric version, with flat arrays).
+Missing neighbors, for instance beyond a maximal distance, have an infinite distance
+and an index of -1, which must not be used to select data.
+See the :ref:`sphx_glr_tutorials_grids_plot_neighbors.py` tutorial.
+
+
 .. _indepth.grids.regrid:
 
 Regridding with :mod:`xoa.regrid`

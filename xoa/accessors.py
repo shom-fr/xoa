@@ -820,6 +820,29 @@ class _GridMixin_:
 
         return get_polygon_mask(self._obj, polygon, threshold=threshold)
 
+    def get_kdtree(self, **kwargs):
+        """Get the :class:`xoa.geo.GeoKDTree` of the points, which is built once and cached
+
+        The tree is rebuilt when the parameters are different from the previous call.
+        """
+        from .geo import GeoKDTree, _pop_tree_kwargs_
+
+        kwargs = _pop_tree_kwargs_(kwargs)
+        cache = getattr(self, "_kdtree", None)
+        if cache is None or cache[0] != kwargs:
+            cache = self._kdtree = (kwargs, GeoKDTree(self._obj, **kwargs))
+        return cache[1]
+
+    def get_neighbors(self, target, k=None, radius=None, units="m", output="index", **kwargs):
+        """Find the neighbors of target points, see :func:`xoa.geo.get_neighbors`
+
+        The tree is cached for successive calls, see :meth:`get_kdtree`.
+        """
+        from .geo import get_neighbors, _pop_tree_kwargs_
+
+        tree = self.get_kdtree(**_pop_tree_kwargs_(kwargs))
+        return get_neighbors(tree, target, k=k, radius=radius, units=units, output=output, **kwargs)
+
 
 class _DynDataArrayMixin_:
     """Provide the dynamics methods that work on a sea surface height"""
