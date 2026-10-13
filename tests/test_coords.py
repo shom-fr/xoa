@@ -72,7 +72,9 @@ def test_as_z():
     np.testing.assert_allclose(coords.as_z(depths), -depths)
     assert coords.as_z(depths).attrs["positive"] == "up"
     # Given by the attribute, even when the values say otherwise
-    assert coords.as_z(heights.assign_attrs(positive="up")).equals(heights.assign_attrs(positive="up"))
+    assert coords.as_z(heights.assign_attrs(positive="up")).equals(
+        heights.assign_attrs(positive="up")
+    )
     flat = xr.DataArray([0.0, 0.0], dims="k", attrs={"positive": "down"})
     np.testing.assert_allclose(coords.as_z(flat), 0.0)
     np.testing.assert_allclose(coords.as_z(heights.assign_attrs(positive="down")), -heights)
@@ -102,6 +104,64 @@ def test_geo_stack():
 
     tempc = coords.geo_stack(ds.temp, "npts")
     xr.testing.assert_equal(tempc, dss.temp)
+
+
+def test_geo_stack_singleton():
+    ds = xr.Dataset(coords={"lon": -5.0, "lat": 48.0})
+    assert coords.geo_stack(ds).encoding["geo_stack"][0] is None
+    dss = coords.geo_stack(ds, "npts", singleton=True)
+    assert dss.lon.dims == dss.lat.dims == ("npts",)
+
+
+@pytest.mark.parametrize("lat", [[40.0, 41.0, 42.0], [42.0, 41.0, 40.0]])
+def test_geo_unstack_grid_keeps_coordinates_and_order(lat):
+    attrs = {"units": "degrees_north"}
+    ref = xr.Dataset(
+        coords={
+            "lon": ("lon", [-7.0, -9.0, -8.0, -10.0], {"units": "degrees_east"}),
+            "lat": ("lat", lat, attrs),
+        }
+    )
+    stacked = coords.geo_stack(ref, "npts", drop=True)
+    data = xr.DataArray(
+        np.arange(2 * stacked.sizes["npts"]).reshape(2, -1),
+        dims=("time", "npts"),
+        coords={"lon": stacked.lon, "lat": stacked.lat},
+        name="v",
+        attrs={"units": "K"},
+    )
+    out = coords.geo_unstack(data, ref, "npts")
+    assert out.dims == ("time", "lat", "lon")
+    np.testing.assert_array_equal(out.lon, ref.lon)
+    np.testing.assert_array_equal(out.lat, ref.lat)
+    assert out.lat.attrs == attrs and out.lon.attrs == ref.lon.attrs
+    assert out.attrs == {"units": "K"} and out.name == "v"
+    # Values at the right place
+    np.testing.assert_array_equal(
+        out.isel(time=0, lat=1, lon=2), data.isel(time=0).values[1 * 4 + 2]
+    )
+    np.testing.assert_array_equal(out.lon.values[2], data.lon.values[1 * 4 + 2])
+
+
+def test_geo_unstack_curvilinear_points_and_singleton():
+    lon, lat = np.meshgrid(np.arange(5.0), np.arange(4.0))
+    cur = xr.Dataset(coords={"lon": (("y", "x"), lon), "lat": (("y", "x"), lat)})
+    stacked = coords.geo_stack(cur, "npts", drop=True)
+    out = coords.geo_unstack(
+        xr.Dataset({"v": ("npts", stacked.lon.values)}, coords=stacked.coords), cur
+    )
+    assert out.v.dims == ("y", "x")
+    np.testing.assert_array_equal(out.v, lon)
+    np.testing.assert_array_equal(out.lat, lat)
+
+    pts = xr.Dataset(coords={"lon": ("pts", [1.0, 2.0]), "lat": ("pts", [3.0, 4.0])})
+    da = xr.DataArray([5.0, 6.0], dims="pts")
+    assert coords.geo_unstack(da, pts, "pts") is da
+
+    single = xr.Dataset(coords={"lon": -5.0, "lat": 48.0})
+    stacked = coords.geo_stack(single, "npts", singleton=True)
+    out = coords.geo_unstack(xr.DataArray([1.0], dims="npts", coords=stacked.coords), single)
+    assert out.ndim == 0 and float(out.lon) == -5.0 and float(out.lat) == 48.0
 
 
 def test_coords_geo_merge():

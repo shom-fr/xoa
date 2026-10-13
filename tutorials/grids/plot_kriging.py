@@ -12,12 +12,15 @@ In this tutorial, we show how to:
 
 The data are synthetic, so that the interpolation can be evaluated: a spatially correlated
 field is sampled at random positions and corrupted with a small noise.
-See also: :ref:`sphx_glr_tutorials_grids_plot_filtering.py`.
+See also: :ref:`sphx_glr_tutorials_grids_plot_filtering.py` and
+:ref:`sphx_glr_tutorials_grids_plot_kriging_sst.py`.
 """
 
 # %%
 # Initialisations
 # ---------------
+
+import time
 
 import numpy as np
 import xarray as xr
@@ -26,7 +29,7 @@ import cartopy.crs as ccrs
 import cmocean
 
 from xoa.filter import generate_kernel, smooth
-from xoa.krig import Kriger, VariogramModel, empirical_variogram
+from xoa.krig import Kriger, LocalKriger, VariogramModel, empirical_variogram
 from xoa.plot import add_colorbar, plot_field, plot_minimap
 
 xr.set_options(display_style="text")
@@ -39,7 +42,9 @@ rng = np.random.default_rng(3)
 nx, ny, nobs = 50, 40, 150
 lon = xr.DataArray(np.linspace(-6, -4, nx), dims="lon", attrs={"units": "degrees_east"})
 lat = xr.DataArray(np.linspace(46, 48, ny), dims="lat", attrs={"units": "degrees_north"})
-noise = xr.DataArray(rng.normal(size=(ny, nx)), dims=("lat", "lon"), coords={"lon": lon, "lat": lat})
+noise = xr.DataArray(
+    rng.normal(size=(ny, nx)), dims=("lat", "lon"), coords={"lon": lon, "lat": lat}
+)
 kernel = generate_kernel(15, noise, window_func="hanning", isotropic=True)
 truth = smooth(noise, kernel, na_thres=1)
 truth = 15 + 2 * truth / truth.std()
@@ -81,13 +86,12 @@ ax.set_ylabel("Semi-variance [degC2]")
 #
 # The fitted model is given to the :class:`~xoa.krig.Kriger`, which returns the
 # estimation and its error at the positions of a target dataset.
-# The result is stacked along the points, and we restore the grid.
+# The result is on the grid of the target.
 
 kriger = Kriger(obs, "ordinary", vario.get_func(), dist_units="km")
 out = kriger.interp(xr.Dataset(coords={"lon": lon, "lat": lat}))
-out = out.set_index(npts=["lat", "lon"]).unstack("npts").transpose("lat", "lon")
-est = out.temp.assign_coords(lon=lon, lat=lat)
-err = out.temp_error.assign_coords(lon=lon, lat=lat)
+est = out.temp
+err = out.temp_error
 
 vmin, vmax = float(truth.min()), float(truth.max())
 kw = dict(cmap=cmocean.cm.thermal, vmin=vmin, vmax=vmax, add_colorbar=False)
@@ -96,9 +100,16 @@ fig, axes = plt.subplots(
     1, 2, figsize=(9, 3.8), subplot_kw={"projection": ccrs.PlateCarree()}, constrained_layout=True
 )
 mappable = plot_field(truth, ax=axes[0], title="Truth and observations", map_kw=map_kw, **kw)
-axes[0].scatter(obs.lon, obs.lat, c=obs, s=18, edgecolors="w", linewidths=0.5, **{
-    k: v for k, v in kw.items() if k != "add_colorbar"
-}, transform=ccrs.PlateCarree())
+axes[0].scatter(
+    obs.lon,
+    obs.lat,
+    c=obs,
+    s=18,
+    edgecolors="w",
+    linewidths=0.5,
+    **{k: v for k, v in kw.items() if k != "add_colorbar"},
+    transform=ccrs.PlateCarree(),
+)
 plot_field(est, ax=axes[1], title="Kriging", map_kw=map_kw, **kw)
 add_colorbar(mappable, axes, da=truth)
 plot_minimap(truth, ax=[0.9, 0.84, 0.1], fig=fig)
@@ -136,3 +147,26 @@ m1 = plot_field(
     add_colorbar=False,
 )
 add_colorbar(m1, axes[1], label="Difference [degC]")
+
+# %%
+# Local kriging
+# -------------
+#
+# The :class:`~xoa.krig.Kriger` uses all the observations at once, which gets slow and heavy
+# with many observations. The :class:`~xoa.krig.LocalKriger` only uses the ``nneigh`` nearest
+# observations of each target point, found with a KD-tree, and solves a small system for each
+# of them with numba. Beyond the range of the variogram, far observations hardly matter.
+
+local = LocalKriger(obs, "ordinary", vario, nneigh=40, dist_units="km")
+target = xr.Dataset(coords={"lon": lon, "lat": lat})
+start = time.perf_counter()
+out_local = local.interp(target)
+print(f"Local kriging: {time.perf_counter() - start:.3f} s")
+est_local = out_local.temp
+print(f"Max difference with the global kriging: {float(abs(est_local - est).max()):.3f} degC")
+
+# %%
+# The local estimation is close to the global one, the largest differences being far from
+# the observations. The number of neighbors and the optional ``maxdist`` set the compromise
+# between speed and accuracy. Where there are fewer than ``nmin`` neighbors, for instance
+# far from the observations with a small ``maxdist``, the result is masked.

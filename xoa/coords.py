@@ -7,6 +7,7 @@ coordinates (longitude, latitude, depth, time, etc.) and dimensions
 from :mod:`xarray` data arrays and datasets, based on the
 :mod:`xoa.meta` metadata specifications.
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -1345,7 +1346,13 @@ def get_binding_data_vars(ds, coord, as_names=False):
 
 
 def geo_stack(
-    obj, stack_dim="npts", rename=False, drop=False, reset_index=False, create_index=False
+    obj,
+    stack_dim="npts",
+    rename=False,
+    drop=False,
+    reset_index=False,
+    create_index=False,
+    singleton=False,
 ):
     """Stack the dimensions of longitude and latitude coordinates
 
@@ -1367,6 +1374,9 @@ def geo_stack(
         Remove MultiIndexes that contains lon and lat dimensions before any operations
     create_index: bool
         Create a MultiIndex when calling :meth:`~xarray.DataArray.stack`
+    singleton: bool
+        When longitude and latitude are scalars, expand them along `stack_dim`
+        instead of returning the object as is.
 
     Return
     ------
@@ -1377,14 +1387,25 @@ def geo_stack(
 
     See also
     --------
+    geo_unstack
     xarray.DataArray.stack
     """
     lon = get_lon(obj)
     lat = get_lat(obj)
 
     # Singleton
-    singleton = lon.ndim == 0 and lat.ndim == 0
-    dims = list(set(lon.dims).union(lat.dims))
+    is_singleton = lon.ndim == 0 and lat.ndim == 0
+    if is_singleton and singleton:
+        obj = obj.assign_coords(
+            {
+                lon.name: (stack_dim, np.atleast_1d(lon.values), lon.attrs),
+                lat.name: (stack_dim, np.atleast_1d(lat.values), lat.attrs),
+            }
+        )
+        lon, lat = get_lon(obj), get_lat(obj)
+        is_singleton = False
+    singleton = is_singleton
+    dims = list(dict.fromkeys(lat.dims + lon.dims))
 
     # Rename to lon and lat?
     if rename:
@@ -1431,6 +1452,66 @@ def geo_stack(
     # Keep trace
     obj.encoding["geo_stack"] = (stack_dim, lon.name, lat.name)
     return obj
+
+
+def geo_unstack(obj, ref, stack_dim="npts"):
+    """Restore the geographic dimensions of `ref` from an object stacked with :func:`geo_stack`
+
+    The stacked dimension is reshaped to the dimensions of the longitude and latitude
+    coordinates of `ref`, in the order used by :func:`geo_stack`, and the coordinates of
+    `ref` that are along them are restored with their values and attributes.
+    Unlike :meth:`xarray.DataArray.unstack`, the order of the coordinates is preserved.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with a stacked dimension, for instance computed from ``geo_stack(ref)``
+    ref: xarray.DataArray, xarray.Dataset
+        Object with valid longitude and latitude coordinates that was given to
+        :func:`geo_stack`.
+    stack_dim: str
+        Name of the stacked dimension
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+        The geographic dimensions are the last ones, with latitude before longitude.
+        Scalar coordinates are restored if `ref` has a single position.
+
+    See also
+    --------
+    geo_stack
+    """
+    lon = get_lon(ref)
+    lat = get_lat(ref)
+
+    # Singleton
+    if lon.ndim == 0 and lat.ndim == 0:
+        obj = obj.squeeze(stack_dim, drop=True)
+        return obj.assign_coords({lon.name: lon.variable, lat.name: lat.variable})
+
+    # Already stacked
+    if lon.ndim == 1 and lat.ndim == 1 and lon.dims == lat.dims:
+        return obj
+
+    # Reshape
+    gdims = tuple(dict.fromkeys(lat.dims + lon.dims))
+    shape = tuple(ref.sizes[dim] for dim in gdims)
+
+    def reshape(var):
+        if stack_dim not in var.dims:
+            return var.variable
+        i = var.dims.index(stack_dim)
+        j = i + 1
+        data = var.values.reshape(var.shape[:i] + shape + var.shape[j:])
+        return xr.Variable(var.dims[:i] + gdims + var.dims[j:], data, var.attrs)
+
+    coords = {name: reshape(coord) for name, coord in obj.coords.items() if name not in gdims}
+    coords.update({dim: ref.coords[dim].variable for dim in gdims if dim in ref.coords})
+    if isinstance(obj, xr.DataArray):
+        return xr.DataArray(reshape(obj), coords=coords, name=obj.name).transpose(..., *gdims)
+    data_vars = {name: reshape(var) for name, var in obj.data_vars.items()}
+    return xr.Dataset(data_vars, coords, attrs=obj.attrs).transpose(..., *gdims)
 
 
 def geo_merge(lon, lat, stack_dim="pts"):

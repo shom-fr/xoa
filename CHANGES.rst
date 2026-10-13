@@ -6,6 +6,9 @@ Unreleased
 
 New features
 ------------
+- Add :class:`xoa.krig.LocalKriger`, which krigs with the nearest points only using the new :class:`~xoa.core.geo.SphericalKDTree` and the numba kernels of :mod:`xoa.core.krig`. See :ref:`sphx_glr_tutorials_grids_plot_kriging.py` and :ref:`sphx_glr_tutorials_grids_plot_kriging_sst.py`.
+- Add :func:`xoa.coords.geo_unstack` to restore the grid of an object stacked with :func:`~xoa.coords.geo_stack`, and its ``singleton`` argument. The stacked dimensions are now in a fixed order, latitude first.
+- Add :class:`xoa.krig.ClusteredKriger`, which now holds the clusterization (``npmax`` and ``nproc``) that moved out of :class:`xoa.krig.Kriger`.
 - Add :class:`xoa.geo.GeoKDTree` and :func:`xoa.geo.get_neighbors` to find the nearest points or those within a distance, also as ``xoa`` accessor methods with a cached tree, based on the new :class:`xoa.core.geo.SphericalKDTree`. See :ref:`sphx_glr_tutorials_grids_plot_neighbors.py`.
 - Add the :ref:`indepth.dyn` guide and the :mod:`xoa.dyn` diagnostics :func:`~xoa.dyn.get_relvort`, :func:`~xoa.dyn.get_div`, :func:`~xoa.dyn.get_strain`, :func:`~xoa.dyn.get_okuboweiss`, :func:`~xoa.dyn.get_coriolis` and :func:`~xoa.dyn.get_geos`, also available as ``xoa`` accessor methods, with numba kernels in the new :mod:`xoa.core.dyn` module. Grid resolution comes from :func:`xoa.grid.get_dx_dy`.
 - Add :func:`xoa.dyn.get_cyclogeos`, an iterative cyclogeostrophic solver after Penven et al. (2014), with full (smoothed) advection terms or the two classic ones with ``terms="penven"``.
@@ -64,6 +67,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix :mod:`xoa.krig`: simple kriging now uses the covariance, block kriging averages per point, :func:`~xoa.krig.empirical_variogram` no longer fails when undersampling, drops pairs at the same distance or overwrites the long name, a fitted :class:`~xoa.krig.VariogramModel` is not fitted again and the first variable of a dataset is used to fit it. The krigers now return the grid or the dimensions of the target with its coordinates and their attributes, and the attributes of the input data, and accept a single position. The kriging error is now named variance, and it is conservative for the :class:`~xoa.krig.ClusteredKriger`. The latter and :func:`xoa.geo.clusterize` accept a ``seed`` for reproducible clusters. The kriging matrices are factorized (Cholesky or LU) instead of inverted, with a pseudo inverse for singular ones, and the fitted nugget is at least ``1e-6`` of the sill.
 - The ``set_meta_specs`` method of the ``xoa`` accessors accepts the same arguments as :class:`xoa.meta.set_meta_specs`, like a name or a dict.
 - Fix :class:`xoa.krig.Kriger` that computed the distances between input points in meters whatever its `dist_units`.
 - :func:`xoa.coords.get_depth` no longer fails when it has to decode a dataset, and no longer warns when ``errors="ignore"``.

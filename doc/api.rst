@@ -19,6 +19,7 @@ Package API
     xoa.core.geo
     xoa.core.grid
     xoa.core.interp
+    xoa.core.krig
     xoa.core.mask
     xoa.core.modes
     xoa.core.num
