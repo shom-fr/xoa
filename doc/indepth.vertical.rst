@@ -38,7 +38,7 @@ hPa.
 
 This guide explains how the two are found, converted and produced, and what to watch for.
 The tutorial :ref:`sphx_glr_tutorials_grids_plot_croco_section.py` shows them at work on a
-CROCO section.
+CROCO section, and :ref:`sphx_glr_tutorials_dynamics_plot_mixed_layer.py` shows isotherms and mixed layers.
 
 .. ipython:: python
 

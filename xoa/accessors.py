@@ -53,15 +53,21 @@ class _BasicMetaAccessor_(object):
 
         Parameters
         ----------
-        meta_specs: xoa.meta.MetaSpecs
+        meta_specs: xoa.meta.MetaSpecs, str, dict
+            Either a :class:`~xoa.meta.MetaSpecs` instance, the name of registered or internal
+            specs, or an argument to instantiate one like a dict or a file name.
 
         See also
         --------
         :ref:`indepth.meta`
         """
+        from . import meta
         from .meta.general import MetaSpecs
 
-        assert isinstance(meta_specs, MetaSpecs)
+        if isinstance(meta_specs, str):
+            meta_specs = meta.get_meta_specs_from_name(meta_specs, errors="ignore") or meta_specs
+        if not isinstance(meta_specs, MetaSpecs):
+            meta_specs = MetaSpecs(meta_specs)
         self._meta_specs = meta_specs
         self._assign_meta_specs_()
 

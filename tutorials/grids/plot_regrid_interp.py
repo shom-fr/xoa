@@ -93,7 +93,7 @@ print(results["bilinear"])
 
 extent = geo.get_extent(temp, margin=0.02)
 fig, axes = plt.subplots(
-    2, 2, figsize=(10, 7.5), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
+    2, 2, figsize=(9, 7), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
 )
 kw = dict(vmin=float(temp.min()), vmax=float(temp.max()), cmap=cmocean.cm.thermal, add_colorbar=False)
 fields = {"source": temp, **results}
@@ -171,7 +171,7 @@ print(on_rotated.dims, int(on_rotated.isnull().sum()), "missing points")
 src_grid = xr.Dataset(coords={"lon_rho": temp.lon_rho, "lat_rho": temp.lat_rho})
 back = regrid.Regridder(on_rotated, src_grid, "bilinear").regrid(on_rotated)
 fig, axes = plt.subplots(
-    1, 3, figsize=(14, 5.5), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
+    1, 3, figsize=(9, 3.5), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
 )
 kw = dict(map_kw={"gridlines_labels_on": ["bottom"]}, add_colorbar=False)
 plot_field(on_rotated, ax=axes[0], title="rotated grid", cmap=cmocean.cm.thermal, **kw)
@@ -303,7 +303,7 @@ zoom = xr.Dataset(
 zoom_regridder = regrid.Regridder(temp, zoom, "bilinear")
 extent_zoom = [19.2, 20.6, -35.0, -34.5]
 fig, axes = plt.subplots(
-    2, 2, figsize=(10, 4.6), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
+    2, 2, figsize=(9, 4), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
 )
 kw = dict(
     vmin=float(temp.min()),

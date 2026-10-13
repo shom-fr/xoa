@@ -123,7 +123,7 @@ mldz = -mixed_layer_depth(tempz, deltatemp=deltatemp)
 # Plot the full section with :func:`xoa.plot.plot_section`, that finds the depths and
 # labels the axes from the meta-data.
 
-fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(13, 5),
+fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(9, 3.5),
                         constrained_layout=True)
 kw = dict(levels=np.arange(0, 23), x="lat")
 plot_section(temp, ax=axs[0], method="contourf", cmap="cmo.thermal", **kw)
@@ -140,7 +140,7 @@ axs[1].set_title("Interpolated")
 # %%
 # Plot a zoom near the surface and add the mixed layer depth isoline.
 
-fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(13, 4.5),
+fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(9, 3),
                         constrained_layout=True)
 plot_section(temp, ax=axs[0], method="contourf", cmap="cmo.thermal", **kw)
 plot_section(

@@ -12,7 +12,7 @@ pandas
 pip
 scipy
 xarray>=2024.6
-sphinx
+sphinx<9
 sphinx-autosummary-accessors
 sphinx-book-theme
 sphinx-argparse

@@ -1,4 +1,4 @@
-Diagrams and maps
+Maps and diagrams
 -----------------
 
-Specialized oceanographic diagrams and maps.
+Maps of fields and currents, and specialized oceanographic diagrams.

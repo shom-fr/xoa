@@ -89,7 +89,7 @@ ds_argo = ds_argo.set_index(N_PROF="time").rename(N_PROF="time")
 
 # %%
 # Quick plot of the salinity that highligths the mediterranean water.
-fig, axs = plt.subplots(ncols=2, figsize=(14, 6), constrained_layout=True)
+fig, axs = plt.subplots(ncols=2, figsize=(9, 4), constrained_layout=True)
 ds_argo.sal.plot.contourf("time", "depth", cmap="cmo.haline", levels=20, ax=axs[0])
 ds_argo.sal.plot.contour("time", "depth", levels=[35.65], linewidths=1, colors="k", ax=axs[0])
 xplot.plot_ts(
@@ -224,7 +224,7 @@ merc_prof_edges = xgrid.get_edges(ds_merc_prof.depth, "depth")
 
 # %%
 # Let's plot them.
-fig, axes = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10, 5))
+fig, axes = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(9, 4.5))
 sal_merc_prof_o.plot(y="depth", color="C1", label="Mercator", ax=axes[0])
 ds_argo_prof.sal.plot(y="depth", label="ARGO", color="C0", ax=axes[0])
 axes[0].set_title("On ARGO depths")

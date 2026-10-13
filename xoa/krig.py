@@ -697,7 +697,7 @@ class Kriger(object):
         for ic, clust in enumerate(self.clusters):
 
             # Get distance between input points
-            dd = xgeo.get_distances(clust).values
+            dd = xgeo.get_distances(clust, units=self._dist_units).values
 
             # Form A
             npts = clust.sizes["npts"]
