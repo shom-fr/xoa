@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 import cmocean
 
 import xoa
+from xoa import meta
 from xoa.plot import (
     plot_field,
     plot_fields,
@@ -37,7 +38,8 @@ from xoa.plot import (
 
 xr.set_options(display_style="text")
 
-ds = xoa.open_data_sample("MODELS/CMEMS-GLORYS/glorys_gulfstream_3d.nc").xoa.decode()
+with meta.set_meta_specs("mercator"):
+    ds = xoa.open_data_sample("MODELS/CMEMS-GLORYS/glorys_gulfstream_3d.nc").xoa.decode()
 ds = ds.isel(time=0, depth=0, drop=True)
 speed = np.hypot(ds.u, ds.v).rename("speed")
 speed.attrs.update(long_name="Surface current speed", units="m s-1")
@@ -49,7 +51,7 @@ speed.attrs.update(long_name="Surface current speed", units="m s-1")
 # Longitudes and latitudes are found in the coordinates, and the colorbar is labelled
 # with the name and units of the field.
 
-plot_field(ds.ptemp, cmap=cmocean.cm.thermal, map_kw={"land": True})
+plot_field(ds.temp, cmap=cmocean.cm.thermal, map_kw={"land": True})
 
 # %%
 # Locating the domain
@@ -59,7 +61,7 @@ plot_field(ds.ptemp, cmap=cmocean.cm.thermal, map_kw={"land": True})
 # here as a box over a small map. A double minimap adds a global map
 # with the location as a single point.
 
-plot_field(ds.ptemp, cmap=cmocean.cm.thermal, map_kw={"land": True})
+plot_field(ds.temp, cmap=cmocean.cm.thermal, map_kw={"land": True})
 plot_minimap(ds, plot_coords="box")
 
 # %%
@@ -76,9 +78,9 @@ plot_double_minimap(ds, ax=[0.9, 0.55, 0.09])
 
 fig, axes = plot_fields(
     {
-        "Temperature": ds.ptemp,
+        "Temperature": ds.temp,
         "Salinity": ds.sal,
-        "Absolute dynamic topography": ds.adt,
+        "Sea surface height": ds.ssh,
         "Speed": speed,
     },
     ncols=2,

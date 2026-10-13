@@ -131,3 +131,9 @@ with meta.set_meta_specs(specs):
     custom = make_dataset()
     print(custom.xoa.get("temp").name, custom.xoa.get("lon").name)
     print(list(custom.xoa.decode().variables))
+
+# %%
+# Using specs registers them, which changes how the next datasets are decoded. Since
+# the other tutorials share this session, we restore the initial state.
+
+meta.reset_cache(memory=True)

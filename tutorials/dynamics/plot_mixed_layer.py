@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 import cmocean
 
 import xoa
+from xoa import meta
 from xoa.interp import isoslice
 from xoa.plot import plot_fields, plot_minimap
 from xoa.thermdyn import mixed_layer_depth
@@ -33,9 +34,10 @@ from xoa.thermdyn import mixed_layer_depth
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
-ds = xoa.open_data_sample("MODELS/CMEMS-GLORYS/glorys_gulfstream_3d.nc")
-ds = ds.xoa.decode().isel(time=0, drop=True)
-temp, sal = ds.ptemp, ds.sal
+with meta.set_meta_specs("mercator"):
+    ds = xoa.open_data_sample("MODELS/CMEMS-GLORYS/glorys_gulfstream_3d.nc").xoa.decode()
+ds = ds.isel(time=0, drop=True)
+temp, sal = ds.temp, ds.sal
 print(temp.depth.attrs["positive"], float(temp.depth[-1]))
 
 # %%
