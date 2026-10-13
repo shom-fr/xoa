@@ -10,8 +10,6 @@ from multiprocessing import Pool, cpu_count
 import warnings
 
 import numpy as np
-import scipy.linalg
-import scipy.linalg.lapack
 import xarray as xr
 
 from . import exceptions
@@ -21,66 +19,8 @@ from . import coords as xcoords
 from .core import krig as ckrig
 from .core.geo import SphericalKDTree
 
-#: Minimal relative condition number below which a kriging matrix is considered singular
-_RCOND_MIN = 1e-14
-
 #: Minimal nugget, relative to the sill, when fitting a variogram model
 NUGGET_MIN = 1e-6
-
-
-class _Solver(object):
-    """Factorize a kriging matrix once to solve for many right-hand sides
-
-    - A positive definite matrix, like the covariance matrix of the simple kriging, is
-      factorized with Cholesky.
-    - Otherwise, like the variogram matrix of the ordinary kriging which is indefinite, it is
-      factorized with LU.
-    - Singular or ill-conditioned matrices, for instance with duplicate points
-      and no nugget, are solved with a pseudo inverse.
-
-    Parameters
-    ----------
-    a: numpy.ndarray
-        Square matrix
-    spd: bool
-        Is the matrix expected to be symmetric positive definite?
-    """
-
-    def __init__(self, a, spd=False):
-        self._cho = self._lu = self._pinv = None
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", scipy.linalg.LinAlgWarning)
-            if spd:
-                self._cho = self._try_(scipy.linalg.cho_factor, a)
-            if self._cho is None:
-                self._lu = self._try_(self._lu_factor_, a)
-        if self._cho is None and self._lu is None:
-            self._pinv = np.linalg.pinv(a)
-
-    @staticmethod
-    def _try_(factor, a):
-        """Factorize or return None if it fails"""
-        try:
-            return factor(a, check_finite=False)
-        except (scipy.linalg.LinAlgError, scipy.linalg.LinAlgWarning, ValueError):
-            return None
-
-    @staticmethod
-    def _lu_factor_(a, check_finite=False):
-        """LU factorization that fails for ill-conditioned matrices"""
-        lu = scipy.linalg.lu_factor(a, check_finite=check_finite)
-        gecon = scipy.linalg.lapack.get_lapack_funcs("gecon", (a,))
-        if not gecon(lu[0], np.linalg.norm(a, 1))[0] > _RCOND_MIN:
-            raise scipy.linalg.LinAlgError("Ill-conditioned matrix")
-        return lu
-
-    def solve(self, b):
-        """Solve ``a @ x = b``"""
-        if self._cho is not None:
-            return scipy.linalg.cho_solve(self._cho, b, check_finite=False)
-        if self._lu is not None:
-            return scipy.linalg.lu_solve(self._lu, b, check_finite=False)
-        return self._pinv @ b
 
 
 def get_xyz(obj):
@@ -246,16 +186,10 @@ class variogram_model_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta)
     spherical = 3
 
 
-def _clamp_params_(n, s, r, nrelmax=0.2):
-    """Clip variogram parameters to valid values"""
-    s = max(s, 0)
-    return min(max(n, 0), nrelmax * s), s, max(r, 0)
-
-
 def get_variogram_model_func(mtype, n, s, r, nrelmax=0.2):
     """Get the variogram model function from its name"""
     code = variogram_model_types[mtype].value
-    n, s, r = _clamp_params_(n, s, r, nrelmax)
+    n, s, r = ckrig.clamp_variogram_params(n, s, r, nrelmax)
     return lambda h: ckrig.variogram(h, code, n, s, r)
 
 
@@ -572,106 +506,71 @@ class kriging_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     simple = 0
 
 
-def _setup_variogram_(da, variogram_func, dist_units):
-    """Get the variogram function, fitted if needed, and the distance units"""
-    if isinstance(variogram_func, str):
-        variogram_func = VariogramModel(variogram_func, dist_units=dist_units)
-    if isinstance(variogram_func, VariogramModel):
-        if dist_units is None:
-            dist_units = variogram_func.dist_units
-        else:
-            dist_units = xgeo.distance_units[dist_units]
-        if dist_units != variogram_func.dist_units:
-            exceptions.xoa_warn(
-                f"Incompatible distance units: {dist_units} vs {variogram_func.dist_units}"
-            )
-        if not variogram_func.is_fitted:
-            variogram_func.fit(da)
-    return variogram_func, xgeo.distance_units[dist_units]
+class BaseKriger(object):
+    """Base class of the krigers
 
-
-def _get_mean_(da, krigtype, mean):
-    """Get the mean used by the simple kriging"""
-    if krigtype != kriging_types.simple:
-        return 0.0
-    if mean is None:
-        return float(da.to_array().mean() if isinstance(da, xr.Dataset) else da.mean())
-    return mean
-
-
-def _stack_output_(dso):
-    """Stack the output positions and get the stacked coordinates"""
-    dso = xcoords.geo_stack(dso, rename=False, drop=True)
-    sname, xname, yname = dso.encoding["geo_stack"]
-    stacked_coords = {}
-    for cname, cdat in dso.coords.items():
-        if sname in cdat.dims:
-            stacked_coords[cname] = cdat
-    return dso, sname, xname, yname, stacked_coords
-
-
-def _format_output_(zo, eo, name, dims, sname, coords, stacked_coords, attrs):
-    """Format the estimations and errors as a dataset"""
-    dao = xr.DataArray(zo, dims=dims, coords=coords, attrs=attrs)
-    daoe = xr.DataArray(
-        eo, dims=(sname,), coords=stacked_coords, attrs={"long_name": "Kriging variance"}
-    )
-    return xr.Dataset({name: dao, name + "_error": daoe}).unstack()
-
-
-class Kriger(object):
-    """Kriger that works with all the input points at once
-
-    The variogram matrix of the input points is factorized once, and the values
-    are computed at the output positions using this factorization.
-    The memory and time costs grow quickly with the number of input points:
-    use :class:`ClusteredKriger` for big clouds of points.
+    It manages the kriging type, the variogram, the input points and the formatting
+    of the output as a dataset that has the coordinates of the target positions,
+    and the attributes of the input data.
 
     Parameters
     ----------
-
     da: xarray.DataArray, xarray.Dataset
-        Input positions and optionally data.
+        Input positions and data.
+        The dimensions that are not geographic are kept in the output.
     krigtype: optional
         Kriging type: {kriging_types.rst_with_links}.
-    variogram_func: callable, VariogramModel, optional
-        Callable to be used as a variogram function.
-        It is either a function or an instance of :class:`VariogramModel`.
+    variogram_func: callable, VariogramModel, str
+        A callable, an instance of :class:`VariogramModel` or a model name.
+        A model that is not fitted yet is fitted to the data.
     exact: optional
         If True, variogram is exactly zero when distance is zero.
+    dist_units: optional
+        Distance units as one of: {xgeo.distance_units.rst_with_links}.
+    mean: optional
+        Mean for the simple kriging, which defaults to the mean of the data.
     """
 
     def __init__(
-        self,
-        da,
-        krigtype,
-        variogram_func,
-        exact=False,
-        dist_units=None,
-        mean=None,
-        farvalue=None,
-        **kwargs,
+        self, da, krigtype, variogram_func, exact=False, dist_units=None, mean=None, **kwargs
     ):
         # Kriging type
         self.krigtype = kriging_types[krigtype]
 
         # Variogram function
-        self._variogram_func, self._dist_units = _setup_variogram_(da, variogram_func, dist_units)
+        if isinstance(variogram_func, str):
+            variogram_func = VariogramModel(variogram_func, dist_units=dist_units)
+        if isinstance(variogram_func, VariogramModel):
+            if dist_units is None:
+                dist_units = variogram_func.dist_units
+            elif xgeo.distance_units[dist_units] != variogram_func.dist_units:
+                exceptions.xoa_warn(
+                    f"Incompatible distance units: {xgeo.distance_units[dist_units]} "
+                    f"vs {variogram_func.dist_units}"
+                )
+            if not variogram_func.is_fitted:
+                variogram_func.fit(da)
+        self._variogram_func = variogram_func
+        self._dist_units = xgeo.distance_units[dist_units]
 
         # Input points
-        self._set_clouds_([xgeo.clusterize(da, npmax=np.inf)])
+        cloud = xgeo.clusterize(da, npmax=np.inf)
+        self._vname = cloud.encoding["clust_var_names"][0]
+        cloud[self._vname] = cloud[self._vname].transpose(..., "npts")
+        self._cloud = cloud
+        self._attrs = cloud[self._vname].attrs
+        self._dims = cloud[self._vname].dims[:-1]
+        self._unstacked_coords = {
+            cname: cdat for cname, cdat in cloud.coords.items() if "npts" not in cdat.dims
+        }
 
         # Other parameters
         self.exact = exact
-        self.mean = _get_mean_(da, self.krigtype, mean)
-
-    def _set_clouds_(self, clouds):
-        """Set the clouds of input points that are kriged separately"""
-        self._clouds = clouds
-        self._unstacked_coords = {}
-        for cname, cdat in clouds[0].coords.items():
-            if "npts" not in cdat.dims:
-                self._unstacked_coords[cname] = cdat
+        if self.krigtype != kriging_types.simple:
+            mean = 0.0
+        elif mean is None:
+            mean = float(da.to_array().mean() if isinstance(da, xr.Dataset) else da.mean())
+        self.mean = mean
 
     @property
     def dist_units(self):
@@ -691,7 +590,100 @@ class Kriger(object):
             return vgf.get_params()["s"]
         return float(vgf(np.float64(1e12)))
 
-    def _get_matrix_(self, dd, diag=False):
+    def _interp_points(self, dso, xname, yname, **kwargs):
+        """Interpolate to stacked positions and return the values and the errors"""
+        raise NotImplementedError
+
+    def interp(self, dso, name=None, **kwargs):
+        """Interpolate to the `dso` positions
+
+        Parameters
+        ----------
+        dso: xarray.Dataset, xarray.DataArray
+            Object that contains lon and lat coordinates, which are not necessarily
+            along the same dimension, like a regular grid.
+        name: str, None:
+            Name of the output data array, which defaults to the name of the input one.
+
+        Return
+        ------
+        xarray.Dataset
+            A dataset that contains the interpolated values and the associated kriging variance
+            with the suffix ``_error``.
+            It has the coordinates of `dso` with their attributes, and the non geographic
+            coordinates of the input data.
+            The attributes of the data are those of the input data.
+        """
+        # Positions
+        stacked = xcoords.geo_stack(dso, rename=False, drop=True, singleton=True)
+        sname, xname, yname = stacked.encoding["geo_stack"]
+        stacked_coords = {
+            cname: cdat for cname, cdat in stacked.coords.items() if sname in cdat.dims
+        }
+
+        # Interpolate
+        zo, eo = self._interp_points(stacked, xname, yname, **kwargs)
+
+        # Format
+        name = name or self._vname
+        coords = {**self._unstacked_coords, **stacked_coords}
+        attrs_err = {"long_name": "Kriging variance"}
+        if "units" in self._attrs:
+            attrs_err["units"] = self._attrs["units"] + "^2"
+        out = xr.Dataset(
+            {
+                name: xr.DataArray(
+                    zo, dims=self._dims + (sname,), coords=coords, attrs=self._attrs
+                ),
+                name
+                + "_error": xr.DataArray(eo, dims=(sname,), coords=stacked_coords, attrs=attrs_err),
+            }
+        )
+        return xcoords.geo_unstack(out, dso, sname)
+
+    __call__ = interp
+
+
+BaseKriger.__doc__ = BaseKriger.__doc__.format(**locals())
+
+
+class Kriger(BaseKriger):
+    """Kriger that works with all the input points at once
+
+    The variogram matrix of the input points is factorized once, and the values
+    are computed at the output positions using this factorization.
+    The memory and time costs grow quickly with the number of input points:
+    use :class:`LocalKriger` or :class:`ClusteredKriger` for big clouds of points.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+        Input positions and data.
+    krigtype: optional
+        Kriging type: {kriging_types.rst_with_links}.
+    variogram_func: callable, VariogramModel, optional
+        Callable to be used as a variogram function.
+        It is either a function or an instance of :class:`VariogramModel`.
+    exact: optional
+        If True, variogram is exactly zero when distance is zero.
+
+    See also
+    --------
+    BaseKriger
+    LocalKriger
+    ClusteredKriger
+    """
+
+    def __init__(self, da, krigtype, variogram_func, **kwargs):
+        super().__init__(da, krigtype, variogram_func, **kwargs)
+        self._clouds = [self._cloud]
+
+    @property
+    def _spd(self):
+        """Is the kriging matrix symmetric positive definite?"""
+        return self.krigtype == kriging_types.simple
+
+    def _get_matrix(self, dd, diag=False):
         """Convert distances to the variogram, or the covariance for the simple kriging"""
         g = np.asarray(self.variogram_func(dd), dtype="d")
         if self.exact:
@@ -702,13 +694,13 @@ class Kriger(object):
             g = self.sill - g
         return g
 
-    def _get_A_(self, cloud):
+    def get_A(self, cloud):
         """Get the variogram matrix of a cloud of points"""
         plus1 = int(self.krigtype == kriging_types.ordinary)
         dd = xgeo.get_distances(cloud, units=self._dist_units).values
         npts = cloud.sizes["npts"]
         A = np.empty((npts + plus1, npts + plus1))
-        A[:npts, :npts] = self._get_matrix_(dd, diag=True)
+        A[:npts, :npts] = self._get_matrix(dd, diag=True)
         if plus1:
             A[-1] = 1
             A[:, -1] = 1
@@ -716,18 +708,15 @@ class Kriger(object):
         return A
 
     @property
-    def _spd(self):
-        """Is the kriging matrix symmetric positive definite?"""
-        return self.krigtype == kriging_types.simple
-
-    @property
     def solvers(self):
         """Get the solver of the A matrix of each cloud of points"""
         if not hasattr(self, '_solvers'):
-            self._solvers = [_Solver(self._get_A_(cloud), spd=self._spd) for cloud in self._clouds]
+            self._solvers = [
+                ckrig.MatrixSolver(self.get_A(cloud), spd=self._spd) for cloud in self._clouds
+            ]
         return self._solvers
 
-    def _interp_cloud_(self, cloud, solver, dso, vname, neighbors):
+    def _interp_cloud(self, cloud, solver, dso, neighbors):
         """Interpolate with a single cloud of points
 
         Return
@@ -743,7 +732,7 @@ class Kriger(object):
         dd = xgeo.get_distances(cloud, dso, units=self._dist_units).values
         npts = cloud.sizes["npts"]
         B = np.empty((npts + plus1, dd.shape[-1]))
-        B[:npts] = self._get_matrix_(dd)
+        B[:npts] = self._get_matrix(dd)
         if plus1:
             B[-1] = 1
         del dd
@@ -759,7 +748,7 @@ class Kriger(object):
         W = solver.solve(B)
 
         # Interpolate
-        zc = cloud[vname].values
+        zc = cloud[self._vname].values
         if self.krigtype == kriging_types.simple:
             zc = zc - self.mean
         z = zc @ W[:npts]
@@ -772,35 +761,7 @@ class Kriger(object):
             e = self.sill - e
         return z, e
 
-    def _interp_clouds_(self, dso, vname, neighbors):
-        """Interpolate with all the clouds and return the values and errors"""
-        (cloud,) = self._clouds
-        return self._interp_cloud_(cloud, self.solvers[0], dso, vname, neighbors)
-
-    def interp(self, dso: xr.Dataset, block=None, name=None):
-        """Interpolate to the `dso` positions
-
-        Parameters
-        ----------
-        dso: xr.Dataset
-            Dataset that contains lon and lat coordinates
-        block: None, int
-            Number of nearest neighbours for block kriging
-        name: str, None:
-            Default name of the output data array.
-
-        Return
-        ------
-        xarray.Dataset
-            A dataset that contains the interpolated values and associated errors
-
-        """
-        # Inits
-        dso, sname, xname, yname, stacked_coords = _stack_output_(dso)
-        cloud = self._clouds[0]
-        vname = cloud.encoding["clust_var_names"][0]
-        dimso = cloud[vname].dims[:-1] + (sname,)
-
+    def _interp_points(self, dso, xname, yname, block=None):
         # Block kriging
         neighbors = None
         if block:
@@ -809,15 +770,26 @@ class Kriger(object):
             tree = cKDTree(np.dstack([dso[xname].values, dso[yname].values])[0])
             neighbors = tree.query_ball_tree(tree, block)
 
-        # Interpolate
-        zo, eo = self._interp_clouds_(dso, vname, neighbors)
+        return self._interp_cloud(self._cloud, self.solvers[0], dso, neighbors)
 
-        # Format
-        coords = self._unstacked_coords.copy()
-        coords.update(stacked_coords)
-        return _format_output_(
-            zo, eo, name or vname, dimso, sname, coords, stacked_coords, cloud.attrs
-        )
+    def interp(self, dso, block=None, name=None):
+        """Interpolate to the `dso` positions
+
+        Parameters
+        ----------
+        dso: xarray.Dataset, xarray.DataArray
+            Object that contains lon and lat coordinates
+        block: None, float
+            Radius of the blocks for block kriging, in the units of the coordinates.
+        name: str, None:
+            Name of the output data array.
+
+        Return
+        ------
+        xarray.Dataset
+            See :meth:`BaseKriger.interp`.
+        """
+        return super().interp(dso, name=name, block=block)
 
     __call__ = interp
 
@@ -842,8 +814,9 @@ class ClusteredKriger(Kriger):
            each using the factorized matrix of cluster.
         #. Final value is a weighted average of
            the values estimated using each cluster.
-           Weights are inversely proportional to the inverse
-           of the squared error.
+           Weights are inversely proportional to the squared error.
+        #. The final error is the same weighted average of the errors, which is
+           conservative since the errors of the clusters are correlated.
 
     Parameters
     ----------
@@ -852,7 +825,7 @@ class ClusteredKriger(Kriger):
         When the number of input points is greater than this value,
         clusterization is applied.
     nproc: optional
-        Number of processes to use to invert matrices.
+        Number of processes to use to factorize matrices.
         Set it to a number <2 to switch off parallelisation.
 
     See also
@@ -866,7 +839,7 @@ class ClusteredKriger(Kriger):
         # Clusters
         if npmax is None:
             npmax = np.inf
-        self._set_clouds_(xgeo.clusterize(da, npmax=npmax, split=True))
+        self._clouds = xgeo.clusterize(da, npmax=npmax, split=True)
 
         # Number of cores for parallel computing
         if nproc is None:
@@ -893,29 +866,37 @@ class ClusteredKriger(Kriger):
     def solvers(self):
         """Get the solver of the A matrix of each cluster"""
         if not hasattr(self, '_solvers'):
-            AA = [self._get_A_(clust) for clust in self.clusters]
+            AA = [self.get_A(clust) for clust in self.clusters]
             if self.nproc > 1:
                 with Pool(self.nproc) as pool:
-                    self._solvers = pool.map(partial(_Solver, spd=self._spd), AA, chunksize=1)
+                    self._solvers = pool.map(
+                        partial(ckrig.MatrixSolver, spd=self._spd), AA, chunksize=1
+                    )
             else:
-                self._solvers = [_Solver(A, spd=self._spd) for A in AA]
+                self._solvers = [ckrig.MatrixSolver(A, spd=self._spd) for A in AA]
         return self._solvers
 
-    def _interp_clouds_(self, dso, vname, neighbors):
-        nptso = dso.sizes[dso.encoding["geo_stack"][0]]
-        zo = np.zeros(self.clusters[0][vname].shape[:-1] + (nptso,), 'd')
-        wo = np.zeros(nptso, 'd')
+    def _interp_points(self, dso, xname, yname, block=None):
+        neighbors = None
+        if block:
+            from scipy.spatial import cKDTree
+
+            tree = cKDTree(np.dstack([dso[xname].values, dso[yname].values])[0])
+            neighbors = tree.query_ball_tree(tree, block)
+
+        zo = eo = wo = 0.0
         for clust, solver in zip(self.clusters, self.solvers):
-            z, e = self._interp_cloud_(clust, solver, dso, vname, neighbors)
+            z, e = self._interp_cloud(clust, solver, dso, neighbors)
 
             # Weighted contribution based on errors, which can be zero at an input point
             w = 1 / np.maximum(e, 1e-12 * self.sill) ** 2
-            zo += z * w
-            wo += w
-        return zo / wo, 1 / np.sqrt(wo)
+            zo = zo + z * w
+            eo = eo + e * w
+            wo = wo + w
+        return zo / wo, eo / wo
 
 
-class LocalKriger(object):
+class LocalKriger(BaseKriger):
     """Kriger that uses only the nearest input points of each output point
 
     The neighbors are found with a :class:`~xoa.core.geo.SphericalKDTree`, and a small
@@ -944,47 +925,27 @@ class LocalKriger(object):
 
     See also
     --------
+    BaseKriger
     Kriger
     ClusteredKriger
     """
 
-    def __init__(
-        self,
-        da,
-        krigtype,
-        variogram_func,
-        nneigh=16,
-        maxdist=None,
-        nmin=3,
-        exact=False,
-        dist_units=None,
-        mean=None,
-    ):
-        self.krigtype = kriging_types[krigtype]
-        vgf, self._dist_units = _setup_variogram_(da, variogram_func, dist_units)
-        if not isinstance(vgf, VariogramModel):
+    def __init__(self, da, krigtype, variogram_func, nneigh=16, maxdist=None, nmin=3, **kwargs):
+        super().__init__(da, krigtype, variogram_func, **kwargs)
+        if not isinstance(self.variogram_func, VariogramModel):
             raise exceptions.XoaKrigingError(
                 "The local kriging needs a variogram model name or a VariogramModel instance"
             )
-        self._variogram_func = vgf
         self.nneigh = nneigh
         self.maxdist = maxdist
         self.nmin = max(nmin, 1)
-        self.exact = exact
-        self.mean = _get_mean_(da, self.krigtype, mean)
 
         # Valid input points
-        cloud = xgeo.clusterize(da, npmax=np.inf)
-        self._vname = cloud.encoding["clust_var_names"][0]
-        data = cloud[self._vname].transpose(..., "npts")
-        self._attrs = data.attrs
-        self._dims = data.dims[:-1]
-        self._shape = data.shape[:-1]
-        self._unstacked_coords = {
-            cname: cdat for cname, cdat in cloud.coords.items() if "npts" not in cdat.dims
-        }
+        cloud = self._cloud
+        data = cloud[self._vname]
         values = data.values.reshape(-1, data.shape[-1])
         valid = np.isfinite(values).all(axis=0) & np.isfinite(cloud.lon) & np.isfinite(cloud.lat)
+        self._shape = data.shape[:-1]
         self._lon = np.ascontiguousarray(cloud.lon.values[valid], "d")
         self._lat = np.ascontiguousarray(cloud.lat.values[valid], "d")
         self._values = np.ascontiguousarray(values[:, valid], "d")
@@ -995,49 +956,21 @@ class LocalKriger(object):
         )
         self.tree = SphericalKDTree(self._lon, self._lat, radius=self._radius)
 
-    @property
-    def dist_units(self):
-        """Distance units"""
-        return self._dist_units
-
-    @property
-    def variogram_func(self):
-        """The :class:`VariogramModel` instance"""
-        return self._variogram_func
-
-    def interp(self, dso: xr.Dataset, name=None):
-        """Interpolate to the `dso` positions
-
-        Parameters
-        ----------
-        dso: xr.Dataset
-            Dataset that contains lon and lat coordinates
-        name: str, None:
-            Default name of the output data array.
-
-        Return
-        ------
-        xarray.Dataset
-            A dataset that contains the interpolated values and associated errors
-        """
-        dso, sname, xname, yname, stacked_coords = _stack_output_(dso)
+    def _interp_points(self, dso, xname, yname):
+        lono = np.ascontiguousarray(dso[xname].values, "d")
+        lato = np.ascontiguousarray(dso[yname].values, "d")
         k = min(self.nneigh, self._lon.size)
-        dist, idx = self.tree.query(
-            dso[xname].values, dso[yname].values, k=k, max_dist=self.maxdist, workers=-1
-        )
-        dist = np.ascontiguousarray(dist.reshape(-1, k), "d")
-        idx = np.ascontiguousarray(idx.reshape(-1, k), "i8")
-
+        dist, idx = self.tree.query(lono, lato, k=k, max_dist=self.maxdist, workers=-1)
         vgf = self.variogram_func
-        n, s, r = _clamp_params_(**vgf.get_params())
+        n, s, r = ckrig.clamp_variogram_params(**vgf.get_params())
         zo, eo = ckrig.krig_local(
             self._lon,
             self._lat,
             self._values,
-            np.ascontiguousarray(dso[xname].values, "d"),
-            np.ascontiguousarray(dso[yname].values, "d"),
-            idx,
-            dist,
+            lono,
+            lato,
+            np.ascontiguousarray(idx.reshape(-1, k), "i8"),
+            np.ascontiguousarray(dist.reshape(-1, k), "d"),
             vgf.mtype.value,
             n,
             s,
@@ -1048,21 +981,7 @@ class LocalKriger(object):
             float(self.mean),
             self._radius,
         )
-
-        coords = self._unstacked_coords.copy()
-        coords.update(stacked_coords)
-        return _format_output_(
-            zo.reshape(self._shape + (-1,)),
-            eo,
-            name or self._vname,
-            self._dims + (sname,),
-            sname,
-            coords,
-            stacked_coords,
-            self._attrs,
-        )
-
-    __call__ = interp
+        return zo.reshape(self._shape + (-1,)), eo
 
 
 LocalKriger.__doc__ = LocalKriger.__doc__.format(**locals())

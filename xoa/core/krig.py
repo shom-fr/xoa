@@ -23,10 +23,17 @@ which sets their units, and positions are longitudes and latitudes in degrees.
 # limitations under the License.
 import os
 
+import warnings
+
 import numba
 import numpy as np
+import scipy.linalg
+import scipy.linalg.lapack
 
 from .geo import haversine
+
+#: Minimal reciprocal condition number below which a matrix is considered singular
+RCOND_MIN = 1e-14
 
 NOT_CI = os.environ.get("CI", "false") == "false"
 
@@ -152,6 +159,70 @@ def _krig_point_(
         for i in range(m):
             v -= w[i] * b[i]
     vo[io] = v
+
+
+def clamp_variogram_params(n, s, r, nrelmax=0.2):
+    """Clip the nugget `n`, sill `s` and range `r` of a variogram to valid values
+
+    The nugget is at most `nrelmax` times the sill.
+    """
+    s = max(s, 0)
+    return min(max(n, 0), nrelmax * s), s, max(r, 0)
+
+
+class MatrixSolver(object):
+    """Factorize a kriging matrix once to solve for many right-hand sides
+
+    - A positive definite matrix, like the covariance matrix of the simple kriging, is
+      factorized with Cholesky.
+    - Otherwise, like the variogram matrix of the ordinary kriging which is indefinite, it is
+      factorized with LU.
+    - Singular or ill-conditioned matrices, for instance with duplicate points
+      and no nugget, are solved with a pseudo inverse.
+
+    Parameters
+    ----------
+    a: numpy.ndarray
+        Square matrix
+    spd: bool
+        Is the matrix expected to be symmetric positive definite?
+    """
+
+    def __init__(self, a, spd=False):
+        self._cho = self._lu = self._pinv = None
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", scipy.linalg.LinAlgWarning)
+            if spd:
+                self._cho = self._try_(scipy.linalg.cho_factor, a)
+            if self._cho is None:
+                self._lu = self._try_(self._lu_factor_, a)
+        if self._cho is None and self._lu is None:
+            self._pinv = np.linalg.pinv(a)
+
+    @staticmethod
+    def _try_(factor, a):
+        """Factorize or return None if it fails"""
+        try:
+            return factor(a, check_finite=False)
+        except (scipy.linalg.LinAlgError, scipy.linalg.LinAlgWarning, ValueError):
+            return None
+
+    @staticmethod
+    def _lu_factor_(a, check_finite=False):
+        """LU factorization that fails for ill-conditioned matrices"""
+        lu = scipy.linalg.lu_factor(a, check_finite=check_finite)
+        gecon = scipy.linalg.lapack.get_lapack_funcs("gecon", (a,))
+        if not gecon(lu[0], np.linalg.norm(a, 1))[0] > RCOND_MIN:
+            raise scipy.linalg.LinAlgError("Ill-conditioned matrix")
+        return lu
+
+    def solve(self, b):
+        """Solve ``a @ x = b``"""
+        if self._cho is not None:
+            return scipy.linalg.cho_solve(self._cho, b, check_finite=False)
+        if self._lu is not None:
+            return scipy.linalg.lu_solve(self._lu, b, check_finite=False)
+        return self._pinv @ b
 
 
 @numba.njit(cache=NOT_CI, parallel=True)

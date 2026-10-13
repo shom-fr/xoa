@@ -130,17 +130,17 @@ plot_minimap(truth, ax=[0.9, 0.84, 0.1], fig=fig)
 # We remove a plane fitted to the observations, krig the residuals, and add the plane back.
 
 
-def fit_plane(obs):
-    """Fit a plane to scattered observations and return a function that evaluates it"""
-    A = np.c_[np.ones(obs.size), obs.lon.values, obs.lat.values]
-    coef = np.linalg.lstsq(A, obs.values, rcond=None)[0]
-    return lambda lo, la: coef[0] + coef[1] * lo + coef[2] * la
+A = np.c_[np.ones(obs.size), obs.lon.values, obs.lat.values]
+coef = np.linalg.lstsq(A, obs.values, rcond=None)[0]
 
 
-plane = fit_plane(obs)
+def plane(lo, la):
+    return coef[0] + coef[1] * lo + coef[2] * la
+
+
 resid = obs - plane(obs.lon, obs.lat)
 resid.attrs.update(obs.attrs, long_name="Temperature anomaly")
-trend = plane(lon, lat + 0 * lon).transpose("lat", "lon").where(~land)
+trend = plane(lon, lat).where(~land)
 print(f"Standard deviation: {float(obs.std()):.2f} degC before and {float(resid.std()):.2f} after")
 
 fig, axes = plt.subplots(
@@ -202,25 +202,17 @@ print("Best model:", vario)
 # ----------------
 #
 # The anomalies are kriged on the grid of the truth with the :class:`~xoa.krig.Kriger`,
-# and the trend is added back. The result has the estimation and its kriging variance.
-# The land points are masked.
+# and the trend is added back. The result is a dataset on the target grid with the
+# estimation and its kriging variance. The land points are masked.
 
 target = xr.Dataset(coords={"lon": lon, "lat": lat})
 
-
-def to_grid(out, name="sst"):
-    """Convert the kriging output to a lon/lat grid with the land masked"""
-    out = out.set_index(npts=["lat", "lon"]).unstack("npts").transpose("lat", "lon")
-    out = out.assign_coords(lon=lon, lat=lat)
-    est = (out[name] + plane(lon, lat + 0 * lon)).where(~land)
-    std = np.sqrt(out[name + "_error"].clip(min=0)).where(~land)
-    return est.assign_attrs(truth.attrs), std
-
-
 start = time.perf_counter()
 kriger = Kriger(resid, "ordinary", vario, dist_units="km")
-est, std = to_grid(kriger.interp(target, name="sst"))
+out = kriger.interp(target, name="sst")
 t_global = time.perf_counter() - start
+est = (out.sst + plane(lon, lat)).where(~land).assign_attrs(truth.attrs)
+std = np.sqrt(out.sst_error.clip(min=0)).where(~land)
 diff = est - truth
 rmse = float(np.sqrt((diff**2).mean()))
 print(f"Global kriging: RMSE={rmse:.2f} degC in {t_global:.2f} s")
@@ -267,8 +259,10 @@ for ax in axes[1:]:
 local = LocalKriger(resid, "ordinary", vario, nneigh=32, dist_units="km")
 local.interp(target.isel(lon=slice(2), lat=slice(2)))  # compilation
 start = time.perf_counter()
-est_local, std_local = to_grid(local.interp(target, name="sst"))
+out_local = local.interp(target, name="sst")
 t_local = time.perf_counter() - start
+est_local = (out_local.sst + plane(lon, lat)).where(~land)
+std_local = np.sqrt(out_local.sst_error.clip(min=0)).where(~land)
 rmse_local = float(np.sqrt(((est_local - truth) ** 2).mean()))
 print(f"Local kriging: RMSE={rmse_local:.2f} degC in {t_local:.3f} s")
 
@@ -314,8 +308,9 @@ for nneigh in nneighs:
     best_t = np.inf
     for _ in range(3):
         start = time.perf_counter()
-        res, _ = to_grid(lk.interp(target, name="sst"))
+        out_nn = lk.interp(target, name="sst")
         best_t = min(best_t, time.perf_counter() - start)
+    res = (out_nn.sst + plane(lon, lat)).where(~land)
     errs.append(float(np.sqrt(((res - truth) ** 2).mean())))
     gaps.append(float(np.sqrt(((res - est) ** 2).mean())))
     costs.append(best_t)

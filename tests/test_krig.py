@@ -329,14 +329,14 @@ def test_krig_solver_uses_cholesky_for_covariance_matrices():
     m = rng.normal(size=(30, 30))
     a = m @ m.T + 30 * np.eye(30)
     b = rng.normal(size=(30, 4))
-    solver = xkrig._Solver(a, spd=True)
+    solver = xkrig.ckrig.MatrixSolver(a, spd=True)
     assert solver._cho is not None
     np.testing.assert_allclose(a @ solver.solve(b), b, atol=1e-10)
 
 
 def test_krig_solver_uses_lu_for_indefinite_matrices():
     a = np.array([[0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [1.0, 1.0, 0.0]])  # not positive
-    solver = xkrig._Solver(a, spd=True)  # cholesky fails
+    solver = xkrig.ckrig.MatrixSolver(a, spd=True)  # cholesky fails
     assert solver._cho is None and solver._lu is not None
     b = np.arange(3.0)
     np.testing.assert_allclose(a @ solver.solve(b), b, atol=1e-12)
@@ -344,7 +344,7 @@ def test_krig_solver_uses_lu_for_indefinite_matrices():
 
 def test_krig_solver_falls_back_to_pinv_for_singular_matrices():
     a = np.array([[1.0, 1.0], [1.0, 1.0]])
-    solver = xkrig._Solver(a)
+    solver = xkrig.ckrig.MatrixSolver(a)
     assert solver._lu is None and solver._pinv is not None
     np.testing.assert_allclose(solver.solve(np.array([2.0, 2.0])), [1.0, 1.0])
 
@@ -354,7 +354,7 @@ def test_krig_solver_falls_back_to_pinv_for_ill_conditioned_matrices():
     lon = np.linspace(0, 1, 60)
     d = np.abs(lon[:, None] - lon[None])
     a = 1 - xkrig.ckrig.variogram(d, xkrig.variogram_model_types.gaussian.value, 0.0, 1.0, 0.5)
-    assert xkrig._Solver(a, spd=True)._pinv is not None
+    assert xkrig.ckrig.MatrixSolver(a, spd=True)._pinv is not None
 
 
 def test_krig_kriger_with_duplicate_points_and_no_nugget():
@@ -371,3 +371,184 @@ def test_krig_variogram_fit_has_a_nugget_floor():
     model = xkrig.VariogramModel("gaussian", dist_units="km")
     model.fit(obs)
     assert model["n"] >= xkrig.NUGGET_MIN * float(model["s"]) * 0.5
+
+
+KRIGERS = {
+    "kriger": (xkrig.Kriger, {}),
+    "clustered": (xkrig.ClusteredKriger, {"npmax": 1000, "nproc": 1}),  # no kmeans, which is random
+    "local": (xkrig.LocalKriger, {"nneigh": 10}),
+}
+LON_ATTRS = {"units": "degrees_east", "long_name": "Longitude"}
+LAT_ATTRS = {"units": "degrees_north", "long_name": "Latitude"}
+
+
+def get_attrs_obs(n=40):
+    obs = get_obs(n)
+    obs = obs.assign_coords(
+        lon=("npts", obs.lon.values, LON_ATTRS), lat=("npts", obs.lat.values, LAT_ATTRS)
+    )
+    obs = xr.concat([obs, 2 * obs], dim="time").assign_coords(
+        time=("time", [0, 1], {"long_name": "Time axis"}), depth=5.0
+    )
+    obs.attrs.update(units="degC", long_name="Temperature", source="test")
+    return obs.rename("temp")
+
+
+@pytest.mark.parametrize("name", list(KRIGERS))
+def test_krig_output_is_on_the_target_grid_with_input_attributes(name):
+    cls, kw = KRIGERS[name]
+    obs = get_attrs_obs()
+    lon = xr.DataArray([-4.5, -4.9, -4.2], dims="lon", attrs=LON_ATTRS)  # not sorted
+    lat = xr.DataArray([47.9, 47.1, 47.5, 47.3], dims="lat", attrs=LAT_ATTRS)
+    out = cls(obs, "ordinary", get_model(), dist_units="km", **kw).interp(
+        xr.Dataset(coords={"lon": lon, "lat": lat})
+    )
+    assert isinstance(out, xr.Dataset)
+    assert out.temp.dims == ("time", "lat", "lon") and out.temp_error.dims == ("lat", "lon")
+    # Target coordinates are kept as they are, with their attributes
+    np.testing.assert_array_equal(out.lon, lon)
+    np.testing.assert_array_equal(out.lat, lat)
+    assert out.lon.attrs == LON_ATTRS and out.lat.attrs == LAT_ATTRS
+    # Input attributes and non geographic coordinates are kept
+    assert out.temp.attrs == obs.attrs
+    assert out.temp_error.attrs["units"] == "degC^2"
+    assert out.time.attrs == {"long_name": "Time axis"} and float(out.depth) == 5.0
+    # Values are at the right place
+    point = xr.Dataset(coords={"lon": ("npts", [-4.2]), "lat": ("npts", [47.3])})
+    ref = cls(obs, "ordinary", get_model(), dist_units="km", **kw).interp(point)
+    np.testing.assert_allclose(
+        out.temp.sel(lon=-4.2, lat=47.3).values, ref.temp.isel(npts=0).values, atol=1e-8
+    )
+
+
+@pytest.mark.parametrize("name", list(KRIGERS))
+def test_krig_output_on_points_and_curvilinear_and_scalar_targets(name):
+    cls, kw = KRIGERS[name]
+    obs = get_attrs_obs()
+    kriger = cls(obs, "ordinary", get_model(), dist_units="km", **kw)
+
+    pts = xr.Dataset(
+        coords={
+            "lon": ("pts", [-4.5, -4.4], LON_ATTRS),
+            "lat": ("pts", [47.5, 47.6], LAT_ATTRS),
+            "id": ("pts", ["a", "b"]),
+        }
+    )
+    out = kriger.interp(pts)
+    assert out.temp.dims == ("time", "pts") and list(out.id.values) == ["a", "b"]
+    assert out.lon.attrs == LON_ATTRS
+
+    lon, lat = np.meshgrid([-4.8, -4.6, -4.4], [47.2, 47.4])
+    cur = xr.Dataset(
+        coords={
+            "lon_rho": (("eta", "xi"), lon, LON_ATTRS),
+            "lat_rho": (("eta", "xi"), lat, LAT_ATTRS),
+        }
+    )
+    out = kriger.interp(cur)
+    assert out.temp.dims == ("time", "eta", "xi")
+    np.testing.assert_array_equal(out.lon_rho, lon)
+
+    out = kriger.interp(xr.Dataset(coords={"lon": -4.5, "lat": 47.5}))
+    assert out.temp.dims == ("time",) and out.temp_error.dims == ()
+    assert float(out.lon) == -4.5 and float(out.lat) == 47.5
+
+
+@pytest.mark.parametrize("name", list(KRIGERS))
+def test_krig_input_forms(name):
+    """Datasets, unnamed arrays, other coordinate names and grids as inputs"""
+    cls, kw = KRIGERS[name]
+    obs = get_obs(40)
+    target = get_grid_target()
+    ref = cls(obs, "ordinary", get_model(), dist_units="km", **kw).interp(target).temp.values
+
+    def interp(da, **kws):
+        return cls(da, "ordinary", get_model(), dist_units="km", **kw).interp(target, **kws)
+
+    np.testing.assert_allclose(interp(obs.to_dataset()).temp.values, ref)
+    out = interp(obs.rename(None))
+    assert "data" in out and np.allclose(out.data.values, ref)
+    renamed = obs.rename(lon="longitude", lat="latitude")
+    assert np.allclose(interp(renamed).temp.values, ref)
+    assert "other" in interp(obs, name="other")
+    # Target as a data array
+    da_target = xr.DataArray(
+        np.zeros((8, 8)), dims=("lat", "lon"), coords={"lon": target.lon, "lat": target.lat}
+    )
+    assert np.allclose(interp(obs).temp.values, interp(obs).temp.values)
+    assert np.allclose(
+        cls(obs, "ordinary", get_model(), dist_units="km", **kw).interp(da_target).temp.values, ref
+    )
+
+
+def test_krig_input_on_a_grid_equals_the_same_input_as_points():
+    lon, lat = np.meshgrid(np.linspace(-4.9, -4.1, 6), np.linspace(47.1, 47.9, 5))
+    values = np.sin(5 * (lon + 5)) + np.cos(5 * (lat - 47))
+    grid = xr.DataArray(
+        values,
+        dims=("lat", "lon"),
+        coords={"lon": ("lon", lon[0]), "lat": ("lat", lat[:, 0])},
+        name="temp",
+    )
+    points = xr.DataArray(
+        values.ravel(),
+        dims="npts",
+        coords={"lon": ("npts", lon.ravel()), "lat": ("npts", lat.ravel())},
+        name="temp",
+    )
+    target = xr.Dataset(coords={"lon": [-4.55, -4.35], "lat": [47.45, 47.65]})
+    out = xkrig.LocalKriger(grid, "ordinary", get_model(), nneigh=10, dist_units="km").interp(
+        target
+    )
+    ref = xkrig.LocalKriger(points, "ordinary", get_model(), nneigh=10, dist_units="km").interp(
+        target
+    )
+    np.testing.assert_allclose(out.temp.values, ref.temp.values)
+
+
+def get_random_fields(nobs=100, ntgt=60, nreal=40, sill=1.0, rng_km=40.0):
+    """Gaussian random fields with an exponential covariance, at observations and targets"""
+    rng = np.random.default_rng(0)
+    lon = rng.uniform(-5, -4, nobs + ntgt)
+    lat = rng.uniform(47, 48, nobs + ntgt)
+    d = (
+        1e-3
+        * xkrig.xgeo.EARTH_RADIUS
+        * xkrig.ckrig.haversine(lon[:, None], lat[:, None], lon[None], lat[None])
+    )
+    chol = np.linalg.cholesky(sill * np.exp(-3 * d / rng_km) + 1e-9 * np.eye(nobs + ntgt))
+    fields = chol @ rng.normal(size=(nobs + ntgt, nreal))
+    pos = lambda sl: {"lon": ("npts", lon[sl]), "lat": ("npts", lat[sl])}  # noqa: E731
+    return pos(slice(nobs)), xr.Dataset(coords=pos(slice(nobs, None))), fields[:nobs], fields[nobs:]
+
+
+@pytest.mark.parametrize(
+    "name,krigtype,low,high",
+    [
+        ("kriger", "ordinary", 0.85, 1.15),
+        ("kriger", "simple", 0.85, 1.15),
+        ("local", "ordinary", 0.85, 1.15),
+        ("local", "simple", 0.85, 1.15),
+        ("clustered", "ordinary", 0.6, 1.0),  # conservative
+    ],
+)
+def test_krig_error_is_calibrated(name, krigtype, low, high):
+    """The squared errors are, on average, close to the kriging variance"""
+    cls, kw = KRIGERS[name]
+    if name == "clustered":
+        kw = {"npmax": 50, "nproc": 1}
+    pos, target, zobs, ztgt = get_random_fields()
+    model = xkrig.VariogramModel("exponential", dist_units="km", n=0.0, s=1.0, r=40.0)
+    ratios = []
+    for i in range(zobs.shape[1]):
+        obs = xr.DataArray(zobs[:, i], dims="npts", coords=pos, name="t")
+        kriger = cls(
+            obs,
+            krigtype,
+            model,
+            dist_units="km",
+            **{**kw, **({"mean": 0.0} if krigtype == "simple" else {})},
+        )
+        out = kriger.interp(target)
+        ratios.append(np.mean((out.t.values - ztgt[:, i]) ** 2 / out.t_error.values))
+    assert low < np.mean(ratios) < high

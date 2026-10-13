@@ -42,7 +42,9 @@ rng = np.random.default_rng(3)
 nx, ny, nobs = 50, 40, 150
 lon = xr.DataArray(np.linspace(-6, -4, nx), dims="lon", attrs={"units": "degrees_east"})
 lat = xr.DataArray(np.linspace(46, 48, ny), dims="lat", attrs={"units": "degrees_north"})
-noise = xr.DataArray(rng.normal(size=(ny, nx)), dims=("lat", "lon"), coords={"lon": lon, "lat": lat})
+noise = xr.DataArray(
+    rng.normal(size=(ny, nx)), dims=("lat", "lon"), coords={"lon": lon, "lat": lat}
+)
 kernel = generate_kernel(15, noise, window_func="hanning", isotropic=True)
 truth = smooth(noise, kernel, na_thres=1)
 truth = 15 + 2 * truth / truth.std()
@@ -84,13 +86,12 @@ ax.set_ylabel("Semi-variance [degC2]")
 #
 # The fitted model is given to the :class:`~xoa.krig.Kriger`, which returns the
 # estimation and its error at the positions of a target dataset.
-# The result is stacked along the points, and we restore the grid.
+# The result is on the grid of the target.
 
 kriger = Kriger(obs, "ordinary", vario.get_func(), dist_units="km")
 out = kriger.interp(xr.Dataset(coords={"lon": lon, "lat": lat}))
-out = out.set_index(npts=["lat", "lon"]).unstack("npts").transpose("lat", "lon")
-est = out.temp.assign_coords(lon=lon, lat=lat)
-err = out.temp_error.assign_coords(lon=lon, lat=lat)
+est = out.temp
+err = out.temp_error
 
 vmin, vmax = float(truth.min()), float(truth.max())
 kw = dict(cmap=cmocean.cm.thermal, vmin=vmin, vmax=vmax, add_colorbar=False)
@@ -99,9 +100,16 @@ fig, axes = plt.subplots(
     1, 2, figsize=(9, 3.8), subplot_kw={"projection": ccrs.PlateCarree()}, constrained_layout=True
 )
 mappable = plot_field(truth, ax=axes[0], title="Truth and observations", map_kw=map_kw, **kw)
-axes[0].scatter(obs.lon, obs.lat, c=obs, s=18, edgecolors="w", linewidths=0.5, **{
-    k: v for k, v in kw.items() if k != "add_colorbar"
-}, transform=ccrs.PlateCarree())
+axes[0].scatter(
+    obs.lon,
+    obs.lat,
+    c=obs,
+    s=18,
+    edgecolors="w",
+    linewidths=0.5,
+    **{k: v for k, v in kw.items() if k != "add_colorbar"},
+    transform=ccrs.PlateCarree(),
+)
 plot_field(est, ax=axes[1], title="Kriging", map_kw=map_kw, **kw)
 add_colorbar(mappable, axes, da=truth)
 plot_minimap(truth, ax=[0.9, 0.84, 0.1], fig=fig)
@@ -154,8 +162,7 @@ target = xr.Dataset(coords={"lon": lon, "lat": lat})
 start = time.perf_counter()
 out_local = local.interp(target)
 print(f"Local kriging: {time.perf_counter() - start:.3f} s")
-out_local = out_local.set_index(npts=["lat", "lon"]).unstack("npts").transpose("lat", "lon")
-est_local = out_local.temp.assign_coords(lon=lon, lat=lat)
+est_local = out_local.temp
 print(f"Max difference with the global kriging: {float(abs(est_local - est).max()):.3f} degC")
 
 # %%
