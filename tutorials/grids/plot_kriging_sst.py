@@ -30,6 +30,7 @@ import cartopy.crs as ccrs
 import cmocean
 
 import xoa
+from xoa import meta
 from xoa.krig import ClusteredKriger, Kriger, LocalKriger, VariogramModel, empirical_variogram
 from xoa.plot import add_colorbar, plot_field, plot_minimap
 
@@ -46,8 +47,9 @@ cmap_temp = cmocean.cm.thermal
 # The Gulf Stream separates the cold slope waters from the warm Sargasso Sea
 # with a sharp front and meanders. Such a field is a difficult test for an interpolation.
 
-ds = xoa.open_data_sample("MODELS/CMEMS-GLORYS/glorys_gulfstream_3d.nc").xoa.decode()
-truth = ds.ptemp.isel(time=0, depth=0, drop=True)
+with meta.set_meta_specs("mercator"):
+    ds = xoa.open_data_sample("MODELS/CMEMS-GLORYS/glorys_gulfstream_3d.nc").xoa.decode()
+truth = ds.temp.isel(time=0, depth=0, drop=True)
 truth.attrs.update(long_name="Sea surface temperature", units="degC")
 land = truth.isnull()
 lon, lat = truth.lon, truth.lat
