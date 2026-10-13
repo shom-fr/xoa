@@ -827,19 +827,22 @@ class ClusteredKriger(Kriger):
     nproc: optional
         Number of processes to use to factorize matrices.
         Set it to a number <2 to switch off parallelisation.
+    seed: int, None
+        Seed of the random initialisation of the clusters, to get reproducible results.
+        The clusters, hence the result, change slightly from one call to another without it.
 
     See also
     --------
     Kriger
     """
 
-    def __init__(self, da, krigtype, variogram_func, npmax=None, nproc=None, **kwargs):
+    def __init__(self, da, krigtype, variogram_func, npmax=None, nproc=None, seed=None, **kwargs):
         super().__init__(da, krigtype, variogram_func, **kwargs)
 
         # Clusters
         if npmax is None:
             npmax = np.inf
-        self._clouds = xgeo.clusterize(da, npmax=npmax, split=True)
+        self._clouds = xgeo.clusterize(da, npmax=npmax, split=True, seed=seed)
 
         # Number of cores for parallel computing
         if nproc is None:

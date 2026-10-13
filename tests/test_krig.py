@@ -552,3 +552,17 @@ def test_krig_error_is_calibrated(name, krigtype, low, high):
         out = kriger.interp(target)
         ratios.append(np.mean((out.t.values - ztgt[:, i]) ** 2 / out.t_error.values))
     assert low < np.mean(ratios) < high
+
+
+def test_krig_clustered_kriger_is_reproducible_with_a_seed():
+    obs = get_obs(60)
+    target = get_grid_target()
+
+    def run(seed):
+        kriger = xkrig.ClusteredKriger(
+            obs, "ordinary", get_model(), dist_units="km", npmax=15, nproc=1, seed=seed
+        )
+        return kriger.interp(target).temp.values
+
+    np.testing.assert_array_equal(run(1), run(1))
+    assert not np.array_equal(run(1), run(2))

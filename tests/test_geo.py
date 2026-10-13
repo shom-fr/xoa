@@ -156,3 +156,19 @@ class TestGeoKDTree:
         assert grid.xoa.get_neighbors(points, radius=100, units="km", output="mask").equals(mask)
         with pytest.raises(Exception):
             geo.get_neighbors(grid, points)
+
+
+def test_clusterize_seed():
+    rng = np.random.default_rng(0)
+    ds = xr.Dataset(
+        {"v": ("npts", rng.normal(size=30))},
+        coords={"lon": ("npts", rng.uniform(0, 1, 30)), "lat": ("npts", rng.uniform(0, 1, 30))},
+    )
+    sizes = [
+        [c.sizes["npts"] for c in geo.clusterize(ds, npmax=8, split=True, seed=3)] for _ in range(2)
+    ]
+    assert sizes[0] == sizes[1]
+    first = geo.clusterize(ds, npmax=8, split=True, seed=3)
+    again = geo.clusterize(ds, npmax=8, split=True, seed=3)
+    for c0, c1 in zip(first, again):
+        np.testing.assert_array_equal(c0.indices, c1.indices)

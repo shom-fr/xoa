@@ -360,7 +360,7 @@ def get_extent(extent, margin=0, square=False, min_extent=None):
     return [xmin, xmax, ymin, ymax]
 
 
-def clusterize(obj, npmax, split=False):
+def clusterize(obj, npmax, split=False, seed=None):
     """Split data into clouds of points of max size `npmax`
 
     Input object must have valid geographic coordinates.
@@ -373,6 +373,8 @@ def clusterize(obj, npmax, split=False):
         Maximal number of point per cluster
     split:
         Return one dataset per cluster
+    seed: int, numpy.random.Generator, None
+        Seed of the random initialisation of the k-means, to get reproducible clusters.
 
     Return
     ------
@@ -416,7 +418,7 @@ def clusterize(obj, npmax, split=False):
     points = np.dstack((x, y))[0]
     ii = np.arange(csize)
     while csize > npmax:
-        centroids, global_distorsion = kmeans(points, nclust)
+        centroids, global_distorsion = kmeans(points, nclust, seed=seed)
         indices, distorsions = vq(points, centroids)
         sindices = [ii[indices == nc] for nc in range(nclust)]
         csizes = [sii.shape[0] for sii in sindices]
