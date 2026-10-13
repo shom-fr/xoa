@@ -1502,8 +1502,9 @@ def geo_unstack(obj, ref, stack_dim="npts"):
         if stack_dim not in var.dims:
             return var.variable
         i = var.dims.index(stack_dim)
-        data = var.values.reshape(var.shape[:i] + shape + var.shape[i + 1 :])
-        return xr.Variable(var.dims[:i] + gdims + var.dims[i + 1 :], data, var.attrs)
+        j = i + 1
+        data = var.values.reshape(var.shape[:i] + shape + var.shape[j:])
+        return xr.Variable(var.dims[:i] + gdims + var.dims[j:], data, var.attrs)
 
     coords = {name: reshape(coord) for name, coord in obj.coords.items() if name not in gdims}
     coords.update({dim: ref.coords[dim].variable for dim in gdims if dim in ref.coords})

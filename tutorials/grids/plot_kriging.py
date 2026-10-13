@@ -166,7 +166,7 @@ est_local = out_local.temp
 print(f"Max difference with the global kriging: {float(abs(est_local - est).max()):.3f} degC")
 
 # %%
-# The local estimation is close to the global one, the largest differences being far from the observations. The number of neighbors and
-# the optional ``maxdist`` set the compromise between speed and accuracy. Where there are
-# fewer than ``nmin`` neighbors, for instance far from the observations with a small
-# ``maxdist``, the result is masked.
+# The local estimation is close to the global one, the largest differences being far from
+# the observations. The number of neighbors and the optional ``maxdist`` set the compromise
+# between speed and accuracy. Where there are fewer than ``nmin`` neighbors, for instance
+# far from the observations with a small ``maxdist``, the result is masked.
