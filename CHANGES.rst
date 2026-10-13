@@ -142,7 +142,7 @@ Breaking changes
 ----------------
 - :meth:`xoa.cf.CFSpecs` tests the generic pivot name last, not first.
 - The :meth:`xoa.cf.CFSpecs.decode` method no longer sets the "cf_specs" encoding [:pull:`96`].
-- The default `name_format` option of the :cfsec:`sglocator` CF specifications option is set to False to prevent parsing the grid location in names [:pull:`96`].
+- The default :metaopt:`name_format <[sglocator] name_format>` option of the :metasec:`sglocator <[sglocator]>` section of the meta specifications is set to False to prevent parsing the grid location in names [:pull:`96`].
 - :func:`xoa.filter.tidal_filter` raises an :class:`~xoa.XoaError` instead of a simple warning when the time step is greater than an hour.
 - :func:`xoa.regrid.regrid1d`: extrapolation from input data instead of output data [:pull:`91`].
 
