@@ -18,6 +18,8 @@ Key features:
 - **Mask operations**: Iterative mask erosion and coast filling
 - **Data decimation**: Intelligent undersampling based on spatial proximity
 
+See :ref:`sphx_glr_tutorials_grids_plot_filtering.py` for a walkthrough with figures.
+
 .. _indepth.filtering.spatial:
 
 Spatial filtering with convolution

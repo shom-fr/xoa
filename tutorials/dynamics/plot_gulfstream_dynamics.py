@@ -146,7 +146,7 @@ fig, axes = plot_fields(
     ],
     titles=["Rossby number", "Divergence", "Strain", "Okubo-Weiss"],
     ncols=2,
-    figsize=(12, 9),
+    figsize=(9, 7),
     map_kw=MAP_KW,
     method="contourf",
     extend="both",
@@ -174,7 +174,7 @@ ageos.attrs = {"long_name": "Ageostrophic speed", "units": "m s-1"}
 fig, axes = plot_fields(
     {"Reanalysis": speed, "Geostrophy": speed_g},
     colorbar="shared",
-    figsize=(14, 6),
+    figsize=(9, 4),
     map_kw=MAP_KW,
     **SPEED_KW,
 )
@@ -227,7 +227,7 @@ for da in errors.values():
 fig, axes = plot_fields(
     errors,
     colorbar="shared",
-    figsize=(15, 5.2),
+    figsize=(9, 3),
     map_kw=MAP_KW,
     method="contourf",
     cmap="cmo.matter",
@@ -293,7 +293,7 @@ fig, axes = plot_fields(
     {f"{labels[t]}: {int(m.sum())} cells": rossby.where(m) for t, m in masks.items()},
     ncols=2,
     colorbar="shared",
-    figsize=(10, 6),
+    figsize=(9, 5.5),
     map_kw=MAP_KW,
     cmap="cmo.balance",
     vmin=-0.6,

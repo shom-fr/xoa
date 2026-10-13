@@ -186,7 +186,7 @@ for k, title, vmax in (0, "Barotropic mode", 1.2), (1, "Baroclinic mode 1", 0.8)
 fig, axes = plot_fields(
     list(amps.values()),
     titles=list(amps),
-    figsize=(10, 4.6),
+    figsize=(9, 4),
     method="contourf",
     cmap="cmo.tempo",
     extend="max",

@@ -103,6 +103,19 @@ class TestMetaAccessorMethods:
         self.ds.meta.set_meta_specs(new_specs)
         assert self.ds.meta.get_meta_specs() is new_specs
 
+    def test_set_meta_specs_from_name_and_dict(self):
+        """Specs are set from the name of internal specs or from a dict"""
+        from xoa import meta
+
+        registered = list(meta.get_cache()["registered"])
+        try:
+            self.ds.meta.set_meta_specs("croco")  # internal specs get registered
+            assert self.ds.meta.get_meta_specs().name == "croco"
+        finally:
+            meta.get_cache()["registered"][:] = registered
+        self.ds.meta.set_meta_specs({"data_vars": {"banana": {"standard_name": "banana"}}})
+        assert "banana" in self.ds.meta.get_meta_specs().data_vars
+
     def test_get_meta_specs(self):
         """Test getting meta specs"""
         specs = self.ds.meta.get_meta_specs()

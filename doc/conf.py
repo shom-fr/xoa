@@ -146,10 +146,11 @@ sphinx_gallery_conf = {
     "gallery_dirs": "tutorials",
     "subsection_order": ExplicitOrder(
         [
+            "../tutorials/meta",
+            "../tutorials/graphics",
             "../tutorials/grids",
             "../tutorials/dynamics",
             "../tutorials/evaluation",
-            "../tutorials/graphics",
         ]
     ),
     "binder": {

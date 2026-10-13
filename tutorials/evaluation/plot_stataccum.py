@@ -6,9 +6,9 @@ Accumulating statistics in time
 
 In this tutorial, we show how to:
 
-* accumulate temporal and spatial statistics step by step,
+* accumulate temporal statistics step by step and check them against a manual computation,
 * get volume statistics that are automatically weighted by the layer thicknesses and
-  the grid cell sizes,
+  the grid cell sizes, whose weights are far from homogeneous,
 * stop the accumulation and restart it from a file.
 
 The data are synthetic: a temperature that is linear with depth, on sigma layers
@@ -30,6 +30,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 
 from xoa.stats import StatAccum
+from xoa.grid import get_dx_dy, get_dz
 
 nt, nz, ny, nx = 10, 20, 12, 30
 time = np.array("2020-01-01", dtype="M8[h]") + np.arange(nt) * 6
@@ -49,27 +50,84 @@ temp = temp.assign_coords(z=z, lon=lon, lat=lat)
 temp_ref = (temp + 0.5).rename("temp_ref")
 
 # %%
+# Accumulating step by step
+# -------------------------
+#
+# The data are appended in five chunks of two time steps, as if they were
+# produced along a run. Nothing but the moments is kept between two calls.
+# After each chunk, we get the statistics at a given point, and we compare them
+# with a manual computation on all the time steps available so far.
+
+point = dict(nz=-1, y=0, x=-1)
+sa = StatAccum()
+steps, tmean, tstd = [], [], []
+for i in range(0, nt, 2):
+    sa.append(temp.isel(time=slice(i, i + 2)))
+    stats = sa.get_stats(["tmean", "tstd"]).isel(point)
+    steps.append(sa.nt)
+    tmean.append(float(stats.tmean))
+    tstd.append(float(stats.tstd))
+
+series = temp.isel(point).values
+manual_mean = [series[:n].mean() for n in steps]
+manual_std = [series[:n].std() for n in steps]
+np.testing.assert_allclose(tmean, manual_mean)
+np.testing.assert_allclose(tstd, manual_std)
+
+fig, axes = plt.subplots(1, 2, figsize=(9, 3), sharex=True)
+for ax, acc, man, name in zip(axes, (tmean, tstd), (manual_mean, manual_std), ("mean", "std")):
+    ax.plot(steps, man, "o-", label="Manual")
+    ax.plot(steps, acc, "x--", ms=10, label="StatAccum")
+    ax.set_title(f"Temporal {name}")
+    ax.set_xlabel("Number of accumulated time steps")
+ax.legend()
+
+# %%
+# The accumulated statistics match the manual ones at each step,
+# although the data of the previous steps are not used anymore.
+
+# %%
 # Volume statistics
 # -----------------
 #
-# We reduce all the spatial dimensions at each time step. Statistics are weighted by
-# the layer thicknesses, which are deduced from the ``z`` coordinate, and by the grid
+# We now reduce all the spatial dimensions at each time step. Statistics are weighted
+# by the layer thicknesses, which are deduced from the ``z`` coordinate, and by the grid
 # cell sizes, which are deduced from the longitudes and latitudes.
-# Temporal statistics are also accumulated at each point.
+# These are the weights that ``StatAccum`` computes internally.
+# They are very heterogeneous, as shown below.
+
+dz = get_dz(temp)
+dx, dy = get_dx_dy(temp)
+weights = dz * dx * dy
+
+fig, axes = plt.subplots(1, 3, figsize=(9, 2.5))
+dz.isel(time=0).plot(ax=axes[0], x="x", y="nz")
+axes[0].set_title("Layer thickness (m)")
+(dx * dy).isel(x=0).plot(ax=axes[1])
+axes[1].set_title("Cell area (m2)")
+weights.isel(time=0, y=0).plot(ax=axes[2], x="x", y="nz")
+axes[2].set_title("Cell volume (m3)")
+fig.tight_layout()
+print("Weights range over a factor", float(weights.max() / weights.min()))
+
+# %%
+# We accumulate the volume statistics and compare the mean with a manual weighted
+# computation. We also compare with an unweighted mean, where thin layers on the shelf
+# count as much as thick ones in the open ocean, and cells at high latitudes
+# as much as the others.
 
 sa = StatAccum(spatial=True)
 sa.append(temp, temp_ref)
 stats = sa.get_stats()
 print(stats)
 
-# %%
-# Without weights, thin layers on the shelf count as much as thick ones
-# in the open ocean, and cells at high latitudes as much as the others.
-
+manual = (temp * weights).sum(["nz", "y", "x"]) / weights.sum(["nz", "y", "x"])
+xr.testing.assert_allclose(stats.smean0, manual, check_dim_order=False)
 unweighted = StatAccum(temporal=False, spatial=True, weights=False).append(temp).get_stats()
 
 fig, ax = plt.subplots(figsize=(6, 3))
-stats.smean0.plot(ax=ax, label="Weighted")
+manual.plot(ax=ax, label="Manual weighted", lw=4, alpha=0.4)
+stats.smean0.plot(ax=ax, label="StatAccum weighted", ls="--")
 unweighted.smean.plot(ax=ax, label="Unweighted")
 ax.legend()
 ax.set_title("Volume mean of the temperature")

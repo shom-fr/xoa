@@ -44,9 +44,9 @@ xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 # %%
-# Register the internal CROCO naming specifications.
+# Use the internal CROCO naming specifications.
 
-xmeta.register_meta_specs(xoa.get_meta_config_file("croco"))
+xmeta.set_meta_specs("croco")
 
 # %%
 # Read the simulation
@@ -105,7 +105,7 @@ kw = {"method": "contourf", "cmap": "cmo.balance", "extend": "both", "x": "lon"}
 fig, axes = plt.subplots(
     1,
     3,
-    figsize=(15, 4.2),
+    figsize=(9, 2.5),
     sharey=True,
     constrained_layout=True,
     gridspec_kw={"width_ratios": [1, 1, 1.15]},
@@ -120,6 +120,8 @@ diff = (rossby_z - rossby_s).rename("rossby")
 diff.attrs["long_name"] = "Difference of Rossby number"
 plot_section(diff.isel(y_rho=jsec), ax=axes[2], levels=np.linspace(-0.3, 0.3, 21), **kw)
 axes[2].set_title("Difference")
+for ax in axes:
+    ax.set_xlabel("Longitude")
 for ax in axes[1:]:
     ax.set_ylabel("")
 
@@ -172,7 +174,7 @@ kw = {
     "colorbar": "shared",
 }
 fig, axes = plot_fields(
-    {name: da.where(valid) for name, da in estimates.items()}, figsize=(15, 5), **kw
+    {name: da.where(valid) for name, da in estimates.items()}, figsize=(9, 3), **kw
 )
 
 # %%
@@ -188,7 +190,7 @@ kw.update(
 )
 estimates.pop("Reference")
 fig, axes = plot_fields(
-    {name: (da - rossby_ref).where(valid) for name, da in estimates.items()}, figsize=(10, 5), **kw
+    {name: (da - rossby_ref).where(valid) for name, da in estimates.items()}, figsize=(9, 4.5), **kw
 )
 print(f"Standard deviation of the reference: {float(rossby_ref.where(valid).std()):.3f}")
 for name, da in estimates.items():

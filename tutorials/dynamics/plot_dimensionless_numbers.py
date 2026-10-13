@@ -114,7 +114,7 @@ fig, axes = plot_fields(
     ],
     titles=["Rossby", "Burger from the modes", "Burger from N H / f", "Froude"],
     ncols=2,
-    figsize=(12, 9),
+    figsize=(9, 7),
     map_kw=MAP_KW,
     method="contourf",
     extend="both",

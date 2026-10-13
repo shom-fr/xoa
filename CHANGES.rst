@@ -14,7 +14,7 @@ New features
 - Add the :mod:`xoa.numbers` module with :func:`~xoa.numbers.get_rossby`, :func:`~xoa.numbers.get_burger`, :func:`~xoa.numbers.get_froude` and :func:`~xoa.numbers.get_ekman`. ``xoa.dyn.get_rossby`` moved to it, without backward compatibility. See :ref:`sphx_glr_tutorials_dynamics_plot_dimensionless_numbers.py`.
 - Add :class:`xoa.stats.StatAccum` to accumulate temporal and spatial statistics, with automatic vertical and horizontal weights, dump and restart, based on numba moments in :mod:`xoa.core.stats`. See :ref:`indepth.stataccum`.
 - Add :func:`xoa.grid.dz2z`, :func:`xoa.grid.z2dz`, :func:`xoa.grid.get_dz`, :func:`xoa.grid.get_dz_terms` and :func:`xoa.grid.decode_dz2z`, and the ``positive`` and ``errors`` arguments of :func:`xoa.coords.get_positive_attr`. :func:`xoa.coords.get_z` now relies on :func:`~xoa.grid.decode_dz2z`. Fix :func:`xoa.grid.decode_dz2depth` with a bathymetry or a sea surface height and ``positive="down"``.
-- Group the tutorials in categories: grids, dynamics, evaluation and graphics.
+- Group the tutorials in categories: graphics, grids, dynamics and evaluation, and add the :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`, :ref:`sphx_glr_tutorials_grids_plot_filtering.py` and :ref:`sphx_glr_tutorials_grids_plot_kriging.py` tutorials, and the new :ref:`sphx_glr_tutorials_meta_plot_naming.py` and :ref:`sphx_glr_tutorials_dynamics_plot_mixed_layer.py` ones. Figures are narrower to fit the doc pages, and the :ref:`indepth.meta` guide is shorter and clearer.
 - Add the :ref:`references` page.
 - Add :func:`xoa.mask.get_polygon_mask`, also an ``xoa`` accessor method, to flag grid cells inside polygons with a coverage threshold, based on the new :mod:`xoa.core.mask` and :mod:`xoa.core.poly` numba functions.
 - Add :func:`xoa.plot.plot_fields` to plot several fields on maps of a single figure, with a shared colorbar if needed.
@@ -63,6 +63,8 @@ Deprecations
 
 Bug fixes
 ---------
+- The ``set_meta_specs`` method of the ``xoa`` accessors accepts the same arguments as :class:`xoa.meta.set_meta_specs`, like a name or a dict.
+- Fix :class:`xoa.krig.Kriger` that computed the distances between input points in meters whatever its `dist_units`.
 - :func:`xoa.coords.get_depth` no longer fails when it has to decode a dataset, and no longer warns when ``errors="ignore"``.
 - Fix the ``decode_sigma`` subaccessor of the ``xoa`` accessor of datasets, that returned ``None``.
 - Fix the meta appendix: the meta configurations are no longer called specifications, the specifications provided by the internal :file:`meta.ini` file have their own page, and the details pages of the configuration items are not listed in the left table of contents anymore.
