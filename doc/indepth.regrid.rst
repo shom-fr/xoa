@@ -232,7 +232,9 @@ Triangulation remains the right tool when the source really is **a cloud of scat
 points**, like observations: all the methods of this guide need a structured grid. It
 is not part of :class:`~xoa.interp.Interpolator`, and :mod:`xoa.krig` offers an
 optimal interpolation for scattered data, as shown in
-:ref:`sphx_glr_tutorials_grids_plot_kriging.py`.
+:ref:`sphx_glr_tutorials_grids_plot_kriging.py`. Big clouds of points are handled
+by :class:`xoa.krig.LocalKriger`, which only uses the nearest points of each target, or
+by :class:`xoa.krig.ClusteredKriger`.
 
 Points near the edges of the source grid
 ----------------------------------------

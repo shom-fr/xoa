@@ -12,12 +12,15 @@ In this tutorial, we show how to:
 
 The data are synthetic, so that the interpolation can be evaluated: a spatially correlated
 field is sampled at random positions and corrupted with a small noise.
-See also: :ref:`sphx_glr_tutorials_grids_plot_filtering.py`.
+See also: :ref:`sphx_glr_tutorials_grids_plot_filtering.py` and
+:ref:`sphx_glr_tutorials_grids_plot_kriging_sst.py`.
 """
 
 # %%
 # Initialisations
 # ---------------
+
+import time
 
 import numpy as np
 import xarray as xr
@@ -26,7 +29,7 @@ import cartopy.crs as ccrs
 import cmocean
 
 from xoa.filter import generate_kernel, smooth
-from xoa.krig import Kriger, VariogramModel, empirical_variogram
+from xoa.krig import Kriger, LocalKriger, VariogramModel, empirical_variogram
 from xoa.plot import add_colorbar, plot_field, plot_minimap
 
 xr.set_options(display_style="text")
@@ -136,3 +139,27 @@ m1 = plot_field(
     add_colorbar=False,
 )
 add_colorbar(m1, axes[1], label="Difference [degC]")
+
+# %%
+# Local kriging
+# -------------
+#
+# The :class:`~xoa.krig.Kriger` uses all the observations at once, which gets slow and heavy
+# with many observations. The :class:`~xoa.krig.LocalKriger` only uses the ``nneigh`` nearest
+# observations of each target point, found with a KD-tree, and solves a small system for each
+# of them with numba. Beyond the range of the variogram, far observations hardly matter.
+
+local = LocalKriger(obs, "ordinary", vario, nneigh=40, dist_units="km")
+target = xr.Dataset(coords={"lon": lon, "lat": lat})
+start = time.perf_counter()
+out_local = local.interp(target)
+print(f"Local kriging: {time.perf_counter() - start:.3f} s")
+out_local = out_local.set_index(npts=["lat", "lon"]).unstack("npts").transpose("lat", "lon")
+est_local = out_local.temp.assign_coords(lon=lon, lat=lat)
+print(f"Max difference with the global kriging: {float(abs(est_local - est).max()):.3f} degC")
+
+# %%
+# The local estimation is close to the global one, the largest differences being far from the observations. The number of neighbors and
+# the optional ``maxdist`` set the compromise between speed and accuracy. Where there are
+# fewer than ``nmin`` neighbors, for instance far from the observations with a small
+# ``maxdist``, the result is masked.
