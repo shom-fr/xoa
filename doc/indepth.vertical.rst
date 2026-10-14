@@ -138,15 +138,17 @@ to the default ones with :func:`xoa.meta.assign_meta_specs`:
 Note that ``depth`` is also the name of the bathymetry term of the formulas, which
 is positive down but is not a coordinate.
 
-Heights at other vertical locations, like the w levels of CROCO, get the location in
-their name, like ``z_w``, whatever the name format of the meta specs.
+Heights at other vertical locations, like the w levels of CROCO, are named with the
+location, like ``z_rho`` and ``z_w``, which requires meta specs whose name format has
+a location, like ``croco``. Otherwise, decoding raises an error instead of writing twice
+to ``z``.
 
 These heights are relative to the fixed datum of the formulas, at which the sea surface
 height is zero, so the free surface is at ``z = ssh``. When you want the free surface at
-zero, to interpolate at a given distance below it for instance, use ``ref="surface"``, or
-:func:`~xoa.coords.to_surface_ref` on an existing ``z`` or ``depth``.
-The result has a ``xoa_vertical_ref`` attribute set to ``"surface"``, and a ``z`` loses
-its ``altitude`` standard name, which is relative to the datum:
+zero, to interpolate at a given distance below it for instance, use ``ref="surface"``:
+the ``ssh`` is subtracted in the computation, so the water column and the levels
+are unchanged. The result has a ``xoa_vertical_ref`` attribute set to ``"surface"``,
+and loses its ``altitude`` standard name, which is relative to the datum:
 
 .. ipython:: python
 

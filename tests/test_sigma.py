@@ -198,40 +198,46 @@ def get_staggered_sigma_dataset(nzr=4, nx=3, zeta=0.0):
     )
 
 
-@pytest.mark.parametrize("specs,zname", [("default", "z"), ("croco", "z_rho")])
-def test_decode_sigma_staggered_vertical_locations(specs, zname):
+def test_decode_sigma_staggered_vertical_locations():
     """Heights at rho and w levels must not overwrite each other"""
-    ds = meta.assign_meta_specs(get_staggered_sigma_dataset(), specs)
+    ds = meta.assign_meta_specs(get_staggered_sigma_dataset(), "croco")
     s_rho, s_w = ds.s_rho.values, ds.s_w.values
 
     ds_out = sigma.decode_sigma(ds)
 
-    assert zname in ds_out.coords and "z_w" in ds_out.coords
-    assert "s_rho" in ds_out[zname].dims and "s_w" not in ds_out[zname].dims
+    assert "z_rho" in ds_out.coords and "z_w" in ds_out.coords
+    assert "s_rho" in ds_out.z_rho.dims and "s_w" not in ds_out.z_rho.dims
     assert "s_w" in ds_out.z_w.dims and "s_rho" not in ds_out.z_w.dims
-    assert zname in ds_out.temp.coords
-    np.testing.assert_allclose(ds_out[zname].isel(xi_rho=0), 100 * s_rho)
+    assert "z_rho" in ds_out.temp.coords
+    np.testing.assert_allclose(ds_out.z_rho.isel(xi_rho=0), 100 * s_rho)
     np.testing.assert_allclose(ds_out.z_w.isel(xi_rho=0), 100 * s_w)
 
 
-@pytest.mark.parametrize("specs,zname", [("default", "z"), ("croco", "z_rho")])
-def test_decode_sigma_ref(specs, zname):
+def test_decode_sigma_writing_twice_raises():
+    """Without the croco specs, rho and w heights would both be named z"""
+    ds = meta.assign_meta_specs(get_staggered_sigma_dataset(), "default")
+    with pytest.raises(xoa.exceptions.XoaSigmaError, match="written twice"):
+        sigma.decode_sigma(ds)
+
+
+def test_decode_sigma_ref():
     """Heights relative to the datum or to the free surface"""
-    ds = meta.assign_meta_specs(get_staggered_sigma_dataset(zeta=-2.0), specs)
+    ds = meta.assign_meta_specs(get_staggered_sigma_dataset(zeta=-2.0), "croco")
     s_rho, s_w = ds.s_rho.values, ds.s_w.values
 
     ds_datum = sigma.decode_sigma(ds)
     np.testing.assert_allclose(ds_datum.z_w.isel(xi_rho=0), -2 + 98 * s_w)
-    assert "xoa_vertical_ref" not in ds_datum[zname].attrs
+    assert "xoa_vertical_ref" not in ds_datum.z_rho.attrs
 
     ds_surf = sigma.decode_sigma(ds, ref="surface")
-    np.testing.assert_allclose(ds_surf[zname].isel(xi_rho=0), 98 * s_rho)
+    np.testing.assert_allclose(ds_surf.z_rho.isel(xi_rho=0), 98 * s_rho)
     np.testing.assert_allclose(ds_surf.z_w.isel(xi_rho=0), 98 * s_w)
     assert ds_surf.z_w.isel(s_w=-1).values.tolist() == [0.0] * 3
-    for name in (zname, "z_w"):
+    for name in ("z_rho", "z_w"):
         assert ds_surf[name].attrs["xoa_vertical_ref"] == "surface"
+        assert "standard_name" not in ds_surf[name].attrs
         assert ds_surf[name].dims == ds_datum[name].dims
-    assert zname in ds_surf.temp.coords
+    assert "z_rho" in ds_surf.temp.coords
 
     with pytest.raises(xoa.exceptions.XoaSigmaError, match="Invalid ref"):
         sigma.decode_sigma(ds, ref="bottom")

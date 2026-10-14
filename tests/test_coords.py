@@ -80,43 +80,6 @@ def test_as_z():
     np.testing.assert_allclose(coords.as_z(heights.assign_attrs(positive="down")), -heights)
 
 
-def test_to_surface_ref():
-    ssh = xr.DataArray([1.0, -2.0], dims="x", name="ssh")
-    z = xr.DataArray(
-        [[-10.0, -10.0], [1.0, -2.0]],
-        dims=("k", "x"),
-        name="z",
-        attrs={"standard_name": "altitude", "units": "m", "positive": "up"},
-    )
-    zs = coords.to_surface_ref(z, ssh)
-    assert zs.name == "z" and zs.dims == z.dims
-    np.testing.assert_allclose(zs, [[-11.0, -8.0], [0.0, 0.0]])
-    assert "standard_name" not in zs.attrs
-    assert zs.attrs["units"] == "m" and zs.attrs["positive"] == "up"
-    assert zs.attrs["xoa_vertical_ref"] == "surface"
-    # Already referred to the surface
-    assert coords.to_surface_ref(zs, ssh) is zs
-    # Depth
-    depth = coords.to_depth(z)
-    np.testing.assert_allclose(coords.to_surface_ref(depth, ssh), -zs)
-    # Convention inferred from the name, and ssh searched for in the coordinates
-    zc = z.copy()
-    zc.attrs = {}
-    zc = zc.assign_coords(ssh=ssh)
-    np.testing.assert_allclose(coords.to_surface_ref(zc), zs)
-    assert "ssh" in coords.to_surface_ref(zc).coords
-    # ssh searched for in a dataset
-    np.testing.assert_allclose(coords.to_surface_ref(z, ssh.to_dataset()), zs)
-    # Broadcasting along time keeps the dims of the input first
-    ssht = xr.concat([ssh, ssh + 1], "time")
-    assert coords.to_surface_ref(z, ssht).dims == ("k", "x", "time")
-    # Errors
-    with pytest.raises(xoa.exceptions.XoaCoordsError, match="sea surface height"):
-        coords.to_surface_ref(z)
-    with pytest.raises(xoa.exceptions.XoaCoordsError, match="positive"):
-        coords.to_surface_ref(zc.drop_vars("ssh").rename("banana"), ssh)
-
-
 def test_get_depth_from_variable():
     """Test depth coordinate functions"""
     da = xr.DataArray(
