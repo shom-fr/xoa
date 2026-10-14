@@ -28,7 +28,7 @@ New features
 - Add :func:`xoa.plot.plot_vectors` and :func:`xoa.core.plot.plot_vectors` to draw currents as under-sampled arrows.
 - Add the :ref:`sphx_glr_tutorials_dynamics_plot_gulfstream_dynamics.py` tutorial, based on a new GLORYS data sample.
 - The ``mercator`` naming specifications are also used for GLORYS.
-- Add the ``ref="surface"`` argument to :func:`xoa.sigma.decode_sigma`, the ``decode_sigma`` accessor and the ocean sigma functions, to get heights relative to the free surface instead of the fixed datum.
+- Add the ``ref="surface"`` argument to :func:`xoa.sigma.decode_sigma`, the ``decode_sigma`` accessor and the ocean sigma functions, to get heights relative to the free surface instead of the fixed datum. The core functions of :mod:`xoa.core.sigma` take a new ``datum`` argument, and :func:`xoa.coords.to_z` and :func:`xoa.coords.to_depth` keep the ``xoa_vertical_ref`` attribute.
 - Add :func:`xoa.coords.copy_coord_attrs` to restore coordinate attributes after :func:`xarray.apply_ufunc`.
 - Add the :ref:`indepth.vertical` guide and the ``z`` coordinate (positive up) as distinct from ``depth`` (positive down): ``z`` meta spec, :func:`xoa.coords.get_z`, :func:`~xoa.coords.is_z`, :func:`~xoa.coords.to_z`, :func:`~xoa.coords.to_depth`, :func:`~xoa.coords.reverse_dim` and the ``xoa.get_z`` accessor method. :func:`~xoa.coords.get_depth` and :func:`~xoa.coords.get_z` fall back on each other and flip the sign when needed.
 - Add :func:`xoa.core.plot.get_projection` to get a map projection from an instance, a cartopy lower case name or the ``"merc"``, ``"pc"`` and ``"ortho"`` aliases. The default of :func:`xoa.plot.plot_grid` is ``"ortho"``, centered on the grid.

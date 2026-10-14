@@ -241,3 +241,12 @@ def test_decode_sigma_ref():
 
     with pytest.raises(xoa.exceptions.XoaSigmaError, match="Invalid ref"):
         sigma.decode_sigma(ds, ref="bottom")
+
+
+def test_decode_sigma_writing_twice_errors_policy():
+    """The duplicate height error follows the errors argument"""
+    ds = meta.assign_meta_specs(get_staggered_sigma_dataset(), "default")
+    assert "z" not in sigma.decode_sigma(ds, errors="ignore").coords
+    with pytest.warns(UserWarning, match="written twice"):
+        out = sigma.decode_sigma(ds, errors="warn")
+    assert "z" not in out.coords

@@ -174,7 +174,7 @@ def atmosphere_sigma_coordinate(sig, ps, ptop, dask="parallelized", cache=None):
     )
 
 
-def ocean_sigma_coordinate(sig, ssh, bathy, ref="datum", dask="parallelized", cache=None):
+def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None, ref="datum"):
     """Convert from sigma [-1, 0] to z heights (positive up) in an ocean model
 
     .. note:: This function is dask-aware since it delegates the core computation to
@@ -294,9 +294,9 @@ def ocean_s_coordinate(
     thetab=None,
     cs=None,
     cs_type=None,
-    ref="datum",
     cache=None,
     dask="parallelized",
+    ref="datum",
 ):
     """Convert from s [-1, 0] to z heights (positive up) in an ocean model
 
@@ -367,9 +367,9 @@ def ocean_s_coordinate_g1(
     thetab=None,
     cs=None,
     cs_type=None,
-    ref="datum",
     cache=None,
     dask="parallelized",
+    ref="datum",
 ):
     """Convert from s [-1, 0] generic form 1 to z heights (positive up) in an ocean model
 
@@ -446,9 +446,9 @@ def ocean_s_coordinate_g2(
     thetab=None,
     cs=None,
     cs_type=None,
-    ref="datum",
     cache=None,
     dask="parallelized",
+    ref="datum",
 ):
     """Convert from s [-1, 0] generic form 2 to z heights (positive up) in an ocean model
 
@@ -734,6 +734,7 @@ def decode_sigma(ds, rename=False, hlocs=None, ref="datum", errors="raise"):
     """
     # Init
     ds = ds.copy()
+    ds0 = ds.copy()
     meta_specs = meta.get_meta_specs(ds)
     errors = misc.ERRORS[errors]
     _check_ref_(ref)
@@ -784,11 +785,16 @@ def decode_sigma(ds, rename=False, hlocs=None, ref="datum", errors="raise"):
             # Never write twice to the same height, as when the meta specs have no location
             # in their names (the croco specs must be used for CROCO)
             if height.name in done:
-                raise exceptions.XoaSigmaError(
+                e = exceptions.XoaSigmaError(
                     f"Height {height.name!r} would be written twice, at the {done[height.name]!r} "
                     f"and {loc!r} locations. Please use meta specs whose names have a location, "
                     "like croco."
                 )
+                if errors == "raise":
+                    raise e
+                if errors == "warn":
+                    exceptions.xoa_warn(f"Error while decoding sigma coords: {e}. Skipping...")
+                return ds0
             done[height.name] = loc
 
             # Transpose if appropriate and set as coordinate

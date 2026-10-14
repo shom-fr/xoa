@@ -563,7 +563,7 @@ def _flip_vertical_(da, name, positive, reverse):
     out = 0 - da  # avoids negative zeros
     if da.name in out.coords:  # stale copy of itself
         out = out.drop_vars(da.name)
-    out.attrs = {k: v for k, v in da.attrs.items() if k == "units"}
+    out.attrs = {k: v for k, v in da.attrs.items() if k in ("units", "xoa_vertical_ref")}
     out.attrs["positive"] = positive
     out = out.rename(name)
     return reverse_dim(out, None if reverse is True else reverse) if reverse else out
@@ -572,8 +572,8 @@ def _flip_vertical_(da, name, positive, reverse):
 def to_z(da, name="z", reverse=False):
     """Convert a depth (positive down) to z (positive up) by changing its sign
 
-    Only the ``units`` attribute is kept, and the ``positive`` attribute
-    is set to ``"up"``. The array is lazily negated if it is a dask array.
+    Only the ``units`` and ``xoa_vertical_ref`` attributes are kept,
+    and the ``positive`` attribute is set to ``"up"``. The array is lazily negated if it is a dask array.
 
     Parameters
     ----------

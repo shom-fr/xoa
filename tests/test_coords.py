@@ -290,3 +290,11 @@ class TestZDepth:
         assert coords.get_vertical(da).name == "z"
         da = da.assign_coords(depth=self.get_depth())
         assert coords.get_vertical(da).name == "depth"
+
+
+def test_to_z_to_depth_keep_vertical_ref():
+    z = xr.DataArray(
+        [-2.0, 0.0], dims="k", attrs={"units": "m", "positive": "up", "xoa_vertical_ref": "surface"}
+    )
+    assert coords.to_depth(z).attrs["xoa_vertical_ref"] == "surface"
+    assert coords.to_z(coords.to_depth(z)).attrs["xoa_vertical_ref"] == "surface"
