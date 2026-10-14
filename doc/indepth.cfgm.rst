@@ -3,193 +3,57 @@
 Config management with :mod:`xoa.cfgm`
 #######################################
 
-
-Introduction
-============
-
-The :mod:`xoa.cfgm` module simplifies and extends the functionality
-provided by the excellent
+The :mod:`xoa.cfgm` module simplifies and extends the
 `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_
-configuration file reader and validator package.
-It makes global usage a little easier and adds support for
-plural forms and for exporting the specifications
-to commandline options and rst declarations.
+configuration file reader and validator package. It is what xoa uses for its own
+:doc:`options <configure>` and for its naming specifications (see :ref:`indepth.meta`).
+It makes global usage a little easier and adds support for plural forms,
+for command line options and for rst declarations of the options.
 
+The tutorial :ref:`sphx_glr_tutorials_config_plot_cfgm.py` goes through all of this with code.
 
-Loading and validating
-======================
+Concepts
+========
 
+- **Specifications** describe the options: a section is in brackets, and an option is a
+  ``name=function(parameters, default=value) # help``. They are typically in a static file
+  next to the module, which initializes a :class:`~xoa.cfgm.ConfigManager`.
+- **Validation functions** convert and check the values: the ones of configobj, like
+  ``string``, ``float`` or ``option``, and the ones of xoa, like ``figsize``,
+  ``cmap`` or the dates. :func:`xoa.cfgm.print_validation_functions` lists them
+  and :func:`xoa.cfgm.register_validation_functions` adds yours.
+- **Plural forms** validate lists: ``floats(n=2)`` is a list of two floats.
+- **Precedence**: the command line options, if any, override the user configuration file,
+  which overrides the defaults of the specifications.
 
-Let's define the configuration specifications:
+The workflow is to create the manager from the specifications, then call
+:meth:`~xoa.cfgm.ConfigManager.load` to validate a user configuration, or
+:meth:`~xoa.cfgm.ConfigManager.arg_parse` to also get the command line options:
 
-.. ipython:: python
-
-    cfgspecs_lines = ["[logger] # logging system", "level=option(debug,info,error,default=info) # logging level", "name=string(default=root) # logger name", "[domain]", "xlim=floats(n=2, default=list(-20,0)) # min and max longitudes", "ylim=floats(n=2,default=list(40,50))"]
-    print("\n".join(cfgspecs_lines))
-
-.. note:: Note that the built-in `float` validation function has been
-    used here in its plural form.
-
-Let's set the user configuration:
-
-.. ipython:: python
-
-    cfg_lines = ["[logger]", "name=xoa", "[domain]", "xminmax=-10,0"]
-    print("\n".join(cfg_lines))
-
-Now, initialize the config manager:
-
-.. ipython:: python
+.. code-block:: python
 
     from xoa import cfgm
-    CFGM = cfgm.ConfigManager(cfgspecs_lines)
 
-.. note:: To configure a library, the `cfgspecs_lines` argument is typically the name
-    of a static file placed in the same directory as the module, which will
-    initialize an instance of the :class:`~xoa.cfgm.ConfigManager` class.
+    CFGM = cfgm.ConfigManager("myspecs.cfg")
+    cfg = CFGM.load("user.cfg")                  # validated, with defaults
+    cfg, args = CFGM.arg_parse(parser=parser, getargs=True, cfgfile="user.cfg")
 
-And finally, load and validate the user configuration:
+:func:`xoa.cfgm.cfgargparse` does both in a single call.
 
-.. ipython:: python
+Command line options
+====================
 
-    cfg = CFGM.load(cfg_lines)
+:meth:`~xoa.cfgm.ConfigManager.arg_parse` adds one option per option of the specifications,
+named after its section, like ``--logger-level``. They are set to ``None`` by default so that
+the ones that are not passed do not override the user configuration. It also adds
+``--cfgfile`` for the user configuration file, and ``--short-help`` and ``--long-help``
+in addition to ``--help``.
 
-    from pprint import pprint
-    pprint(cfg)
+Documenting the options
+=======================
 
-Get the default values:
-
-.. ipython:: python
-
-    pprint(CFGM.defaults.dict())
-
-Extending the validation capabilities
-=====================================
-
-One can add user validation functions to the default ones.
-
-Use the :func:`~xoa.cfgm.print_validation_functions` function to print
-the list of validation functions.
-In the following example, only those matching ``*datetime*`` are printed:
-
-.. ipython:: python
-
-    cfgm.print_validation_functions("*time*") # use a pattern to restrict search
-
-To define a new validation function, use the
-:func:`~xoa.cfgm.register_validation_functions` function.
-Here we define and register a validation function that converts
-an entry to an angle in degrees within [0, 360):
-
-.. ipython:: python
-
-    # Define
-    from validate import VdtTypeError
-    def is_angle(value, radians=False):
-        """Validate an angle with optional conversion to radians"""
-        try:
-            value = float(value) % 360.
-        except Exception:
-            raise VdtTypeError("Invalid angle")
-        value = float(value)
-        if radians:
-            value = np.radians(value)
-        return value
-
-    # Register
-    cfgm.register_validation_functions(angle=is_angle)
-
-    # Check that it is registered
-    cfgm.print_validation_functions("angle")
-
-    # Check that it works
-    validator = cfgm.get_validator()
-    print(validator.check("angle(radians=True)", 180+360))
-
-
-Using the :mod:`argparse` capabilities
-======================================
-
-The :class:`~xoa.cfgm.ConfigManager` has the capability to generate
-commandline options from the configuration specifications thanks to
-the :class:`~xoa.cfgm.ConfigManager.arg_parse` method.
-The goal is to add more control to the configuration
-for the user that use it from an executable script that parses the
-commandline:
-
-* Default values are internally defined in the config specifications.
-* The user can optionally alter these values with a configuration file.
-* The user can optionally alter the configuration using the
-  commandline options, which are set to None by default.
-
-In other words, the commandline arguments take precedence over
-the user configuration, which takes precedence over the default
-internal configuration.
-
-Taking advantage of the example above, we create a parser
-and add arguments that reflect the configuration specifications:
-
-
-.. ipython:: python
-    :okwarning:
-
-    # Write the user config file
-    with open("config.cfg", "w") as f:
-        f.write("\n".join(cfg_lines))
-
-    # Define our commandline options
-    argv = ["--logger-level", "error", "myfile.nc"]
-
-    # Init the parser
-    from argparse import ArgumentParser
-    parser = ArgumentParser(description="My script")
-    parser.add_argument("ncfile", help="netcdf file")
-
-    # Add options and parse
-    cfg, args = CFGM.arg_parse(
-        parser=parser, getargs=True, args=argv, cfgfile="config.cfg")
-
-    # Args
-    print(args)
-
-    # Cfg
-    pprint(cfg)
-
-    # See the help like with the -h option
-    parser.print_help()
-
-    # Long help
-    parser.parse_args(["--long-help"])
-
-    # Very short help
-    parser.parse_args(["--short-help"])
-
-
-The :class:`~xoa.cfgm.ConfigManager.arg_parse` method makes also available
-the ``--short-help`` and ``--long-help`` in addition to the
-``--help`` option.
-
-.. note:: The previous example can be compacted using the
-    :func:`~xoa.cfgm.cfgargparse` function::
-
-        cfg, args = cfgargparse(cfgspecsfile, parser=parser, getargs=True)
-
-
-Converting to ``.rst`` format
-==============================
-
-The config manager instance is exportable to `rst` declaration
-for documentation purpose.
-
-.. ipython:: python
-
-    print(CFGM.get_rst())
-
-The result is the following.
-
-.. include:: indepth.cfgm.cfg2rst.txt
-
-These above sphinx declarations need two object types to be declared::
+:meth:`~xoa.cfgm.ConfigManager.to_rst` exports the specifications as Sphinx declarations
+of options and sections, which need two object types to be declared::
 
     app.add_object_type('confopt', 'confopt',
                         objname='configuration option',
@@ -198,11 +62,9 @@ These above sphinx declarations need two object types to be declared::
                         objname='configuration section',
                         indextemplate='pair: %s; configuration section')
 
-The name of these types are parameters of the
-:func:`~xoa.cfgm.cfg2rst` function
-(and :func:`xoa.cfgm.ConfigManager.get_rst` method).
+The names of these types are parameters of the :func:`~xoa.cfgm.cfg2rst` function.
 
-Fortunately, the :mod:`xoa.cfgm` comes also as a **Sphinx extension**:
+Fortunately, :mod:`xoa.cfgm` also comes as a **Sphinx extension**:
 
 - Add ``"xoa.cfgm"`` to the list of Sphinx extensions that are declared in the :file:`conf.py` file.
 - Declare the following Sphinx config variables in the :file:`conf.py`:
@@ -215,3 +77,10 @@ Fortunately, the :mod:`xoa.cfgm` comes also as a **Sphinx extension**:
 
      Name of the outfile file in which rst declarations are written.
 
+Pitfalls
+========
+
+- **Keys that are not in the specifications are kept as unvalidated strings.** A typo in a
+  user file, like ``xminmax`` instead of ``xlim``, does not raise an error, and the default
+  value of ``xlim`` is used.
+- **Validation errors name the option** and are :class:`~xoa.cfgm.XoaValidateError`.

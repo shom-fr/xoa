@@ -69,6 +69,9 @@ def haversine(lon0, lat0, lon1, lat1):
 def bearing(lon0, lat0, lon1, lat1):
     """Compute the bearing angle (forward azimuth)
 
+    The angle is in degrees, in ]-180, 180], counter-clockwise from the east like the angle
+    of a vector ``(u, v)``: east is 0, north is 90, west is 180 and south is -90.
+
     Parameters
     ----------
     lon0: float, array_like

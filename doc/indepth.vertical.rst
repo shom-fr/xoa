@@ -146,6 +146,8 @@ The ``positive`` argument is
 also what decides which end of the levels is the surface, as well as the
 ``[vertical] positive`` option of the configuration or the ``positive`` attribute
 of the vertical dimension coordinate when it is inferred.
+The tutorial :ref:`sphx_glr_tutorials_grids_plot_layer_thicknesses.py` shows the conversions
+between thicknesses and depths, and the use of the thicknesses as weights.
 
 .. ipython:: python
 
@@ -199,6 +201,8 @@ Pitfalls
   and give it another name.
 - **Staggered locations.** With a configuration like ``croco``, ``z`` gets the location
   suffix of its grid, like ``z_w``, as the other coordinates.
+  To get ``z`` at the u and v points, move the sea surface height and the bathymetry or move ``z``
+  itself from the rho points: see :ref:`sphx_glr_tutorials_grids_plot_croco_uv_depths.py`.
 - **Datasets in which the levels are not ordered like their sign suggests.** Functions that
   need the surface level, like the mixed layer depth, take it from the ``positive`` attribute
   and the order of the levels: check that they are consistent after converting

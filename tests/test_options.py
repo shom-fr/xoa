@@ -62,3 +62,14 @@ class TestOptionsManagement:
         value = options.get_option('meta.cache')
         assert isinstance(value, bool)
         assert value is False
+
+
+def test_options_are_available_from_the_package():
+    import xoa
+
+    for name in xoa.__all__:
+        assert hasattr(xoa, name), name
+    assert xoa.get_option("plot.cmapdiv") == options.get_option("plot.cmapdiv")
+    with xoa.set_options("plot", cmapdiv="cmo.delta"):
+        assert xoa.get_option("plot.cmapdiv") == "cmo.delta"
+    assert xoa.get_option("plot.cmapdiv") != "cmo.delta"

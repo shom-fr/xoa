@@ -84,14 +84,17 @@ class CmapAdapter(object):
     def __init__(self, cmap, specs=None):
         self.cmap = plt.get_cmap(cmap)
         self.vmin = self.vmax = None
+        self.specs = None
         if specs is None:
-            self.specs = None
-        if specs.startswith("piv"):
+            pass
+        elif specs.startswith("piv"):
             self.specs = ("pivot", float(specs[3:]))
         elif specs.startswith("cyc"):
             self.specs = ("cycle", float(specs[3:]))
             self.vmin = 0
             self.vmax = self.specs[1]
+        else:
+            raise ValueError(f"Invalid cmap specs: {specs!r}. Must start with 'piv' or 'cyc'")
 
     def set_vlim(self, vmin, vmax):
         """Set the min and max data value for scaling"""
@@ -103,11 +106,12 @@ class CmapAdapter(object):
 
     def get_cmap(self):
         """Get the adapted colormap"""
-        if self.specs[0] == "pivot":
+        if self.specs and self.specs[0] == "pivot":
             if self.vmin is None or self.vmax is None:
                 exceptions.xoa_warn("cmap not adapted since vmin and vmax are not set")
                 return self.cmap
             return crop_cmap(self.cmap, self.vmin, self.vmax, self.specs[1])
+        return self.cmap
 
     def get_dict(self):
         """The specs for plots as a dict whose keys are cmap, vmin and vmax"""

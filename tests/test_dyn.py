@@ -64,6 +64,19 @@ def test_flow2d():
         [1., 2., 1.0148674, 2.04497533, 1.02261437, 2.06865695])
     assert ff.time.values[0] == np.datetime64("2000-01-01")
 
+    # Initial positions from a dataset use the longitudes and the latitudes
+    pos = xr.Dataset(
+        coords={
+            "lon": ("p", [1.0, 2.0], {"standard_name": "longitude"}),
+            "lat": ("p", [1.0, 1.5], {"standard_name": "latitude"}),
+        }
+    )
+    ff2 = dyn.flow2d(
+        u, v, pos, np.timedelta64(3, "h"), np.timedelta64(2, "h"), date="2000-01-01"
+    )
+    np.testing.assert_allclose(ff2.lon, ff.lon)
+    np.testing.assert_allclose(ff2.lat, ff.lat)
+
 
 def _velocity_ds(nt=0, ny=20, nx=30, res=5000.0):
     """Solid body rotation on a regular grid with a 5 km step"""
@@ -431,6 +444,32 @@ class TestVerticalModes:
         vm = dyn.VerticalModes(cube)
         assert vm.rd.dims == ("mode", "time", "lat", "lon")
 
+    def test_rossby_radius(self):
+        n2 = self.get_profile()
+        lat = xr.DataArray(45.0, name="lat", attrs={"standard_name": "latitude"})
+        rd = dyn.get_rossby_radius(n2, lat=lat)
+        f = float(dyn.get_coriolis(45.0))
+        assert rd.dims == () and rd.attrs["units"] == "m"
+        # Same as the integral of N, and close to the exact first radius
+        np.testing.assert_allclose(rd, (np.sqrt(n2) * dyn.xgrid.z2dz(n2.z)).sum() / (np.pi * f))
+        np.testing.assert_allclose(rd, dyn.VerticalModes(n2, lat=lat).rd[1], rtol=0.3)
+        # Extra dimensions, latitudes from the coordinates, positive down and the equator
+        cube = self.get_cube()
+        assert dyn.get_rossby_radius(cube).dims == ("time", "lat", "lon")
+        down = self.get_profile(positive="down")
+        np.testing.assert_allclose(dyn.get_rossby_radius(down, lat=lat), rd)
+        assert np.isnan(dyn.get_rossby_radius(n2, lat=0.0))
+        # Layer, positive up whatever the convention of the vertical coordinate
+        layer = dyn.get_rossby_radius(n2, lat=lat, zrange=(-1500.0, -500.0))
+        inside = (n2.z >= -1500.0) & (n2.z <= -500.0)
+        dz = dyn.xgrid.z2dz(n2.z)
+        np.testing.assert_allclose(layer, (np.sqrt(n2) * dz).where(inside).sum() / (np.pi * f))
+        assert 0 < float(layer) < float(rd)
+        down_layer = dyn.get_rossby_radius(down, lat=lat, zrange=(-1500.0, -500.0))
+        np.testing.assert_allclose(down_layer, layer)
+        with pytest.raises(XoaError, match="latitude"):
+            dyn.get_rossby_radius(n2)
+
     def test_free_surface(self):
         n2 = self.get_profile()
         vm = dyn.VerticalModes(n2, bc="free")
@@ -579,11 +618,11 @@ class TestVerticalModes:
         np.testing.assert_allclose(rec.where(inside), field.where(inside), atol=1e-9)
         assert np.isnan(rec.where(~inside)).all() and full.zrange is None
 
-    def test_depths_for_the_zoom_follow_the_convention_of_z(self):
+    def test_zoom_is_positive_up_whatever_the_convention_of_z(self):
         up = self.get_profile()
         down = self.get_profile(positive="down", name="depth")
         a = dyn.VerticalModes(up, nmodes=3, zrange=(-1000.0, -100.0))
-        b = dyn.VerticalModes(down, nmodes=3, zrange=(100.0, 1000.0))
+        b = dyn.VerticalModes(down, nmodes=3, zrange=(-1000.0, -100.0))
         np.testing.assert_allclose(a.c, b.c, equal_nan=True)
 
     def test_dask(self):

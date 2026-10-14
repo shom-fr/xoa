@@ -134,6 +134,11 @@ Missing neighbors, for instance beyond a maximal distance, have an infinite dist
 and an index of -1, which must not be used to select data.
 See the :ref:`sphx_glr_tutorials_grids_plot_neighbors.py` tutorial.
 
+Distances and directions on the sphere are computed by :func:`xoa.geo.haversine`,
+:func:`xoa.geo.bearing`, :func:`xoa.geo.cdist`, :func:`xoa.geo.pdist` and
+:func:`xoa.geo.get_distances`. The bearing is counter-clockwise from the east, like the angle
+of a vector ``(u, v)``. See the :ref:`sphx_glr_tutorials_grids_plot_distances.py` tutorial.
+
 
 .. _indepth.grids.regrid:
 
@@ -232,6 +237,9 @@ Sigma coordinates are terrain-following vertical coordinates commonly used in oc
 and atmospheric models. Instead of using fixed depth or pressure levels, sigma
 coordinates follow the bathymetry (ocean models) or topography (atmospheric models),
 which allows better resolution near boundaries.
+which allows better resolution near boundaries.
+The tutorial :ref:`sphx_glr_tutorials_grids_plot_sigma_levels.py` shows how the stretching
+parameters distribute the levels over a slope.
 
 Supported coordinate types
 ---------------------------

@@ -146,7 +146,9 @@ sphinx_gallery_conf = {
     "gallery_dirs": "tutorials",
     "subsection_order": ExplicitOrder(
         [
+            "../tutorials/start",
             "../tutorials/meta",
+            "../tutorials/config",
             "../tutorials/graphics",
             "../tutorials/grids",
             "../tutorials/dynamics",

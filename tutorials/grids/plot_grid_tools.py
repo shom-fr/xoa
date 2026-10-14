@@ -31,6 +31,7 @@ from xoa.core.grid import create_rotated_grid
 from xoa.plot import plot_grid
 
 xr.set_options(display_style="text")
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 # %%
 # Horizontal resolution
@@ -85,7 +86,8 @@ plot_grid(big)
 
 # %%
 # The stride can also be set by hand, for each direction, and edges or centers
-# can be switched off.
+# can be switched off. When it does not divide the number of cells, the coarse cells
+# are spread evenly instead of leaving a thin one at the end.
 
 plot_grid(big, stride=(40, 60), centers=False)
 

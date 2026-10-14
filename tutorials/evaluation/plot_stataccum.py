@@ -32,6 +32,8 @@ import matplotlib.pyplot as plt
 from xoa.stats import StatAccum
 from xoa.grid import get_dx_dy, get_dz
 
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
+
 nt, nz, ny, nx = 10, 20, 12, 30
 time = np.array("2020-01-01", dtype="M8[h]") + np.arange(nt) * 6
 lon = xr.DataArray(np.linspace(-6, -4, nx), dims="x", attrs={"units": "degrees_east"})

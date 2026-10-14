@@ -190,7 +190,7 @@ kw.update(
 )
 estimates.pop("Reference")
 fig, axes = plot_fields(
-    {name: (da - rossby_ref).where(valid) for name, da in estimates.items()}, figsize=(9, 4.5), **kw
+    {name: (da - rossby_ref).where(valid) for name, da in estimates.items()}, figsize=(6.5, 3.3), **kw
 )
 print(f"Standard deviation of the reference: {float(rossby_ref.where(valid).std()):.3f}")
 for name, da in estimates.items():

@@ -6,6 +6,14 @@ Unreleased
 
 New features
 ------------
+- Add the tutorials :ref:`sphx_glr_tutorials_start_plot_quickstart.py`, :ref:`sphx_glr_tutorials_dynamics_plot_flow_advection.py`, :ref:`sphx_glr_tutorials_grids_plot_layer_thicknesses.py`, :ref:`sphx_glr_tutorials_grids_plot_distances.py`, :ref:`sphx_glr_tutorials_grids_plot_sigma_levels.py`, :ref:`sphx_glr_tutorials_graphics_plot_colormaps_effects.py` and :ref:`sphx_glr_tutorials_config_plot_options.py`, and improve the figures of the others: consistent fonts and units, shared colorbars, compact layouts.
+- Add the ``parent``, ``loc`` and ``size`` arguments to :func:`xoa.plot.plot_minimap` and :func:`~xoa.plot.plot_double_minimap` to inset the minimaps in an axes.
+- Add ``cmap="auto"`` to :func:`xoa.plot.plot_field` to choose the colormap from the sign of the data and the ``plot`` options, and the ``pretty`` argument of :func:`xoa.plot.get_label` that writes the units in a nicer way (``°C``, ``m s⁻¹``).
+- The options functions, like :func:`xoa.get_option` and :func:`xoa.set_options`, are now available from the ``xoa`` package, as documented.
+- Add the "Specifications and configuration" tutorials :ref:`sphx_glr_tutorials_config_plot_cfgm.py` and :ref:`sphx_glr_tutorials_config_plot_naming_specs.py`, moved out of :ref:`sphx_glr_tutorials_meta_plot_naming.py`, and shorten the :ref:`indepth.cfgm` guide.
+- Add :func:`xoa.core.plot.get_quiverkey_value` and :func:`~xoa.core.plot.add_quiverkey`: reference arrows now have a round value (1, 2 or 5 times a power of ten) and are placed above the left corner of the axes, also with :func:`xoa.plot.plot_stick`. The :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py` tutorial is reworked and its minimaps no longer enlarge the figures.
+- Add :func:`xoa.dyn.get_rossby_radius`, a quick WKB estimate of the first Rossby radius of deformation. See :ref:`sphx_glr_tutorials_dynamics_plot_vertical_modes.py`.
+- Add the :ref:`sphx_glr_tutorials_grids_plot_croco_uv_depths.py` tutorial on the depths at the u and v points of a CROCO grid.
 - Add :class:`xoa.krig.LocalKriger`, which krigs with the nearest points only using the new :class:`~xoa.core.geo.SphericalKDTree` and the numba kernels of :mod:`xoa.core.krig`. See :ref:`sphx_glr_tutorials_grids_plot_kriging.py` and :ref:`sphx_glr_tutorials_grids_plot_kriging_sst.py`.
 - Add :func:`xoa.coords.geo_unstack` to restore the grid of an object stacked with :func:`~xoa.coords.geo_stack`, and its ``singleton`` argument. The stacked dimensions are now in a fixed order, latitude first.
 - Add :class:`xoa.krig.ClusteredKriger`, which now holds the clusterization (``npmax`` and ``nproc``) that moved out of :class:`xoa.krig.Kriger`.
@@ -67,6 +75,11 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix :func:`xoa.dyn.flow2d` with a dataset of initial positions, which used the longitudes for the latitudes, and :func:`xoa.plot.plot_flow` with missing values in the currents.
+- Fix :func:`xoa.geo.get_distances` for a single set of points, which had two dimensions of the same name, now ``npts0`` and ``npts1``, and clarify the angle of :func:`xoa.geo.bearing`.
+- Fix :func:`xoa.plot.add_lightshading`, which gave black objects with recent versions of matplotlib, with a default ``fraction`` of one.
+- Fix the thin last row and column of the under-sampled grids of :func:`xoa.plot.plot_grid`: the drawn edges are now evenly spread with the first and last ones kept.
+- Fix :class:`xoa.color.CmapAdapter` without specs, which made the ``cmap`` validation function of :mod:`xoa.cfgm` crash, and its invalid specs, which now raise an error.
 - Fix :mod:`xoa.krig`: simple kriging now uses the covariance, block kriging averages per point, :func:`~xoa.krig.empirical_variogram` no longer fails when undersampling, drops pairs at the same distance or overwrites the long name, a fitted :class:`~xoa.krig.VariogramModel` is not fitted again and the first variable of a dataset is used to fit it. The krigers now return the grid or the dimensions of the target with its coordinates and their attributes, and the attributes of the input data, and accept a single position. The kriging error is now named variance, and it is conservative for the :class:`~xoa.krig.ClusteredKriger`. The latter and :func:`xoa.geo.clusterize` accept a ``seed`` for reproducible clusters. The kriging matrices are factorized (Cholesky or LU) instead of inverted, with a pseudo inverse for singular ones, and the fitted nugget is at least ``1e-6`` of the sill.
 - The ``set_meta_specs`` method of the ``xoa`` accessors accepts the same arguments as :class:`xoa.meta.set_meta_specs`, like a name or a dict.
 - Fix :class:`xoa.krig.Kriger` that computed the distances between input points in meters whatever its `dist_units`.

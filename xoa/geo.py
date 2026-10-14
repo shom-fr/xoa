@@ -60,6 +60,9 @@ def haversine(lon0, lat0, lon1, lat1, radius=EARTH_RADIUS):
 def bearing(lon0, lat0, lon1, lat1):
     """Compute the bearing angle (forward azimuth)
 
+    The angle is in degrees, in ]-180, 180], counter-clockwise from the east like the angle
+    of a vector ``(u, v)``: east is 0, north is 90, west is 180 and south is -90.
+
     Parameters
     ----------
     lon0: float, array_like
@@ -129,12 +132,14 @@ def get_distances(da0, da1=None, radius=EARTH_RADIUS, units="m"):
         dd = pdist(XY0, radius=radius)
         if units == distance_units.km:
             dd *= 1e-3
+        ds0 = ds0.rename(npts="npts0")
+        ds1 = ds0.rename(npts0="npts1")
         dd = xr.DataArray(
             dd,
-            dims=("npts", "npts"),
+            dims=("npts0", "npts1"),
             attrs={"units": du},
             name="distance",
-            coords={"lon": ds0.lon, "lat": ds0.lat},
+            coords={"lon_0": ds0.lon, "lat_0": ds0.lat, "lon_1": ds1.lon, "lat_1": ds1.lat},
         )
     else:
         ds0 = ds0.rename(npts="npts0")

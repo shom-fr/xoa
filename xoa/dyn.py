@@ -228,7 +228,7 @@ def flow2d(u, v, xy0, duration, step, date=None):
     tt0 = None
     if isinstance(xy0, xr.Dataset):
         tx0 = xcoords.get_lon(xy0).values.ravel()
-        ty0 = xcoords.get_lon(xy0).values.ravel()
+        ty0 = xcoords.get_lat(xy0).values.ravel()
         tt0 = xcoords.get_time(xy0, errors='ignore')
     elif isinstance(xy0, int):
         tx0 = np.random.uniform(gx.min(), gx.max(), xy0)
@@ -648,6 +648,64 @@ def get_cyclogeos(
     return tuple(out)
 
 
+def get_rossby_radius(n2, z=None, lat=None, zrange=None, fmin=1e-5):
+    """Estimate the first baroclinic Rossby radius of deformation, in m
+
+    It uses the WKB approximation of Chelton et al. (1998),
+    :math:`R_d = \\frac{1}{\\pi |f|} \\int N \\, dz`, where the integral
+    of the buoyancy frequency :math:`N = \\sqrt{N^2}` is taken over the water column.
+    It is much cheaper than :class:`VerticalModes`, which gives the exact radii of all the modes,
+    and it is typically within a few tens of percent of the first one.
+
+    Parameters
+    ----------
+    n2: xarray.DataArray
+        Squared Brunt-Vaisala frequency in s-2 at the levels, with a vertical dimension,
+        like the one computed by :func:`xoa.thermdyn.get_n2`.
+        Negative values are set to zero and missing ones are skipped,
+        so that the radius is the one of the water column described by the data.
+    z: None, xarray.DataArray
+        Vertical coordinate of the levels, which defaults to the one of `n2`.
+        See :func:`xoa.coords.as_z` for the sign convention.
+    lat: None, float, xarray.DataArray
+        Latitudes, which default to the ones of the coordinates of `n2`.
+    zrange: None, tuple(float)
+        Integrate only the levels between these two z values, positive up and thus
+        negative in the ocean, like with :class:`VerticalModes`. It is useful to focus
+        on a layer.
+    fmin: float
+        The radii are missing where the absolute value of the Coriolis parameter
+        is smaller than this value in s-1, like close to the equator.
+
+    Return
+    ------
+    xarray.DataArray
+        Radii in meters, without the vertical dimension
+
+    See also
+    --------
+    VerticalModes
+    xoa.thermdyn.get_n2
+    """
+    zdim = xcoords.get_zdim(n2, errors="raise")
+    z = xcoords.get_z(n2) if z is None else z
+    dz = xgrid.z2dz(z, zdim=zdim)
+    if zrange is not None:
+        zmin, zmax = sorted(zrange)
+        zup = xcoords.as_z(z)
+        n2 = n2.where((zup >= zmin) & (zup <= zmax))
+    if lat is None:
+        lat = xcoords.get_lat(n2, errors="ignore")
+        if lat is None:
+            raise exceptions.XoaError("The latitude is needed to compute the radius: pass lat=")
+    corio = abs(get_coriolis(float(lat) if np.ndim(lat) == 0 else lat))
+    nint = (np.sqrt(n2.clip(min=0)) * dz).sum(zdim, skipna=True, min_count=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rd = xr.where(corio >= fmin, nint / (np.pi * corio), np.nan)
+    rd = rd.transpose(*[d for d in n2.dims if d in rd.dims], ...)
+    return _name_(rd, n2, "rd", "Rossby radius of deformation", "m")
+
+
 def _mode_dims_(res, ref, *drop):
     """Order the dimensions of a result: the mode, the ones of the reference and the others"""
     dims = [d for d in res.dims if d not in drop]
@@ -690,9 +748,9 @@ class VerticalModes:
         Latitudes, to compute the deformation radii. They default to the ones
         of the coordinates, if any.
     zrange: None, tuple(float)
-        Focus on a layer: only the levels between these two values, in the convention
-        of `z`, are used, and the modes have no flux through the limits of the layer.
-        Everything is missing outside of it.
+        Focus on a layer: only the levels between these two z values, positive up
+        and thus negative in the ocean, are used, and the modes have no flux through
+        the limits of the layer. Everything is missing outside of it.
     n2min: float
         Minimal stratification in s-2, which is used in the unstable or mixed layers
     fmin: float
@@ -744,21 +802,14 @@ class VerticalModes:
         self.n2 = n2
 
         # Vertical coordinate, which is positive up
-        if z is None:
-            z = xcoords.get_z(n2)
-            positive = xcoords.get_positive_attr(n2, zdim)
-        else:
-            positive = z.attrs.get("positive")
-            if positive not in ("up", "down"):
-                positive = "up" if not bool((z > 0).any()) else "down"
-            z = xcoords.as_z(z)
+        z = xcoords.get_z(n2) if z is None else z
+        z = xcoords.as_z(z)
         self.z = z
 
-        # Layer, in the convention of the vertical coordinate
+        # Layer
         zmin, zmax = -np.inf, np.inf
         if self.zrange is not None:
-            bounds = sorted(self.zrange)
-            zmin, zmax = bounds if positive == "up" else (-bounds[1], -bounds[0])
+            zmin, zmax = sorted(self.zrange)
 
         modes, c, dz = xr.apply_ufunc(
             cmodes.vertical_modes,

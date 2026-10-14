@@ -35,6 +35,18 @@ from .data_samples import (  # noqa: F401
     show_data_samples,
     open_data_sample,
 )
+from .options import (  # noqa: F401
+    get_default_user_config_file,
+    load_options,
+    get_option,
+    set_option,
+    set_options,
+    reset_options,
+    show_options,
+    show_versions,
+    show_paths,
+    show_info,
+)
 from .accessors import register_accessors, register_xoa_accessors
 
 try:
@@ -53,7 +65,10 @@ __all__ = [
     "get_default_user_config_file",
     "load_options",
     "get_option",
+    "set_option",
     "set_options",
+    "reset_options",
+    "show_options",
     "show_versions",
     "show_paths",
     "show_info",

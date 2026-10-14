@@ -149,6 +149,25 @@ fig, axes = plot_fields(
 # shelf side. The contours show the surface currents of 0.8 and 1.2 m/s, which is the stream.
 
 # %%
+# A quick estimate
+# ----------------
+#
+# When only the first radius is needed, :func:`xoa.dyn.get_rossby_radius` is much cheaper:
+# it integrates the buoyancy frequency along the water column, :math:`R_d = \int N dz / (\pi |f|)`
+# (WKB approximation). Let's compare it with the exact radius.
+
+rd1_wkb = (xdyn.get_rossby_radius(n2) * 1e-3).where(open_ocean)
+ratio = rd1_wkb / rd1
+print(f"WKB / modes: median = {float(ratio.median()):.2f}, "
+      f"5-95% = {float(ratio.quantile(0.05)):.2f}-{float(ratio.quantile(0.95)):.2f}")
+
+# %%
+# The estimate is within about ten percent of the radius of the first baroclinic mode here.
+# Use :class:`~xoa.dyn.VerticalModes` for the exact radii or for the other modes.
+#
+# The integral can be limited to a layer with ``zrange``, in z positive up, like for the modes.
+
+# %%
 # Decompose the currents
 # ----------------------
 #
@@ -219,7 +238,7 @@ for n, color in zip((1, 2, 3), colors):
         label=f"{n} mode" + ("s" if n > 1 else ""),
     )
 axes[0].invert_yaxis()
-axes[0].set_xlabel("Zonal current [m s-1]")
+axes[0].set_xlabel("Zonal current [m s⁻¹]")
 axes[0].set_ylabel("Depth [m]")
 axes[0].set_title("Profile in the stream")
 axes[0].legend(frameon=False)
@@ -231,7 +250,7 @@ axes[1].plot(errors.nmodes, errors, "o-", color="0.2")
 axes[1].set_xscale("log")
 axes[1].set_yscale("log")
 axes[1].set_xlabel("Number of modes")
-axes[1].set_ylabel("Root mean square error [m s-1]")
+axes[1].set_ylabel("Root mean square error [m s⁻¹]")
 axes[1].set_title("Truncation error")
 axes[1].grid(True, which="both", alpha=0.3)
 
@@ -244,11 +263,11 @@ axes[1].grid(True, which="both", alpha=0.3)
 # Focus on the upper ocean
 # ------------------------
 #
-# The ``zrange`` parameter restricts the computation to a layer: only the levels that are in it
-# are used, and the modes have no flux through its limits. The modes of the upper 500 m
+# The ``zrange`` parameter restricts the computation to a layer, given as z positive up,
+# i.e. negative in the ocean: only the levels that are in it are used, and the modes have no flux through its limits. The modes of the upper 500 m
 # describe the thermocline, and their radii are smaller since they are faster to oscillate.
 
-zoom = xdyn.VerticalModes(n2, nmodes=5, zrange=(0, 500))
+zoom = xdyn.VerticalModes(n2, nmodes=5, zrange=(-500, 0))
 rd1z = (zoom.rd.isel(mode=1) * 1e-3).where(open_ocean)
 print(
     f"Median first radius: {float(rd1.median()):.1f} km for the water column, "
