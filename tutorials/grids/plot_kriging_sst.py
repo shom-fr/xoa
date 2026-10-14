@@ -119,7 +119,7 @@ mappable = plot_field(truth, ax=axes[0], title="Truth", map_kw=map_kw, **kw)
 plot_field(truth, ax=axes[1], title="Observations", map_kw=map_kw, alpha=0.35, **kw)
 plot_obs(axes[1], obs, vmin, vmax)
 add_colorbar(mappable, axes, da=truth)
-plot_minimap(truth, ax=[0.9, 0.84, 0.1], fig=fig)
+plot_minimap(truth, parent=axes[0], loc="lower right", size=0.25)
 
 # %%
 # Remove the large scale trend
@@ -149,7 +149,7 @@ fig, axes = plt.subplots(
     1, 2, figsize=(10, 4.2), subplot_kw={"projection": proj}, constrained_layout=True
 )
 m0 = plot_field(trend, ax=axes[0], title="Fitted trend", map_kw=map_kw, **kw)
-add_colorbar(m0, axes[0], label="degC")
+add_colorbar(m0, axes[0], label="°C")
 amax = float(np.abs(resid).quantile(0.98))
 sc = axes[1].scatter(
     resid.lon, resid.lat, c=resid, s=16, cmap=cmocean.cm.balance, vmin=-amax, vmax=amax,
@@ -157,7 +157,7 @@ sc = axes[1].scatter(
 )  # fmt: skip
 plot_field(truth * np.nan, ax=axes[1], title="Observation anomalies", map_kw=map_kw, **kw)
 axes[1].set_extent([*lon_lim, *lat_lim], crs=proj)
-add_colorbar(sc, axes[1], label="degC")
+add_colorbar(sc, axes[1], label="°C")
 
 # %%
 # Fit the semi-variogram
@@ -187,7 +187,7 @@ dist = np.linspace(0, 500, 200)
 for (mtype, model), color in zip(models.items(), ["tab:blue", "tab:orange"]):
     ax.plot(dist, model(dist), color=color, lw=2, label=mtype.title())
 ax.set_xlabel("Distance [km]")
-ax.set_ylabel("Semi-variance [degC$^2$]")
+ax.set_ylabel("Semi-variance [°C$^2$]")
 ax.set_title("Semi-variogram of the anomalies")
 ax.legend(loc="lower right")
 
@@ -238,12 +238,12 @@ m2 = plot_field(
     diff, ax=axes[2], title=f"Estimation - truth (RMSE {rmse:.2f})", cmap=cmocean.cm.balance,
     vmin=-dmax, vmax=dmax, map_kw=map_kw, add_colorbar=False,
 )  # fmt: skip
-add_colorbar(m2, axes[2], label="degC", shrink=0.8)
+add_colorbar(m2, axes[2], label="°C", shrink=0.8)
 m3 = plot_field(
     std, ax=axes[3], title="Kriging standard deviation", cmap=cmocean.cm.amp, map_kw=map_kw,
     add_colorbar=False,
 )  # fmt: skip
-add_colorbar(m3, axes[3], label="degC", shrink=0.8)
+add_colorbar(m3, axes[3], label="°C", shrink=0.8)
 for ax in axes[1:]:
     ax.scatter(obs.lon, obs.lat, c="k", s=1.5, transform=proj, zorder=5)
 
@@ -279,14 +279,14 @@ m1 = plot_field(
     dd, ax=axes[1], title="Local - global", cmap=cmocean.cm.balance, vmin=-dmax, vmax=dmax,
     map_kw=map_kw, add_colorbar=False,
 )  # fmt: skip
-add_colorbar(m1, axes[1], label="degC", shrink=0.8)
+add_colorbar(m1, axes[1], label="°C", shrink=0.8)
 ds_ = std_local - std
 smax = max(float(np.abs(ds_).max()), 1e-3)
 m2 = plot_field(
     ds_, ax=axes[2], title="Standard deviation: local - global", cmap=cmocean.cm.balance,
     vmin=-smax, vmax=smax, map_kw=map_kw, add_colorbar=False,
 )  # fmt: skip
-add_colorbar(m2, axes[2], label="degC", shrink=0.8)
+add_colorbar(m2, axes[2], label="°C", shrink=0.8)
 
 # %%
 # The two estimations agree where the observations are dense. They differ in the
@@ -308,7 +308,8 @@ errs, gaps, costs = [], [], []
 for nneigh in nneighs:
     lk = LocalKriger(resid, "ordinary", vario, nneigh=int(nneigh), dist_units="km")
     best_t = np.inf
-    for _ in range(3):
+    lk.interp(target.isel(lon=slice(2), lat=slice(2)))  # warm-up
+    for _ in range(5):
         start = time.perf_counter()
         out_nn = lk.interp(target, name="sst")
         best_t = min(best_t, time.perf_counter() - start)

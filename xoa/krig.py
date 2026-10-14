@@ -478,9 +478,9 @@ class VariogramModel(object):
         if show_params:
             params = self.params.copy()
             text = [
-                "r[ange] = {:<g} {}".format(params["r"], du),
-                "n[ugget] = {:<g}".format(params["n"]),
-                "s[ill] = {:<g}".format(params["s"]),
+                "r[ange] = {:.3g} {}".format(params["r"], du),
+                "n[ugget] = {:.3g}".format(params["n"]),
+                "s[ill] = {:.3g}".format(params["s"]),
             ]
             maxlen = max([len(t) for t in text])
             text = "\n".join(t.ljust(maxlen) for t in text)

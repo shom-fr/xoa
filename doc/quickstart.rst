@@ -7,9 +7,10 @@ Quick start guide
 Read the documentation
 -------------------------
 
-You should probably start with the :ref:`tutorials` section, which is organized by theme:
-grids and regridding, ocean dynamics, comparison with observations and statistics,
-and graphics.
+You should probably start with the tour :ref:`sphx_glr_tutorials_start_plot_quickstart.py`,
+then browse the :ref:`tutorials` section, which is organized by theme:
+naming and configuration, graphics, grids and regridding, ocean dynamics,
+and comparison with observations and statistics.
 This collection of tutorials will gradually be completed
 to cover almost all features of the library.
 

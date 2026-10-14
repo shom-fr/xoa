@@ -38,6 +38,9 @@ grid are inside polygons. Both are numba accelerated and keep the missing values
     * - :func:`xoa.dyn.get_cyclogeos`
       - Cyclogeostrophic currents from the sea surface height
       - m s-1
+    * - :func:`xoa.dyn.get_rossby_radius`
+      - Quick estimate of the first Rossby radius of deformation from the stratification
+      - m
     * - :class:`xoa.dyn.VerticalModes`
       - Vertical modes of the water columns, their speeds and deformation radii, and the
         decomposition of profiles on them
@@ -228,6 +231,10 @@ temperature and the salinity, and decomposes and recomposes profiles:
     part = vm.recomp(amps, modes=[1, 2])   # contribution of the first baroclinic modes
     vm.rd.isel(mode=1)                     # first deformation radius, in meters
 
+- :func:`xoa.dyn.get_rossby_radius` is a quick WKB estimate of the first radius,
+  :math:`R_d = \int N dz / (\pi |f|)`, that needs no modes and is typically within about 10 to
+  30% of the exact one. Use the modes when you need the exact radii, or the other modes.
+  ``zrange=(zmin, zmax)`` restricts the integral to a layer.
 - :meth:`~xoa.dyn.VerticalModes.energy_share` gives the share of the kinetic energy of each
   mode, and :meth:`~xoa.dyn.VerticalModes.truncation_error` the error of recomposing profiles
   with a given number of modes.
@@ -254,9 +261,9 @@ temperature and the salinity, and decomposes and recomposes profiles:
   layers. In a column that is entirely mixed, there is no baroclinic mode and its speed vanishes.
 - The deformation radii are missing where the Coriolis parameter is smaller than ``fmin``, which
   is the case close to the equator, where the equatorial beta-plane radius is the appropriate one.
-- To focus on a layer, like the upper ocean, use ``zrange=(zmin, zmax)``, in the convention
-  of the vertical coordinate: the modes of the layer have no flux through its limits, and only
-  the layer is decomposed. The modes of the thermocline are faster to oscillate, and have
+- To focus on a layer, like the upper ocean, use ``zrange=(zmin, zmax)``, with z positive up,
+  hence negative in the ocean, whatever the convention of the vertical coordinate:
+  the modes of the layer have no flux through its limits, and only the layer is decomposed. The modes of the thermocline are faster to oscillate, and have
   smaller deformation radii than the ones of the whole water column.
 
 Dimensionless numbers
@@ -367,3 +374,12 @@ polygon for the cell to be inside:
   :func:`xoa.core.poly.point_in_polygon` and :func:`xoa.core.poly.points_in_polygon`
   for points, and :func:`xoa.core.mask.polygon_cell_fraction` and
   :func:`xoa.core.mask.polygon_mask` for cells.
+
+Particle advection
+==================
+
+:func:`xoa.dyn.flow2d` advects particles in a 2D current field with a fourth-order Runge-Kutta
+scheme, from initial positions and for a duration and a step, and
+:func:`xoa.plot.plot_flow` draws a field of short tracks as a "windy" plot. The currents are
+interpolated at the positions of the particles, and are steady since a single date is used.
+See the tutorial :ref:`sphx_glr_tutorials_dynamics_plot_flow_advection.py`.

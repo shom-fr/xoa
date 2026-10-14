@@ -6,6 +6,7 @@ channels:
 
 dependencies:
   - platformdirs
+  - cmocean
   - configobj
   - gsw
   - matplotlib-base

@@ -73,7 +73,7 @@ fig, axes = plot_fields(
     extend="max",
     map_kw={"land": True},
 )
-plot_minimap(ds, ax=[0.9, 0.88, 0.1], fig=fig)
+plot_minimap(ds, parent=axes[0], loc="lower left", size=0.25)
 
 # %%
 # Both criteria give the same patterns, with mixed layers of a few tens of meters that deepen
@@ -89,8 +89,8 @@ plot_minimap(ds, ax=[0.9, 0.88, 0.1], fig=fig)
 point = dict(lat=39.0, lon=-66.0, method="nearest")
 fig, axes = plt.subplots(1, 2, figsize=(7, 4.5), sharey=True, constrained_layout=True)
 for ax, var, mld, label in (
-    (axes[0], temp, mld_temp, "Temperature [degC]"),
-    (axes[1], sigma0, mld_dens, "Potential density anomaly [kg m-3]"),
+    (axes[0], temp, mld_temp, "Temperature [°C]"),
+    (axes[1], sigma0, mld_dens, "Potential density anomaly [kg m⁻³]"),
 ):
     prof = var.sel(**point)
     ax.plot(prof, prof.depth, "o-", ms=3)

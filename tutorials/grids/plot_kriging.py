@@ -33,6 +33,7 @@ from xoa.krig import Kriger, LocalKriger, VariogramModel, empirical_variogram
 from xoa.plot import add_colorbar, plot_field, plot_minimap
 
 xr.set_options(display_style="text")
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 # %%
 # The truth is white noise that is smoothed to get a correlation length of about 40 km,
@@ -112,7 +113,7 @@ axes[0].scatter(
 )
 plot_field(est, ax=axes[1], title="Kriging", map_kw=map_kw, **kw)
 add_colorbar(mappable, axes, da=truth)
-plot_minimap(truth, ax=[0.9, 0.84, 0.1], fig=fig)
+plot_minimap(truth, parent=axes[0], loc="lower right", size=0.25)
 
 # %%
 # The kriged field retrieves the structures of the truth from the sparse observations.

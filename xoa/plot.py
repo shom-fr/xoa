@@ -21,6 +21,8 @@ and http://vacumm.github.io/vacumm/library/misc.core_plot.html
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -139,7 +141,7 @@ def plot_flow(
         if duration is None:
             xmin, xmax, ymin, ymax = xgeo.get_extent(u)
             dist = xgeo.haversine(xmin, ymin, xmax, ymax)
-            speed = np.sqrt(np.abs(u.values).mean() ** 2 + np.abs(v.values).mean() ** 2)
+            speed = np.sqrt(np.nanmean(np.abs(u.values)) ** 2 + np.nanmean(np.abs(v.values)) ** 2)
             duration = dist / speed / 30
         elif isinstance(duration, np.timedelta64):
             duration /= np.timedelta64(1, "s")
@@ -417,10 +419,33 @@ minimap_plot_coords = xmisc.Choices(
 )
 
 
+_MINIMAP_LOCS = ("upper right", "upper left", "lower right", "lower left")
+
+
+def _get_inset_position_(parent, loc, size, pad=0.01):
+    """Get the ``[x, y, size]`` position in figure coordinates of a square inset of a parent axes
+
+    The size is relative to the width of the axes and the pad is relative to the smallest side.
+    """
+    if loc not in _MINIMAP_LOCS:
+        raise exceptions.XoaError(f"Invalid loc: {loc!r}. Choose one of: " + ", ".join(_MINIMAP_LOCS))
+    parent.apply_aspect()
+    box = parent.get_position()
+    fw, fh = parent.figure.get_size_inches()
+    width = size * box.width * fw  # In inches
+    pad = pad * min(box.width * fw, box.height * fh)
+    x = box.x0 + pad / fw if "left" in loc else box.x1 - (width + pad) / fw
+    y = box.y0 + pad / fh if "lower" in loc else box.y1 - (width + pad) / fh
+    return [x, y, width / fw, width / fh]
+
+
 @minimap_plot_coords.format_function_docstring
 def plot_minimap(
     obj,
-    ax=[0.9, 0.9, 0.09],
+    ax=None,
+    parent=None,
+    loc="upper right",
+    size=0.2,
     fig=None,
     extent=1.0,
     min_extent=2.0,
@@ -444,9 +469,18 @@ def plot_minimap(
         The object must contain unique and identifiable geographic coordinates
         that can be retrieved with :func:`xoa.coords.get_lon` and :func:`xoa.coords.get_lat`.
         In case of a tuple, it should a couple of `(lon, lat)` :class:`xarray.DataArray`.
-    ax: list, cartopy.mpl.geoaxes.GeoAxes
+    ax: None, list, cartopy.mpl.geoaxes.GeoAxes
         A matplotlib axes instance or a list that defines the bounding box of the axes to be
         created ``[xmin, ymin, width, height]`` or ``[xmin, ymin, size]`` in figure coordinates.
+        It defaults to the upper right corner of the figure, or to an inset of `parent`.
+    parent: None, matplotlib.axes.Axes
+        Axes in which the minimap is inset, which avoids to enlarge the figure
+        and to hide its content: it is placed at `loc` when `ax` is not given.
+    loc: str
+        Corner of `parent`: ``"upper right"``, ``"upper left"``, ``"lower right"``
+        or ``"lower left"``.
+    size: float
+        Width of the inset relative to the one of `parent`.
     fig: figure
         Figure instance
     extent: str, float
@@ -520,6 +554,14 @@ def plot_minimap(
     else:
         lon = xcoords.get_lon(obj)
         lat = xcoords.get_lat(obj)
+    anchor = None
+    if ax is None:
+        if parent is None:
+            ax = [0.9, 0.9, 0.09]
+        else:
+            ax = _get_inset_position_(parent, loc, size)
+            fig = parent.figure if fig is None else fig
+            anchor = {"upper": "N", "lower": "S"}[loc.split()[0]] + {"left": "W", "right": "E"}[loc.split()[1]]
     if fig is None:
         fig = plt.gcf()
     if isinstance(ax, (list, tuple)):
@@ -533,6 +575,8 @@ def plot_minimap(
             ax = ax + ax[-1:]
         ax = fig.add_axes(ax, projection=proj, facecolor=ocean_color)
         ax.spines["geo"].set_linewidth(0.2)
+        if anchor:
+            ax.set_anchor(anchor)
     if gridlines:
         kwgl = xmisc.dict_filter(kwargs, "gridlines_")
         ax.gridlines(**kwgl)
@@ -609,7 +653,8 @@ def plot_double_minimap(obj, regional_ax="below", **kwargs):
     **kwargs:
         Parameters matching ``global_<param>`` are passed to the global minimap while
         parameters matching ``regional_<param>`` are passed to the regional minimap.
-        All other parameters are passed to both minimaps.
+        All other parameters are passed to both minimaps, like ``parent``, ``loc`` and ``size``
+        that place the global one as an inset of an axes.
 
     Returns
     -------
@@ -667,7 +712,33 @@ def plot_double_minimap(obj, regional_ax="below", **kwargs):
 # %% Labels and maps
 
 
-def get_label(da, units=True):
+_PRETTY_UNITS = {
+    "degc": "°C",
+    "degree_c": "°C",
+    "degrees_c": "°C",
+    "degree_celsius": "°C",
+    "degrees_celsius": "°C",
+    "celsius": "°C",
+    "degrees_east": "°E",
+    "degree_east": "°E",
+    "degrees_north": "°N",
+    "degree_north": "°N",
+    "1e-3": "psu",
+    "psu": "psu",
+}
+_SUPERSCRIPTS = str.maketrans("-0123456789", "⁻⁰¹²³⁴⁵⁶⁷⁸⁹")
+
+
+def _get_pretty_units_(units):
+    """Get units that are nicer to read: ``°C`` for Celsius and ``m s⁻¹`` for ``m s-1``"""
+    units = str(units).strip()
+    pretty = _PRETTY_UNITS.get(units.lower())
+    if pretty:
+        return pretty
+    return re.sub(r"(?<=[A-Za-z])(-?\d+)(?=\s|$)", lambda m: m.group(1).translate(_SUPERSCRIPTS), units)
+
+
+def get_label(da, units=True, pretty=True):
     """Get a label like ``"Long name [units]"`` for a data array
 
     Missing attributes are completed from the current meta specs with
@@ -678,6 +749,9 @@ def get_label(da, units=True):
     da: xarray.DataArray
     units: bool
         Add the units between brackets.
+    pretty: bool
+        Write the units in a nicer way, like ``°C`` instead of ``degrees_celsius``
+        and ``m s⁻¹`` instead of ``m s-1``, and skip the unit ``1`` of dimensionless numbers.
 
     Return
     ------
@@ -701,6 +775,8 @@ def get_label(da, units=True):
     if label:
         label = label[0].upper() + label[1:]
     unit = attrs.get("units")
+    if unit is not None and pretty:
+        unit = "" if str(unit).strip() == "1" else _get_pretty_units_(unit)
     if units and unit:
         label = f"{label} [{unit}]" if label else f"[{unit}]"
     return label
@@ -770,6 +846,29 @@ def _get_map_axes_(ax, extent, transform, map_kw, projection=None):
     return ax
 
 
+def _get_auto_cmap_kwargs_(field, kwargs):
+    """Choose the colormap from the sign of the data and the ``plot`` options of xoa
+
+    A diverging colormap with symmetric limits is used when the data have both signs,
+    else a sequential colormap for positive or negative data.
+    """
+    import cmocean  # noqa: F401 to register the cmo colormaps
+
+    from .options import get_option
+
+    values = np.asarray(field.values, dtype=float)
+    if not np.isfinite(values).any():
+        return {"cmap": get_option("plot.cmappos")}
+    vmin, vmax = np.nanmin(values), np.nanmax(values)
+    if vmin < 0 < vmax:
+        vabs = max(-vmin, vmax)
+        out = {"cmap": get_option("plot.cmapdiv")}
+        if "levels" not in kwargs or np.isscalar(kwargs["levels"]):
+            out.update(vmin=-vabs, vmax=vabs)
+        return out
+    return {"cmap": get_option("plot.cmapneg" if vmax <= 0 and vmin < 0 else "plot.cmappos")}
+
+
 def plot_field(
     field,
     ax=None,
@@ -820,6 +919,9 @@ def plot_field(
         Extra parameters are passed to the plot method, like ``cmap``, ``vmin``,
         ``vmax`` or ``add_colorbar``. The colorbar is shrunk by default, which
         can be changed with ``cbar_kwargs``.
+        With ``cmap="auto"``, the colormap is chosen from the sign of the data among the
+        ``plot.cmapdiv``, ``plot.cmappos`` and ``plot.cmapneg`` :doc:`options </configure>`,
+        and the limits of the diverging colormap are made symmetric.
 
     Return
     ------
@@ -846,6 +948,11 @@ def plot_field(
     extent = xgeo.get_extent(field, margin=margin)
     ax = _get_map_axes_(ax, extent, transform, map_kw)
 
+    if isinstance(kwargs.get("cmap"), str) and kwargs["cmap"] == "auto":
+        auto = _get_auto_cmap_kwargs_(field, kwargs)
+        kwargs.pop("cmap")
+        for key, value in auto.items():
+            kwargs.setdefault(key, value)
     if kwargs.get("add_colorbar", True):
         kwargs["cbar_kwargs"] = _get_cbar_kwargs_(field, kwargs.get("cbar_kwargs"))
     mappable = getattr(field.plot, method)(
@@ -1264,7 +1371,9 @@ def plot_section(
     return mappable
 
 
-def plot_stick(u, v=None, ax=None, scale=None, color="steelblue", **kwargs):
+def plot_stick(
+    u, v=None, ax=None, scale=None, color="steelblue", key=True, key_pos=(0.0, 1.03), **kwargs
+):
     """Plot a current time series as sticks
 
     Each vector is drawn as a stick anchored at ``y=0``, oriented along the current
@@ -1283,6 +1392,10 @@ def plot_stick(u, v=None, ax=None, scale=None, color="steelblue", **kwargs):
         Scale passed to :meth:`matplotlib.axes.Axes.quiver`: the smaller, the longer
         the sticks.
     color: color
+    key: bool, str
+        Add a reference stick that is labelled with its speed, as in :func:`plot_vectors`
+    key_pos: tuple(float)
+        Position of the reference stick in axes coordinates
     kwargs:
         Extra parameters are passed to :meth:`matplotlib.axes.Axes.quiver`
 
@@ -1327,16 +1440,16 @@ def plot_stick(u, v=None, ax=None, scale=None, color="steelblue", **kwargs):
     quiver = cplot.plot_sticks(ax, x, u.values, v.values, scale=scale, color=color, **kwargs)
     if xlabel:
         ax.set_xlabel(xlabel)
+    if key:
+        _add_key_(ax, quiver, np.hypot(u.values, v.values), key, u, key_pos)
     return quiver
 
 
-def _get_quiver_key_value_(speed):
-    """Get a round reference speed that is about half of the maximal one"""
-    ref = 0.5 * float(np.nanmax(speed))
-    if not ref > 0:
-        return 1.0
-    mag = 10 ** np.floor(np.log10(ref))
-    return float(min((1, 2, 5, 10), key=lambda m: abs(m * mag - ref)) * mag)
+def _add_key_(ax, quiver, speed, key, da, key_pos):
+    """Add a quiver key whose value and units come from the speeds and the data"""
+    units = key if isinstance(key, str) else da.attrs.get("units", "")
+    value = cplot.get_quiverkey_value(speed)
+    return cplot.add_quiverkey(ax, quiver, value, units, pos=key_pos)
 
 
 def plot_vectors(
@@ -1347,7 +1460,7 @@ def plot_vectors(
     min_spacing=16,
     color="k",
     key=True,
-    key_pos=(0.25, 0.07),
+    key_pos=(0.0, 1.03),
     transform=None,
     margin=0.0,
     map_kw=None,
@@ -1377,10 +1490,11 @@ def plot_vectors(
         Color of the arrows, or ``"speed"`` to color them with the speed, in which case
         a colorbar is added unless ``add_colorbar=False`` is passed.
     key: bool, str, None
-        Add a reference arrow that is labelled with its speed. A string is used as the
+        Add a reference arrow that is labelled with its speed, whose round value is given by
+        :func:`xoa.core.plot.get_quiverkey_value`. A string is used as the
         label units, which default to the ones of `u`.
     key_pos: tuple(float)
-        Position of the reference arrow in axes coordinates
+        Position of the reference arrow in axes coordinates, above the left corner by default
     transform: None, cartopy.crs.CRS
         Coordinate system of the field, which defaults to ``PlateCarree``
     margin: float
@@ -1453,20 +1567,7 @@ def plot_vectors(
         label = xr.DataArray(speed, attrs={"long_name": "Speed", "units": u.attrs.get("units")})
         add_colorbar(quiver, ax, da=label, **(cbar_kwargs or {}))
     if key:
-        units = key if isinstance(key, str) else u.attrs.get("units", "")
-        ref = _get_quiver_key_value_(speed[::sy, ::sx])
-        qkey = ax.quiverkey(
-            quiver,
-            *key_pos,
-            ref,
-            f"{ref:g} {units}".strip(),
-            labelpos="E",
-            coordinates="axes",
-            color="k" if by_speed else color,
-            labelcolor="k",
-            fontproperties={"size": "small"},
-        )
-        qkey.text.set_bbox({"facecolor": "w", "alpha": 0.7, "edgecolor": "none", "pad": 2})
+        _add_key_(ax, quiver, speed[::sy, ::sx], key, u, key_pos)
     if title:
         ax.set_title(title)
     return quiver
@@ -1715,7 +1816,7 @@ class GrowFilter(_BaseFilter_):
 class LightFilter(_BaseFilter_):
     """Apply a light filter"""
 
-    def __init__(self, sigma, fraction=0.5, **kwargs):
+    def __init__(self, sigma, fraction=1.0, **kwargs):
         self.gauss_filter = GaussianFilter(sigma / 3, alpha=1)
         self.light_source = mcolors.LightSource(**kwargs)
         self.fraction = fraction
@@ -1862,7 +1963,7 @@ def add_glow(objs, width=3, zorder=None, color='w', ax=None, alpha=1.0, add=True
         exceptions.xoa_warn('Cannot add glow effect using agg filters')
 
 
-def add_lightshading(objs, width=7, fraction=0.5, zorder=None, ax=None, add=True, **kwargs):
+def add_lightshading(objs, width=7, fraction=1.0, zorder=None, ax=None, add=True, **kwargs):
     """Add a light shading effect to objects
 
     Parameters
@@ -1872,7 +1973,8 @@ def add_lightshading(objs, width=7, fraction=0.5, zorder=None, ax=None, add=True
     width: optional
         Width of the gaussian filter in points.
     fraction: optional
-        Unknown.
+        Contrast of the shading, passed to :meth:`matplotlib.colors.LightSource.shade_rgb`.
+        Values lower than one give black objects with recent versions of matplotlib.
     zorder: optional
         zorder (else guess from ``objs``).
     ax: optional, :class:`matplotlib.axes.Axes`

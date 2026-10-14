@@ -37,6 +37,7 @@ from xoa.plot import add_colorbar, plot_field
 from xoa.core.grid import create_rotated_grid
 
 xr.set_options(display_style="text")
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 # %%
 # Read the source data

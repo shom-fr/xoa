@@ -9,7 +9,9 @@ In this tutorial, we show how to:
 * smooth a masked 2D field with different kernels,
 * control how missing values propagate near the coast,
 * extend a field into the land mask,
-* remove the tidal signal of a time series with the Demerliac and Godin filters.
+* apply a Shapiro filter, a classic of ocean modelling, with your own kernel,
+* remove the tidal signal of a time series with the Demerliac and Godin filters,
+* decimate scattered observations that are too close to each other.
 
 The concepts are explained in the :ref:`indepth.filtering` guide.
 See also: :ref:`sphx_glr_tutorials_grids_plot_kriging.py`.
@@ -30,6 +32,7 @@ from xoa import filter as xfilter
 from xoa.plot import plot_field, plot_minimap, add_colorbar
 
 xr.set_options(display_style="text")
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 ds = xoa.open_data_sample("MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.surf.nc")
 ds["temp"] = ds.temp.where(ds.mask_rho.astype(bool))
@@ -60,7 +63,7 @@ fig, axes = plt.subplots(
 for ax, (title, field) in zip(axes.flat, fields.items()):
     mappable = plot_field(field, ax=ax, title=title, map_kw={"gridlines_labels_on": []}, **kw)
 add_colorbar(mappable, axes, da=temp)
-plot_minimap(temp, ax=[0.9, 0.9, 0.09], fig=fig)
+plot_minimap(temp, parent=axes[0, 0], loc="upper left", size=0.25)
 
 # %%
 # Tolerating missing values
@@ -124,3 +127,43 @@ ax.set_xlabel("")
 # %%
 # Both filters recover the slow signal, except at the ends of the series where
 # the convolution window is incomplete and the result is masked.
+
+# %%
+# Decimating scattered observations
+# ---------------------------------
+#
+# Observations are often much denser along tracks than elsewhere, which is a problem for
+# a statistical interpolation like kriging. :func:`xoa.filter.decimate` keeps the points that
+# are at least ``radius`` meters from each other. With the ``"pick"`` method, the kept points are
+# a sample of the original ones. With the ``"average"`` method, they get the average
+# of the points that are within the radius. Here are points along three tracks of a ship.
+
+rng = np.random.default_rng(1)
+ny, nx = temp.shape
+s_ = rng.uniform(size=2000)
+ii = np.clip((nx * (0.1 + 0.8 * s_)).astype(int), 0, nx - 1)
+jj = np.clip((ny * (0.2 + 0.6 * np.sin(2 * np.pi * s_) ** 2)).astype(int), 0, ny - 1)
+valid = np.isfinite(temp.values[jj, ii])
+ii, jj = ii[valid], jj[valid]
+obs = xr.Dataset(
+    {"temp": ("npts", temp.values[jj, ii])},
+    coords={
+        "lon": ("npts", temp.lon_rho.values[jj, ii], {"standard_name": "longitude"}),
+        "lat": ("npts", temp.lat_rho.values[jj, ii], {"standard_name": "latitude"}),
+    },
+)
+picked = xfilter.decimate(obs, 20e3, method="pick")
+averaged = xfilter.decimate(obs, 20e3, method="average")
+print(obs.sizes["npts"], "->", picked.sizes["npts"], "points")
+
+fig, axes = plt.subplots(1, 3, figsize=(10, 2.8), sharex=True, sharey=True, constrained_layout=True)
+for ax, (title, d) in zip(
+    axes, {"Original": obs, "Picked": picked, "Averaged": averaged}.items()
+):
+    sc = ax.scatter(d.lon, d.lat, c=d.temp, s=6, vmin=kw["vmin"], vmax=kw["vmax"], cmap=kw["cmap"])
+    ax.set_title(f"{title}: {d.sizes['npts']} points")
+add_colorbar(sc, axes, da=temp)
+
+# %%
+# The decimated points are evenly spaced. The averaged ones are smoother, since they are the mean
+# of the neighbors, while the picked ones keep the original values.

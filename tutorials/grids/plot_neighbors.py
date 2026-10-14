@@ -30,6 +30,7 @@ from xoa.geo import GeoKDTree
 from xoa.plot import add_colorbar, plot_field
 
 xr.set_options(display_style="text")
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 pc = ccrs.PlateCarree()
 map_kw = {"gridlines_labels_on": ["left", "bottom"]}
 

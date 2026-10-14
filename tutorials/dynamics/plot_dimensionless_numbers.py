@@ -68,12 +68,14 @@ print(rossby)
 #
 # The Burger number :math:`Bu = (R_d / L)^2` compares the deformation radius to the scale
 # of the flow. We take here a scale of 50 km for the eddies. The deformation radius is either
-# the one of the first baroclinic vertical mode, or the approximation :math:`N H / |f|` with
+# the one of the first baroclinic vertical mode, the quick WKB estimate of
+# :func:`xoa.dyn.get_rossby_radius`, or the approximation :math:`N H / |f|` with
 # the mean stratification of the upper 1000 m.
 
 L = 50e3
 vm = xdyn.VerticalModes(n2, nmodes=2)
 burger = xnum.get_burger(L, rd=vm.rd.isel(mode=1)).where(open_ocean)
+burger_wkb = xnum.get_burger(L, rd=xdyn.get_rossby_radius(n2)).where(open_ocean)
 
 H = 1000.0
 n2_mean = n2.where(n2.depth <= H).mean("depth")
@@ -109,12 +111,19 @@ fig, axes = plot_fields(
     [
         (rossby, {"cmap": "cmo.balance", "levels": np.linspace(-0.6, 0.6, 25)}),
         (burger, {"cmap": "cmo.matter", "levels": np.linspace(0, 1, 21)}),
+        (burger_wkb, {"cmap": "cmo.matter", "levels": np.linspace(0, 1, 21)}),
         (burger_nh, {"cmap": "cmo.matter", "levels": np.linspace(0, 6, 25)}),
-        (froude, {"cmap": "cmo.amp", "levels": np.linspace(0, 0.1, 21)}),
+        (froude, {"cmap": "cmo.amp", "levels": np.linspace(0, 0.2, 21)}),
     ],
-    titles=["Rossby", "Burger from the modes", "Burger from N H / f", "Froude"],
-    ncols=2,
-    figsize=(9, 7),
+    titles=[
+        "Rossby",
+        "Burger from the modes",
+        "Burger from the WKB radius",
+        "Burger from N H / f",
+        "Froude",
+    ],
+    ncols=3,
+    figsize=(10, 6.2),
     map_kw=MAP_KW,
     method="contourf",
     extend="both",
@@ -122,7 +131,8 @@ fig, axes = plot_fields(
 
 # %%
 # The Rossby number reaches 0.5 along the stream and its eddies, and the Burger number
-# of the first mode is of order 0.1 to 0.5 for eddies of 50 km. The :math:`N H / |f|` estimate
+# of the first mode is of order 0.1 to 0.5 for eddies of 50 km, and the WKB radius gives about
+# the same. The :math:`N H / |f|` estimate
 # is about :math:`\pi^2` times larger, since the first baroclinic radius is
 # close to :math:`N H / (\pi |f|)` for a constant stratification: use the radius of the modes
 # when it is available. The Froude number stays below one, i.e. the flow is subcritical,
