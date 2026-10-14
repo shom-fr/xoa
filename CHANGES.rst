@@ -6,11 +6,13 @@ Unreleased
 
 New features
 ------------
-- Add the tutorials :ref:`sphx_glr_tutorials_start_plot_quickstart.py`, :ref:`sphx_glr_tutorials_dynamics_plot_flow_advection.py`, :ref:`sphx_glr_tutorials_grids_plot_layer_thicknesses.py`, :ref:`sphx_glr_tutorials_grids_plot_distances.py`, :ref:`sphx_glr_tutorials_grids_plot_sigma_levels.py`, :ref:`sphx_glr_tutorials_graphics_plot_colormaps_effects.py` and :ref:`sphx_glr_tutorials_config_plot_options.py`, and improve the figures of the others: consistent fonts and units, shared colorbars, compact layouts.
+- Add the ``projection`` argument to :func:`xoa.plot.plot_grid`, orthographic by default.
+- Add :class:`xoa.plot.PanelLabeler`, :func:`xoa.plot.add_panel_labels` and the ``panel_labels`` argument of :func:`xoa.plot.plot_fields` to label panels like "a)".
+- Add a tour of xoa to the :ref:`quickstart`, and the tutorials :ref:`sphx_glr_tutorials_dynamics_plot_flow_advection.py`, :ref:`sphx_glr_tutorials_grids_plot_layer_thicknesses.py`, :ref:`sphx_glr_tutorials_grids_plot_distances.py`, :ref:`sphx_glr_tutorials_grids_plot_sigma_levels.py`, :ref:`sphx_glr_tutorials_graphics_plot_colormaps_effects.py` and :ref:`sphx_glr_tutorials_config_plot_options.py`, and improve the figures of the others: consistent fonts and units, shared colorbars, compact layouts.
 - Add the ``parent``, ``loc`` and ``size`` arguments to :func:`xoa.plot.plot_minimap` and :func:`~xoa.plot.plot_double_minimap` to inset the minimaps in an axes.
 - Add ``cmap="auto"`` to :func:`xoa.plot.plot_field` to choose the colormap from the sign of the data and the ``plot`` options, and the ``pretty`` argument of :func:`xoa.plot.get_label` that writes the units in a nicer way (``°C``, ``m s⁻¹``).
 - The options functions, like :func:`xoa.get_option` and :func:`xoa.set_options`, are now available from the ``xoa`` package, as documented.
-- Add the "Specifications and configuration" tutorials :ref:`sphx_glr_tutorials_config_plot_cfgm.py` and :ref:`sphx_glr_tutorials_config_plot_naming_specs.py`, moved out of :ref:`sphx_glr_tutorials_meta_plot_naming.py`, and shorten the :ref:`indepth.cfgm` guide.
+- Add the "Configuration" tutorial :ref:`sphx_glr_tutorials_config_plot_cfgm.py` and the naming tutorial :ref:`sphx_glr_tutorials_meta_plot_naming_specs.py`, moved out of :ref:`sphx_glr_tutorials_meta_plot_naming.py`, and shorten the :ref:`indepth.cfgm` guide.
 - Add :func:`xoa.core.plot.get_quiverkey_value` and :func:`~xoa.core.plot.add_quiverkey`: reference arrows now have a round value (1, 2 or 5 times a power of ten) and are placed above the left corner of the axes, also with :func:`xoa.plot.plot_stick`. The :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py` tutorial is reworked and its minimaps no longer enlarge the figures.
 - Add :func:`xoa.dyn.get_rossby_radius`, a quick WKB estimate of the first Rossby radius of deformation. See :ref:`sphx_glr_tutorials_dynamics_plot_vertical_modes.py`.
 - Add the :ref:`sphx_glr_tutorials_grids_plot_croco_uv_depths.py` tutorial on the depths at the u and v points of a CROCO grid.
@@ -75,6 +77,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix the white margins of the figures of :func:`xoa.plot.plot_grid`, whose size now follows the aspect ratio of the map, and use ``cmo.deep`` for its bathymetry.
 - Fix :func:`xoa.dyn.flow2d` with a dataset of initial positions, which used the longitudes for the latitudes, and :func:`xoa.plot.plot_flow` with missing values in the currents.
 - Fix :func:`xoa.geo.get_distances` for a single set of points, which had two dimensions of the same name, now ``npts0`` and ``npts1``, and clarify the angle of :func:`xoa.geo.bearing`.
 - Fix :func:`xoa.plot.add_lightshading`, which gave black objects with recent versions of matplotlib, with a default ``fraction`` of one.

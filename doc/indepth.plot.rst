@@ -242,6 +242,11 @@ and labelled with :func:`~xoa.plot.get_label`, so that they do not dwarf the map
 - To lay out the axes yourself, skip the colorbars of :func:`~xoa.plot.plot_field` and add
   a shared one with :func:`~xoa.plot.add_colorbar`, which takes the axes and the array that
   gives the label.
+- For publications, ``panel_labels=True`` of :func:`~xoa.plot.plot_fields` labels the maps
+  "a)", "b)"... A string sets the style, like ``"({A})"``, and a dict the other parameters of
+  :class:`~xoa.plot.PanelLabeler`. :func:`~xoa.plot.add_panel_labels` does the same on any axes,
+  and the :class:`~xoa.plot.PanelLabeler` instance goes on with its sequence from one figure
+  to the next.
 
 Colormaps and effects
 =====================

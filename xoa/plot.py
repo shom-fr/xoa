@@ -992,6 +992,7 @@ def plot_fields(
     colorbar="each",
     cbar_kwargs=None,
     map_kw=None,
+    panel_labels=None,
     **kwargs,
 ):
     """Plot several fields on maps of a single figure
@@ -1020,6 +1021,9 @@ def plot_fields(
         Parameters of the colorbars, see :func:`add_colorbar`
     map_kw: None, dict
         Parameters that decorate the maps, see :func:`plot_field`
+    panel_labels: None, bool, str, dict
+        Add labels like "a)" to the maps, see :class:`PanelLabeler`.
+        A string is the `style` and a dict gives the other parameters.
     kwargs:
         Extra parameters that are passed to :func:`plot_field`, like ``cmap`` or ``levels``
 
@@ -1077,7 +1081,98 @@ def plot_fields(
         mappables.append(plot_field(field, ax=ax, title=title, **{**kwargs, **fkwargs}))
     if colorbar == "shared":
         add_colorbar(mappables[0], axes, da=fields[0][0], **(cbar_kwargs or {}))
+    if panel_labels:
+        if isinstance(panel_labels, str):
+            panel_labels = {"style": panel_labels}
+        add_panel_labels(axes, **(panel_labels if isinstance(panel_labels, dict) else {}))
     return fig, axes
+
+
+class PanelLabeler(object):
+    """Label the panels of figures with letters or numbers, like "a)"
+
+    The counter goes on from one call to the next, so that the panels of
+    several figures or of several groups of axes can share a single sequence.
+
+    Parameters
+    ----------
+    style: str
+        Format of the labels, where ``{a}`` is a lower case letter,
+        ``{A}`` an upper case letter and ``{n}`` a number starting from 1.
+    start: int
+        Index of the first label, starting from 0.
+    loc: {"upper left", "upper right", "lower left", "lower right"}
+        Corner of the axes where the labels are put.
+    pad: float
+        Distance to the corner in axes fraction.
+    text_kw:
+        Extra parameters passed to :meth:`matplotlib.axes.Axes.text`, like ``fontsize``.
+        By default, the labels are bold and have a white halo.
+
+    Example
+    -------
+    .. code-block:: python
+
+        labeler = PanelLabeler("({A})")
+        labeler(axes[:2])
+        labeler(axes[2:])  # Goes on with "(C)"
+    """
+
+    def __init__(self, style="{a})", start=0, loc="upper left", pad=0.03, **text_kw):
+        vloc, hloc = loc.split() if isinstance(loc, str) and len(loc.split()) == 2 else (None,) * 2
+        if vloc not in ("upper", "lower") or hloc not in ("left", "right"):
+            raise exceptions.XoaError(f"Invalid label location: {loc!r}")
+        self.style = style
+        self.index = start
+        self.xy = (pad if hloc == "left" else 1 - pad, 1 - pad if vloc == "upper" else pad)
+        self.text_kw = {
+            "fontweight": "bold",
+            "ha": hloc,
+            "va": "top" if vloc == "upper" else "bottom",
+            "path_effects": [mpatheffects.withStroke(linewidth=3, foreground="w")],
+            **text_kw,
+        }
+
+    def get_label(self, index):
+        """Get the label of a given index, starting from 0"""
+        letters = ""
+        i = index
+        while True:
+            i, r = divmod(i, 26)
+            letters = chr(97 + r) + letters
+            if i == 0:
+                break
+            i -= 1
+        return self.style.format(a=letters, A=letters.upper(), n=index + 1)
+
+    def __call__(self, axes):
+        """Label one axes or a sequence of axes and return the texts"""
+        if not isinstance(axes, (list, tuple, np.ndarray)):
+            axes = [axes]
+        texts = []
+        for ax in np.ravel(axes):
+            texts.append(
+                ax.text(*self.xy, self.get_label(self.index), transform=ax.transAxes, **self.text_kw)
+            )
+            self.index += 1
+        return texts
+
+
+def add_panel_labels(axes, **kwargs):
+    """Label axes with letters or numbers, like "a)"
+
+    Parameters
+    ----------
+    axes: matplotlib.axes.Axes, list
+        One axes or a sequence of axes, labelled in this order.
+    kwargs:
+        Parameters of :class:`PanelLabeler`
+
+    Return
+    ------
+    list(matplotlib.text.Text)
+    """
+    return PanelLabeler(**kwargs)(axes)
 
 
 def plot_grid(
@@ -1091,6 +1186,7 @@ def plot_grid(
     strips=None,
     n_cells=1,
     transform=None,
+    projection=None,
     map_kw=None,
     edge_kw=None,
     center_kw=None,
@@ -1143,6 +1239,10 @@ def plot_grid(
         Number of cells of the strips
     transform: None, cartopy.crs.CRS
         Coordinate system, which defaults to ``PlateCarree``
+    projection: None, str, cartopy.crs.Projection
+        Projection of the map when it is created, see :func:`xoa.core.plot.get_projection`.
+        It has priority over the one of `map_kw`. The default is orthographic, centered on
+        the grid, which limits the deformation of the cells.
     map_kw: None, dict
         Parameters that decorate the map. See :func:`plot_field`.
     edge_kw: None, dict
@@ -1193,7 +1293,9 @@ def plot_grid(
             mask = _get_meta_var_(obj, "mask")
             if mask is not None and set(mask.dims) == set(field.dims):
                 field = field.where(mask != 0)
-            kwargs.setdefault("cmap", "terrain_r")
+            import cmocean  # noqa: F401 to register the cmo colormaps
+
+            kwargs.setdefault("cmap", "cmo.deep")
             obj = field
     if edges is None:
         edges = kind == "mesh"
@@ -1203,7 +1305,14 @@ def plot_grid(
     # Axes
     lon, lat = xgrid._get_lonlat_yx_(obj)
     extent = xgeo.get_extent((lon.values, lat.values), margin=0.05)
-    ax = _get_map_axes_(ax, extent, transform, map_kw, projection="ortho")
+    if ax is None and "figsize" not in (map_kw or {}):
+        # Figure adapted to the aspect ratio of the map, to avoid white margins
+        aspect = (extent[3] - extent[2]) / ((extent[1] - extent[0]) * np.cos(np.radians(np.mean(extent[2:]))))
+        width = 7.0 if field is None else 8.0  # Room for the colorbar
+        map_kw = {**(map_kw or {}), "figsize": (width, np.clip(7.0 * aspect, 3.0, 8.0))}
+    map_kw = dict(map_kw or {})
+    map_kw["projection"] = projection or map_kw.get("projection", "ortho")
+    ax = _get_map_axes_(ax, extent, transform, map_kw)
 
     # Background field
     if kind == "resolution":

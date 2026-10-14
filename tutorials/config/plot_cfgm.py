@@ -16,7 +16,7 @@ This is the :mod:`xoa.cfgm` module, which extends
 `configobj <https://configobj.readthedocs.io/en/latest/index.html>`_, and that xoa
 uses for its own options and its naming specifications.
 The concepts are explained in the :ref:`indepth.cfgm` guide.
-See also: :ref:`sphx_glr_tutorials_config_plot_naming_specs.py`.
+See also: :ref:`sphx_glr_tutorials_meta_plot_naming_specs.py`.
 """
 
 # %%

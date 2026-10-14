@@ -157,13 +157,28 @@ fig, axes = plot_fields(
 # (WKB approximation). Let's compare it with the exact radius.
 
 rd1_wkb = (xdyn.get_rossby_radius(n2) * 1e-3).where(open_ocean)
-ratio = rd1_wkb / rd1
-print(f"WKB / modes: median = {float(ratio.median()):.2f}, "
-      f"5-95% = {float(ratio.quantile(0.05)):.2f}-{float(ratio.quantile(0.95)):.2f}")
+diff = ((rd1_wkb / rd1 - 1) * 100).rename("diff")
+diff.attrs = {"long_name": "WKB relative difference", "units": "%"}
+print(f"WKB / modes - 1: median = {float(diff.median()):.1f} %, "
+      f"5-95% = {float(diff.quantile(0.05)):.1f} to {float(diff.quantile(0.95)):.1f} %")
+
+contours = [{"field": speed0, "levels": [0.8, 1.2], "colors": ["0.35", "k"], "linewidths": 0.8}]
+rd_kw = {"cmap": "cmo.matter", "levels": np.linspace(18, 34, 17), "extend": "both"}
+diff_kw = {"cmap": "cmo.balance", "levels": np.linspace(-20, 20, 21), "extend": "both"}
+fig, axes = plot_fields(
+    {"Vertical modes": (rd1, rd_kw), "WKB": (rd1_wkb, rd_kw), "WKB - modes": (diff, diff_kw)},
+    ncols=3,
+    figsize=(11, 3.8),
+    method="contourf",
+    map_kw=MAP_KW,
+    overlay_contours=contours,
+    panel_labels=True,
+)
 
 # %%
-# The estimate is within about ten percent of the radius of the first baroclinic mode here.
-# Use :class:`~xoa.dyn.VerticalModes` for the exact radii or for the other modes.
+# The maps are similar. The WKB radius is about 10 % smaller in the south, with a difference
+# that shrinks northward, and it does not depend on the stream. Use
+# :class:`~xoa.dyn.VerticalModes` for the exact radii or for the other modes.
 #
 # The integral can be limited to a layer with ``zrange``, in z positive up, like for the modes.
 

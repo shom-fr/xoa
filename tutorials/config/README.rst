@@ -1,4 +1,4 @@
-Specifications and configuration
---------------------------------
+Configuration
+-------------
 
-Write naming specifications for your own datasets, and manage configurations with their validation and command line options.
+Manage configurations with their validation and command line options, and set the options of xoa.

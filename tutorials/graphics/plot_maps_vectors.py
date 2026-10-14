@@ -81,6 +81,9 @@ plot_double_minimap(ds, parent=ax, loc="lower right", size=0.15, regional_ax="le
 # --------------
 #
 # A dict maps titles to fields, which are drawn on maps of a single figure.
+# For publications, ``panel_labels=True`` adds the labels "a)", "b)"... to the maps.
+# A string sets the style, like ``"({A})"``, and a dict sets the other parameters of
+# :class:`~xoa.plot.PanelLabeler`, like ``loc="lower right"``.
 
 fig, axes = plot_fields(
     {
@@ -92,6 +95,7 @@ fig, axes = plot_fields(
     ncols=2,
     figsize=(8, 6),
     map_kw={"land": True},
+    panel_labels=True,
 )
 
 # %%
