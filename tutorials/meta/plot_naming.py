@@ -12,7 +12,7 @@ In this tutorial, we show how to:
 * use the naming specifications of a model.
 
 The concepts are explained in the :ref:`indepth.meta` guide.
-See also: :ref:`sphx_glr_tutorials_config_plot_naming_specs.py`, :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
+See also: :ref:`sphx_glr_tutorials_meta_plot_naming_specs.py`, :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
 """
 
 # %%
@@ -111,7 +111,7 @@ with meta.set_meta_specs("croco"):
 # -----------------------
 #
 # For a model that is not known by xoa, you write the naming specifications yourself,
-# as a dict or a configuration file: see :ref:`sphx_glr_tutorials_config_plot_naming_specs.py`.
+# as a dict or a configuration file: see :ref:`sphx_glr_tutorials_meta_plot_naming_specs.py`.
 
 # %%
 # Using specifications registers them, which changes how the next datasets are decoded.

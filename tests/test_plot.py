@@ -234,6 +234,23 @@ def get_center_points(ax):
 
 
 class TestPlotGrid:
+    def test_projection(self):
+        assert type(xplot.plot_grid(get_temp()).projection).__name__ == "Orthographic"
+        ax = xplot.plot_grid(get_temp(), projection="merc", map_kw={"projection": "pc"})
+        assert type(ax.projection).__name__ == "Mercator"
+        ax = xplot.plot_grid(get_temp(), map_kw={"projection": "pc"})
+        assert type(ax.projection).__name__ == "PlateCarree"
+
+    def test_figsize_follows_the_aspect_ratio(self):
+        def get_size(dlon, dlat):
+            lon = xr.DataArray(np.linspace(0, dlon, 5), dims="lon", attrs={"standard_name": "longitude"})
+            lat = xr.DataArray(np.linspace(0, dlat, 5), dims="lat", attrs={"standard_name": "latitude"})
+            return xplot.plot_grid(xr.Dataset(coords={"lon": lon, "lat": lat})).figure.get_size_inches()
+
+        assert get_size(20, 5)[1] < get_size(5, 20)[1]
+        ax = xplot.plot_grid(get_temp(), map_kw={"figsize": (5, 5)})
+        assert tuple(ax.figure.get_size_inches()) == (5, 5)
+
     def test_edges_and_centers_by_default(self):
         temp = get_temp(nx=11, ny=9)
         ax = xplot.plot_grid(temp)
@@ -762,6 +779,38 @@ class TestPlotFields:
     def test_bad_colorbar(self):
         with pytest.raises(xoa.exceptions.XoaError):
             xplot.plot_fields(self.get_fields(), colorbar="bad")
+
+    def test_panel_labels(self):
+        _, axes = xplot.plot_fields(self.get_fields(3), colorbar=None, panel_labels=True)
+        assert [ax.texts[0].get_text() for ax in axes] == ["a)", "b)", "c)"]
+        _, axes = xplot.plot_fields(self.get_fields(2), colorbar=None, panel_labels="({A})")
+        assert axes[1].texts[0].get_text() == "(B)"
+        _, axes = xplot.plot_fields(
+            self.get_fields(2), colorbar=None, panel_labels={"loc": "lower right"}
+        )
+        assert axes[0].texts[0].get_position() == (0.97, 0.03)
+
+
+class TestPanelLabeler:
+    def test_labels(self):
+        labeler = xplot.PanelLabeler("{A}.")
+        assert [labeler.get_label(i) for i in (0, 25, 26, 27, 52)] == ["A.", "Z.", "AA.", "AB.", "BA."]
+        assert xplot.PanelLabeler("{n}").get_label(2) == "3"
+
+    def test_counter_goes_on(self):
+        _, axes = plt.subplots(1, 3)
+        labeler = xplot.PanelLabeler(start=1, fontsize=8)
+        texts = labeler(axes[:2]) + labeler(axes[2])
+        assert [t.get_text() for t in texts] == ["b)", "c)", "d)"]
+        assert texts[0].get_fontsize() == 8
+
+    def test_add_panel_labels(self):
+        _, ax = plt.subplots()
+        assert xplot.add_panel_labels(ax, loc="upper right")[0].get_ha() == "right"
+
+    def test_bad_loc(self):
+        with pytest.raises(xoa.exceptions.XoaError):
+            xplot.PanelLabeler(loc="middle")
 
 
 class TestMinimap:
