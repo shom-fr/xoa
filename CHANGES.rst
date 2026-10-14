@@ -28,6 +28,7 @@ New features
 - Add :func:`xoa.plot.plot_vectors` and :func:`xoa.core.plot.plot_vectors` to draw currents as under-sampled arrows.
 - Add the :ref:`sphx_glr_tutorials_dynamics_plot_gulfstream_dynamics.py` tutorial, based on a new GLORYS data sample.
 - The ``mercator`` naming specifications are also used for GLORYS.
+- Add :func:`xoa.coords.to_surface_ref` to refer a ``z`` or a ``depth`` to the free surface instead of the fixed datum, and the ``ref`` argument of :func:`xoa.sigma.decode_sigma` and of the ``decode_sigma`` accessor to do it while decoding.
 - Add :func:`xoa.coords.copy_coord_attrs` to restore coordinate attributes after :func:`xarray.apply_ufunc`.
 - Add the :ref:`indepth.vertical` guide and the ``z`` coordinate (positive up) as distinct from ``depth`` (positive down): ``z`` meta spec, :func:`xoa.coords.get_z`, :func:`~xoa.coords.is_z`, :func:`~xoa.coords.to_z`, :func:`~xoa.coords.to_depth`, :func:`~xoa.coords.reverse_dim` and the ``xoa.get_z`` accessor method. :func:`~xoa.coords.get_depth` and :func:`~xoa.coords.get_z` fall back on each other and flip the sign when needed.
 - Add :func:`xoa.core.plot.get_projection` to get a map projection from an instance, a cartopy lower case name or the ``"merc"``, ``"pc"`` and ``"ortho"`` aliases. The default of :func:`xoa.plot.plot_grid` is ``"ortho"``, centered on the grid.
@@ -72,6 +73,7 @@ Bug fixes
 - Fix :class:`xoa.krig.Kriger` that computed the distances between input points in meters whatever its `dist_units`.
 - :func:`xoa.coords.get_depth` no longer fails when it has to decode a dataset, and no longer warns when ``errors="ignore"``.
 - Fix the ``decode_sigma`` subaccessor of the ``xoa`` accessor of datasets, that returned ``None``.
+- Fix :func:`xoa.sigma.decode_sigma` that gave the same name to the heights at all vertical locations, like ``z`` at rho and w levels of CROCO, when the name format of the meta specs has no location, as the default one, so that one of them was lost. The location is now always appended to the name, like ``z_w``, and it is also parsed from the name of the sigma variable, so that the heights at rho levels of CROCO are named ``z_rho`` with the ``croco`` specs, as in :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`.
 - Fix the meta appendix: the meta configurations are no longer called specifications, the specifications provided by the internal :file:`meta.ini` file have their own page, and the details pages of the configuration items are not listed in the left table of contents anymore.
 - Fix the bilinear and bicubic interpolation with ``skipna=True`` and ``na_thres=0``, that set isolated points to nan because of rounding errors in the sum of the weights of valid neighbours.
 - Fix the conservative weights of the cells that cross the dateline or that are on the other side of it, which were missing. Longitudes of the cells are made continuous before computing their overlaps, with :func:`xoa.core.poly.unwrap_longitudes` and :func:`xoa.core.grid.unwrap_grid_longitudes`.

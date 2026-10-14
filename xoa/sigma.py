@@ -608,7 +608,9 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
             raise exceptions.XoaSigmaError(
                 "No standard_name attribute found in sigma/s " "variable name: " + sig.name
             )
-        standard_name, loc = meta_specs.sglocator.parse_attr("standard_name", sig.standard_name)
+        standard_name = meta_specs.sglocator.parse_attr("standard_name", sig.standard_name)[0]
+        # The loc is also parsed from the name, like "rho" from "s_rho" with croco specs
+        loc = meta_specs.sglocator.get_loc_from_da(sig)
         # skip this one
         if standard_name not in SIGMA_COORDINATE_FUNCTIONS:
             continue
@@ -660,7 +662,7 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
 
 
 @misc.ERRORS.format_function_docstring
-def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
+def decode_sigma(ds, rename=False, hlocs=None, ref="datum", errors="raise"):
     """Compute heights from sigma-like variable in a dataset using CF conventions
 
     This makes use of the :class:`~xoa.meta.MetaSpecs` instance that is retrieved
@@ -683,6 +685,10 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
     hlocs: None, list of str
         Horizontal staggered grid locations to search for "bathy" and "ssh".
         By default, no location is assumed.
+    ref: {{"datum", "surface"}}
+        Reference of the heights: the fixed datum of the formulas, at which the
+        sea surface height is zero, or the free surface, at which the heights are zero.
+        See :func:`xoa.coords.to_surface_ref`.
     {errors}
 
     Return
@@ -693,6 +699,8 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
     ds = ds.copy()
     meta_specs = meta.get_meta_specs(ds)
     errors = misc.ERRORS[errors]
+    if ref not in ("datum", "surface"):
+        raise exceptions.XoaSigmaError(f'Invalid ref: {ref}. Must be "datum" or "surface"')
 
     # Decode formula terms
     try:
@@ -733,6 +741,19 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
             # Format
             loc = (hloc or "") + (vloc or "")
             height = meta_specs.sglocator.format_dataarray(height, loc)
+
+            # Make sure the location is in the name to prevent collisions between
+            # locations when the name format does not include it (like "{root}")
+            if loc and not height.name.endswith("_" + loc):
+                height.name = f"{height.name}_{loc}"
+
+            # Refer to the free surface
+            if ref == "surface":
+                if "ssh" not in kwargs:
+                    raise exceptions.XoaSigmaError(
+                        f"No sea surface height to refer to the surface with {sigma_type}"
+                    )
+                height = xcoords.to_surface_ref(height, kwargs["ssh"], positive="up")
 
             # Transpose if appropriate and set as coordinate
             transposed = False
