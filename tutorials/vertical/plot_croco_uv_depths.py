@@ -11,7 +11,7 @@ of a staggered CROCO grid, in two ways:
 * compute ``z`` at the rho points, then move it to the u and v points.
 
 The concepts are explained in the :ref:`indepth.vertical` guide.
-See also: :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`.
+See also: :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`.
 """
 
 # %%
@@ -37,7 +37,7 @@ xmeta.register_meta_specs(xoa.get_meta_config_file("croco"))
 # The currents ``u`` and ``v`` are not at the same points as the sea surface height ``zeta``
 # and the bathymetry ``h``, which are at the rho points.
 # We compute the heights at the rho points, as in the :ref:`sigma section tutorial
-# <sphx_glr_tutorials_grids_plot_croco_section.py>`.
+# <sphx_glr_tutorials_vertical_plot_croco_section.py>`.
 
 ds = xoa.open_data_sample("MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.surf.nc")
 ds = ds.xoa.decode_sigma().isel(time=0)

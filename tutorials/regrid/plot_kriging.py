@@ -12,8 +12,8 @@ In this tutorial, we show how to:
 
 The data are synthetic, so that the interpolation can be evaluated: a spatially correlated
 field is sampled at random positions and corrupted with a small noise.
-See also: :ref:`sphx_glr_tutorials_grids_plot_filtering.py` and
-:ref:`sphx_glr_tutorials_grids_plot_kriging_sst.py`.
+See also: :ref:`sphx_glr_tutorials_filtering_plot_filtering.py` and
+:ref:`sphx_glr_tutorials_regrid_plot_kriging_sst.py`.
 """
 
 # %%

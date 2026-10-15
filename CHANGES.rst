@@ -8,15 +8,15 @@ New features
 ------------
 - Add the ``projection`` argument to :func:`xoa.plot.plot_grid`, orthographic by default.
 - Add :class:`xoa.plot.PanelLabeler`, :func:`xoa.plot.add_panel_labels` and the ``panel_labels`` argument of :func:`xoa.plot.plot_fields` to label panels like "a)".
-- Add a tour of xoa to the :ref:`quickstart`, and the tutorials :ref:`sphx_glr_tutorials_dynamics_plot_flow_advection.py`, :ref:`sphx_glr_tutorials_grids_plot_layer_thicknesses.py`, :ref:`sphx_glr_tutorials_grids_plot_distances.py`, :ref:`sphx_glr_tutorials_grids_plot_sigma_levels.py`, :ref:`sphx_glr_tutorials_graphics_plot_colormaps_effects.py` and :ref:`sphx_glr_tutorials_config_plot_options.py`, and improve the figures of the others: consistent fonts and units, shared colorbars, compact layouts.
+- Add a tour of xoa to the :ref:`quickstart`, and the tutorials :ref:`sphx_glr_tutorials_dynamics_plot_flow_advection.py`, :ref:`sphx_glr_tutorials_vertical_plot_layer_thicknesses.py`, :ref:`sphx_glr_tutorials_grids_plot_distances.py`, :ref:`sphx_glr_tutorials_vertical_plot_sigma_levels.py`, :ref:`sphx_glr_tutorials_graphics_plot_colormaps_effects.py` and :ref:`sphx_glr_tutorials_config_plot_options.py`, and improve the figures of the others: consistent fonts and units, shared colorbars, compact layouts.
 - Add the ``parent``, ``loc`` and ``size`` arguments to :func:`xoa.plot.plot_minimap` and :func:`~xoa.plot.plot_double_minimap` to inset the minimaps in an axes.
 - Add ``cmap="auto"`` to :func:`xoa.plot.plot_field` to choose the colormap from the sign of the data and the ``plot`` options, and the ``pretty`` argument of :func:`xoa.plot.get_label` that writes the units in a nicer way (``°C``, ``m s⁻¹``).
 - The options functions, like :func:`xoa.get_option` and :func:`xoa.set_options`, are now available from the ``xoa`` package, as documented.
 - Add the "Configuration" tutorial :ref:`sphx_glr_tutorials_config_plot_cfgm.py` and the naming tutorial :ref:`sphx_glr_tutorials_meta_plot_naming_specs.py`, moved out of :ref:`sphx_glr_tutorials_meta_plot_naming.py`, and shorten the :ref:`indepth.cfgm` guide.
 - Add :func:`xoa.core.plot.get_quiverkey_value` and :func:`~xoa.core.plot.add_quiverkey`: reference arrows now have a round value (1, 2 or 5 times a power of ten) and are placed above the left corner of the axes, also with :func:`xoa.plot.plot_stick`. The :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py` tutorial is reworked and its minimaps no longer enlarge the figures.
 - Add :func:`xoa.dyn.get_rossby_radius`, a quick WKB estimate of the first Rossby radius of deformation. See :ref:`sphx_glr_tutorials_dynamics_plot_vertical_modes.py`.
-- Add the :ref:`sphx_glr_tutorials_grids_plot_croco_uv_depths.py` tutorial on the depths at the u and v points of a CROCO grid.
-- Add :class:`xoa.krig.LocalKriger`, which krigs with the nearest points only using the new :class:`~xoa.core.geo.SphericalKDTree` and the numba kernels of :mod:`xoa.core.krig`. See :ref:`sphx_glr_tutorials_grids_plot_kriging.py` and :ref:`sphx_glr_tutorials_grids_plot_kriging_sst.py`.
+- Add the :ref:`sphx_glr_tutorials_vertical_plot_croco_uv_depths.py` tutorial on the depths at the u and v points of a CROCO grid.
+- Add :class:`xoa.krig.LocalKriger`, which krigs with the nearest points only using the new :class:`~xoa.core.geo.SphericalKDTree` and the numba kernels of :mod:`xoa.core.krig`. See :ref:`sphx_glr_tutorials_regrid_plot_kriging.py` and :ref:`sphx_glr_tutorials_regrid_plot_kriging_sst.py`.
 - Add :func:`xoa.coords.geo_unstack` to restore the grid of an object stacked with :func:`~xoa.coords.geo_stack`, and its ``singleton`` argument. The stacked dimensions are now in a fixed order, latitude first.
 - Add :class:`xoa.krig.ClusteredKriger`, which now holds the clusterization (``npmax`` and ``nproc``) that moved out of :class:`xoa.krig.Kriger`.
 - Add :class:`xoa.geo.GeoKDTree` and :func:`xoa.geo.get_neighbors` to find the nearest points or those within a distance, also as ``xoa`` accessor methods with a cached tree, based on the new :class:`xoa.core.geo.SphericalKDTree`. See :ref:`sphx_glr_tutorials_grids_plot_neighbors.py`.
@@ -27,8 +27,9 @@ New features
 - Add :func:`xoa.thermdyn.get_n2` for the squared Brunt-Vaisala frequency, and :func:`xoa.coords.as_z` to get a vertical coordinate as z, positive up.
 - Add the :mod:`xoa.numbers` module with :func:`~xoa.numbers.get_rossby`, :func:`~xoa.numbers.get_burger`, :func:`~xoa.numbers.get_froude` and :func:`~xoa.numbers.get_ekman`. ``xoa.dyn.get_rossby`` moved to it, without backward compatibility. See :ref:`sphx_glr_tutorials_dynamics_plot_dimensionless_numbers.py`.
 - Add :class:`xoa.stats.StatAccum` to accumulate temporal and spatial statistics, with automatic vertical and horizontal weights, dump and restart, based on numba moments in :mod:`xoa.core.stats`. See :ref:`indepth.stataccum`.
+- Split the grids tutorials into grids, vertical, regridding and filtering, and split the filtering one into :ref:`sphx_glr_tutorials_filtering_plot_filter_space.py`, :ref:`sphx_glr_tutorials_filtering_plot_filter_time.py` and :ref:`sphx_glr_tutorials_filtering_plot_decimate.py`, with more on kernels, tidal filters and decimation.
 - Add :func:`xoa.grid.dz2z`, :func:`xoa.grid.z2dz`, :func:`xoa.grid.get_dz`, :func:`xoa.grid.get_dz_terms` and :func:`xoa.grid.decode_dz2z`, and the ``positive`` and ``errors`` arguments of :func:`xoa.coords.get_positive_attr`. :func:`xoa.coords.get_z` now relies on :func:`~xoa.grid.decode_dz2z`. Fix :func:`xoa.grid.decode_dz2depth` with a bathymetry or a sea surface height and ``positive="down"``.
-- Group the tutorials in categories: graphics, grids, dynamics and evaluation, and add the :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`, :ref:`sphx_glr_tutorials_grids_plot_filtering.py` and :ref:`sphx_glr_tutorials_grids_plot_kriging.py` tutorials, and the new :ref:`sphx_glr_tutorials_meta_plot_naming.py` and :ref:`sphx_glr_tutorials_dynamics_plot_mixed_layer.py` ones. Figures are narrower to fit the doc pages, and the :ref:`indepth.meta` guide is shorter and clearer.
+- Group the tutorials in categories: graphics, grids, dynamics and evaluation, and add the :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`, :ref:`sphx_glr_tutorials_filtering_plot_filtering.py` and :ref:`sphx_glr_tutorials_regrid_plot_kriging.py` tutorials, and the new :ref:`sphx_glr_tutorials_meta_plot_naming.py` and :ref:`sphx_glr_tutorials_dynamics_plot_mixed_layer.py` ones. Figures are narrower to fit the doc pages, and the :ref:`indepth.meta` guide is shorter and clearer.
 - Add the :ref:`references` page.
 - Add :func:`xoa.mask.get_polygon_mask`, also an ``xoa`` accessor method, to flag grid cells inside polygons with a coverage threshold, based on the new :mod:`xoa.core.mask` and :mod:`xoa.core.poly` numba functions.
 - Add :func:`xoa.plot.plot_fields` to plot several fields on maps of a single figure, with a shared colorbar if needed.
@@ -78,6 +79,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix :func:`xoa.filter.tidal_filter` with series that are sampled more than hourly, and the unit of its error message.
 - Fix the white margins of the figures of :func:`xoa.plot.plot_grid`, whose size now follows the aspect ratio of the map, and use ``cmo.deep`` for its bathymetry.
 - Fix :func:`xoa.dyn.flow2d` with a dataset of initial positions, which used the longitudes for the latitudes, and :func:`xoa.plot.plot_flow` with missing values in the currents.
 - Fix :func:`xoa.geo.get_distances` for a single set of points, which had two dimensions of the same name, now ``npts0`` and ``npts1``, and clarify the angle of :func:`xoa.geo.bearing`.
@@ -239,7 +241,7 @@ Bug fixes
 Documentation
 -------------
 - Add an example of `xoa.plot.plot_double_minimap` to :ref:`sphx_glr_tutorials_evaluation_plot_mercator_argo.py` and :ref:`sphx_glr_tutorials_evaluation_plot_hycom_gdp.py` examples [:pull:`73`].
-- Add an example of `xoa.thermdyn.mixed_layer_depth` to :ref:`sphx_glr_tutorials_grids_plot_croco_section.py` example [:pull:`67`].
+- Add an example of `xoa.thermdyn.mixed_layer_depth` to :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py` example [:pull:`67`].
 
 
 0.6.1 (2022-02-24)

@@ -14,7 +14,7 @@ In this tutorial, we show how to:
 * pad an array and its coordinates.
 
 The concepts are explained in the :ref:`indepth.grids` guide.
-See also: :ref:`sphx_glr_tutorials_grids_plot_regrid_interp.py`, :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`.
+See also: :ref:`sphx_glr_tutorials_regrid_plot_regrid_interp.py`, :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`.
 """
 
 # %%

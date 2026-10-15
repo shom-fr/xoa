@@ -131,7 +131,7 @@ Regrid and interpolate
 
 The same temperature is regridded to a regular grid that is twice coarser with the
 conservative method, and interpolated along a transect.
-See :ref:`sphx_glr_tutorials_grids_plot_regrid_interp.py`.
+See :ref:`sphx_glr_tutorials_regrid_plot_regrid_interp.py`.
 
 .. ipython:: python
 

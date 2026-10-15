@@ -14,7 +14,7 @@ In this tutorial, we show how to:
 The first data are the thicknesses of the upper layers of the Hycom model, which vary with time
 and position. The second are the currents of a CROCO simulation on sigma levels.
 The concepts are explained in the :ref:`indepth.vertical` guide.
-See also: :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`,
+See also: :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`,
 :ref:`sphx_glr_tutorials_evaluation_plot_hycom_gdp.py`.
 """
 

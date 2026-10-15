@@ -15,8 +15,8 @@ how to use the low level routines. The tutorials show them at work, with figures
 
 - :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`: fields and currents on maps,
 - :ref:`sphx_glr_tutorials_grids_plot_grid_tools.py`: grids, resolutions and edges,
-- :ref:`sphx_glr_tutorials_grids_plot_regrid_interp.py`: maps of regridded fields,
-- :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`: sections.
+- :ref:`sphx_glr_tutorials_regrid_plot_regrid_interp.py`: maps of regridded fields,
+- :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`: sections.
 
 .. ipython:: python
 

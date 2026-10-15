@@ -19,7 +19,7 @@ The currents are already at the same points as the sea surface height,
 so that the diagnostics of :mod:`xoa.dyn` can be applied.
 
 The concepts are explained in the :ref:`indepth.dyn` guide.
-See also: :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`, :ref:`sphx_glr_tutorials_dynamics_plot_gulfstream_dynamics.py`.
+See also: :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`, :ref:`sphx_glr_tutorials_dynamics_plot_gulfstream_dynamics.py`.
 """
 
 # %%
