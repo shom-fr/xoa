@@ -93,6 +93,7 @@ def test_float_operators_vs_xarray(chunked):
     rng = np.random.default_rng(0)
     da = xr.DataArray(rng.random((3, 4, 5), dtype="f4"), dims=("z", "y", "x"))
     if chunked:
+        pytest.importorskip("dask")
         da = da.chunk({"y": 2})
     pad_width = {"y": (2, 1), "x": 1}
     with warnings.catch_warnings():
