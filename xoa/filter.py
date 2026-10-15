@@ -1025,13 +1025,15 @@ def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
         if mdt > 1 + dt_tol:
             raise exceptions.XoaError(
                 f"You should not apply a {filter_name} filter to data that are less "
-                f"than hourly sampled. Current mean time step: {mdt:1.2f} s"
+                f"than hourly sampled. Current mean time step: {mdt:1.2f} h"
             )
         elif mdt < 1 - dt_tol:
             nw = len(weights)
             from scipy.interpolate import interp1d
 
-            weights = interp1d(weights, np.linspace(0, 1, nw), "cubic")(np.linspace(0, 1, nw / dt))
+            weights = interp1d(np.linspace(0, 1, nw), weights, "cubic")(
+                np.linspace(0, 1, int(round((nw - 1) / mdt)) + 1)
+            )
 
     # Apply
     return convolve(da, {tdim: weights}, normalize=True, na_thres=na_thres)

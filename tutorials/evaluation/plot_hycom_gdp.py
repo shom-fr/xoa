@@ -13,7 +13,7 @@ In this tutorial, we show how to:
 * make an horizontal slice of a 4D variable with a variable depth coordinate.
 
 The concepts are explained in the :ref:`indepth.meta` guide.
-See also: :ref:`sphx_glr_tutorials_evaluation_plot_mercator_argo.py`, :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`.
+See also: :ref:`sphx_glr_tutorials_evaluation_plot_mercator_argo.py`, :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`.
 """
 # %%
 # Initialisations

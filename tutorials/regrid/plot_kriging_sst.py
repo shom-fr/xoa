@@ -14,7 +14,7 @@ In this tutorial, we show how to:
 
 The truth is the surface temperature of a Mercator ocean reanalysis around the Gulf Stream,
 which is sampled to mimic observations, so that the interpolation can be evaluated.
-The basics are in the :ref:`sphx_glr_tutorials_grids_plot_kriging.py` tutorial.
+The basics are in the :ref:`sphx_glr_tutorials_regrid_plot_kriging.py` tutorial.
 """
 
 # %%

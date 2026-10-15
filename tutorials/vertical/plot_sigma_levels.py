@@ -13,8 +13,8 @@ In this tutorial, we show how to:
 
 The data are synthetic: a shelf, a slope and an abyssal plain, with a flat sea surface.
 The concepts are explained in the :ref:`indepth.vertical` guide.
-See also: :ref:`sphx_glr_tutorials_grids_plot_croco_section.py`,
-:ref:`sphx_glr_tutorials_grids_plot_croco_uv_depths.py`.
+See also: :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`,
+:ref:`sphx_glr_tutorials_vertical_plot_croco_uv_depths.py`.
 """
 
 # %%

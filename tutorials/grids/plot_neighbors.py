@@ -13,7 +13,7 @@ In this tutorial, we show how to:
 * search across the dateline and near the poles, where lon/lat distances fail.
 
 The distances are great circle distances, and the search is fast thanks to a KD-tree.
-See also: :ref:`sphx_glr_tutorials_grids_plot_kriging.py`.
+See also: :ref:`sphx_glr_tutorials_regrid_plot_kriging.py`.
 """
 
 # %%

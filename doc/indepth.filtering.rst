@@ -18,7 +18,9 @@ Key features:
 - **Mask operations**: Iterative mask erosion and coast filling
 - **Data decimation**: Intelligent undersampling based on spatial proximity
 
-See :ref:`sphx_glr_tutorials_grids_plot_filtering.py` for a walkthrough with figures.
+See the tutorials :ref:`sphx_glr_tutorials_filtering_plot_filter_space.py`,
+:ref:`sphx_glr_tutorials_filtering_plot_filter_time.py` and
+:ref:`sphx_glr_tutorials_filtering_plot_decimate.py` for walkthroughs with figures.
 
 .. _indepth.filtering.spatial:
 
@@ -144,8 +146,9 @@ For isotropic (radially symmetric) kernels, use :func:`~xoa.filter.generate_isot
 Shapiro kernel
 ^^^^^^^^^^^^^^
 
-The Shapiro kernel is a specialized filter kernel commonly used in numerical
-models for smoothing:
+The Shapiro kernel is a cross with weights of 1 on the neighbors and 2 at the center,
+used to erode masks. It reduces the grid-scale noise by a factor of 3 only: for a complete
+removal, use the orthogonal kernel ``{'x': [1, 2, 1], 'y': [1, 2, 1]}``.
 
 .. ipython:: python
 
@@ -447,6 +450,8 @@ Computational considerations
 
 - Convolution is computationally intensive for large kernels
 - Consider using FFT-based methods for very large kernels (not yet in xoa)
+- Kernel sizes are in grid points, so their footprint varies with the grid resolution,
+  for instance with the latitude on a regular longitude and latitude grid
 - For repeated filtering, pre-generate kernels:
 
 .. code-block:: python

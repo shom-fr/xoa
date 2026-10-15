@@ -1,4 +1,4 @@
-Grids, filtering, regridding and kriging
-----------------------------------------
+Horizontal grids and geometry
+-----------------------------
 
-Inspect grids, work with vertical coordinates, move data from one grid to another, filter fields and series, and interpolate scattered data.
+Inspect horizontal grids, compute distances and directions on the sphere, and find neighbors.

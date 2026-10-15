@@ -212,7 +212,7 @@ Horizontal regridding
 The :class:`~xoa.regrid.Regridder` and :class:`~xoa.interp.Interpolator` classes regrid
 and interpolate horizontally, on regular, rectangular and curvilinear grids, with the
 ``bilinear``, ``bicubic`` and ``conservative`` methods. They have their own guide,
-:ref:`indepth.horizontal`, and a :ref:`tutorial <sphx_glr_tutorials_grids_plot_regrid_interp.py>`.
+:ref:`indepth.horizontal`, and a :ref:`tutorial <sphx_glr_tutorials_regrid_plot_regrid_interp.py>`.
 
 Vertical regridding
 -------------------
@@ -238,7 +238,7 @@ and atmospheric models. Instead of using fixed depth or pressure levels, sigma
 coordinates follow the bathymetry (ocean models) or topography (atmospheric models),
 which allows better resolution near boundaries.
 which allows better resolution near boundaries.
-The tutorial :ref:`sphx_glr_tutorials_grids_plot_sigma_levels.py` shows how the stretching
+The tutorial :ref:`sphx_glr_tutorials_vertical_plot_sigma_levels.py` shows how the stretching
 parameters distribute the levels over a slope.
 
 Supported coordinate types
@@ -334,7 +334,7 @@ vertical sections and perform operations like:
 - Computing vertical derivatives
 - Creating vertical transects
 
-See the gallery tutorial :ref:`sphx_glr_tutorials_grids_plot_croco_section.py` for a practical
+See the gallery tutorial :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py` for a practical
 demonstration of working with sigma coordinates and vertical sections.
 
 Formula terms mapping

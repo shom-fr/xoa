@@ -19,18 +19,18 @@ def test_filter_get_window_func():
     # From numpy name
     func = xfilter.get_window_func("bartlett")
     w = func(5)
-    np.testing.assert_allclose(w, [0., 0.5, 1., 0.5, 0.])
+    np.testing.assert_allclose(w, [0.0, 0.5, 1.0, 0.5, 0.0])
 
     # From list
     func = xfilter.get_window_func([1, 2, 1])
     w = func(5)
     assert w.shape == (5,)
-    assert w[0] == 1.
-    assert w[-1] == 1.
+    assert w[0] == 1.0
+    assert w[-1] == 1.0
 
     # From callable
     func = xfilter.get_window_func(np.ones)
-    np.testing.assert_allclose(func(3), [1., 1., 1.])
+    np.testing.assert_allclose(func(3), [1.0, 1.0, 1.0])
 
 
 def test_filter_generate_isotropic_kernel():
@@ -173,6 +173,17 @@ class TestTidalFilter:
         assert da_out.shape == da_in.shape
         assert da_out.min() > -1e-4
         assert da_out.max() < 1e-4
+
+    @pytest.mark.parametrize("minutes", [30, 20])
+    def test_subhourly(self, minutes):
+        times = np.arange("2000-01-01", "2000-01-10", minutes, dtype="M8[m]").astype("M8[ns]")
+        hours = np.arange(len(times)) * minutes / 60
+        da_in = xr.DataArray(np.cos(2 * np.pi * hours / 12.42), dims="time", coords={"time": times})
+
+        da_out = xfilter.tidal_filter(da_in, "demerliac")
+        assert da_out.shape == da_in.shape
+        assert da_out.notnull().any()
+        assert float(abs(da_out).max()) < 1e-2
 
     def test_na_thres(self):
         times = np.arange("2000-01-01", "2000-01-10", dtype="M8[h]").astype("M8[ns]")

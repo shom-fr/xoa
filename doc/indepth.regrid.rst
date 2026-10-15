@@ -8,7 +8,7 @@ Introduction
 
 This guide explains how the horizontal interpolation and regridding tools work, what they
 assume and how to choose between them. The :ref:`regridding tutorial
-<sphx_glr_tutorials_grids_plot_regrid_interp.py>` shows them at work on real data, with figures:
+<sphx_glr_tutorials_regrid_plot_regrid_interp.py>` shows them at work on real data, with figures:
 read it first for a walkthrough, and come back here for the rules behind it.
 
 .. ipython:: python
@@ -232,7 +232,7 @@ Triangulation remains the right tool when the source really is **a cloud of scat
 points**, like observations: all the methods of this guide need a structured grid. It
 is not part of :class:`~xoa.interp.Interpolator`, and :mod:`xoa.krig` offers an
 optimal interpolation for scattered data, as shown in
-:ref:`sphx_glr_tutorials_grids_plot_kriging.py`. Big clouds of points are handled
+:ref:`sphx_glr_tutorials_regrid_plot_kriging.py`. Big clouds of points are handled
 by :class:`xoa.krig.LocalKriger`, which only uses the nearest points of each target, or
 by :class:`xoa.krig.ClusteredKriger`.
 
@@ -459,7 +459,7 @@ The core classes take dictionaries of arrays, with ``lon`` and ``lat`` keys and 
 See also
 ========
 
-- The :ref:`tutorial <sphx_glr_tutorials_grids_plot_regrid_interp.py>` for maps, the curvilinear case,
+- The :ref:`tutorial <sphx_glr_tutorials_regrid_plot_regrid_interp.py>` for maps, the curvilinear case,
   time and masks on real data.
 - :ref:`indepth.grids` for the 1D regridding, edges, resolutions and ``to_rect``.
 - :ref:`indepth.plot` for the plotting of fields, grids and sections.
