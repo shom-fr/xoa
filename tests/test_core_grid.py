@@ -184,3 +184,22 @@ def test_centers2edges_axes():
     xx = np.random.default_rng(0).random((3, 4))
     np.testing.assert_allclose(grid.centers2edges(xx, axis=0), grid.edges(xx, 0))
     np.testing.assert_allclose(grid.centers2edges(xx), grid.edges(grid.edges(xx, 0), 1))
+
+
+@pytest.mark.parametrize("dtype", ["f4", "f8"])
+def test_lon_across_dateline(dtype):
+    lon = np.array([[170.0, 178.0, -174.0, -166.0]] * 2, dtype)
+    row = lambda x: np.array([x] * 2, dtype)  # noqa
+    np.testing.assert_allclose(grid.diff(lon, 1, lon=True), row([8, 8, 8]))
+    np.testing.assert_allclose(grid.centers(lon, 1, lon=True), row([174, -178, -170]))
+    np.testing.assert_allclose(grid.edges(lon, 1, lon=True), row([166, 174, -178, -170, -162]))
+    np.testing.assert_allclose(
+        grid.pad(lon, 1, 2, "linear_extrap", lon=True),
+        row([154, 162, 170, 178, -174, -166, -158, -150]),
+    )
+    np.testing.assert_allclose(
+        grid.shift(lon, 1, 1, "linear_extrap", lon=True), row([174, -178, -170, -162])
+    )
+    # Positive longitudes keep their range, and no wrapping occurs without a jump
+    np.testing.assert_allclose(grid.centers(lon % 360, 1, lon=True), row([174, 182, 190]))
+    np.testing.assert_allclose(grid.pad(np.arange(3.0), 0, 2, "linear_extrap", lon=True), np.arange(-2, 5))

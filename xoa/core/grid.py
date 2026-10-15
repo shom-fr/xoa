@@ -23,6 +23,7 @@ import numba
 import numpy as np
 
 from .geo import EARTH_RADIUS, diff_lon, haversine
+from .num import is_float
 
 NOT_CI = os.environ.get("CI", "false") == "false"
 
@@ -30,8 +31,29 @@ NOT_CI = os.environ.get("CI", "false") == "false"
 _BLOCK = 512
 
 
+@numba.njit(cache=NOT_CI)
+def _dlon_(b, a, period):
+    # Difference b - a, across the dateline when period is not 0
+    d = b - a
+    if period > 0:
+        d -= period * np.floor(d / period + 0.5)
+    return d
+
+
+@numba.njit(cache=NOT_CI)
+def _lerp_(a, b, w, period, lo):
+    # a + w * (b - a), across the dateline when period is not 0, in which case
+    # the result is put in [lo, lo + period[ if a and b are on each side of it
+    d = b - a
+    if period > 0:
+        k = np.floor(d / period + 0.5)
+        if k != 0:
+            return lo + (a + w * (d - period * k) - lo) % period
+    return a + w * d
+
+
 @numba.njit(cache=NOT_CI, parallel=True)
-def _centers3d_(a, o):
+def _centers3d_(a, o, period, lo):
     no, n, ni = a.shape
     nb = (ni + _BLOCK - 1) // _BLOCK
     for t in numba.prange(no * nb):
@@ -40,11 +62,11 @@ def _centers3d_(a, o):
         k1 = min(ni, k0 + _BLOCK)
         for j in range(n - 1):
             for k in range(k0, k1):
-                o[i, j, k] = a[i, j, k] + 0.5 * (a[i, j + 1, k] - a[i, j, k])
+                o[i, j, k] = _lerp_(a[i, j, k], a[i, j + 1, k], 0.5, period, lo)
 
 
 @numba.njit(cache=NOT_CI, parallel=True)
-def _edges3d_(a, o):
+def _edges3d_(a, o, period, lo):
     no, n, ni = a.shape
     nb = (ni + _BLOCK - 1) // _BLOCK
     for t in numba.prange(no * nb):
@@ -52,15 +74,15 @@ def _edges3d_(a, o):
         k0 = (t % nb) * _BLOCK
         k1 = min(ni, k0 + _BLOCK)
         for k in range(k0, k1):
-            o[i, 0, k] = a[i, 0, k] + 0.5 * (a[i, 0, k] - a[i, 1, k])
-            o[i, n, k] = a[i, n - 1, k] + 0.5 * (a[i, n - 1, k] - a[i, n - 2, k])
+            o[i, 0, k] = _lerp_(a[i, 0, k], a[i, 1, k], -0.5, period, lo)
+            o[i, n, k] = _lerp_(a[i, n - 1, k], a[i, n - 2, k], -0.5, period, lo)
         for j in range(1, n):
             for k in range(k0, k1):
-                o[i, j, k] = a[i, j - 1, k] + 0.5 * (a[i, j, k] - a[i, j - 1, k])
+                o[i, j, k] = _lerp_(a[i, j - 1, k], a[i, j, k], 0.5, period, lo)
 
 
 @numba.njit(cache=NOT_CI, parallel=True)
-def _diff3d_(a, o):
+def _diff3d_(a, o, period, lo):
     no, n, ni = a.shape
     nb = (ni + _BLOCK - 1) // _BLOCK
     for t in numba.prange(no * nb):
@@ -69,11 +91,11 @@ def _diff3d_(a, o):
         k1 = min(ni, k0 + _BLOCK)
         for j in range(n - 1):
             for k in range(k0, k1):
-                o[i, j, k] = a[i, j + 1, k] - a[i, j, k]
+                o[i, j, k] = _dlon_(a[i, j + 1, k], a[i, j, k], period)
 
 
 @numba.njit(cache=NOT_CI, parallel=True)
-def _pad3d_(a, o, p0, p1, mode, cval):
+def _pad3d_(a, o, p0, p1, mode, cval, period, lo):
     # mode: 0 edge, 1 linear_extrap, 2 constant, 3 wrap
     no, n, ni = a.shape
     nb = (ni + _BLOCK - 1) // _BLOCK
@@ -90,12 +112,10 @@ def _pad3d_(a, o, p0, p1, mode, cval):
                 for j in range(p1):
                     o[i, p0 + n + j, k] = a[i, j % n, k]
             elif mode == 1:
-                d0 = a0 - a[i, 1, k]
-                d1 = a1 - a[i, n - 2, k]
                 for j in range(p0):
-                    o[i, j, k] = a0 + d0 * (p0 - j)
+                    o[i, j, k] = _lerp_(a0, a[i, 1, k], j - p0, period, lo)
                 for j in range(p1):
-                    o[i, p0 + n + j, k] = a1 + d1 * (j + 1)
+                    o[i, p0 + n + j, k] = _lerp_(a1, a[i, n - 2, k], -(j + 1), period, lo)
             else:
                 v0 = cval if mode == 2 else a0
                 v1 = cval if mode == 2 else a1
@@ -109,7 +129,7 @@ def _pad3d_(a, o, p0, p1, mode, cval):
 
 
 @numba.njit(cache=NOT_CI, parallel=True)
-def _shift3d_(a, o, direction, linear):
+def _shift3d_(a, o, direction, linear, period, lo):
     # Centers of the points and their neighbour up (direction > 0) or down,
     # which is replicated or extrapolated at the end
     no, n, ni = a.shape
@@ -122,14 +142,14 @@ def _shift3d_(a, o, direction, linear):
         k1 = min(ni, k0 + _BLOCK)
         for j in range(n - 1):
             for k in range(k0, k1):
-                o[i, j + s, k] = a[i, j, k] + 0.5 * (a[i, j + 1, k] - a[i, j, k])
+                o[i, j + s, k] = _lerp_(a[i, j, k], a[i, j + 1, k], 0.5, period, lo)
         for k in range(k0, k1):
             if up:
                 e = a[i, n - 1, k]
-                o[i, n - 1, k] = e + 0.5 * (e - a[i, n - 2, k]) if linear else e
+                o[i, n - 1, k] = _lerp_(e, a[i, n - 2, k], -0.5, period, lo) if linear else e
             else:
                 e = a[i, 0, k]
-                o[i, 0, k] = e + 0.5 * (e - a[i, 1, k]) if linear else e
+                o[i, 0, k] = _lerp_(e, a[i, 1, k], -0.5, period, lo) if linear else e
 
 
 @numba.njit(cache=NOT_CI, parallel=True)
@@ -150,7 +170,7 @@ def _gradient3d_(a, o, x):
 def _as3d_(a, axis):
     """Contiguous float array seen as ``(before, n, after)`` around `axis`"""
     a = np.asarray(a)
-    if a.dtype not in (np.float32, np.float64):
+    if not is_float(a):
         a = a.astype("d")
     shape = a.shape
     return np.ascontiguousarray(a).reshape(
@@ -168,28 +188,63 @@ def _apply_along_axis_(func, a, axis, size, *args):
     return o.reshape(shape[:axis] + (size,) + shape[axis + 1 :])
 
 
-def centers(a, axis=-1):
-    """Average consecutive points along an axis: size ``n`` becomes ``n-1``"""
-    return _apply_along_axis_(_centers3d_, a, axis, np.shape(a)[axis] - 1)
+def _lon_args_(a, lon):
+    """Period and lower bound of the longitudes: [-180, 180[ if some are negative else [0, 360["""
+    if not lon:
+        return 0.0, 0.0
+    return 360.0, -180.0 if np.nanmin(a) < 0 else 0.0
 
 
-def edges(a, axis=-1):
-    """Cell edges from centers along an axis, extrapolated at the ends: ``n`` becomes ``n+1``"""
+_LON_DOC = """lon: bool
+        The values are longitudes in degrees: differences are taken across the dateline
+        and a result between points on each side of it is put in [-180, 180[ if the input has
+        negative values and else in [0, 360["""
+
+
+def centers(a, axis=-1, lon=False):
+    """Average consecutive points along an axis: size ``n`` becomes ``n-1``
+
+    Parameters
+    ----------
+    a: array_like
+    axis: int
+    {lon_doc}
+    """
+    return _apply_along_axis_(_centers3d_, a, axis, np.shape(a)[axis] - 1, *_lon_args_(a, lon))
+
+
+def edges(a, axis=-1, lon=False):
+    """Cell edges from centers along an axis, extrapolated at the ends: ``n`` becomes ``n+1``
+
+    Parameters
+    ----------
+    a: array_like
+    axis: int
+    {lon_doc}
+    """
     n = np.shape(a)[axis]
     if n < 2:
         raise ValueError("At least two points are needed to extrapolate")
-    return _apply_along_axis_(_edges3d_, a, axis, n + 1)
+    return _apply_along_axis_(_edges3d_, a, axis, n + 1, *_lon_args_(a, lon))
 
 
-def diff(a, axis=-1):
-    """Difference of consecutive points along an axis: size ``n`` becomes ``n-1``"""
-    return _apply_along_axis_(_diff3d_, a, axis, np.shape(a)[axis] - 1)
+def diff(a, axis=-1, lon=False):
+    """Difference of consecutive points along an axis: size ``n`` becomes ``n-1``
+
+    Parameters
+    ----------
+    a: array_like
+    axis: int
+    lon: bool
+        The values are longitudes in degrees and differences are taken across the dateline
+    """
+    return _apply_along_axis_(_diff3d_, a, axis, np.shape(a)[axis] - 1, *_lon_args_(a, lon))
 
 
 _PAD_MODES = {"edge": 0, "linear_extrap": 1, "constant": 2, "wrap": 3}
 
 
-def pad(a, axis=-1, width=1, mode="edge", constant_values=np.nan):
+def pad(a, axis=-1, width=1, mode="edge", constant_values=np.nan, lon=False):
     """Pad an array along an axis
 
     Parameters
@@ -203,6 +258,7 @@ def pad(a, axis=-1, width=1, mode="edge", constant_values=np.nan):
         `constant_values`, or repeat the array periodically
     constant_values: float
         Value used with the ``"constant"`` mode
+    {lon_doc}
     """
     if mode not in _PAD_MODES:
         raise ValueError(f"Invalid pad mode: {mode}")
@@ -213,11 +269,19 @@ def pad(a, axis=-1, width=1, mode="edge", constant_values=np.nan):
     if n < 1 and mode == "wrap":
         raise ValueError("At least one point is needed to wrap")
     return _apply_along_axis_(
-        _pad3d_, a, axis, n + p0 + p1, p0, p1, _PAD_MODES[mode], float(constant_values)
+        _pad3d_,
+        a,
+        axis,
+        n + p0 + p1,
+        p0,
+        p1,
+        _PAD_MODES[mode],
+        float(constant_values),
+        *_lon_args_(a, lon),
     )
 
 
-def shift(a, axis=-1, direction=1, mode="edge"):
+def shift(a, axis=-1, direction=1, mode="edge", lon=False):
     """Move an array by half a grid cell along an axis, keeping its size
 
     Parameters
@@ -228,13 +292,20 @@ def shift(a, axis=-1, direction=1, mode="edge"):
         Positive to move up, and negative to move down
     mode: {"edge", "linear_extrap"}
         How the end value is obtained
+    {lon_doc}
     """
     if mode not in ("edge", "linear_extrap"):
         raise ValueError(f"Invalid shift mode: {mode}")
     n = np.shape(a)[axis]
     if n < 2:
         raise ValueError("At least two points are needed to shift")
-    return _apply_along_axis_(_shift3d_, a, axis, n, direction, mode == "linear_extrap")
+    return _apply_along_axis_(
+        _shift3d_, a, axis, n, direction, mode == "linear_extrap", *_lon_args_(a, lon)
+    )
+
+
+for _func_ in (centers, edges, pad, shift):
+    _func_.__doc__ = _func_.__doc__.replace("{lon_doc}", _LON_DOC)
 
 
 def gradient(a, x, axis=-1):
