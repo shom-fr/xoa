@@ -29,6 +29,7 @@ Package API
     xoa.core.sigma
     xoa.core.spline
     xoa.core.stats
+    xoa.core.thermdyn
     xoa.core.time
     xoa.data_samples
     xoa.dyn

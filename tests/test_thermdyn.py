@@ -235,7 +235,7 @@ class TestN2:
     def test_in_situ_temperature(self):
         temp, sal = self.get_profile()
         pt = thermdyn.get_n2(temp, sal, lat=45.0)
-        insitu = thermdyn.get_n2(temp, sal, lat=45.0, ptemp=False)
+        insitu = thermdyn.get_n2(temp, sal, lat=45.0, temp_kind="temp")
         assert not np.allclose(pt, insitu)
         np.testing.assert_allclose(pt.isel(z=slice(4, None)), insitu.isel(z=slice(4, None)), rtol=0.05)
 
@@ -256,3 +256,107 @@ class TestN2:
         temp, sal = self.get_profile()
         with pytest.raises(Exception, match="lat"):
             thermdyn.get_n2(temp, sal)
+
+
+class TestKinds:
+    """Test the kinds of temperature and salinity"""
+
+    @staticmethod
+    def get_state():
+        import gsw
+
+        temp, sal = TestN2.get_profile()
+        sal = sal.assign_attrs(standard_name="sea_water_practical_salinity")
+        p = gsw.p_from_z(temp.z.values, 45.0)
+        sa = gsw.SA_from_SP(sal.values, p, 0.0, 45.0)
+        ct = gsw.CT_from_pt(sa, temp.values)
+        return temp, sal, sa, ct
+
+    def test_choices_and_aliases(self):
+        for alias, kind in [("conservative", "ctemp"), ("ctemp", "ctemp"), ("potential", "ptemp"),
+                            ("insitu", "temp"), (None, None)]:
+            assert thermdyn.TEMP_KINDS[alias] == kind
+        for alias, kind in [("absolute", "asal"), ("asal", "asal"), ("practical", "psal"),
+                            ("preformed", "pfsal")]:
+            assert thermdyn.SAL_KINDS[alias] == kind
+        with pytest.raises(Exception):
+            thermdyn.TEMP_KINDS["atemp"]
+
+    def test_variants(self):
+        ds = xr.Dataset({"x": xr.DataArray([1.0], dims="z", attrs={
+            "standard_name": "sea_water_conservative_temperature"})})
+        assert thermdyn.get_temp(ds, "conservative", errors="ignore") is not None
+        assert thermdyn.get_temp(ds, "ptemp", errors="ignore") is None
+
+    def test_infer(self):
+        temp, sal, sa, ct = self.get_state()
+        assert thermdyn._get_temp_kind_(temp, None) == "ptemp"
+        assert thermdyn._get_temp_kind_(temp.assign_attrs(standard_name="sea_water_temperature"), None) == "temp"
+        assert thermdyn._get_temp_kind_(temp.assign_attrs(standard_name="sea_water_conservative_temperature"), None) == "ctemp"
+        assert thermdyn._get_temp_kind_(temp, "conservative") == "ctemp"
+        assert thermdyn._get_sal_kind_(sal, None) == "psal"
+        assert thermdyn._get_sal_kind_(sal.assign_attrs(standard_name="sea_water_absolute_salinity"), None) == "asal"
+
+    def test_n2_equivalent_kinds(self):
+        temp, sal, sa, ct = self.get_state()
+        ref = thermdyn.get_n2(temp, sal, lat=45.0)
+        asal = sal.copy(data=sa)
+        ctemp = temp.copy(data=ct)
+        for kw in [
+            dict(temp=temp, sal=asal, sal_kind="absolute"),
+            dict(temp=ctemp, sal=sal, temp_kind="conservative"),
+            dict(temp=ctemp, sal=asal, temp_kind="ctemp", sal_kind="asal"),
+        ]:
+            np.testing.assert_allclose(thermdyn.get_n2(lat=45.0, **kw), ref, rtol=1e-10)
+
+    def test_kelvin(self):
+        temp, sal, sa, ct = self.get_state()
+        kelvin = (temp + 273.15).assign_attrs(units="kelvin")
+        np.testing.assert_allclose(
+            thermdyn.get_n2(kelvin, sal, lat=45.0, temp_kind="ptemp"),
+            thermdyn.get_n2(temp, sal, lat=45.0), rtol=1e-10)
+
+    def test_convert_sal(self):
+        temp, sal, sa, ct = self.get_state()
+        asal = thermdyn.convert_sal(sal, "absolute", lat=45.0)
+        np.testing.assert_allclose(asal, sa)
+        assert asal.name == "asal" and asal.attrs["units"] == "g kg-1"
+        back = thermdyn.convert_sal(asal, "psal", "asal", lat=45.0)
+        np.testing.assert_allclose(back, sal, rtol=1e-8)
+        pf = thermdyn.convert_sal(sal, "pfsal", lat=45.0)
+        np.testing.assert_allclose(thermdyn.convert_sal(pf, "asal", "pfsal", lat=45.0), sa)
+        same = thermdyn.convert_sal(sal, "psal", lat=45.0)
+        np.testing.assert_allclose(same, sal)
+
+    def test_convert_temp(self):
+        temp, sal, sa, ct = self.get_state()
+        out = thermdyn.convert_temp(temp, "conservative", sal=sal, lat=45.0)
+        np.testing.assert_allclose(out, ct)
+        assert out.name == "ctemp"
+        back = thermdyn.convert_temp(out, "ptemp", sal=sal, lat=45.0, temp_kind="ctemp")
+        np.testing.assert_allclose(back, temp, rtol=1e-8)
+        insitu = thermdyn.convert_temp(temp, "insitu", sal=sal, lat=45.0)
+        assert float(insitu.isel(z=0)) > float(temp.isel(z=0))
+        assert not np.allclose(insitu, temp)
+        np.testing.assert_allclose(
+            thermdyn.convert_temp(insitu, "ptemp", sal=sal, lat=45.0, temp_kind="temp"),
+            temp, rtol=1e-8)
+        # With absolute salinity
+        np.testing.assert_allclose(
+            thermdyn.convert_temp(temp, "ctemp", sal=sal.copy(data=sa), sal_kind="asal", lat=45.0), ct)
+        # Same kind needs no salinity, but different kinds do
+        np.testing.assert_allclose(thermdyn.convert_temp(temp, "ptemp"), temp)
+        with pytest.raises(Exception, match="salinity"):
+            thermdyn.convert_temp(temp, "ctemp", lat=45.0)
+
+
+class TestMixedLayerDepthKind:
+    """Kind of temperature in the mixed layer depth"""
+
+    def test_insitu_warns(self):
+        temp, _ = TestN2.get_profile()
+        mld = thermdyn.mixed_layer_depth(temp, method="deltatemp")
+        with pytest.warns(Warning, match="in-situ"):
+            mld_is = thermdyn.mixed_layer_depth(temp, method="deltatemp", temp_kind="insitu")
+        np.testing.assert_allclose(mld, mld_is)
+        thermdyn.mixed_layer_depth(temp, method="deltatemp", temp_kind="conservative")
