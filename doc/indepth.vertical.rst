@@ -138,6 +138,24 @@ to the default ones with :func:`xoa.meta.assign_meta_specs`:
 Note that ``depth`` is also the name of the bathymetry term of the formulas, which
 is positive down but is not a coordinate.
 
+Heights at other vertical locations, like the w levels of CROCO, are named with the
+location, like ``z_rho`` and ``z_w``, which requires meta specs whose name format has
+a location, like ``croco``. Otherwise, decoding raises an error instead of writing twice
+to ``z``.
+
+These heights are relative to the fixed datum of the formulas, at which the sea surface
+height is zero, so the free surface is at ``z = ssh``. When you want the free surface at
+zero, to interpolate at a given distance below it for instance, use ``ref="surface"``:
+the ``ssh`` is subtracted in the computation, so the water column and the levels
+are unchanged. The result has a ``xoa_vertical_ref`` attribute set to ``"surface"``,
+and loses its ``altitude`` standard name, which is relative to the datum:
+
+.. ipython:: python
+
+    ds["ssh"] = ("x", [1., -2.])
+    sigma.decode_sigma(ds).z.isel(sig=-1).values
+    sigma.decode_sigma(ds, ref="surface").z.isel(sig=-1).values
+
 Layer thicknesses are integrated by :func:`xoa.grid.dz2z`, which always returns a ``z``.
 The surface of the water column is at zero by default, or at the ``top`` argument,
 or the bottom is at the ``bottom`` argument, with ``z`` values. The :func:`xoa.grid.dz2depth`

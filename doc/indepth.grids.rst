@@ -297,11 +297,17 @@ depend on:
     print(ds.s_rho.attrs.get('standard_name'))
 
     # Decode sigma to z heights, which are negative in the ocean, using the sigma module
-    # The decode_cf_sigma function will automatically detect
-    # the coordinate type and apply the correct formula
+    # The decode_sigma function will automatically detect
+    # the coordinate type and apply the correct formula.
+    # The croco specs name the heights z_rho and z_w, according to their vertical location.
     from xoa.sigma import decode_sigma
+    xoa.meta.assign_meta_specs(ds, "croco")
     dsz = decode_sigma(ds)
-    print(dsz.z)
+    print(dsz.z_rho)
+
+Heights are relative to the fixed datum of the formulas by default, so that the free
+surface is at ``z = ssh``. Use ``ref="surface"`` to get them relative to the free surface:
+see :ref:`indepth.vertical`.
 
 Atmosphere sigma coordinates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

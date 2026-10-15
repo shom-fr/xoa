@@ -595,7 +595,7 @@ class SigmaAccessor(_BasicMetaAccessor_):
         self._ds = self._obj
 
     @ERRORS.format_method_docstring
-    def decode(self, rename=False, errors="raise"):
+    def decode(self, rename=False, ref="datum", errors="raise"):
         """Compute depth from sigma coordinates
 
         Parameters
@@ -603,6 +603,8 @@ class SigmaAccessor(_BasicMetaAccessor_):
         rename: bool
             Rename and format arrays to make them compliant with
             :mod:`xoa.meta`
+        ref: {{"datum", "surface"}}
+            Reference of the heights, see :func:`xoa.sigma.decode_sigma`.
         {errors}
 
         Return
@@ -615,11 +617,11 @@ class SigmaAccessor(_BasicMetaAccessor_):
         """
         from .sigma import decode_sigma
 
-        return decode_sigma(self._ds, rename=rename, errors=errors)
+        return decode_sigma(self._ds, rename=rename, ref=ref, errors=errors)
 
-    def __call__(self):
+    def __call__(self, **kwargs):
         """Shortcut to :meth:`decode`"""
-        return self.decode()
+        return self.decode(**kwargs)
 
     def get_sigma_terms(self, loc=None, rename=False):
         """Call :func:`get_sigma_terms` on the dataset

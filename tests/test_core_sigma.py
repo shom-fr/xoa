@@ -58,7 +58,7 @@ class TestOceanSigma:
         eta = 0.5  # Sea surface height in m
         depth = 100.0  # Bottom depth in m
 
-        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth)
+        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth, 1.0)
 
         # z = eta + sigma * (eta + depth)
         expected = np.array([-100.0, -49.75, 0.5])
@@ -70,7 +70,7 @@ class TestOceanSigma:
         eta = 0.0
         depth = 100.0
 
-        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth)
+        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth, 1.0)
 
         expected = np.array([-100.0, -50.0, 0.0])
         np.testing.assert_allclose(result, expected)
@@ -81,7 +81,7 @@ class TestOceanSigma:
         eta = np.array([[0.5, 1.0], [0.0, -0.5]])
         depth = np.array([[100.0, 150.0], [200.0, 50.0]])
 
-        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth)
+        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth, 1.0)
 
         assert result.shape == (2, 2, 3)
         # Check first point: eta=0.5, depth=100
@@ -101,7 +101,7 @@ class TestOceanS:
         depth_c = 10.0
         C = np.array([0.0, 0.5, 1.0])
 
-        result = sigma.ocean_s_coordinate(s_levels, eta, depth, depth_c, C)
+        result = sigma.ocean_s_coordinate(s_levels, eta, depth, depth_c, C, 1.0)
 
         # z = eta*(1+s) + depth_c*s + (depth-depth_c)*C
         # For s=-1: 0.5*0 + 10*(-1) + 90*0 = -10
@@ -118,7 +118,7 @@ class TestOceanS:
         depth_c = 20.0
         C = np.array([0.0, 1.0])
 
-        result = sigma.ocean_s_coordinate(s_levels, eta, depth, depth_c, C)
+        result = sigma.ocean_s_coordinate(s_levels, eta, depth, depth_c, C, 1.0)
 
         # For s=-1: eta*(1+s) + depth_c*s + (depth-depth_c)*C
         #         = 1*0 + 20*(-1) + 180*0 = -20
@@ -134,7 +134,7 @@ class TestOceanS:
         depth_c = 10.0
         C = np.array([0.0, 1.0])
 
-        result = sigma.ocean_s_coordinate(s_levels, eta, depth, depth_c, C)
+        result = sigma.ocean_s_coordinate(s_levels, eta, depth, depth_c, C, 1.0)
 
         assert result.shape == (1, 2, 2)
 
@@ -150,7 +150,7 @@ class TestOceanSG1:
         depth_c = 10.0
         C = np.array([-1.0, -0.5, 0.0])
 
-        result = sigma.ocean_s_coordinate_g1(s_levels, eta, depth, depth_c, C)
+        result = sigma.ocean_s_coordinate_g1(s_levels, eta, depth, depth_c, C, 1.0)
 
         # S = depth_c*s + (depth-depth_c)*C
         # z = S + eta*(1 + S/depth)
@@ -170,7 +170,7 @@ class TestOceanSG1:
         depth_c = 15.0
         C = np.array([0.0, 1.0])
 
-        result = sigma.ocean_s_coordinate_g1(s_levels, eta, depth, depth_c, C)
+        result = sigma.ocean_s_coordinate_g1(s_levels, eta, depth, depth_c, C, 1.0)
 
         # The function should pre-compute 1/depth = 1/150
         # For s=-1, C=0: S = -15, z = -15 + 2*(1-15/150) = -15 + 2*0.9 = -13.2
@@ -186,7 +186,7 @@ class TestOceanSG1:
         depth_c = 10.0
         C = np.array([0.0, 1.0])
 
-        result = sigma.ocean_s_coordinate_g1(s_levels, eta, depth, depth_c, C)
+        result = sigma.ocean_s_coordinate_g1(s_levels, eta, depth, depth_c, C, 1.0)
 
         assert result.shape == (2, 3, 4, 2)
 
@@ -202,7 +202,7 @@ class TestOceanSG2:
         depth_c = 10.0
         C = np.array([-1.0, -0.5, 0.0])
 
-        result = sigma.ocean_s_coordinate_g2(s_levels, eta, depth, depth_c, C)
+        result = sigma.ocean_s_coordinate_g2(s_levels, eta, depth, depth_c, C, 1.0)
 
         # S = (depth_c*s + depth*C) / (depth_c + depth)
         # z = S*(depth + eta) + eta
@@ -222,7 +222,7 @@ class TestOceanSG2:
         depth_c = 20.0
         C = np.array([0.0, 1.0])
 
-        result = sigma.ocean_s_coordinate_g2(s_levels, eta, depth, depth_c, C)
+        result = sigma.ocean_s_coordinate_g2(s_levels, eta, depth, depth_c, C, 1.0)
 
         # Pre-computed: depth+depth_c=220, 1/220, depth+eta=201
         # For s=-1, C=0: S = -20/220 = -0.090909..
@@ -240,7 +240,7 @@ class TestOceanSG2:
         depth_c = 10.0  # Scalar depth_c
         C = np.array([0.0, 1.0])
 
-        result = sigma.ocean_s_coordinate_g2(s_levels, eta, depth, depth_c, C)
+        result = sigma.ocean_s_coordinate_g2(s_levels, eta, depth, depth_c, C, 1.0)
 
         assert result.shape == (1, 2, 2)
 
@@ -254,7 +254,7 @@ class TestEdgeCases:
         eta = 0.1
         depth = 1.0  # Very shallow
 
-        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth)
+        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth, 1.0)
 
         # Should still work correctly
         expected = np.array([-1.0, 0.1])
@@ -266,7 +266,7 @@ class TestEdgeCases:
         eta = 0.5
         depth = 10000.0  # Very deep
 
-        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth)
+        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth, 1.0)
 
         expected = np.array([-10000.0, 0.5])
         np.testing.assert_allclose(result, expected)
@@ -277,7 +277,7 @@ class TestEdgeCases:
         eta = -0.5
         depth = 100.0
 
-        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth)
+        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth, 1.0)
 
         # z = eta + sigma*(eta + depth)
         # For sigma=-1: -0.5 + (-1)*99.5 = -100
@@ -292,7 +292,7 @@ class TestEdgeCases:
         eta = 1.0
         depth = 100.0
 
-        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth)
+        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth, 1.0)
 
         assert result.shape == (1,)
         np.testing.assert_allclose(result, [1.0])
@@ -304,7 +304,7 @@ class TestEdgeCases:
         eta = 0.5
         depth = 100.0
 
-        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth)
+        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth, 1.0)
 
         assert result.shape == (n_levels,)
         # Check surface and bottom
@@ -321,7 +321,7 @@ class TestDataTypes:
         eta = np.float32(0.5)
         depth = np.float32(100.0)
 
-        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth)
+        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth, 1.0)
 
         # Result should work even if inputs are float32
         expected = np.array([-100.0, 0.5])
@@ -333,7 +333,25 @@ class TestDataTypes:
         eta = 0.5  # Python float
         depth = 100  # Python int
 
-        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth)
+        result = sigma.ocean_sigma_coordinate(sigma_levels, eta, depth, 1.0)
 
         expected = np.array([-100.0, 0.5])
         np.testing.assert_allclose(result, expected)
+
+
+@pytest.mark.parametrize("zeta", [0.0, 1.5, -2.0])
+def test_ref_surface(zeta):
+    """Heights relative to the free surface are the datum ones minus the ssh"""
+    s = np.linspace(-1, 0, 5)
+    h, hc = 100.0, 10.0
+    C = (np.sinh(2 * s) / np.sinh(2)) * 0.5 + 0.5 * s * s * 0 + 0.5 * s
+    for func, args in (
+        (sigma.ocean_sigma_coordinate, (s, zeta, h)),
+        (sigma.ocean_s_coordinate, (s, zeta, h, hc, C)),
+        (sigma.ocean_s_coordinate_g1, (s, zeta, h, hc, C)),
+        (sigma.ocean_s_coordinate_g2, (s, zeta, h, hc, C)),
+    ):
+        datum = func(*args, 1.0)
+        surface = func(*args, 0.0)
+        np.testing.assert_allclose(surface, datum - zeta, atol=1e-12)
+        np.testing.assert_allclose(surface[-1], 0.0, atol=1e-12)

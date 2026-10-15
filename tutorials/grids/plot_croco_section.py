@@ -65,20 +65,20 @@ print(ds)
 # Decode the dataset according to the CF conventions:
 #
 # 1. Find sigma terms
-# 2. Compute the ``z`` heights, that are negative in the ocean
+# 2. Compute the ``z_rho`` and ``z_w`` heights, that are negative in the ocean
 # 3. Assign them as coordinates
 #
 # Note that the ``decode_sigma`` subaccessor of the :ref:`xoa <accessors>` accessor
 # calls the :func:`xoa.sigma.decode_cf_sigma` function.
 
 ds = ds.xoa.decode_sigma()
-print(ds.z)
+print(ds.z_rho)
 
 # %%
 # Find coordinate names from CF conventions
 # -----------------------------------------
 #
-# The `z` was assigned as coordinates at the previous stage.
+# The `z_rho` was assigned as coordinates at the previous stage.
 # We use the :ref:`xoa <accessors.dataset>` accessor to easily access the temperature, latitude and z arrays.
 # The default configuration exposes shortcuts for some variables and coordinates
 # as shown in :metasec:`accessors`.
@@ -96,7 +96,7 @@ lat_name = temp.xoa.lat.name
 # Let's create the output heights.
 
 z = xr.DataArray(
-    np.linspace(ds.z.values.min(), ds.z.values.max(), 1000), name="z", dims="z"
+    np.linspace(ds.z_rho.values.min(), ds.z_rho.values.max(), 1000), name="z", dims="z"
 )
 
 # %%
