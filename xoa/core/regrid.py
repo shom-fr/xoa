@@ -26,7 +26,7 @@ import numba
 from ..exceptions import xoa_warn
 from .conserv import compute_conservative_weights
 from .grid import centers2edges, check_grid_type, edges2bounds, unwrap_grid_longitudes
-from .interp import XYInterpolator, _get_source_matrix_
+from .interp import XYInterpolator, _get_source_matrix_, _normalize_lon_
 from .num import (
     EMPTY_OFFSETS,
     CsrMatrix,
@@ -725,8 +725,7 @@ class XYRegridder(XYInterpolator):
             elif grid['lon_bounds'].shape != (ny, nx, 4) or grid['lat_bounds'].shape != (ny, nx, 4):
                 raise ValueError(f'{grid_name} grid corner arrays must have shape ({ny}, {nx}, 4)')
 
-            if np.any(grid['lon'] < -180) or np.any(grid['lon'] > 180):
-                raise ValueError(f'{grid_name} grid longitudes must be in range [-180, 180]')
+            grid['lon'] = _normalize_lon_(grid['lon'])
 
             if np.any(grid['lat'] < -90) or np.any(grid['lat'] > 90):
                 raise ValueError(f'{grid_name} grid latitudes must be in range [-90, 90]')

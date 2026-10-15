@@ -253,7 +253,15 @@ def compute_frac_indices(
         a = b = 0.0
 
         if grid_type == 0:
-            fi = diff_lon(src_lon_start, dst_lon) / src_dlon
+            # Fractional index along a longitude axis that may span more than 180°, with the
+            # representation of the point, modulo a cycle, that is in the valid range
+            cycle = 360.0 / abs(src_dlon)
+            fi = ((dst_lon - src_lon_start) / src_dlon) % cycle
+            f0 = fi
+            for f in (f0, f0 + cycle, f0 - cycle):
+                if m - FRAC_TOL <= f <= src_nx - 1 - m + FRAC_TOL:
+                    fi = f
+                    break
             fj = (dst_lat - src_lat_start) / src_dlat
             # Cells are closed: points on their edges are inside, like the ones of the first
             # and last lines of the grid. Truncating toward zero would let in the points
@@ -340,7 +348,9 @@ def compute_frac_indices(
 
 
 @numba.njit(cache=NOT_CI, parallel=True)
-def bilinear_frac(j_base, i_base, frac_a, frac_b, X, nx_src, out, skipna, na_thres):
+def bilinear_frac(
+    j_base, i_base, frac_a, frac_b, X, nx_src, out, skipna, na_thres, periodic=False
+):
     """
     Bilinear interpolation over K columns using fractional cell indices.
 
@@ -353,6 +363,7 @@ def bilinear_frac(j_base, i_base, frac_a, frac_b, X, nx_src, out, skipna, na_thr
     out            : (n_dst, K) float64  filled in-place
     skipna         : bool
     na_thres       : float
+    periodic       : bool  columns are wrapped around, like in a global grid
     """
     nan = np.nan
     na_threshold = min(max(1.0 - na_thres, EPSILON), 1.0 - EPSILON)
@@ -367,6 +378,10 @@ def bilinear_frac(j_base, i_base, frac_a, frac_b, X, nx_src, out, skipna, na_thr
             continue
 
         i0 = i_base[dst_idx]
+        i1 = i0 + 1
+        if periodic:
+            i0 %= nx_src
+            i1 %= nx_src
         a = frac_a[dst_idx]
         b = frac_b[dst_idx]
 
@@ -376,9 +391,9 @@ def bilinear_frac(j_base, i_base, frac_a, frac_b, X, nx_src, out, skipna, na_thr
         w11 = a * b  # NE
 
         c00 = j0 * nx_src + i0
-        c10 = j0 * nx_src + i0 + 1
+        c10 = j0 * nx_src + i1
         c01 = (j0 + 1) * nx_src + i0
-        c11 = (j0 + 1) * nx_src + i0 + 1
+        c11 = (j0 + 1) * nx_src + i1
 
         for k in range(K):
             v00 = X[c00, k]
@@ -407,7 +422,19 @@ def bilinear_frac(j_base, i_base, frac_a, frac_b, X, nx_src, out, skipna, na_thr
 
 @numba.njit(cache=NOT_CI, parallel=True)
 def bicubic_frac(
-    j_base, i_base, frac_a, frac_b, X, ny_src, nx_src, out, skipna, na_thres, bias=0.0, tension=0.0
+    j_base,
+    i_base,
+    frac_a,
+    frac_b,
+    X,
+    ny_src,
+    nx_src,
+    out,
+    skipna,
+    na_thres,
+    bias=0.0,
+    tension=0.0,
+    periodic=False,
 ):
     """
     Bicubic (Hermite) interpolation over K columns using fractional cell indices.
@@ -427,6 +454,7 @@ def bicubic_frac(
     skipna         : bool
     na_thres       : float
     bias, tension  : float  Hermite parameters (default 0)
+    periodic       : bool  columns are wrapped around, like in a global grid
     """
     nan = np.nan
     na_threshold = min(max(1.0 - na_thres, EPSILON), 1.0 - EPSILON)
@@ -456,6 +484,8 @@ def bicubic_frac(
             for ci in range(4):
                 sj = j0 + ri - 1
                 si = i0 + ci - 1
+                if periodic:
+                    si %= nx_src
                 p = ri * 4 + ci
                 stencil_flat[p] = sj * nx_src + si
                 w_bic[p] = y_w[ri] * x_w[ci]

@@ -116,3 +116,10 @@ def test_trideigh_matches_dense():
     values, vectors = num.trideigh(d, e, 5)
     np.testing.assert_allclose(values, w[:5], rtol=1e-10)
     np.testing.assert_allclose(np.abs(np.sum(vectors * v[:, :5], axis=0)), 1.0, atol=1e-8)
+
+
+def test_is_float():
+    assert num.is_float(np.zeros(2, "f4"))
+    assert num.is_float(np.dtype("f8"))
+    assert not num.is_float(np.arange(2))
+    assert not num.is_float(np.zeros(2, "f2"))

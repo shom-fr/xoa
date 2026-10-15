@@ -85,6 +85,11 @@ def ravel_index(ii, shape):
     return ir
 
 
+def is_float(arr):
+    """Tell if an array, or a dtype, is a single or double precision float"""
+    return np.dtype(getattr(arr, "dtype", arr)) in (np.float32, np.float64)
+
+
 def as_float_array(arr):
     """Convert input to at least 1D float array, useful for numba accelerated functions
 

@@ -24,8 +24,8 @@ import numpy as np
 import numba
 
 from ..exceptions import xoa_warn
-from .geo import closest_point_fast, relative_cell_coords
-from .grid import check_grid_type
+from .geo import closest_point_fast, diff_lon, relative_cell_coords
+from .grid import check_grid_type, is_periodic_lon
 from .num import EPSILON
 from .spline import (
     bicubic_frac,
@@ -531,6 +531,7 @@ def interp_transect(
     time_method,
     bias,
     tension,
+    periodic=False,
 ):
     """
     Trilinear interpolation at scattered (x, y, t) locations.
@@ -573,6 +574,8 @@ def interp_transect(
         Kochanek-Bartels bias for bicubic (0.0 = Catmull-Rom).
     tension : float
         Kochanek-Bartels tension for bicubic (0.0 = standard).
+    periodic : bool
+        Columns are wrapped around, like in a global grid.
 
     Returns
     -------
@@ -594,6 +597,10 @@ def interp_transect(
             continue
 
         i0 = i_base[dst_idx]
+        i1 = i0 + 1
+        if periodic:
+            i0 %= nx_src
+            i1 %= nx_src
         a = frac_a[dst_idx]
         b = frac_b[dst_idx]
         wt = frac_t[dst_idx]
@@ -605,9 +612,9 @@ def interp_transect(
             w01 = (1.0 - a) * b
             w11 = a * b
             c00 = j0 * nx_src + i0
-            c10 = j0 * nx_src + i0 + 1
+            c10 = j0 * nx_src + i1
             c01 = (j0 + 1) * nx_src + i0
-            c11 = (j0 + 1) * nx_src + i0 + 1
+            c11 = (j0 + 1) * nx_src + i1
 
             for k in range(K):
                 v00_0 = data[it, k, c00]
@@ -670,6 +677,8 @@ def interp_transect(
                 for ci in range(4):
                     sj = j0 + ri - 1
                     si = i0 + ci - 1
+                    if periodic:
+                        si %= nx_src
                     p = ri * 4 + ci
                     stencil_flat[p] = sj * nx_src + si
                     w_bic[p] = y_w[ri] * x_w[ci]
@@ -737,6 +746,14 @@ def interp_transect(
 # %% XYInterpolator
 
 
+def _normalize_lon_(lon):
+    """Put longitudes in [-180, 180], leaving the ones that already are"""
+    lon = np.asarray(lon)
+    if lon.size and (lon.min() < -180 or lon.max() > 180):
+        lon = np.where((lon < -180) | (lon > 180), (lon + 180) % 360 - 180, lon)
+    return lon
+
+
 def _get_source_matrix_(data, mask=None):
     """Get the ``(n_src, K)`` matrix of the kernels from ``(..., ny, nx)`` data
 
@@ -792,7 +809,7 @@ class XYInterpolator:
         self.bias = bias
         self.tension = tension
 
-        dst_lon = np.asarray(dst_lon, dtype=np.float64)
+        dst_lon = _normalize_lon_(np.asarray(dst_lon, dtype=np.float64))
         dst_lat = np.asarray(dst_lat, dtype=np.float64)
         if dst_lon.ndim == 0:
             dst_lon = dst_lon.reshape(1)
@@ -809,6 +826,7 @@ class XYInterpolator:
         self._frac_a = None
         self._frac_b = None
         self._valid_dst_mask = None
+        self._periodic = False
 
         self._validate_src()
         self._prepare_src()
@@ -870,8 +888,7 @@ class XYInterpolator:
         if len(grid['lon'].shape) != 2:
             raise ValueError("source grid 'lon' and 'lat' must be 2D arrays")
 
-        if np.any(grid['lon'] < -180) or np.any(grid['lon'] > 180):
-            raise ValueError('source grid longitudes must be in range [-180, 180]')
+        grid['lon'] = _normalize_lon_(grid['lon'])
 
         if np.any(grid['lat'] < -90) or np.any(grid['lat'] > 90):
             raise ValueError('source grid latitudes must be in range [-90, 90]')
@@ -908,14 +925,29 @@ class XYInterpolator:
         n = len(self._dst_lon_flat)
         dst_lon_2d = self._dst_lon_flat.reshape(n, 1)
         dst_lat_2d = self._dst_lat_flat.reshape(n, 1)
+        src_lon = self.src_grid['lon']
+        src_lat = self.src_grid['lat']
+        self._periodic = grid_type_idx < 2 and is_periodic_lon(src_lon)
+        if self._periodic:
+            # One column is added before and two after, wrapped around, so that
+            # the cells between the last and first columns have their stencil
+            nx = src_lon.shape[1]
+            cols = np.r_[nx - 1, np.arange(nx), 0, 1]
+            sign = 1.0 if diff_lon(src_lon[0, 0], src_lon[0, 1]) > 0 else -1.0
+            src_lon = src_lon[:, cols]
+            src_lon[:, 0] -= 360.0 * sign
+            src_lon[:, -2:] += 360.0 * sign
+            src_lat = src_lat[:, cols]
         self._j_base, self._i_base, self._frac_a, self._frac_b = compute_frac_indices(
-            self.src_grid['lon'],
-            self.src_grid['lat'],
+            np.ascontiguousarray(src_lon),
+            np.ascontiguousarray(src_lat),
             dst_lon_2d,
             dst_lat_2d,
             grid_type_idx,
             stencil_margin=stencil_margin,
         )
+        if self._periodic:
+            self._i_base[self._j_base >= 0] -= 1
         self._valid_dst_mask = self._j_base >= 0
 
     def interp(self, data, skipna=False, na_thres=1.0):
@@ -961,6 +993,7 @@ class XYInterpolator:
                 out,
                 skipna,
                 na_thres,
+                self._periodic,
             )
         else:  # bicubic
             bicubic_frac(
@@ -976,6 +1009,7 @@ class XYInterpolator:
                 na_thres,
                 self.bias,
                 self.tension,
+                self._periodic,
             )
 
         return out.T.reshape(extra + self._dst_shape)
@@ -1064,6 +1098,7 @@ class XYInterpolator:
             time_method,
             float(self.bias),
             float(self.tension),
+            self._periodic,
         )
         # out: (K, n_dst) → reshape to (...extra, *dst_shape)
         return out.reshape(extra + self._dst_shape)
@@ -1083,6 +1118,7 @@ class XYInterpolator:
                 i_base=self._i_base,
                 frac_a=self._frac_a,
                 frac_b=self._frac_b,
+                periodic=self._periodic,
             )
 
     def load_weights(self, filename):
@@ -1106,3 +1142,4 @@ class XYInterpolator:
         self._i_base = p['i_base']
         self._frac_a = p['frac_a']
         self._frac_b = p['frac_b']
+        self._periodic = bool(p.get('periodic', False))

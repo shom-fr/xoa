@@ -277,13 +277,17 @@ algorithm:
 
 Things to know:
 
-- **Longitudes must be in [-180, 180] and latitudes in [-90, 90]**, for both grids and
-  points, otherwise a :class:`ValueError` is raised. Convert 0-360 longitudes beforehand.
+- **Latitudes must be in [-90, 90]**, for both grids and points, otherwise a
+  :class:`ValueError` is raised. Longitudes can be in any range, like 0-360, and are put in
+  [-180, 180].
 - Axes may increase or decrease along their dimension, like latitudes that go from north to south.
 - Grids may cross the **dateline**, with longitudes that jump from 180 to -180, for all
   the methods and types of grids, except the ``bicubic`` method on rectangular grids. Cells that
   contain a pole, whose longitudes span more than 180°, are not supported by the
   ``conservative`` method.
+- Global regular and rectangular grids are **periodic**: the cells between the last and first
+  columns are interpolated for the ``bilinear`` and ``bicubic`` methods. Grids that span more than
+  180° are supported.
 - Curvilinear grids are searched around the closest node of each target, so cells must not be
   extremely sheared.
 - On **staggered grids**, a dataset may have several longitude/latitude pairs, one for

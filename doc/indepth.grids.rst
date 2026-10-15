@@ -49,6 +49,13 @@ The :mod:`xoa.grid` module offers various functions to manipulate grids:
     x_back = xgrid.get_edges(x_centers, "x", mode="linear_extrap")
     print(x_back.values)
 
+.. note:: :func:`~xoa.grid.pad`, :func:`~xoa.grid.get_centers`, :func:`~xoa.grid.get_edges`,
+    :func:`~xoa.grid.shift`, :func:`~xoa.grid.diff` and :func:`~xoa.grid.gradient` run numba
+    kernels from :mod:`xoa.core.grid` on single or double precision floats, with the ``"edge"``,
+    ``"linear_extrap"``, ``"constant"`` and ``"wrap"`` pad modes. Other types and modes use xarray.
+    Dask arrays are loaded in memory, so loop over chunks to bound memory usage.
+    Longitudes are kept continuous across the dateline: the centers of 178° and -174° are -178°.
+
 **Applying operations along dimensions:**
 
 The :func:`~xoa.grid.apply_along_dim` function allows you to apply an xarray operator
