@@ -9,10 +9,10 @@ In this tutorial, we show how to:
 * access the same quantity in datasets that name it differently,
 * write a function once and apply it to several models,
 * decode datasets to generic names and encode them back,
-* use the naming specifications of a model, or write your own.
+* use the naming specifications of a model.
 
 The concepts are explained in the :ref:`indepth.meta` guide.
-See also: :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
+See also: :ref:`sphx_glr_tutorials_meta_plot_naming_specs.py`, :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
 """
 
 # %%
@@ -107,33 +107,14 @@ with meta.set_meta_specs("croco"):
     print(list(croco.xoa.decode().data_vars)[-6:])
 
 # %%
-# Writing your own specifications
-# -------------------------------
+# Your own specifications
+# -----------------------
 #
-# Specifications are written as a dict or a configuration file. We declare here
-# that ``T_surf`` is a temperature and that ``mylon`` is a longitude, which
-# the default specifications do not know.
-
-
-def make_dataset():
-    return xr.Dataset(
-        {"T_surf": ("n", [10.0, 11.0, 12.0], {"units": "degC"})},
-        coords={"mylon": ("n", [1.0, 2.0, 3.0])},
-    )
-
-
-specs = {
-    "data_vars": {"temp": {"alt_names": ["T_surf"]}},
-    "coords": {"lon": {"alt_names": ["mylon"]}},
-}
-print(make_dataset().xoa.get("temp"))
-with meta.set_meta_specs(specs):
-    custom = make_dataset()
-    print(custom.xoa.get("temp").name, custom.xoa.get("lon").name)
-    print(list(custom.xoa.decode().variables))
+# For a model that is not known by xoa, you write the naming specifications yourself,
+# as a dict or a configuration file: see :ref:`sphx_glr_tutorials_meta_plot_naming_specs.py`.
 
 # %%
-# Using specs registers them, which changes how the next datasets are decoded. Since
-# the other tutorials share this session, we restore the initial state.
+# Using specifications registers them, which changes how the next datasets are decoded.
+# Since the other tutorials share this session, we restore the initial state.
 
 meta.reset_cache(memory=True)

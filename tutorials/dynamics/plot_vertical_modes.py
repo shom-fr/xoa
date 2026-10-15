@@ -149,6 +149,40 @@ fig, axes = plot_fields(
 # shelf side. The contours show the surface currents of 0.8 and 1.2 m/s, which is the stream.
 
 # %%
+# A quick estimate
+# ----------------
+#
+# When only the first radius is needed, :func:`xoa.dyn.get_rossby_radius` is much cheaper:
+# it integrates the buoyancy frequency along the water column, :math:`R_d = \int N dz / (\pi |f|)`
+# (WKB approximation). Let's compare it with the exact radius.
+
+rd1_wkb = (xdyn.get_rossby_radius(n2) * 1e-3).where(open_ocean)
+diff = ((rd1_wkb / rd1 - 1) * 100).rename("diff")
+diff.attrs = {"long_name": "WKB relative difference", "units": "%"}
+print(f"WKB / modes - 1: median = {float(diff.median()):.1f} %, "
+      f"5-95% = {float(diff.quantile(0.05)):.1f} to {float(diff.quantile(0.95)):.1f} %")
+
+contours = [{"field": speed0, "levels": [0.8, 1.2], "colors": ["0.35", "k"], "linewidths": 0.8}]
+rd_kw = {"cmap": "cmo.matter", "levels": np.linspace(18, 34, 17), "extend": "both"}
+diff_kw = {"cmap": "cmo.balance", "levels": np.linspace(-20, 20, 21), "extend": "both"}
+fig, axes = plot_fields(
+    {"Vertical modes": (rd1, rd_kw), "WKB": (rd1_wkb, rd_kw), "WKB - modes": (diff, diff_kw)},
+    ncols=3,
+    figsize=(11, 3.8),
+    method="contourf",
+    map_kw=MAP_KW,
+    overlay_contours=contours,
+    panel_labels=True,
+)
+
+# %%
+# The maps are similar. The WKB radius is about 10 % smaller in the south, with a difference
+# that shrinks northward, and it does not depend on the stream. Use
+# :class:`~xoa.dyn.VerticalModes` for the exact radii or for the other modes.
+#
+# The integral can be limited to a layer with ``zrange``, in z positive up, like for the modes.
+
+# %%
 # Decompose the currents
 # ----------------------
 #
@@ -219,7 +253,7 @@ for n, color in zip((1, 2, 3), colors):
         label=f"{n} mode" + ("s" if n > 1 else ""),
     )
 axes[0].invert_yaxis()
-axes[0].set_xlabel("Zonal current [m s-1]")
+axes[0].set_xlabel("Zonal current [m s⁻¹]")
 axes[0].set_ylabel("Depth [m]")
 axes[0].set_title("Profile in the stream")
 axes[0].legend(frameon=False)
@@ -231,7 +265,7 @@ axes[1].plot(errors.nmodes, errors, "o-", color="0.2")
 axes[1].set_xscale("log")
 axes[1].set_yscale("log")
 axes[1].set_xlabel("Number of modes")
-axes[1].set_ylabel("Root mean square error [m s-1]")
+axes[1].set_ylabel("Root mean square error [m s⁻¹]")
 axes[1].set_title("Truncation error")
 axes[1].grid(True, which="both", alpha=0.3)
 
@@ -244,11 +278,11 @@ axes[1].grid(True, which="both", alpha=0.3)
 # Focus on the upper ocean
 # ------------------------
 #
-# The ``zrange`` parameter restricts the computation to a layer: only the levels that are in it
-# are used, and the modes have no flux through its limits. The modes of the upper 500 m
+# The ``zrange`` parameter restricts the computation to a layer, given as z positive up,
+# i.e. negative in the ocean: only the levels that are in it are used, and the modes have no flux through its limits. The modes of the upper 500 m
 # describe the thermocline, and their radii are smaller since they are faster to oscillate.
 
-zoom = xdyn.VerticalModes(n2, nmodes=5, zrange=(0, 500))
+zoom = xdyn.VerticalModes(n2, nmodes=5, zrange=(-500, 0))
 rd1z = (zoom.rd.isel(mode=1) * 1e-3).where(open_ocean)
 print(
     f"Median first radius: {float(rd1.median()):.1f} km for the water column, "

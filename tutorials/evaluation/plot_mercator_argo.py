@@ -37,6 +37,7 @@ import xoa.plot as xplot
 
 mpl.rc("axes", grid=True)
 xr.set_options(display_style="text")
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 # %%
 # Register the Mercator and ARGO naming specifications
@@ -194,9 +195,7 @@ ds_argo_prof.sal.plot(y="depth", label="ARGO", color="C0")
 plt.title("Uncertain profile")
 plt.legend()
 xplot.plot_double_minimap(
-    ds_argo_prof,
-    regional_ax="left",
-    global_ax=(0.88, 0.88, 0.11),
+    ds_argo_prof, parent=plt.gca(), loc="lower right", size=0.22, regional_ax="left"
 )
 
 # %%

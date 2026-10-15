@@ -37,6 +37,31 @@ class TestDistance:
         assert ddc[0] == dd[1, 0]
 
 
+class TestGetDistances:
+    @staticmethod
+    def get_ds(lons, lats):
+        return xr.Dataset(
+            coords={
+                "lon": ("p", lons, {"standard_name": "longitude"}),
+                "lat": ("p", lats, {"standard_name": "latitude"}),
+            }
+        )
+
+    def test_self_distances_have_distinct_dims(self):
+        ds = self.get_ds([0.0, 10.0, 20.0], [0.0, 0.0, 0.0])
+        dd = geo.get_distances(ds, units="km")
+        assert dd.dims == ("npts0", "npts1") and dd.shape == (3, 3)
+        assert dd.attrs["units"] == "km"
+        np.testing.assert_allclose(np.diag(dd), 0)
+        np.testing.assert_allclose(dd, dd.T)
+        np.testing.assert_allclose(dd[0, 1], geo.haversine(0, 0, 10, 0) * 1e-3)
+
+    def test_between_two_sets(self):
+        dd = geo.get_distances(self.get_ds([0.0, 10.0], [0.0, 0.0]), self.get_ds([0.0], [10.0]))
+        assert dd.dims == ("npts0", "npts1") and dd.shape == (2, 1)
+        np.testing.assert_allclose(dd[0, 0], geo.haversine(0, 0, 0, 10))
+
+
 def test_clusterize():
     """Test clustering functions"""
     x = [0, 1, 3, 4, 8, 9, 10.0]

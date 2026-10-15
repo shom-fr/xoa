@@ -30,8 +30,10 @@ from xoa.regrid import grid2loc, regrid1d
 import xoa.meta as xmeta
 import xoa.geo as xgeo
 from xoa.plot import plot_flow, plot_double_minimap
+from xoa.core.plot import add_quiverkey, get_quiverkey_value
 
 xr.set_options(display_style="text")
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 # %%
 # Set the internal Hycom naming specifications as the current ones
@@ -189,8 +191,9 @@ vh15 = regrid1d(hycom["v"], d15).squeeze(drop=True).mean(dim="time")
 
 pmerc = ccrs.Mercator()
 pcarr = ccrs.PlateCarree()
-fig, ax = plt.subplots(figsize=(8, 7), subplot_kw={"facecolor": "teal", "projection": pmerc})
-plt.subplots_adjust(right=0.85)
+fig, ax = plt.subplots(figsize=(6.5, 6.5), subplot_kw={"facecolor": "teal", "projection": pmerc},
+                       constrained_layout=True)
+
 ax.gridlines(draw_labels=True, dms=True)
 ax.set_extent(xgeo.get_extent(uh15))
 kwqv = dict(scale_units="dots", scale=0.1 / 20, units="dots", transform=pcarr)
@@ -216,9 +219,10 @@ ax.quiver(
     width=2,
     **kwqv,
 )
-plt.quiverkey(qv, 0.1, 1.06, 0.1, r"0.1 $m\,s^{-1}$", color="k", alpha=1, labelpos="E")
+qvalue = get_quiverkey_value(np.hypot(uloc, vloc))
+add_quiverkey(ax, qv, qvalue, r"$m\,s^{-1}$", pos=(0.0, 1.07))
 plt.legend()
-plot_double_minimap(drifter)
+plot_double_minimap(drifter, parent=ax, loc="lower left", size=0.15, regional_ax="right")
 
 # %%
 # The discrepancies between the lagrangian and mean eulerian currents highlight

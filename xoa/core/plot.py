@@ -24,6 +24,7 @@ import inspect
 import matplotlib.collections as mcollections
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import matplotlib.transforms as mtransforms
 import numpy as np
 
 from .. import exceptions
@@ -349,8 +350,13 @@ def get_strides(stride, lon, lat, ax=None, transform=None, min_spacing=12):
 
 
 def get_sampled_indices(n, stride):
-    """Get the indices from 0 to ``n-1`` every ``stride``, always keeping the last one"""
-    return sorted(set(range(0, n, stride)) | {n - 1})
+    """Get evenly spread indices from 0 to ``n-1``, about every ``stride``
+
+    The first and last ones are always kept, and the number of points between two consecutive
+    indices differs by at most one, so that there is no thin cell at the end.
+    """
+    nseg = max(1, int(np.ceil((n - 1) / stride)))
+    return np.unique(np.round(np.linspace(0, n - 1, nseg + 1)).astype(int)).tolist()
 
 
 def get_mesh(lon, lat, stride=(1, 1)):
@@ -497,6 +503,84 @@ def plot_depth_section(ax, x, z, data, method="pcolormesh", invert_yaxis=False, 
     if invert_yaxis and not ax.yaxis_inverted():
         ax.invert_yaxis()
     return mappable
+
+
+def get_quiverkey_value(speed, percentile=80):
+    """Get a round reference value for a quiver key
+
+    It is the closest one, in a logarithmic sense, to a high percentile of the speeds
+    among 1, 2 and 5 times a power of ten, so that the reference arrow is as long
+    as the strong arrows of the plot.
+
+    Parameters
+    ----------
+    speed: array_like
+        Speeds, with possibly missing values
+    percentile: float
+        Percentile of the positive speeds that is rounded
+
+    Return
+    ------
+    float
+        ``1.0`` when there is no positive speed
+    """
+    speed = np.asarray(speed, dtype=float)
+    speed = speed[np.isfinite(speed) & (speed > 0)]
+    if not speed.size:
+        return 1.0
+    ref = np.percentile(speed, percentile)
+    mag = 10 ** np.floor(np.log10(ref))
+    return float(min((1, 2, 5, 10), key=lambda m: abs(np.log(m * mag / ref))) * mag)
+
+
+def add_quiverkey(ax, quiver, value, units="", pos=(0.0, 1.03), **kwargs):
+    """Add a reference arrow, labelled with its value, above the left corner of the axes
+
+    Parameters
+    ----------
+    ax: matplotlib.axes.Axes
+    quiver: matplotlib.quiver.Quiver
+    value: float
+        Reference value, see :func:`get_quiverkey_value`
+    units: str
+        Units that are appended to the label
+    pos: tuple(float)
+        Position of the start of the arrow in axes coordinates,
+        which is above the left corner by default
+    kwargs:
+        Extra parameters are passed to :meth:`matplotlib.axes.Axes.quiverkey`
+
+    Return
+    ------
+    matplotlib.quiver.QuiverKey
+    """
+    kwargs.setdefault("labelpos", "E")
+    kwargs.setdefault("coordinates", "axes")
+    kwargs.setdefault("color", "k")
+    kwargs.setdefault("labelcolor", "k")
+    kwargs.setdefault("fontproperties", {"size": "medium", "weight": "bold"})
+    qkey = ax.quiverkey(quiver, *pos, value, f"{value:g} {units}".strip(), **kwargs)
+
+    # The arrow ends at the position with an eastern label: shift it to make it start there
+    if qkey.labelpos == "E" and qkey.coord == "axes":
+        try:
+            ax.apply_aspect()
+            qkey._init()
+            xverts = np.asarray(qkey.verts[0])[:, 0]
+            trans = qkey.vector.get_transform()
+            width = trans.transform([[xverts.max(), 0]])[0, 0] - trans.transform([[xverts.min(), 0]])[0, 0]
+            qkey.X = pos[0] + width / ax.bbox.width
+        except (AttributeError, IndexError, ZeroDivisionError):  # pragma: no cover
+            pass
+
+    # Make the key count in the tight bounding box of the figure, which is not the case by default
+    def get_window_extent(renderer=None):
+        xy = qkey.get_transform().transform([(pos[0], pos[1])])
+        return mtransforms.Bbox.union([qkey.text.get_window_extent(renderer), mtransforms.Bbox([xy[0], xy[0]])])
+
+    qkey.get_window_extent = get_window_extent
+    qkey.set_clip_on(False)
+    return qkey
 
 
 def plot_sticks(ax, x, u, v, scale=None, color="steelblue", **kwargs):

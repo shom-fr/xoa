@@ -26,12 +26,13 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import cmocean  # noqa
 import xoa
-from xoa.plot import plot_section
+from xoa.plot import add_colorbar, plot_section
 from xoa.regrid import regrid1d
 from xoa.thermdyn import mixed_layer_depth
 import xoa.meta as xmeta
 
 xr.set_options(display_style="text")
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 # %%
 # Register the internal CROCO naming specifications
@@ -123,38 +124,35 @@ mldz = -mixed_layer_depth(tempz, deltatemp=deltatemp)
 # Plot the full section with :func:`xoa.plot.plot_section`, that finds the depths and
 # labels the axes from the meta-data.
 
-fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(9, 3.5),
-                        constrained_layout=True)
-kw = dict(levels=np.arange(0, 23), x="lat")
-plot_section(temp, ax=axs[0], method="contourf", cmap="cmo.thermal", **kw)
-plot_section(
-    temp, ax=axs[0], method="contour", colors="k", linewidths=0.3, add_colorbar=False, **kw
+def plot_both(axs, **extra):
+    """Plot the original and the interpolated sections with a shared colorbar"""
+    kw = dict(levels=np.arange(0, 23), x="lat", add_colorbar=False, **extra)
+    for ax, field in zip(axs, (temp, tempz)):
+        mappable = plot_section(field, ax=ax, method="contourf", cmap="cmo.thermal", **kw)
+        plot_section(field, ax=ax, method="contour", colors="k", linewidths=0.3, **kw)
+        ax.set_xlabel("Latitude [°N]")
+        ax.set_ylabel("Height [m]")
+    axs[0].set_title("Original")
+    axs[1].set_title("Interpolated")
+    add_colorbar(mappable, axs, da=temp)
+    return mappable
+
+
+fig, axs = plt.subplots(
+    ncols=2, sharex=True, sharey=True, figsize=(9, 3.4), constrained_layout=True
 )
-plot_section(tempz, ax=axs[1], method="contourf", cmap="cmo.thermal", **kw)
-plot_section(
-    tempz, ax=axs[1], method="contour", colors="k", linewidths=0.3, add_colorbar=False, **kw
-)
-axs[0].set_title("Original")
-axs[1].set_title("Interpolated")
+plot_both(axs)
 
 # %%
 # Plot a zoom near the surface and add the mixed layer depth isoline.
 
-fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(9, 3),
-                        constrained_layout=True)
-plot_section(temp, ax=axs[0], method="contourf", cmap="cmo.thermal", **kw)
-plot_section(
-    temp, ax=axs[0], method="contour", colors="k", linewidths=0.3, add_colorbar=False, **kw
+fig, axs = plt.subplots(
+    ncols=2, sharex=True, sharey=True, figsize=(9, 3), constrained_layout=True
 )
+plot_both(axs)
 axs[0].plot(mld[lat_name], mld, color="k", linewidth=2, linestyle="--")
-plot_section(tempz, ax=axs[1], method="contourf", cmap="cmo.thermal", **kw)
-plot_section(
-    tempz, ax=axs[1], method="contour", colors="k", linewidths=0.3, add_colorbar=False, **kw
-)
 axs[1].plot(mldz[lat_name], mldz, color="k", linewidth=2, linestyle="--")
 axs[0].set_ylim(-300, 0)
-axs[0].set_title("Original")
-axs[1].set_title("Interpolated")
 
 # %%
 # Et voilà!

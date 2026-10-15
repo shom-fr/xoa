@@ -10,6 +10,7 @@ that are not well formatted, since it searches the names and the attributes
 (``standard_name``, ``long_name``, ``units``).
 
 See :ref:`sphx_glr_tutorials_meta_plot_naming.py` for a walkthrough with real datasets,
+:ref:`sphx_glr_tutorials_meta_plot_naming_specs.py` to write your own specs,
 and the appendix :ref:`appendix.meta.default` for the list of known items.
 
 .. note:: It shares features with `cf_xarray <https://cf-xarray.readthedocs.io/en/latest/>`_,

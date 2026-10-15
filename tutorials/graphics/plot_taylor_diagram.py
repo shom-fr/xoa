@@ -27,6 +27,8 @@ import matplotlib.pyplot as plt
 from xoa.plot import plot_taylor, add_shadow
 from xoa.core import plot as cplot
 
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
+
 # %%
 # Synthetic data: a reference and models that are more or less correlated with it,
 # on dimensions ``time`` and ``x``.

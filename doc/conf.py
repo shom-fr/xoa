@@ -140,12 +140,54 @@ extlinks = {
 # nbsphinx_timeout = 120  # in seconds
 
 # %% Sphinx gallery
+TUTORIALS_ORDER = [
+    "plot_options",
+    "plot_cfgm",
+    "plot_naming",
+    "plot_naming_specs",
+    "plot_maps_vectors",
+    "plot_colormaps_effects",
+    "plot_taylor_diagram",
+    "plot_grid_tools",
+    "plot_distances",
+    "plot_neighbors",
+    "plot_regrid_interp",
+    "plot_filtering",
+    "plot_kriging",
+    "plot_kriging_sst",
+    "plot_sigma_levels",
+    "plot_croco_uv_depths",
+    "plot_layer_thicknesses",
+    "plot_croco_section",
+    "plot_gulfstream_dynamics",
+    "plot_dimensionless_numbers",
+    "plot_flow_advection",
+    "plot_mixed_layer",
+    "plot_vertical_modes",
+    "plot_croco_rossby",
+    "plot_stataccum",
+    "plot_mercator_argo",
+    "plot_hycom_gdp",
+]
+
+
+class TutorialsSortKey:
+    """Sort the tutorials of a section like in `TUTORIALS_ORDER`"""
+
+    def __init__(self, src_dir):
+        self.src_dir = src_dir
+
+    def __call__(self, filename):
+        return TUTORIALS_ORDER.index(os.path.splitext(filename)[0])
+
+
 warnings.simplefilter("ignore", MatplotlibDeprecationWarning)
 sphinx_gallery_conf = {
     "examples_dirs": "../tutorials",
     "gallery_dirs": "tutorials",
     "subsection_order": ExplicitOrder(
         [
+            "../tutorials/config",
             "../tutorials/meta",
             "../tutorials/graphics",
             "../tutorials/grids",
@@ -153,6 +195,7 @@ sphinx_gallery_conf = {
             "../tutorials/evaluation",
         ]
     ),
+    "within_subsection_order": TutorialsSortKey,
     "binder": {
         'org': 'shom-fr',
         'repo': 'xoa',

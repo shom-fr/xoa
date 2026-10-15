@@ -19,6 +19,7 @@ import xarray as xr
 import xoa
 from xoa import coords as xcoords
 from xoa import plot as xplot
+from xoa.core import plot as cplot
 
 pytest.importorskip("cartopy")
 
@@ -87,6 +88,29 @@ class TestGetLabel:
         da = xr.DataArray([1.0], dims="x", attrs={"long_name": "my field", "units": "m"})
         assert xplot.get_label(da) == "My field [m]"
         assert xplot.get_label(da, units=False) == "My field"
+
+    @pytest.mark.parametrize(
+        "units, expected",
+        [
+            ("degrees_celsius", "°C"),
+            ("Celsius", "°C"),
+            ("degC", "°C"),
+            ("1e-3", "psu"),
+            ("m s-1", "m s⁻¹"),
+            ("m2 s-2", "m² s⁻²"),
+            ("kg m-3", "kg m⁻³"),
+            ("m", "m"),
+        ],
+    )
+    def test_pretty_units(self, units, expected):
+        da = xr.DataArray([1.0], dims="x", name="a", attrs={"long_name": "a", "units": units})
+        assert xplot.get_label(da) == f"A [{expected}]"
+        assert xplot.get_label(da, pretty=False) == f"A [{units}]"
+
+    def test_dimensionless_units_are_skipped(self):
+        da = xr.DataArray([1.0], dims="x", name="a", attrs={"long_name": "Rossby", "units": "1"})
+        assert xplot.get_label(da) == "Rossby"
+        assert xplot.get_label(da, pretty=False) == "Rossby [1]"
 
     def test_fill_from_meta(self):
         label = xplot.get_label(xr.DataArray([1.0], dims="x", name="temp"))
@@ -210,6 +234,23 @@ def get_center_points(ax):
 
 
 class TestPlotGrid:
+    def test_projection(self):
+        assert type(xplot.plot_grid(get_temp()).projection).__name__ == "Orthographic"
+        ax = xplot.plot_grid(get_temp(), projection="merc", map_kw={"projection": "pc"})
+        assert type(ax.projection).__name__ == "Mercator"
+        ax = xplot.plot_grid(get_temp(), map_kw={"projection": "pc"})
+        assert type(ax.projection).__name__ == "PlateCarree"
+
+    def test_figsize_follows_the_aspect_ratio(self):
+        def get_size(dlon, dlat):
+            lon = xr.DataArray(np.linspace(0, dlon, 5), dims="lon", attrs={"standard_name": "longitude"})
+            lat = xr.DataArray(np.linspace(0, dlat, 5), dims="lat", attrs={"standard_name": "latitude"})
+            return xplot.plot_grid(xr.Dataset(coords={"lon": lon, "lat": lat})).figure.get_size_inches()
+
+        assert get_size(20, 5)[1] < get_size(5, 20)[1]
+        ax = xplot.plot_grid(get_temp(), map_kw={"figsize": (5, 5)})
+        assert tuple(ax.figure.get_size_inches()) == (5, 5)
+
     def test_edges_and_centers_by_default(self):
         temp = get_temp(nx=11, ny=9)
         ax = xplot.plot_grid(temp)
@@ -331,7 +372,7 @@ class TestPlotSection:
         assert ax.yaxis_inverted()
         assert ax.get_xlabel().startswith("Longitude")
         assert ax.get_ylabel().startswith("Depth")
-        assert fig.axes[-1].get_ylabel() == "Temperature [degC]"
+        assert fig.axes[-1].get_ylabel() == "Temperature [°C]"
 
     def test_colorbar_is_shrunk_by_default(self):
         fig, ax = plt.subplots()
@@ -429,6 +470,14 @@ class TestPlotStick:
         assert quiver.axes.get_xlabel() == "time"
         assert not quiver.axes.get_yaxis().get_visible()
 
+    def test_key(self):
+        u, v = self.get_uv()
+        quiver = xplot.plot_stick(u, v)
+        keys = [c for c in quiver.axes.get_children() if isinstance(c, mquiver.QuiverKey)]
+        assert len(keys) == 1
+        quiver = xplot.plot_stick(u, v, key=False)
+        assert not [c for c in quiver.axes.get_children() if isinstance(c, mquiver.QuiverKey)]
+
     def test_dataset_found_with_meta(self):
         u, v = self.get_uv()
         quiver = xplot.plot_stick(xr.Dataset({"uu": u, "vv": v}))
@@ -508,9 +557,17 @@ class TestPlotVectors:
         assert xplot.plot_vectors(u, v).scale > 0
 
     def test_key_value(self):
-        assert xplot._get_quiver_key_value_(np.array([0.9, 0.2])) == 0.5
-        assert xplot._get_quiver_key_value_(np.array([4.0, np.nan])) == 2.0
-        assert xplot._get_quiver_key_value_(np.zeros(3)) == 1.0
+        assert cplot.get_quiverkey_value(np.array([0.9, 0.2])) == 1.0
+        assert cplot.get_quiverkey_value(np.array([0.31, np.nan])) == 0.2
+        assert cplot.get_quiverkey_value(np.array([4.0, 0.0])) == 5.0
+        assert cplot.get_quiverkey_value(np.arange(1, 101), percentile=50) == 5e1
+        assert cplot.get_quiverkey_value(np.zeros(3)) == 1.0
+
+    def test_key_above_left(self):
+        u, v = self.get_uv()
+        quiver = xplot.plot_vectors(u, v)
+        key = [c for c in quiver.axes.get_children() if isinstance(c, mquiver.QuiverKey)][0]
+        assert key.Y == 1.03 and 0 < key.X < 0.5  # The arrow starts at the left of the axes
 
 
 class TestPlotTs:
@@ -544,7 +601,7 @@ class TestPlotTs:
         temp, sal, depth = self.get_ts()
         out = xplot.plot_ts(temp, sal, dens=False, scatter_c=depth)
         assert out["axes"].get_xlabel() == "Salinity"
-        assert out["axes"].get_ylabel() == "Temperature [degC]"
+        assert out["axes"].get_ylabel() == "Temperature [°C]"
         assert out["colorbar"].ax.get_ylabel() == "Depth [m]"
 
     def test_colorbar_is_shrunk_by_default(self):
@@ -666,6 +723,35 @@ class TestPlotTaylor:
             xplot.plot_taylor(mod, ref, dim="lon")
 
 
+class TestAutoCmap:
+    @pytest.mark.parametrize(
+        "offset, option, symmetric",
+        [(-55.0, "plot.cmapdiv", True), (0.0, "plot.cmappos", False), (-70.0, "plot.cmapneg", False)],
+    )
+    def test_cmap_follows_the_sign(self, offset, option, symmetric):
+        temp = get_temp() + offset  # From 50 to 59 without offset
+        mappable = xplot.plot_field(temp, cmap="auto")
+        assert mappable.get_cmap().name == xoa.get_option(option)
+        vmin, vmax = mappable.get_clim()
+        assert (vmin == -vmax) == symmetric
+
+    def test_option_is_used(self):
+        with xoa.set_options("plot", cmapdiv="cmo.delta"):
+            mappable = xplot.plot_field(get_temp() - 55.0, cmap="auto")
+        assert mappable.get_cmap().name == "cmo.delta"
+
+    def test_explicit_limits_and_levels_are_kept(self):
+        temp = get_temp() - 55.0
+        mappable = xplot.plot_field(temp, cmap="auto", vmin=-100, vmax=10)
+        assert mappable.get_clim() == (-100, 10)
+        mappable = xplot.plot_field(temp, cmap="auto", method="contourf", levels=[-20, 0, 20])
+        assert list(mappable.levels) == [-20, 0, 20]
+
+    def test_missing_values_only(self):
+        temp = get_temp() * np.nan
+        assert xplot.plot_field(temp, cmap="auto").get_cmap().name == "cmo.amp"
+
+
 class TestPlotFields:
     def get_fields(self, n=3):
         temp = get_temp()
@@ -693,3 +779,74 @@ class TestPlotFields:
     def test_bad_colorbar(self):
         with pytest.raises(xoa.exceptions.XoaError):
             xplot.plot_fields(self.get_fields(), colorbar="bad")
+
+    def test_panel_labels(self):
+        _, axes = xplot.plot_fields(self.get_fields(3), colorbar=None, panel_labels=True)
+        assert [ax.texts[0].get_text() for ax in axes] == ["a)", "b)", "c)"]
+        _, axes = xplot.plot_fields(self.get_fields(2), colorbar=None, panel_labels="({A})")
+        assert axes[1].texts[0].get_text() == "(B)"
+        _, axes = xplot.plot_fields(
+            self.get_fields(2), colorbar=None, panel_labels={"loc": "lower right"}
+        )
+        assert axes[0].texts[0].get_position() == (0.97, 0.03)
+
+
+class TestPanelLabeler:
+    def test_labels(self):
+        labeler = xplot.PanelLabeler("{A}.")
+        assert [labeler.get_label(i) for i in (0, 25, 26, 27, 52)] == ["A.", "Z.", "AA.", "AB.", "BA."]
+        assert xplot.PanelLabeler("{n}").get_label(2) == "3"
+
+    def test_counter_goes_on(self):
+        _, axes = plt.subplots(1, 3)
+        labeler = xplot.PanelLabeler(start=1, fontsize=8)
+        texts = labeler(axes[:2]) + labeler(axes[2])
+        assert [t.get_text() for t in texts] == ["b)", "c)", "d)"]
+        assert texts[0].get_fontsize() == 8
+
+    def test_add_panel_labels(self):
+        _, ax = plt.subplots()
+        assert xplot.add_panel_labels(ax, loc="upper right")[0].get_ha() == "right"
+
+    def test_bad_loc(self):
+        with pytest.raises(xoa.exceptions.XoaError):
+            xplot.PanelLabeler(loc="middle")
+
+
+class TestMinimap:
+    @staticmethod
+    def get_ds():
+        return xr.Dataset(coords={"lon": ("st", [-7.0, -5.0, -5.0]), "lat": ("st", [44.0, 44.0, 46.0])})
+
+    @pytest.mark.parametrize("loc", ["upper right", "upper left", "lower right", "lower left"])
+    def test_inset_is_inside_the_parent(self, loc):
+        fig, parent = plt.subplots(figsize=(6, 4))
+        ax = xplot.plot_minimap(self.get_ds(), parent=parent, loc=loc, size=0.25)
+        pbox, box = parent.get_position(), ax.get_position(original=True)
+        assert ax.figure is fig and len(fig.axes) == 2
+        assert pbox.x0 <= box.x0 and box.x1 <= pbox.x1 and pbox.y0 <= box.y0 and box.y1 <= pbox.y1
+        assert ("right" in loc) == (box.x0 > pbox.x0 + 0.5 * pbox.width)
+        assert ("upper" in loc) == (box.y0 > pbox.y0 + 0.5 * pbox.height)
+        # Square in pixels
+        np.testing.assert_allclose(box.width * 6, box.height * 4)
+        np.testing.assert_allclose(box.width * 6, 0.25 * pbox.width * 6)
+
+    def test_default_position_and_explicit_ax(self):
+        fig = plt.figure()
+        ax = xplot.plot_minimap(self.get_ds())
+        assert ax.get_position(original=True).x0 == pytest.approx(0.9)
+        ax2 = xplot.plot_minimap(self.get_ds(), ax=[0.1, 0.1, 0.2])
+        assert ax2.get_position(original=True).x0 == pytest.approx(0.1)
+
+    def test_invalid_loc(self):
+        fig, parent = plt.subplots()
+        with pytest.raises(xoa.XoaError, match="Invalid loc"):
+            xplot.plot_minimap(self.get_ds(), parent=parent, loc="middle")
+
+    def test_double_minimap_with_parent(self):
+        fig, parent = plt.subplots(figsize=(6, 4))
+        glob, regional = xplot.plot_double_minimap(
+            self.get_ds(), parent=parent, loc="lower right", size=0.2, regional_ax="left"
+        )
+        gbox, rbox, pbox = (a.get_position(original=True) for a in (glob, regional, parent))
+        assert gbox.x1 <= pbox.x1 and rbox.x1 <= gbox.x0 + 1e-9 and rbox.x0 >= pbox.x0

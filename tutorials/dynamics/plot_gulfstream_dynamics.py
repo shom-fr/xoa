@@ -41,7 +41,7 @@ import xoa.grid as xgrid
 import xoa.mask as xmask
 import xoa.poly as xpoly
 import xoa.stats as xstats
-from xoa.plot import plot_field, plot_fields, plot_vectors
+from xoa.plot import plot_field, plot_fields, plot_vectors, add_shadow
 
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
@@ -94,6 +94,7 @@ print(f"dx = {float(dx.mean()) * 1e-3:.1f} km, dy = {float(dy.mean()) * 1e-3:.1f
 # The speed is drawn with :func:`xoa.plot.plot_field` and the currents are added as arrows
 # with :func:`xoa.plot.plot_vectors`, which under-samples them to keep the figure readable:
 # here, there is one arrow every two grid points, so that each eddy still gets several.
+# A shadow is added to the arrows with :func:`xoa.plot.add_shadow` to make them stand out.
 
 MAP_KW = {"gridlines_labels_on": ["bottom", "left"], "land": True}
 SPEED_KW = {
@@ -104,7 +105,8 @@ SPEED_KW = {
 }
 
 fig, (ax,) = plot_fields({"Surface currents": speed}, figsize=(8.5, 6.2), map_kw=MAP_KW, **SPEED_KW)
-plot_vectors(u, v, ax=ax, color="0.15", stride=2)
+quiver = plot_vectors(u, v, ax=ax, color="0.15", stride=2)
+add_shadow(quiver, ax=ax, width=2, xoffset=1, yoffset=-1, alpha=0.6)
 
 # %%
 # Diagnostics
@@ -179,7 +181,8 @@ fig, axes = plot_fields(
     **SPEED_KW,
 )
 for ax, (fu, fv), key in zip(axes, ((u, v), (ug, vg)), (True, False)):
-    plot_vectors(fu, fv, ax=ax, color="0.15", stride=2, key=key)
+    quiver = plot_vectors(fu, fv, ax=ax, color="0.15", stride=2, key=key)
+    add_shadow(quiver, ax=ax, width=2, xoffset=1, yoffset=-1, alpha=0.6)
 
 # %%
 # The currents are mostly geostrophic, but the flow is strongly curved in the meanders and the

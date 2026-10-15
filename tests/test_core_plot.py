@@ -43,8 +43,9 @@ def test_moved_helpers_are_still_available_from_xoa_plot():
 
 class TestStrides:
     def test_sampled_indices_keep_last(self):
-        assert cplot.get_sampled_indices(10, 4) == [0, 4, 8, 9]
         assert cplot.get_sampled_indices(9, 4) == [0, 4, 8]
+        assert cplot.get_sampled_indices(10, 4) == [0, 3, 6, 9]  # No thin last cell
+        assert cplot.get_sampled_indices(5, 10) == [0, 4]
         assert cplot.get_sampled_indices(1, 3) == [0]
 
     def test_explicit(self):
@@ -110,6 +111,23 @@ class TestGetMesh:
         # First coarse cell goes from edge -0.5 to 1.5 along x and -0.5 to 1.5 along y
         np.testing.assert_allclose(clon[0, 0], 0.5)
         np.testing.assert_allclose(clat[0, 0], 0.5)
+
+    @pytest.mark.parametrize("stride", [(1, 1), (4, 5), (40, 60), (7, 7)])
+    def test_linear_coordinates_give_even_cells(self, stride):
+        ny, nx = 300, 400
+        lon, lat = np.meshgrid(np.arange(nx, dtype=float), np.arange(ny, dtype=float))
+        segments, clon, clat = cplot.get_mesh(lon, lat, stride)
+        # Constant along y first (rows), constant along x next (columns)
+        ylines = sorted({round(float(s[0, 1]), 6) for s in segments if np.ptp(s[:, 1]) == 0})
+        xlines = sorted({round(float(s[0, 0]), 6) for s in segments if np.ptp(s[:, 0]) == 0})
+        # The edges are half a cell beyond the first and last centers
+        assert ylines[0] == -0.5 and ylines[-1] == ny - 0.5
+        assert xlines[0] == -0.5 and xlines[-1] == nx - 0.5
+        # The cells have the same size, up to one fine cell, so that none is thin
+        for lines, step in ((ylines, stride[0]), (xlines, stride[1])):
+            widths = np.diff(lines)
+            assert widths.max() - widths.min() <= 1.0
+            assert widths.min() >= 0.5 * step
 
     def test_scalar_stride(self):
         lon, lat = get_lonlat(4, 3, 3.0, 2.0)

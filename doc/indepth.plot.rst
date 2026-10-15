@@ -147,6 +147,16 @@ the units. Missing attributes are first completed from the meta specifications, 
     xplot.get_label(xr.DataArray([1.0], dims="x", attrs={"long_name": "my field", "units": "m"}))
     xplot.get_label(xr.DataArray([1.0], dims="x", name="temp"), units=False)
 
+The units are written in a nicer way by default (``pretty=True``): ``degC``, ``Celsius`` and
+the like become ``°C``, ``m s-1`` becomes ``m s⁻¹``, ``1e-3`` becomes ``psu``, and the unit
+``1`` of the dimensionless numbers is skipped.
+
+.. ipython:: python
+
+    attrs = {"long_name": "speed", "units": "m s-1"}
+    xplot.get_label(xr.DataArray([1.0], dims="x", attrs=attrs))
+    xplot.get_label(xr.DataArray([1.0], dims="x", attrs=attrs), pretty=False)
+
 Maps
 ====
 
@@ -226,9 +236,34 @@ and labelled with :func:`~xoa.plot.get_label`, so that they do not dwarf the map
     fig, axes = xplot.plot_fields(fields, colorbar="shared", figsize=(11, 3.6), vmin=8, vmax=18,
                                   cmap=cmocean.cm.thermal)
 
+- ``cmap="auto"`` chooses the colormap from the sign of the data, among the ``plot.cmapdiv``,
+  ``plot.cmappos`` and ``plot.cmapneg`` options, with symmetric limits for the diverging one.
+  See the tutorial :ref:`sphx_glr_tutorials_config_plot_options.py`.
 - To lay out the axes yourself, skip the colorbars of :func:`~xoa.plot.plot_field` and add
   a shared one with :func:`~xoa.plot.add_colorbar`, which takes the axes and the array that
   gives the label.
+- For publications, ``panel_labels=True`` of :func:`~xoa.plot.plot_fields` labels the maps
+  "a)", "b)"... A string sets the style, like ``"({A})"``, and a dict the other parameters of
+  :class:`~xoa.plot.PanelLabeler`. :func:`~xoa.plot.add_panel_labels` does the same on any axes,
+  and the :class:`~xoa.plot.PanelLabeler` instance goes on with its sequence from one figure
+  to the next.
+
+Colormaps and effects
+=====================
+
+:class:`xoa.color.CmapAdapter` adapts a colormap to the data: ``"piv0"`` centers a diverging
+colormap on zero, whatever the limits of the data, and ``"cyc360"`` is for circular quantities
+like directions. :func:`xoa.plot.add_shadow` and :func:`xoa.plot.add_glow` make lines and text
+stand out. See the tutorial :ref:`sphx_glr_tutorials_graphics_plot_colormaps_effects.py`.
+
+Minimaps
+========
+
+:func:`~xoa.plot.plot_minimap` and :func:`~xoa.plot.plot_double_minimap` show where the data
+are. With the ``parent`` argument, the minimap is an inset of the axes at ``loc``
+(``"upper right"``, ``"lower left"``...) with a width ``size`` relative to the one of the
+parent, instead of a fixed place in the figure that may enlarge it or hide its content.
+See :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
 
 The adaptive grid stride
 ========================
@@ -244,7 +279,8 @@ The ``stride`` is either ``"auto"`` (default), an integer or a ``(y, x)`` tuple:
   pixels (12 by default) between the lines drawn. It follows the size of the figure, the
   zoom, the projection and the rotation of the grid, and it is independent for each direction.
   The spacing is measured on a bounded number of lines, so that it is cheap for any grid.
-- The first and last edges are always drawn.
+- The first and last edges are always drawn, and the others are evenly spread between them, so
+  that no coarse cell is thin when the stride does not divide the number of cells.
 - When the grid is under-sampled, the centers that are drawn are the ones of the
   coarse cells that are delimited by the lines, and not a subset of the true centers,
   that would sit on the lines.
@@ -324,6 +360,10 @@ Sticks
 line, are oriented along the current and are as long as its speed. This is a compact way to
 show the rotation of tidal currents. Pass ``u`` and ``v``, or a dataset that holds them,
 and use ``scale`` to change the lengths (the smaller, the longer).
+A reference stick is drawn above the left corner of the axes, like the reference arrow of
+:func:`~xoa.plot.plot_vectors`: its value is rounded to 1, 2 or 5 times a power of ten
+by :func:`xoa.core.plot.get_quiverkey_value` and it is added with
+:func:`xoa.core.plot.add_quiverkey`, that you can use with any quiver. Pass ``key=False`` to remove it.
 
 Taylor diagrams
 ===============

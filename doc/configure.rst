@@ -72,4 +72,5 @@ You can use the :func:`xoa.get_option` function to access a single option::
     cmap = xoa.get_option('plot.cmapdiv') # flat mode
     cmap = xoa.get_option('plot', 'cmapdiv') # section mode
 
-
+The tutorial :ref:`sphx_glr_tutorials_config_plot_options.py` shows the options at work, with the
+``cmap="auto"`` argument of the maps that chooses the colormap from the sign of the data.
