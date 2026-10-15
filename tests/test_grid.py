@@ -517,3 +517,20 @@ class TestDz2z:
         assert grid.get_dz_terms(xr.Dataset(), errors="ignore") is None
         ds = grid.decode_dz2z(dz.to_dataset())
         np.testing.assert_allclose(ds.z.isel(x=0), [-50, -350, -1100])
+
+
+def test_apply_along_dim_name_kwargs():
+    """The keywords of a coordinate do not leak to the next ones"""
+    da = xr.DataArray(
+        np.arange(3.0),
+        dims="x",
+        coords={"y": ("x", np.arange(3.0)), "z": ("x", np.arange(3.0))},
+    )
+    calls = []
+
+    def func(da, dim, **kwargs):
+        calls.append(kwargs)
+        return da
+
+    grid.apply_along_dim(da, "x", func, name_kwargs={"y": {"a": 1}}, b=0)
+    assert calls == [{"b": 0}, {"b": 0, "a": 1}, {"b": 0}]

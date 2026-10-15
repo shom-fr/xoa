@@ -127,7 +127,7 @@ def apply_along_dim(
             if coord_name in da_names:
                 continue
             if dim in old_coord.dims:
-                kw = kwargs or {}
+                kw = kwargs.copy()
                 for dd in (coord_kwargs, name_kwargs.get(coord_name)):
                     if dd:
                         kw.update(dd)
