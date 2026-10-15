@@ -4,6 +4,7 @@ Test the :mod:`xoa.core.grid` module
 """
 
 import numpy as np
+import pytest
 
 from xoa.core import grid
 
@@ -97,3 +98,89 @@ def test_compute_centered_resolution():
     np.testing.assert_allclose(dx[:, 0], dxe[:, 0])
     np.testing.assert_allclose(dx[:, 1], dxe[:, 0])
     np.testing.assert_allclose(dx[:, -1], dxe[:, -1])
+
+
+@pytest.mark.parametrize("axis", [0, 1, 2, -1])
+@pytest.mark.parametrize("dtype", ["f4", "f8"])
+def test_axis_operators(axis, dtype):
+    rng = np.random.default_rng(0)
+    a = rng.random((3, 4, 5)).astype(dtype)
+    a[0, 0, 0] = np.nan
+    first = np.take(a, [0], axis)
+    last = np.take(a, [-1], axis)
+    lo = np.take(a, range(a.shape[axis] - 1), axis)
+    hi = np.take(a, range(1, a.shape[axis]), axis)
+
+    for out, ref in [
+        (grid.diff(a, axis), hi - lo),
+        (grid.centers(a, axis), lo + 0.5 * (hi - lo)),
+        (
+            grid.pad(a, axis, (2, 1)),
+            np.concatenate([first, first, a, last], axis),
+        ),
+        (
+            grid.pad(a, axis, 1, "linear_extrap"),
+            np.concatenate([2 * first - np.take(a, [1], axis), a, 2 * last - np.take(a, [-2], axis)], axis),
+        ),
+        (
+            grid.edges(a, axis),
+            np.concatenate(
+                [
+                    first + 0.5 * (first - np.take(a, [1], axis)),
+                    lo + 0.5 * (hi - lo),
+                    last + 0.5 * (last - np.take(a, [-2], axis)),
+                ],
+                axis,
+            ),
+        ),
+    ]:
+        assert out.dtype == a.dtype
+        np.testing.assert_allclose(out, ref, rtol=1e-6, equal_nan=True)
+
+
+def test_axis_operators_errors():
+    with pytest.raises(ValueError):
+        grid.pad(np.arange(3.0), mode="reflect")
+    with pytest.raises(ValueError):
+        grid.edges(np.ones(1))
+
+
+@pytest.mark.parametrize("axis", [0, 1, -1])
+def test_pad_modes_shift_gradient(axis):
+    rng = np.random.default_rng(1)
+    a = rng.random((3, 4, 5))
+    n = a.shape[axis]
+    width = [(0, 0)] * 3
+    width[axis] = (2, 6)
+    for mode, kw in [("wrap", {}), ("constant", {"constant_values": 7.0})]:
+        np.testing.assert_array_equal(grid.pad(a, axis, (2, 6), mode, **kw), np.pad(a, width, mode, **kw))
+    assert np.isnan(grid.pad(a, axis, 1, "constant")).sum() == 2 * a.size // n
+
+    padded = np.pad(a, _width(axis, (1, 0)), "edge")
+    np.testing.assert_allclose(grid.shift(a, axis, -1), grid.centers(padded, axis))
+    padded = np.pad(a, _width(axis, (0, 1)), "edge")
+    np.testing.assert_allclose(grid.shift(a, axis, 1), grid.centers(padded, axis))
+    padded = grid.pad(a, axis, (0, 1), "linear_extrap")
+    np.testing.assert_allclose(grid.shift(a, axis, 1, "linear_extrap"), grid.centers(padded, axis))
+
+    x = np.sort(rng.random(n))
+    shape = [1, 1, 1]
+    shape[axis] = n - 1
+    ref = np.diff(a, axis=axis) / np.diff(x).reshape(shape)
+    np.testing.assert_allclose(grid.gradient(a, x, axis), ref)
+    shape[axis] = n
+    np.testing.assert_allclose(grid.gradient(a, np.broadcast_to(x.reshape(shape), a.shape), axis), ref)
+    with pytest.raises(ValueError):
+        grid.gradient(a, x[:-1], axis)
+
+
+def _width(axis, pad):
+    width = [(0, 0)] * 3
+    width[axis] = pad
+    return width
+
+
+def test_centers2edges_axes():
+    xx = np.random.default_rng(0).random((3, 4))
+    np.testing.assert_allclose(grid.centers2edges(xx, axis=0), grid.edges(xx, 0))
+    np.testing.assert_allclose(grid.centers2edges(xx), grid.edges(grid.edges(xx, 0), 1))

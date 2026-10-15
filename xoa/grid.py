@@ -148,21 +148,80 @@ def apply_along_dim(
     return dso
 
 
+def _unwrap_lons_(da, dims, wrap_data=True):
+    """Make the longitudes continuous along `dims`
+
+    Return the modified object and a function that puts the longitudes of
+    a result back in their original range.
+    The data are unwrapped too if they are longitudes, and they are wrapped back
+    when `wrap_data` is True, which is not wanted for differences.
+    """
+    da = da.copy()
+    items = [(name, coord) for name, coord in da.coords.items() if xcoords.is_lon(coord)]
+    if isinstance(da, xr.DataArray) and xcoords.is_lon(da):
+        items.append((None, da))
+    westerly = {}
+    for name, var in items:
+        values = var.values
+        if not np.isfinite(values).all():
+            continue
+        unwrapped = values
+        for dim in dims:
+            if dim in var.dims:
+                unwrapped = np.unwrap(unwrapped, period=360.0, axis=var.get_axis_num(dim))
+        if np.array_equal(unwrapped, values):
+            continue
+        if name is not None or wrap_data:
+            westerly[name] = values.min() < 0
+        if name is None:
+            da = da.copy(data=unwrapped)
+        else:
+            da = da.assign_coords({name: (var.dims, unwrapped, var.attrs)})
+
+    def restore(dao):
+        for name, west in westerly.items():
+            var = dao if name is None else dao.coords[name]
+            values = var.values
+            values = (values + 180) % 360 - 180 if west else values % 360
+            if name is None:
+                dao = dao.copy(data=values)
+            else:
+                dao = dao.assign_coords({name: (var.dims, values, var.attrs)})
+        return dao
+
+    return da, restore
+
+
+def _is_float_(da):
+    return da.dtype in (np.float32, np.float64)
+
+
+def _fast_pad_(da, mode, kwargs):
+    if not _is_float_(da):
+        return False
+    if mode == "constant":
+        return set(kwargs) <= {"constant_values"} and np.ndim(kwargs.get("constant_values", 0)) == 0
+    return mode in ("edge", "linear_extrap", "wrap") and not kwargs
+
+
 def _pad_(da, dim, pad_width, mode, **kwargs):
     pad_width = pad_width.get(dim, 0)
     if not pad_width:
         return da.copy()
 
-    if mode != "linear_extrap":
-        return da.pad({dim: pad_width}, mode=mode, **kwargs)
-
-    to_concat = []
     if isinstance(pad_width, int):
         pad_width = (pad_width,)
     pad_width0 = pad_width[0]
     pad_width1 = pad_width[-1]
-    if not pad_width0 and not pad_width1:
-        return da
+
+    if _fast_pad_(da, mode, kwargs):
+        data = cgrid.pad(da.values, da.get_axis_num(dim), (pad_width0, pad_width1), mode, **kwargs)
+        return xr.DataArray(data, dims=da.dims)
+
+    if mode != "linear_extrap":
+        return da.pad({dim: (pad_width0, pad_width1)}, mode=mode, **kwargs)
+
+    to_concat = []
     if pad_width0:
         ramp0 = xr.DataArray(np.arange(pad_width0, 0, -1, dtype=da.dtype), dims=dim)
         da0 = da[{dim: 0}] + (da[{dim: 0}] - da[{dim: 1}]) * ramp0
@@ -187,7 +246,9 @@ def pad(
     """Pad data and coordinates along dimensions
 
     This function adds the ``"linear_extrap"`` mode support to the builtin
-    :meth:`xarray.DataArray.pad` methods.
+    :meth:`xarray.DataArray.pad` methods, and runs numba kernels for the
+    ``"edge"``, ``"linear_extrap"``, ``"constant"`` and ``"wrap"`` modes.
+    Longitudes are kept continuous across the dateline.
 
     Parameters
     ----------
@@ -195,7 +256,8 @@ def pad(
     pad_width: dict
         Pad widths. Keys are dimensions and values are int or tuple of ints.
     mode: str
-        Extrapolation mode for the data array
+        Extrapolation mode for the data array, like ``"edge"``, ``"linear_extrap"``,
+        ``"constant"`` or ``"wrap"``
     coord_mode: str
         Extrapolation mode for the coordinates
     name_kwargs: dict(dict)
@@ -216,18 +278,24 @@ def pad(
     xarray.pad
     """
     pad_width = meta.get_meta_specs(da).parse_dims(pad_width, da)
-    return apply_along_dim(
-        da,
-        list(pad_width.keys()),
-        _pad_,
-        data_kwargs={"mode": mode, **kwargs},
-        coord_kwargs={"mode": coord_mode},
-        name_kwargs=name_kwargs,
-        pad_width=pad_width,
+    dims = list(pad_width.keys())
+    da, restore = _unwrap_lons_(da, dims)
+    return restore(
+        apply_along_dim(
+            da,
+            dims,
+            _pad_,
+            data_kwargs={"mode": mode, **kwargs},
+            coord_kwargs={"mode": coord_mode},
+            name_kwargs=name_kwargs,
+            pad_width=pad_width,
+        )
     )
 
 
 def _get_centers_(da, dim):
+    if _is_float_(da):
+        return xr.DataArray(cgrid.centers(da.values, da.get_axis_num(dim)), dims=da.dims)
     dao = da.isel({dim: slice(None, -1)})
     dao = dao + 0.5 * da.diff(dim).data
     return dao
@@ -255,7 +323,15 @@ def get_centers(da, dim):
     apply_along_dim
     """
     dim = meta.get_meta_specs(da).parse_dims(dim, da)
-    return apply_along_dim(da, dim, _get_centers_)
+    da, restore = _unwrap_lons_(da, (dim,) if isinstance(dim, str) else dim)
+    return restore(apply_along_dim(da, dim, _get_centers_))
+
+
+def _get_edges_(da, dim, mode, **kwargs):
+    if mode == "linear_extrap" and _is_float_(da):
+        return xr.DataArray(cgrid.edges(da.values, da.get_axis_num(dim)), dims=da.dims)
+    da = _pad_(da, dim, {dim: 1}, mode, **kwargs)
+    return _get_centers_(da, dim)
 
 
 def get_edges(da, dim, mode="linear_extrap", **kwargs):
@@ -287,14 +363,17 @@ def get_edges(da, dim, mode="linear_extrap", **kwargs):
     get_centers
     apply_along_dim
     """
-    # Extrapolate
     dim = meta.get_meta_specs(da).parse_dims(dim, da)
-    dims = (dim,) if isinstance(dim, str) else dim
-    pad_width = dict((dim, 1) for dim in dims)
-    da = pad(da, pad_width=pad_width, mode=mode, **kwargs)
-
-    # Inner edges
-    return get_centers(da, dim)
+    da, restore = _unwrap_lons_(da, (dim,) if isinstance(dim, str) else dim)
+    return restore(
+        apply_along_dim(
+            da,
+            dim,
+            _get_edges_,
+            data_kwargs={"mode": mode, **kwargs},
+            coord_kwargs={"mode": "linear_extrap"},
+        )
+    )
 
 
 class shift_directions(misc.IntEnumChoices, metaclass=misc.XEnumMeta):
@@ -320,6 +399,14 @@ class shift_directions(misc.IntEnumChoices, metaclass=misc.XEnumMeta):
     high = 1
     #: To the right/top/east/north/high
     east = 1
+
+
+def _shift_(da, dim, direction, mode, **kwargs):
+    if mode in ("edge", "linear_extrap") and _is_float_(da) and not kwargs:
+        data = cgrid.shift(da.values, da.get_axis_num(dim), direction, mode)
+        return xr.DataArray(data, dims=da.dims)
+    pad_width = (1, 0) if direction < 0 else (0, 1)
+    return _get_centers_(_pad_(da, dim, {dim: pad_width}, mode, **kwargs), dim)
 
 
 def shift(da, shift_dirs, mode="edge", **kwargs):
@@ -349,21 +436,25 @@ def shift(da, shift_dirs, mode="edge", **kwargs):
     get_centers
     """
     shift_dirs = meta.get_meta_specs(da).parse_dims(shift_dirs, da)
-
-    # Extrapolate
-    pad_width = {}
+    da, restore = _unwrap_lons_(da, list(shift_dirs))
     for dim, shift_dir in shift_dirs.items():
-        pad_width[dim] = (1, 0) if shift_directions[shift_dir] < 0 else (0, 1)
-    da = pad(da, pad_width=pad_width, mode=mode, **kwargs)
-
-    # Inner edges
-    return get_centers(da, list(shift_dirs.keys()))
+        da = apply_along_dim(
+            da,
+            dim,
+            _shift_,
+            data_kwargs={"mode": mode, **kwargs},
+            coord_kwargs={"mode": "linear_extrap"},
+            direction=shift_directions[shift_dir],
+        )
+    return restore(da)
 
 
 shift.__doc__ = shift.__doc__.format(**locals())
 
 
 def _diff_(da, dim):
+    if _is_float_(da):
+        return xr.DataArray(cgrid.diff(da.values, da.get_axis_num(dim)), dims=da.dims)
     return da.diff(dim)
 
 
@@ -388,7 +479,51 @@ def diff(da, dim):
     get_centers
     apply_along_dim
     """
-    return apply_along_dim(da, dim, _diff_, coord_func=_get_centers_)
+    dim = meta.get_meta_specs(da).parse_dims(dim, da)
+    da, restore = _unwrap_lons_(da, (dim,) if isinstance(dim, str) else dim, wrap_data=False)
+    return restore(apply_along_dim(da, dim, _diff_, coord_func=_get_centers_))
+
+
+def _gradient_(da, dim, coord):
+    if coord.dims != (dim,):
+        coord = coord.broadcast_like(da).transpose(*da.dims)
+    data = cgrid.gradient(da.values, coord.values, da.get_axis_num(dim))
+    return xr.DataArray(data, dims=da.dims)
+
+
+def gradient(da, dim, coord=None):
+    """Derivative along a dimension with respect to a coordinate, at the grid centers
+
+    The result is ``diff(da, dim) / diff(coord, dim)``, so its size is reduced by one
+    along `dim` and its coordinates are centered like with :func:`diff`.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+    dim: str
+    coord: xarray.DataArray, str, None
+        Numeric coordinate, or its name, that is either 1D along `dim` or has the
+        dimensions of `da`, like depths on sigma levels.
+        It defaults to the coordinate of `dim`.
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+
+    See also
+    --------
+    diff
+    get_centers
+    """
+    dim = meta.get_meta_specs(da).parse_dims(dim, da)
+    if coord is None:
+        coord = da[dim]
+    elif isinstance(coord, str):
+        coord = da.coords[coord]
+    coord = xr.DataArray(coord.data, dims=coord.dims)
+    return apply_along_dim(
+        da, dim, _gradient_, coord_func=_get_centers_, data_kwargs={"coord": coord}
+    )
 
 
 class dz2depth_ref_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):

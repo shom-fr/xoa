@@ -87,6 +87,106 @@ def test_get_edges():
     assert dae[1, 0, 0] == da[1, 0, 0]
 
 
+@pytest.mark.parametrize("chunked", [False, True])
+def test_float_operators_vs_xarray(chunked):
+    """Float arrays use the numba kernels, which must agree with xarray"""
+    rng = np.random.default_rng(0)
+    da = xr.DataArray(rng.random((3, 4, 5), dtype="f4"), dims=("z", "y", "x"))
+    if chunked:
+        da = da.chunk({"y": 2})
+    pad_width = {"y": (2, 1), "x": 1}
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        dap = grid.pad(da, pad_width)
+        dapl = grid.pad(da, {"y": (2, 1)}, mode="linear_extrap")
+        dac = grid.get_centers(da, ("y", "x"))
+        dae = grid.get_edges(da, "x")
+        daed = grid.get_edges(da, "x", mode="edge")
+        dad = grid.diff(da, "y")
+    assert dap.dtype == da.dtype
+    ref = da.pad({"y": (2, 1)}, mode="edge").pad({"x": 1}, mode="edge")
+    np.testing.assert_array_equal(dap, ref)
+    np.testing.assert_allclose(dapl[:, 1], da[:, 0] + (da[:, 0] - da[:, 1]), rtol=1e-6)
+    np.testing.assert_allclose(dac, 0.25 * (da[:, :-1, :-1] + da[:, 1:, :-1] + da[:, :-1, 1:] + da[:, 1:, 1:]), rtol=1e-6)
+    np.testing.assert_allclose(dae[..., 1:-1], 0.5 * (da[..., :-1] + da[..., 1:]), rtol=1e-6)
+    np.testing.assert_allclose(dae[..., 0], da[..., 0] + 0.5 * (da[..., 0] - da[..., 1]), rtol=1e-6)
+    np.testing.assert_array_equal(daed[..., 0], da[..., 0])
+    np.testing.assert_allclose(dad, da.diff("y"), rtol=1e-6)
+
+
+def test_int_operators():
+    """Other types use xarray"""
+    da = xr.DataArray(np.arange(4), dims="x")
+    assert grid.pad(da, {"x": 1}, coord_mode="edge").dtype == da.dtype
+    np.testing.assert_allclose(grid.get_centers(da, "x"), [0.5, 1.5, 2.5])
+    np.testing.assert_array_equal(grid.diff(da, "x"), [1, 1, 1])
+
+
+def test_pad_modes():
+    da = xr.DataArray(np.arange(4.0), dims="x")
+    for mode in "constant", "wrap":
+        np.testing.assert_array_equal(
+            grid.pad(da, {"x": (1, 2)}, mode=mode, coord_mode="edge"),
+            da.pad(x=(1, 2), mode=mode),
+        )
+    np.testing.assert_array_equal(
+        grid.pad(da, {"x": 1}, mode="constant", constant_values=7, coord_mode="edge"),
+        [7, 0, 1, 2, 3, 7],
+    )
+
+
+def test_dateline():
+    """Longitudes stay continuous across the dateline"""
+    lon = xr.DataArray(
+        [170.0, 178.0, -174.0, -166.0],
+        dims="x",
+        name="lon",
+        attrs={"standard_name": "longitude", "units": "degrees_east"},
+    )
+    da = xr.DataArray(np.arange(4.0), dims="x", coords={"lon": lon})
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        np.testing.assert_allclose(grid.get_centers(da, "x").lon, [174, -178, -170])
+        np.testing.assert_allclose(grid.get_edges(da, "x").lon, [166, 174, -178, -170, -162])
+        np.testing.assert_allclose(grid.pad(da, {"x": 1}).lon, [162, 170, 178, -174, -166, -158])
+        np.testing.assert_allclose(grid.shift(da, {"x": 1}).lon, [174, -178, -170, -162])
+        np.testing.assert_allclose(grid.diff(da, "x").lon, [174, -178, -170])
+        np.testing.assert_allclose(grid.diff(lon, "x"), [8, 8, 8])
+        np.testing.assert_allclose(grid.get_centers(lon, "x"), [174, -178, -170])
+    # Left untouched when continuous
+    lon0 = xr.DataArray(lon.values % 360, dims="x", name="lon", attrs=lon.attrs)
+    da0 = da.assign_coords(lon=lon0)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        np.testing.assert_allclose(grid.get_centers(da0, "x").lon, [174, 182, 190])
+
+
+def test_shift_vs_pad_centers():
+    da = xr.DataArray(np.random.default_rng(0).random((3, 4)), dims=("y", "x"))
+    for mode in "edge", "linear_extrap":
+        for dirs, width in [({"x": -1}, (1, 0)), ({"x": 1}, (0, 1))]:
+            ref = grid.get_centers(grid.pad(da, {"x": width}, mode=mode), "x")
+            np.testing.assert_allclose(grid.shift(da, dirs, mode=mode), ref)
+
+
+def test_gradient():
+    da = xr.DataArray(
+        np.arange(12.0).reshape(3, 4) ** 2,
+        dims=("y", "x"),
+        coords={"x": [0.0, 1.0, 3.0, 7.0], "y": [0, 1, 2]},
+        attrs={"long_name": "Sq"},
+    )
+    dg = grid.gradient(da, "x")
+    assert dg.shape == (3, 3)
+    np.testing.assert_allclose(dg, da.diff("x") / da.x.diff("x"))
+    np.testing.assert_allclose(dg.x, [0.5, 2.0, 5.0])
+    assert dg.long_name == "Sq"
+    # 3D coordinate and integer data
+    depth = da.x * xr.ones_like(da) + da.y
+    di = grid.gradient(da.astype(int), "x", coord=depth)
+    np.testing.assert_allclose(di, da.diff("x") / depth.diff("x"))
+
+
 def test_shift():
     """Test grid shifting operations"""
     da = get_da()

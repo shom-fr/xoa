@@ -16,17 +16,248 @@ Pure numeric grid utilities
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+import os
+
+import numba
 import numpy as np
 
 from .geo import EARTH_RADIUS, diff_lon, haversine
 
+NOT_CI = os.environ.get("CI", "false") == "false"
 
-def _centers2edges1d_(zi):
-    zo = np.empty(zi.size + 1)
-    zo[0] = zi[0] + 0.5 * (zi[0] - zi[1])
-    zo[-1] = zi[-1] + 0.5 * (zi[-1] - zi[-2])
-    zo[1:-1] = 0.5 * (zi[:-1] + zi[1:])
-    return zo
+#: Size of the blocks of the trailing dimensions that are shared among threads
+_BLOCK = 512
+
+
+@numba.njit(cache=NOT_CI, parallel=True)
+def _centers3d_(a, o):
+    no, n, ni = a.shape
+    nb = (ni + _BLOCK - 1) // _BLOCK
+    for t in numba.prange(no * nb):
+        i = t // nb
+        k0 = (t % nb) * _BLOCK
+        k1 = min(ni, k0 + _BLOCK)
+        for j in range(n - 1):
+            for k in range(k0, k1):
+                o[i, j, k] = a[i, j, k] + 0.5 * (a[i, j + 1, k] - a[i, j, k])
+
+
+@numba.njit(cache=NOT_CI, parallel=True)
+def _edges3d_(a, o):
+    no, n, ni = a.shape
+    nb = (ni + _BLOCK - 1) // _BLOCK
+    for t in numba.prange(no * nb):
+        i = t // nb
+        k0 = (t % nb) * _BLOCK
+        k1 = min(ni, k0 + _BLOCK)
+        for k in range(k0, k1):
+            o[i, 0, k] = a[i, 0, k] + 0.5 * (a[i, 0, k] - a[i, 1, k])
+            o[i, n, k] = a[i, n - 1, k] + 0.5 * (a[i, n - 1, k] - a[i, n - 2, k])
+        for j in range(1, n):
+            for k in range(k0, k1):
+                o[i, j, k] = a[i, j - 1, k] + 0.5 * (a[i, j, k] - a[i, j - 1, k])
+
+
+@numba.njit(cache=NOT_CI, parallel=True)
+def _diff3d_(a, o):
+    no, n, ni = a.shape
+    nb = (ni + _BLOCK - 1) // _BLOCK
+    for t in numba.prange(no * nb):
+        i = t // nb
+        k0 = (t % nb) * _BLOCK
+        k1 = min(ni, k0 + _BLOCK)
+        for j in range(n - 1):
+            for k in range(k0, k1):
+                o[i, j, k] = a[i, j + 1, k] - a[i, j, k]
+
+
+@numba.njit(cache=NOT_CI, parallel=True)
+def _pad3d_(a, o, p0, p1, mode, cval):
+    # mode: 0 edge, 1 linear_extrap, 2 constant, 3 wrap
+    no, n, ni = a.shape
+    nb = (ni + _BLOCK - 1) // _BLOCK
+    for t in numba.prange(no * nb):
+        i = t // nb
+        k0 = (t % nb) * _BLOCK
+        k1 = min(ni, k0 + _BLOCK)
+        for k in range(k0, k1):
+            a0 = a[i, 0, k]
+            a1 = a[i, n - 1, k]
+            if mode == 3:
+                for j in range(p0):
+                    o[i, j, k] = a[i, (j - p0) % n, k]
+                for j in range(p1):
+                    o[i, p0 + n + j, k] = a[i, j % n, k]
+            elif mode == 1:
+                d0 = a0 - a[i, 1, k]
+                d1 = a1 - a[i, n - 2, k]
+                for j in range(p0):
+                    o[i, j, k] = a0 + d0 * (p0 - j)
+                for j in range(p1):
+                    o[i, p0 + n + j, k] = a1 + d1 * (j + 1)
+            else:
+                v0 = cval if mode == 2 else a0
+                v1 = cval if mode == 2 else a1
+                for j in range(p0):
+                    o[i, j, k] = v0
+                for j in range(p1):
+                    o[i, p0 + n + j, k] = v1
+        for j in range(n):
+            for k in range(k0, k1):
+                o[i, p0 + j, k] = a[i, j, k]
+
+
+@numba.njit(cache=NOT_CI, parallel=True)
+def _shift3d_(a, o, direction, linear):
+    # Centers of the points and their neighbour up (direction > 0) or down,
+    # which is replicated or extrapolated at the end
+    no, n, ni = a.shape
+    nb = (ni + _BLOCK - 1) // _BLOCK
+    up = direction > 0
+    s = 0 if up else 1
+    for t in numba.prange(no * nb):
+        i = t // nb
+        k0 = (t % nb) * _BLOCK
+        k1 = min(ni, k0 + _BLOCK)
+        for j in range(n - 1):
+            for k in range(k0, k1):
+                o[i, j + s, k] = a[i, j, k] + 0.5 * (a[i, j + 1, k] - a[i, j, k])
+        for k in range(k0, k1):
+            if up:
+                e = a[i, n - 1, k]
+                o[i, n - 1, k] = e + 0.5 * (e - a[i, n - 2, k]) if linear else e
+            else:
+                e = a[i, 0, k]
+                o[i, 0, k] = e + 0.5 * (e - a[i, 1, k]) if linear else e
+
+
+@numba.njit(cache=NOT_CI, parallel=True)
+def _gradient3d_(a, o, x):
+    no, n, ni = a.shape
+    nb = (ni + _BLOCK - 1) // _BLOCK
+    for t in numba.prange(no * nb):
+        i = t // nb
+        k0 = (t % nb) * _BLOCK
+        k1 = min(ni, k0 + _BLOCK)
+        ix = i if x.shape[0] > 1 else 0
+        for j in range(n - 1):
+            for k in range(k0, k1):
+                kx = k if x.shape[2] > 1 else 0
+                o[i, j, k] = (a[i, j + 1, k] - a[i, j, k]) / (x[ix, j + 1, kx] - x[ix, j, kx])
+
+
+def _as3d_(a, axis):
+    """Contiguous float array seen as ``(before, n, after)`` around `axis`"""
+    a = np.asarray(a)
+    if a.dtype not in (np.float32, np.float64):
+        a = a.astype("d")
+    shape = a.shape
+    return np.ascontiguousarray(a).reshape(
+        math.prod(shape[:axis]), shape[axis], math.prod(shape[axis + 1 :])
+    )
+
+
+def _apply_along_axis_(func, a, axis, size, *args):
+    """Run a 3D kernel along an axis, with a size-`size` output along it"""
+    axis %= np.ndim(a)
+    a3 = _as3d_(a, axis)
+    shape = np.shape(a)
+    o = np.empty((a3.shape[0], size, a3.shape[2]), a3.dtype)
+    func(a3, o, *args)
+    return o.reshape(shape[:axis] + (size,) + shape[axis + 1 :])
+
+
+def centers(a, axis=-1):
+    """Average consecutive points along an axis: size ``n`` becomes ``n-1``"""
+    return _apply_along_axis_(_centers3d_, a, axis, np.shape(a)[axis] - 1)
+
+
+def edges(a, axis=-1):
+    """Cell edges from centers along an axis, extrapolated at the ends: ``n`` becomes ``n+1``"""
+    n = np.shape(a)[axis]
+    if n < 2:
+        raise ValueError("At least two points are needed to extrapolate")
+    return _apply_along_axis_(_edges3d_, a, axis, n + 1)
+
+
+def diff(a, axis=-1):
+    """Difference of consecutive points along an axis: size ``n`` becomes ``n-1``"""
+    return _apply_along_axis_(_diff3d_, a, axis, np.shape(a)[axis] - 1)
+
+
+_PAD_MODES = {"edge": 0, "linear_extrap": 1, "constant": 2, "wrap": 3}
+
+
+def pad(a, axis=-1, width=1, mode="edge", constant_values=np.nan):
+    """Pad an array along an axis
+
+    Parameters
+    ----------
+    a: array_like
+    axis: int
+    width: int, (int, int)
+        Number of points added before and after
+    mode: {"edge", "linear_extrap", "constant", "wrap"}
+        Replicate the end values, extrapolate them linearly, fill with
+        `constant_values`, or repeat the array periodically
+    constant_values: float
+        Value used with the ``"constant"`` mode
+    """
+    if mode not in _PAD_MODES:
+        raise ValueError(f"Invalid pad mode: {mode}")
+    p0, p1 = (width, width) if isinstance(width, int) else (width[0], width[-1])
+    n = np.shape(a)[axis]
+    if n < 2 and mode == "linear_extrap":
+        raise ValueError("At least two points are needed to extrapolate")
+    if n < 1 and mode == "wrap":
+        raise ValueError("At least one point is needed to wrap")
+    return _apply_along_axis_(
+        _pad3d_, a, axis, n + p0 + p1, p0, p1, _PAD_MODES[mode], float(constant_values)
+    )
+
+
+def shift(a, axis=-1, direction=1, mode="edge"):
+    """Move an array by half a grid cell along an axis, keeping its size
+
+    Parameters
+    ----------
+    a: array_like
+    axis: int
+    direction: int
+        Positive to move up, and negative to move down
+    mode: {"edge", "linear_extrap"}
+        How the end value is obtained
+    """
+    if mode not in ("edge", "linear_extrap"):
+        raise ValueError(f"Invalid shift mode: {mode}")
+    n = np.shape(a)[axis]
+    if n < 2:
+        raise ValueError("At least two points are needed to shift")
+    return _apply_along_axis_(_shift3d_, a, axis, n, direction, mode == "linear_extrap")
+
+
+def gradient(a, x, axis=-1):
+    """Derivative of an array with respect to a coordinate, at the centers: ``n`` becomes ``n-1``
+
+    Parameters
+    ----------
+    a: array_like
+    x: array_like
+        Coordinate, 1D along the axis or of the same shape as `a`
+    axis: int
+    """
+    axis %= np.ndim(a)
+    x = np.asarray(x, dtype="d")
+    if x.ndim == 1:
+        x3 = x.reshape(1, -1, 1)
+    elif x.shape == np.shape(a):
+        x3 = _as3d_(x, axis)
+    else:
+        raise ValueError("x must be 1D or have the shape of a")
+    if x3.shape[1] != np.shape(a)[axis]:
+        raise ValueError("x must have the size of a along the axis")
+    return _apply_along_axis_(_gradient3d_, a, axis, np.shape(a)[axis] - 1, x3)
 
 
 def centers2edges(zz, axis=None):
@@ -35,21 +266,16 @@ def centers2edges(zz, axis=None):
     Parameters
     ----------
     zz: array(NX) or (NY,NX)
+    axis: int, None
+        Single axis, or all axes by default
 
     Return
     ------
     array(NX+1) or (NY+1, NX+1)
     """
-    if axis is not None:
-        return np.apply_along_axis(_centers2edges1d_, axis, zz)
-
-    # 1D
-    if zz.ndim == 1:
-        return _centers2edges1d_(zz)
-
-    # 2D
-    for axis in [0, 1]:
-        zz = np.apply_along_axis(_centers2edges1d_, axis, zz)
+    zz = np.asarray(zz)
+    for ax in range(zz.ndim) if axis is None else [axis]:
+        zz = edges(zz, ax)
     return zz
 
 
