@@ -6,6 +6,8 @@ Thermodynamics utilities.
 Provides functions to identify and retrieve temperature, salinity and
 density variables from datasets, and to compute the mixed layer depth.
 """
+import inspect
+
 import numpy as np
 import xarray as xr
 
@@ -321,7 +323,8 @@ def _format_doc_(*choices):
     """Decorator that fills the choices placeholders of a docstring"""
 
     def decorator(func):
-        func.__doc__ = func.__doc__.format(**{c._parameter: c.to_docstring(4) for c in choices})
+        doc = inspect.cleandoc(func.__doc__)
+        func.__doc__ = doc.format(**{c._parameter: c.to_docstring(0) for c in choices})
         return func
 
     return decorator

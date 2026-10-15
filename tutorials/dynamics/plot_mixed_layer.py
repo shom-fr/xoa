@@ -29,7 +29,7 @@ import xoa
 from xoa import meta
 from xoa.interp import isoslice
 from xoa.plot import plot_fields, plot_minimap
-from xoa.thermdyn import mixed_layer_depth
+from xoa.thermdyn import convert_sal, convert_temp, mixed_layer_depth
 
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
@@ -42,12 +42,14 @@ print(temp.depth.attrs["positive"], float(temp.depth[-1]))
 
 # %%
 # The potential density is needed for the density criterion. We compute it with the
-# `gsw <https://teos-10.github.io/GSW-Python/>`_ package from the practical salinity and the
-# potential temperature, with the pressure that is deduced from the depth.
+# `gsw <https://teos-10.github.io/GSW-Python/>`_ package from the absolute salinity and the
+# conservative temperature, that :func:`xoa.thermdyn.convert_sal` and
+# :func:`xoa.thermdyn.convert_temp` deduce from the practical salinity and the potential
+# temperature, whose kinds are inferred.
 
-press = gsw.p_from_z(-temp.depth, temp.lat)
-asal = gsw.SA_from_SP(sal, press, temp.lon, temp.lat)
-sigma0 = gsw.sigma0(asal, gsw.CT_from_pt(asal, temp)).rename("sigma0")
+asal = convert_sal(sal, "absolute")
+ctemp = convert_temp(temp, "conservative", sal=sal)
+sigma0 = gsw.sigma0(asal, ctemp).rename("sigma0")
 sigma0.attrs.update(long_name="Potential density anomaly", units="kg m-3")
 
 # %%
