@@ -203,3 +203,10 @@ def test_lon_across_dateline(dtype):
     # Positive longitudes keep their range, and no wrapping occurs without a jump
     np.testing.assert_allclose(grid.centers(lon % 360, 1, lon=True), row([174, 182, 190]))
     np.testing.assert_allclose(grid.pad(np.arange(3.0), 0, 2, "linear_extrap", lon=True), np.arange(-2, 5))
+
+
+def test_is_periodic_lon():
+    for lons in [np.arange(-180.0, 180.0, 2.0), np.arange(0.0, 360.0, 3.0)[::-1], np.roll(np.arange(-180.0, 180.0, 2.0), 7)]:
+        assert grid.is_periodic_lon(np.tile(lons, (2, 1)))
+    for lons in [np.arange(-120.0, 121.0, 2.0), np.arange(0.0, 300.0, 2.0), np.arange(-180.0, 181.0, 2.0)[:5]]:
+        assert not grid.is_periodic_lon(np.tile(lons, (2, 1)))

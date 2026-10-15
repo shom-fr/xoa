@@ -83,6 +83,7 @@ Bug fixes
 ---------
 - Fix :func:`xoa.grid.pad`, :func:`~xoa.grid.get_centers`, :func:`~xoa.grid.get_edges`, :func:`~xoa.grid.shift` and :func:`~xoa.grid.diff` for longitudes across the dateline.
 - Fix :func:`xoa.grid.apply_along_dim`, whose extra keywords were modified by the coordinate ones.
+- Fix the bilinear and bicubic interpolation and regridding of regular grids that span more than 180°, which gave missing values, and of global grids, whose cells between the last and first columns are now interpolated. Longitudes out of [-180, 180], like 0-360, are now accepted for grids and points.
 - Fix :func:`xoa.filter.tidal_filter` with series that are sampled more than hourly, and the unit of its error message.
 - Fix the white margins of the figures of :func:`xoa.plot.plot_grid`, whose size now follows the aspect ratio of the map, and use ``cmo.deep`` for its bathymetry.
 - Fix :func:`xoa.dyn.flow2d` with a dataset of initial positions, which used the longitudes for the latitudes, and :func:`xoa.plot.plot_flow` with missing values in the currents.

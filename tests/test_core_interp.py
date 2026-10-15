@@ -1127,3 +1127,83 @@ class TestAxisOrientation:
         )
         assert not np.isnan(out).any()
         np.testing.assert_allclose(out, 2.0 * plon - plat, atol=1e-9)
+
+
+def _lonlat_field(lons, lats):
+    lon, lat = np.meshgrid(lons, lats)
+    return {"lon": lon, "lat": lat}, np.cos(np.deg2rad(lon)) * np.cos(np.deg2rad(lat))
+
+
+def _exact(lon, lat):
+    return np.cos(np.deg2rad(lon)) * np.cos(np.deg2rad(lat))
+
+
+class TestLongitudeWrapping:
+    """Grids that are wider than 180° or global, and longitudes out of [-180, 180]"""
+
+    lats = np.arange(-20.0, 21.0, 2.0)
+    pts_lat = np.full(4, 5.0)
+
+    @pytest.mark.parametrize("method", ["bilinear", "bicubic"])
+    def test_wide_regional_grid(self, method):
+        grid, data = _lonlat_field(np.arange(-120.0, 121.0, 2.0), self.lats)
+        pts_lon = np.array([100.0, 50.0, -100.0, 0.0])
+        out = XYInterpolator(grid, pts_lon, self.pts_lat, method).interp(data)
+        np.testing.assert_allclose(out, _exact(pts_lon, self.pts_lat), atol=2e-3)
+        # No wrapping of this regional grid
+        assert not XYInterpolator(grid, pts_lon, self.pts_lat, method)._periodic
+        out = XYInterpolator(grid, [150.0, -150.0], [5.0, 5.0], method).interp(data)
+        assert np.isnan(out).all()
+
+    @pytest.mark.parametrize("method", ["bilinear", "bicubic"])
+    @pytest.mark.parametrize("sign", [1, -1])
+    def test_global_grid_seam(self, method, sign):
+        lons = np.arange(-180.0, 180.0, 2.0)[::sign]
+        grid, data = _lonlat_field(lons, self.lats)
+        pts_lon = np.array([179.3, -179.3, 178.5, -180.0])
+        interpolator = XYInterpolator(grid, pts_lon, self.pts_lat, method)
+        out = interpolator.interp(data)
+        assert interpolator._periodic
+        np.testing.assert_allclose(out, _exact(pts_lon, self.pts_lat), atol=2e-3)
+
+    def test_global_grid_seam_transect_and_weights_file(self, tmp_path):
+        grid, data = _lonlat_field(np.arange(0.0, 360.0, 2.0), self.lats)
+        pts_lon = np.array([359.3, 1.0, 100.0, 181.0])
+        interpolator = XYInterpolator(grid, pts_lon, self.pts_lat)
+        out = interpolator.interp(data)
+        np.testing.assert_allclose(out, _exact(pts_lon, self.pts_lat), atol=2e-3)
+
+        out_time = interpolator.interp_with_time(
+            np.stack([data, data]), np.array([0.0, 1.0]), np.full(4, 0.5)
+        )
+        np.testing.assert_allclose(out_time, out)
+
+        fname = str(tmp_path / "weights.npz")
+        interpolator.save_weights(fname)
+        loaded = XYInterpolator(grid, pts_lon, self.pts_lat)
+        loaded.load_weights(fname)
+        assert loaded._periodic
+        np.testing.assert_allclose(loaded.interp(data), out)
+
+    def test_regional_grid_across_dateline_is_not_periodic(self):
+        lons = np.concatenate([np.arange(160.0, 180.0, 2.0), np.arange(-180.0, -159.0, 2.0)])
+        grid, data = _lonlat_field(lons, self.lats)
+        pts_lon = np.array([179.3, -179.3, 190.0, 170.0])
+        interpolator = XYInterpolator(grid, pts_lon, self.pts_lat)
+        out = interpolator.interp(data)
+        assert not interpolator._periodic
+        np.testing.assert_allclose(out, _exact(pts_lon, self.pts_lat), atol=2e-3)
+
+    def test_longitudes_out_of_range(self):
+        grid, data = _lonlat_field(np.arange(0.0, 360.0, 2.0), self.lats)
+        assert grid["lon"].max() > 180
+        pts_lon = np.array([185.0, -175.0, 270.0, 90.0])
+        out = XYInterpolator(grid, pts_lon, self.pts_lat).interp(data)
+        np.testing.assert_allclose(out, _exact(pts_lon, self.pts_lat), atol=2e-3)
+
+    def test_conservative_global_to_global(self):
+        src, data = _lonlat_field(np.arange(-179.0, 180.0, 2.0), np.arange(-89.0, 90.0, 2.0))
+        dst, _ = _lonlat_field(np.arange(0.5, 360.0, 3.0), np.arange(-60.0, 60.0, 3.0))
+        out = XYRegridder(src, dst, "conservative").regrid(data)
+        assert not np.isnan(out).any()
+        np.testing.assert_allclose(out, _exact(dst["lon"], dst["lat"]), atol=1e-2)

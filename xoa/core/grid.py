@@ -390,6 +390,24 @@ def check_grid_type(grid, tol=1e-8):
     return 'regular'
 
 
+def is_periodic_lon(lon, tol=1e-3):
+    """Tell if the columns of a grid make a full turn around the globe
+
+    The longitudes of the first row go always in the same direction, also across the
+    dateline, and the step between the last and first columns closes the 360° circle
+    and is not much larger than the other ones, unlike for a wide regional grid.
+    """
+    row = np.asarray(lon)[0]
+    if row.size < 3:
+        return False
+    steps = diff_lon(row, np.roll(row, -1))
+    return bool(
+        (np.all(steps > 0) or np.all(steps < 0))
+        and abs(abs(steps.sum()) - 360.0) < tol
+        and abs(steps[-1]) <= 1.5 * abs(steps[:-1]).max()
+    )
+
+
 def create_regular_grid(nx, ny, lon_range, lat_range, mask=None):
     """Create a regular latitude-longitude grid
 
