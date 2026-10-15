@@ -269,8 +269,7 @@ These modules rely on the specs to offer high-level finders:
   :func:`~xoa.coords.get_tdim` and :func:`~xoa.coords.get_fdim`.
 - :mod:`xoa.thermdyn`: :func:`~xoa.thermdyn.get_temp`, :func:`~xoa.thermdyn.get_sal` and
   :func:`~xoa.thermdyn.get_dens`, with a ``variant`` argument to target a type:
-  ``"temp"`` (in situ), ``"ptemp"`` (potential), ``"ctemp"`` (conservative),
-  ``"atemp"`` (absolute) for temperature, and ``"sal"``, ``"psal"``, ``"asal"``,
+  ``"temp"`` (in situ), ``"ptemp"`` (potential), ``"ctemp"`` (conservative) for temperature, and ``"sal"``, ``"psal"``, ``"asal"``,
   ``"pfsal"`` for salinity.
 - :mod:`xoa.dyn`: :func:`~xoa.dyn.get_sea_level` with the variants ``"ssh"``, ``"adt"``,
   ``"sla"``, ``"mdt"`` and ``"mss"``.

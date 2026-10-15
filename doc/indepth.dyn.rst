@@ -231,6 +231,13 @@ temperature and the salinity, and decomposes and recomposes profiles:
     part = vm.recomp(amps, modes=[1, 2])   # contribution of the first baroclinic modes
     vm.rd.isel(mode=1)                     # first deformation radius, in meters
 
+The temperature and the salinity may be of different kinds, that are inferred from the
+standard names or given with the ``temp_kind`` and ``sal_kind`` arguments of
+:func:`~xoa.thermdyn.get_n2`: ``"ptemp"``/``"potential"`` (default), ``"ctemp"``/``"conservative"``
+or ``"temp"``/``"insitu"``, and ``"psal"``/``"practical"`` (default), ``"asal"``/``"absolute"``
+or ``"pfsal"``/``"preformed"``. They are converted when needed, and
+:func:`xoa.thermdyn.convert_temp` and :func:`xoa.thermdyn.convert_sal` do it explicitly.
+
 - :func:`xoa.dyn.get_rossby_radius` is a quick WKB estimate of the first radius,
   :math:`R_d = \int N dz / (\pi |f|)`, that needs no modes and is typically within about 10 to
   30% of the exact one. Use the modes when you need the exact radii, or the other modes.
