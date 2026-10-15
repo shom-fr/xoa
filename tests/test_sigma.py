@@ -250,3 +250,12 @@ def test_decode_sigma_writing_twice_errors_policy():
     with pytest.warns(UserWarning, match="written twice"):
         out = sigma.decode_sigma(ds, errors="warn")
     assert "z" not in out.coords
+
+
+def test_decode_sigma_horizontal_location_with_rho_levels():
+    """Rho levels at u points are named with the horizontal location only"""
+    ds = get_staggered_sigma_dataset().drop_vars(["s_w", "Cs_w"])
+    ds = meta.assign_meta_specs(ds, "croco")
+    ds["zeta_u"], ds["h_u"], ds["hc_u"] = ds.zeta, ds.h, ds.hc
+    ds_out = sigma.decode_sigma(ds, hlocs=["u"])
+    assert "z_u" in ds_out.coords and "z_urho" not in ds_out.coords

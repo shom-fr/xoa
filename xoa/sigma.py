@@ -779,7 +779,8 @@ def decode_sigma(ds, rename=False, hlocs=None, ref="datum", errors="raise"):
             height = func(**kwargs)
 
             # Format
-            loc = (hloc or "") + (vloc or "")
+            # The rho vertical level is implicit at a given horizontal location, like "u"
+            loc = hloc if hloc and vloc == "rho" else (hloc or "") + (vloc or "")
             height = meta_specs.sglocator.format_dataarray(height, loc)
 
             # Never write twice to the same height, as when the meta specs have no location
