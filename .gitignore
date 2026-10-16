@@ -160,3 +160,6 @@ doc/auto_examples/
 # Local files
 *.whl
 external/
+
+# Presentation
+tex/

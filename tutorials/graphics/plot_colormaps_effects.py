@@ -102,7 +102,9 @@ add_shadow(lines, ax=axes[0], width=2, xoffset=1, yoffset=-1)
 axes[0].set_title("Shadowed contours")
 
 axes[1].pcolormesh(lon, lat, ds.temp, cmap="cmo.thermal", transform=ccrs.PlateCarree())
-dark = axes[1].text(-70.0, 38.0, "Cape Cod", weight="bold", transform=ccrs.PlateCarree())
+dark = axes[1].text(
+    -67.5, 41.3, "Georges Bank", weight="bold", ha="center", transform=ccrs.PlateCarree()
+)
 add_glow(dark, ax=axes[1], width=4, color="w")
 light = axes[1].text(
     -66.0, 40.0, "Gulf Stream", color="w", weight="bold", transform=ccrs.PlateCarree()

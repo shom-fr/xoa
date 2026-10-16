@@ -258,6 +258,16 @@ def _geos_(ssh, dx, dy, corio, ug, vg):
 def geos(ssh, dx, dy, corio):
     """Geostrophic currents in m s-1 from the sea surface height in meters
 
+    They balance the Coriolis force with the pressure gradient, with centered differences:
+
+    .. math::
+
+        u_g = -\\frac{g}{f} \\partial_y \\eta, \\quad
+        v_g = \\frac{g}{f} \\partial_x \\eta
+
+    where :math:`\\eta` is the sea surface height, :math:`f` the Coriolis parameter
+    and :math:`g = 9.81` m s-2 the gravity.
+
     Parameters
     ----------
     ssh: array_like(..., ny, nx)

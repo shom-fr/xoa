@@ -87,10 +87,10 @@ plot_double_minimap(ds, parent=ax, loc="lower right", size=0.15, regional_ax="le
 
 fig, axes = plot_fields(
     {
-        "Temperature": ds.temp,
-        "Salinity": ds.sal,
+        "Temperature": (ds.temp, {"cmap": cmocean.cm.thermal}),
+        "Salinity": (ds.sal, {"cmap": cmocean.cm.haline}),
         "Sea surface height": ds.ssh,
-        "Speed": speed,
+        "Speed": (speed, {"cmap": cmocean.cm.speed}),
     },
     ncols=2,
     figsize=(8, 6),
