@@ -498,6 +498,16 @@ def get_coriolis(lat):
 def get_geos(ssh, dx=None, dy=None):
     """Compute the geostrophic currents from the sea surface height, in m s-1
 
+    They balance the Coriolis force with the pressure gradient:
+
+    .. math::
+
+        u_g = -\\frac{g}{f} \\partial_y \\eta, \\quad
+        v_g = \\frac{g}{f} \\partial_x \\eta
+
+    where :math:`\\eta` is the sea surface height and :math:`f` the Coriolis parameter,
+    see :func:`get_coriolis`.
+
     Parameters
     ----------
     ssh: xarray.DataArray
@@ -557,8 +567,24 @@ def get_cyclogeos(
 
     They include the advection terms of the momentum equations on top of the geostrophic
     balance, which is needed where the currents are curved like in eddies and meanders.
-    They are found with an iterative method like the one of Penven et al. (2014), see
-    :func:`xoa.core.dyn.cyclogeos` for the details.
+    The currents :math:`\\mathbf{u}` satisfy
+
+    .. math::
+
+        f \\mathbf{k} \\times \\mathbf{u} + (\\mathbf{u} \\cdot \\nabla) \\mathbf{u}
+        = f \\mathbf{k} \\times \\mathbf{u}_g
+
+    where :math:`\\mathbf{u}_g` are the geostrophic currents of :func:`get_geos`.
+    They are found with an iterative method like the one of Penven et al. (2014), that starts
+    from :math:`\\mathbf{u}_g` and corrects it with the advection terms of the previous
+    iteration until the currents no longer change:
+
+    .. math::
+
+        u_{n+1} = u_g - \\frac{u_n \\partial_x v_n + v_n \\partial_y v_n}{f}, \\quad
+        v_{n+1} = v_g + \\frac{u_n \\partial_x u_n + v_n \\partial_y u_n}{f}
+
+    See :func:`xoa.core.dyn.cyclogeos` for the details.
 
     Parameters
     ----------
@@ -573,7 +599,8 @@ def get_cyclogeos(
         See :func:`xoa.core.dyn.cyclogeos`.
     smooth: None, int
         Number of smoothings of the advection terms at each iteration, which prevents
-        the iterations from diverging. See :func:`xoa.core.dyn.cyclogeos`.
+        the iterations from diverging. It defaults to 1 with the ``"full"`` terms and to 0
+        with the ``"penven"`` ones. See :func:`xoa.core.dyn.cyclogeos`.
     niter: int
         Maximal number of iterations
     tol: float

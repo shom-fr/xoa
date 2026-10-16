@@ -31,6 +31,7 @@ import cmocean  # noqa
 import xoa
 import xoa.meta as xmeta
 import xoa.dyn as xdyn
+import xoa.grid as xgrid
 import xoa.numbers as xnum
 import xoa.thermdyn as xthermdyn
 from xoa.plot import plot_fields
@@ -70,7 +71,8 @@ print(rossby)
 # of the flow. We take here a scale of 50 km for the eddies. The deformation radius is either
 # the one of the first baroclinic vertical mode, the quick WKB estimate of
 # :func:`xoa.dyn.get_rossby_radius`, or the approximation :math:`N H / |f|` with
-# the mean stratification of the upper 1000 m.
+# the mean stratification of the upper 1000 m, weighted by the layer thicknesses with
+# :func:`xoa.grid.vmean`.
 
 L = 50e3
 vm = xdyn.VerticalModes(n2, nmodes=2)
@@ -78,7 +80,8 @@ burger = xnum.get_burger(L, rd=vm.rd.isel(mode=1)).where(open_ocean)
 burger_wkb = xnum.get_burger(L, rd=xdyn.get_rossby_radius(n2)).where(open_ocean)
 
 H = 1000.0
-n2_mean = n2.where(n2.depth <= H).mean("depth")
+n_mean = xgrid.vmean(np.sqrt(n2.where(n2 > 0)), zmin=-H)
+n2_mean = n_mean**2
 burger_nh = xnum.get_burger(L, n2=n2_mean, h=H).where(open_ocean)
 
 # %%
@@ -112,8 +115,8 @@ fig, axes = plot_fields(
         (rossby, {"cmap": "cmo.balance", "levels": np.linspace(-0.6, 0.6, 25)}),
         (burger, {"cmap": "cmo.matter", "levels": np.linspace(0, 1, 21)}),
         (burger_wkb, {"cmap": "cmo.matter", "levels": np.linspace(0, 1, 21)}),
-        (burger_nh, {"cmap": "cmo.matter", "levels": np.linspace(0, 6, 25)}),
-        (froude, {"cmap": "cmo.amp", "levels": np.linspace(0, 0.2, 21)}),
+        (burger_nh, {"cmap": "cmo.matter", "levels": np.linspace(0, 2, 21)}),
+        (froude, {"cmap": "cmo.amp", "levels": np.linspace(0, 0.4, 21)}),
     ],
     titles=[
         "Rossby",
@@ -132,8 +135,8 @@ fig, axes = plot_fields(
 # %%
 # The Rossby number reaches 0.5 along the stream and its eddies, and the Burger number
 # of the first mode is of order 0.1 to 0.5 for eddies of 50 km, and the WKB radius gives about
-# the same. The :math:`N H / |f|` estimate
-# is about :math:`\pi^2` times larger, since the first baroclinic radius is
+# the same. The :math:`N H / |f|` estimate has the same spatial pattern but is
+# several times larger, since the first baroclinic radius is
 # close to :math:`N H / (\pi |f|)` for a constant stratification: use the radius of the modes
 # when it is available. The Froude number stays below one, i.e. the flow is subcritical,
 # and it is largest where the stratification is weak.
