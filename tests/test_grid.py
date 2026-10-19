@@ -507,6 +507,36 @@ class TestDz2z:
         with pytest.raises(xoa.XoaError):
             grid.get_dz(xr.DataArray([1.0], dims="foo"))
 
+    def test_vintegrate_vmean(self):
+        z = xr.DataArray([-1000.0, -300.0, -100.0, -10.0], dims="depth", attrs={"positive": "up"})
+        dz = xr.DataArray([700.0, 450.0, 145.0, 90.0], dims="depth")
+        da = xr.DataArray(
+            [[1.0, 2.0, 3.0, 4.0], [1.0, np.nan, 3.0, 4.0]],
+            dims=("x", "depth"),
+            coords={"depth": z},
+            name="temp",
+            attrs={"units": "K"},
+        )
+        # Thickness weighted, with valid values only
+        vint = grid.vintegrate(da, dz=dz)
+        np.testing.assert_allclose(vint, [2395.0, 1495.0])
+        assert vint.attrs["units"] == "K m"
+        vmean = grid.vmean(da, dz=dz)
+        np.testing.assert_allclose(vmean, [2395.0 / 1385.0, 1495.0 / 935.0])
+        assert vmean.attrs["units"] == "K" and vmean.name == "temp"
+        # Differs from the plain mean, and thicknesses are found from z
+        assert float(vmean[0]) != float(da[0].mean())
+        np.testing.assert_allclose(grid.vmean(da), vmean)
+        # Layers crossing the bounds are partly accounted for
+        np.testing.assert_allclose(grid.vintegrate(da, zmax=-200.0)[0], 1 * 700 + 2 * 325)
+        np.testing.assert_allclose(
+            grid.vmean(da, zmin=-500.0, zmax=-50.0)[0],
+            (2 * 425 + 3 * 122.5 + 4 * 5) / 552.5,
+        )
+        # Nothing valid
+        assert np.isnan(grid.vmean(da, zmin=100.0)).all()
+        assert np.isnan(grid.vintegrate(da, zmin=100.0)).all()
+
     def test_get_dz_terms_and_decode_dz2z(self):
         dz = xr.DataArray(
             np.resize([100, 500, 1000.0], (2, 3)).T,

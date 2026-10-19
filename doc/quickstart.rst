@@ -75,10 +75,13 @@ See :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
     surf = ds.isel(depth=0)
     @savefig quickstart.fields.png width=6in
     plot_fields(
-        {"Temperature": surf.temp, "Salinity": surf.sal, "Sea surface height": surf.ssh},
+        {
+            "Temperature": (surf.temp, {"cmap": cmocean.cm.thermal}),
+            "Salinity": (surf.sal, {"cmap": cmocean.cm.haline}),
+            "Sea surface height": surf.ssh,
+        },
         ncols=3,
         figsize=(10, 3.4),
-        cmap=cmocean.cm.thermal,
         map_kw=map_kw,
     );
 

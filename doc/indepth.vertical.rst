@@ -181,6 +181,9 @@ outer ones are extrapolated, unless ``top`` and ``bottom`` are given. This is ex
 evenly spaced levels and approximate otherwise. :func:`xoa.grid.get_dz` does the whole job:
 it returns the thickness variable if there is one, else it computes them from what
 :func:`~xoa.coords.get_z` finds. Weighted statistics rely on it, see :ref:`indepth.stataccum`.
+A plain ``da.mean(zdim)`` ignores these thicknesses: use :func:`xoa.grid.vmean` and
+:func:`xoa.grid.vintegrate` to average and integrate along the vertical, optionally between
+``zmin`` and ``zmax``.
 
 .. ipython:: python
 

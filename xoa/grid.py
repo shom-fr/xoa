@@ -968,6 +968,104 @@ def get_dz(obj, errors="raise", **kwargs):
         return z2dz(z, **kwargs)
 
 
+def _get_vweights_(da, zmin, zmax, dz, zdim):
+    """Get the layer thicknesses of the layers to integrate and the vertical dimension"""
+    if zdim is None:
+        zdim = xcoords.get_zdim(da, errors="raise")
+    if dz is None:
+        dz = get_dz(da, zdim=zdim)
+    if zmin is not None or zmax is not None:
+        # Part of each layer, centered on its z, that lies within the bounds
+        z = xcoords.as_z(xcoords.get_z(da))
+        top = z + dz / 2 if zmax is None else np.minimum(z + dz / 2, zmax)
+        bottom = z - dz / 2 if zmin is None else np.maximum(z - dz / 2, zmin)
+        dz = (top - bottom).where(top > bottom).where(dz.notnull())
+    return dz, zdim
+
+
+def vintegrate(da, zmin=None, zmax=None, dz=None, zdim=None):
+    """Integrate along the vertical, accounting for the layer thicknesses
+
+    This is the sum of the values times the thicknesses of the layers, where the
+    values are valid. Contrary to a simple sum or mean along the vertical dimension, it is
+    right with variable thicknesses, which is the rule in the ocean.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Array with a vertical dimension, and either a z or depth coordinate
+        or a thickness coordinate when `dz` is not provided
+    zmin: None, float
+        Lower bound of the layers to integrate, in z, i.e. negative in the ocean.
+        The layers that cross it are partly accounted for, assuming that their
+        z is at their center.
+    zmax: None, float
+        Upper bound, in z, treated like `zmin`.
+    dz: None, xarray.DataArray
+        Layer thicknesses, which are searched or computed with :func:`get_dz` by default
+    zdim: None, str
+        Name of the vertical dimension, which is inferred by default
+
+    Return
+    ------
+    xarray.DataArray
+        Integral, with the vertical dimension removed. It is masked
+        where there is no valid value.
+
+    See also
+    --------
+    vmean
+    get_dz
+    """
+    dz, zdim = _get_vweights_(da, zmin, zmax, dz, zdim)
+    out = (da * dz).sum(zdim, min_count=1)
+    attrs = {"long_name": f"Vertical integral of {da.attrs.get('long_name', da.name)}"}
+    if "units" in da.attrs:
+        attrs["units"] = f"{da.attrs['units']} m"
+    return out.rename(da.name).assign_attrs(attrs)
+
+
+def vmean(da, zmin=None, zmax=None, dz=None, zdim=None):
+    """Average along the vertical, weighted by the layer thicknesses
+
+    The layers where the values are not valid are ignored.
+    Contrary to ``da.mean(zdim)``, it is right with variable thicknesses.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Array with a vertical dimension, and either a z or depth coordinate
+        or a thickness coordinate when `dz` is not provided
+    zmin: None, float
+        Lower bound of the layers to average, in z, i.e. negative in the ocean.
+        The layers that cross it are partly accounted for, assuming that their
+        z is at their center.
+    zmax: None, float
+        Upper bound, in z, treated like `zmin`.
+    dz: None, xarray.DataArray
+        Layer thicknesses, which are searched or computed with :func:`get_dz` by default
+    zdim: None, str
+        Name of the vertical dimension, which is inferred by default
+
+    Return
+    ------
+    xarray.DataArray
+        Mean, with the vertical dimension removed. It is masked
+        where there is no valid value.
+
+    See also
+    --------
+    vintegrate
+    get_dz
+    """
+    dz, zdim = _get_vweights_(da, zmin, zmax, dz, zdim)
+    dz = dz.where(da.notnull())
+    out = (da * dz).sum(zdim, min_count=1) / dz.sum(zdim, min_count=1)
+    return out.rename(da.name).assign_attrs(
+        {k: v for k, v in da.attrs.items() if k in ("long_name", "units")}
+    )
+
+
 @misc.ERRORS.format_function_docstring
 def to_rect(da, tol=1e-5, errors="warn"):
     """Convert the curvilinear coordinates of array/dataset to rectangular axis coordinates

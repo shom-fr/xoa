@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Add :func:`xoa.grid.vmean` and :func:`xoa.grid.vintegrate` for thickness weighted vertical means and integrals.
 - Add the ``projection`` argument to :func:`xoa.plot.plot_grid`, orthographic by default.
 - Add :class:`xoa.plot.PanelLabeler`, :func:`xoa.plot.add_panel_labels` and the ``panel_labels`` argument of :func:`xoa.plot.plot_fields` to label panels like "a)".
 - Add a tour of xoa to the :ref:`quickstart`, and the tutorials :ref:`sphx_glr_tutorials_dynamics_plot_flow_advection.py`, :ref:`sphx_glr_tutorials_vertical_plot_layer_thicknesses.py`, :ref:`sphx_glr_tutorials_grids_plot_distances.py`, :ref:`sphx_glr_tutorials_vertical_plot_sigma_levels.py`, :ref:`sphx_glr_tutorials_graphics_plot_colormaps_effects.py` and :ref:`sphx_glr_tutorials_config_plot_options.py`, and improve the figures of the others: consistent fonts and units, shared colorbars, compact layouts.
