@@ -148,6 +148,7 @@ TUTORIALS_ORDER = [
     "plot_maps_vectors",
     "plot_colormaps_effects",
     "plot_taylor_diagram",
+    "plot_wave_rose",
     "plot_grid_tools",
     "plot_distances",
     "plot_neighbors",
