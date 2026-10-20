@@ -6,6 +6,9 @@ Unreleased
 
 New features
 ------------
+- Add the :mod:`xoa.tide` subpackage for tidal harmonic analysis and prediction, ellipses and diagnostics, and plots in :mod:`xoa.tide.plot`, based on :mod:`xoa.core.tide` and :mod:`xoa.core.signal`. See :ref:`indepth.tide`.
+- Move the tidal filters to :func:`xoa.tide.tidal_filter` and :func:`xoa.tide.demerliac`. The :mod:`xoa.filter` versions are deprecated.
+- Add the :mod:`xoa.core.filter` module with the public :func:`~xoa.core.filter.get_decimate_arg` and :func:`~xoa.core.filter.decimate_by_average` kernels of :func:`xoa.filter.decimate`.
 - Add :func:`xoa.plot.plot_rose`, :class:`xoa.core.plot.Rose` and :func:`xoa.core.stats.rose_hist` for wind and wave roses, and the ``rose`` method of the ``plot`` accessor. See :ref:`sphx_glr_tutorials_graphics_plot_wave_rose.py`.
 - Add the Pierres Noires wave buoy sample and the ``direction`` alias of the mean wave direction.
 - Add :func:`xoa.grid.vmean` and :func:`xoa.grid.vintegrate` for thickness weighted vertical means and integrals.

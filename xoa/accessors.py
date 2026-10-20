@@ -905,8 +905,39 @@ class _DynDatasetMixin_:
         return get_okuboweiss(*self._get_uv_(), dx=dx, dy=dy, z=z, normalize=normalize)
 
 
+class _TideDataArrayMixin_:
+    """Provide the tide methods that work on a sea surface height or a current component"""
+
+    def harmonic_analysis(self, **kwargs):
+        """Get the tidal harmonic coefficients, see :func:`xoa.tide.harmonic_analysis`"""
+        from .tide import harmonic_analysis
+
+        return harmonic_analysis(self._obj, **kwargs)
+
+    def tidal_filter(self, filter_name, **kwargs):
+        """Filter the tide, see :func:`xoa.tide.tidal_filter`"""
+        from .tide import tidal_filter
+
+        return tidal_filter(self._obj, filter_name, **kwargs)
+
+
+class _TideDatasetMixin_:
+    """Provide the tide methods that work on the coefficients of a harmonic analysis"""
+
+    def harmonic_predict(self, t_out, **kwargs):
+        """Predict the tide from harmonic coefficients, see :func:`xoa.tide.harmonic_predict`"""
+        from .tide import harmonic_predict
+
+        return harmonic_predict(self._obj, t_out, **kwargs)
+
+
 class XoaDataArrayAccessor(
-    _PlotMixin_, _InterpRegridMixin_, _GridMixin_, _DynDataArrayMixin_, MetaDataArrayAccessor
+    _PlotMixin_,
+    _InterpRegridMixin_,
+    _GridMixin_,
+    _DynDataArrayMixin_,
+    _TideDataArrayMixin_,
+    MetaDataArrayAccessor,
 ):
     """Main xoa accessor registered on :class:`xarray.DataArray`"""
 
@@ -935,7 +966,12 @@ class XoaDataArrayAccessor(
 
 
 class XoaDatasetAccessor(
-    _PlotMixin_, _InterpRegridMixin_, _GridMixin_, _DynDatasetMixin_, MetaDatasetAccessor
+    _PlotMixin_,
+    _InterpRegridMixin_,
+    _GridMixin_,
+    _DynDatasetMixin_,
+    _TideDatasetMixin_,
+    MetaDatasetAccessor,
 ):
     """Main xoa accessor registered on :class:`xarray.Dataset`"""
 

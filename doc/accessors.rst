@@ -56,6 +56,8 @@ Methods
     DataArray.xoa.regrid
     DataArray.xoa.get_geos
     DataArray.xoa.get_cyclogeos
+    DataArray.xoa.harmonic_analysis
+    DataArray.xoa.tidal_filter
     DataArray.xoa.get_polygon_mask
 
 
@@ -102,6 +104,7 @@ Methods
     Dataset.xoa.get_div
     Dataset.xoa.get_strain
     Dataset.xoa.get_okuboweiss
+    Dataset.xoa.harmonic_predict
     Dataset.xoa.get_polygon_mask
     Dataset.decode_sigma.decode
     Dataset.decode_sigma.get_sigma_terms
