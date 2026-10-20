@@ -107,6 +107,69 @@ def taylor_stats(model, ref):
     return _taylor_stats_(np.ascontiguousarray(model), ref)
 
 
+@numba.njit(cache=NOT_CI)
+def _rose_hist_(direction, value, nsector, edges):
+    nbin = edges.size
+    counts = np.zeros((nsector, nbin))
+    width = 360.0 / nsector
+    for i in range(direction.size):
+        d = direction[i]
+        v = value[i]
+        if np.isnan(d) or np.isnan(v) or v < edges[0]:
+            continue
+        isec = int(((d + 0.5 * width) % 360.0) // width) % nsector
+        ibin = np.searchsorted(edges, v, side="right") - 1
+        counts[isec, ibin] += 1
+    return counts
+
+
+def rose_hist(direction, value, nsector=16, edges=None):
+    """Frequencies of a direction and a value, as needed by a wind or wave rose
+
+    The sectors are centered on the directions ``0, 360/nsector, ...``, so that
+    the north is the middle of the first sector. The last bin of value is open.
+    The samples that are missing in a array, or lower than the first edge, are ignored.
+
+    Parameters
+    ----------
+    direction: array_like
+        Directions in degrees, clockwise from the north
+    value: array_like
+        Values, like speeds or heights, with the same shape as the directions
+    nsector: int
+        Number of sectors
+    edges: None, array_like(nbin)
+        Increasing lower edges of the bins of value, which are
+        chosen from 0 to the maximum of the values by default.
+
+    Return
+    ------
+    numpy.ndarray(nsector, nbin)
+        Frequencies in percent of the valid samples
+    numpy.ndarray(nbin)
+        Lower edges of the bins
+    """
+    direction = np.ravel(np.asarray(direction, dtype="d"))
+    value = np.ravel(np.asarray(value, dtype="d"))
+    if direction.shape != value.shape:
+        raise ValueError("direction and value must have the same size")
+    if edges is None:
+        vmax = np.nanmax(value) if np.isfinite(value).any() else 0.0
+        if vmax > 0:
+            raw = vmax / 8
+            mag = 10 ** np.floor(np.log10(raw))
+            step = next(m for m in (1, 2, 2.5, 5, 10) if m * mag >= raw) * mag
+            edges = np.arange(0, vmax, step)
+        else:
+            edges = np.zeros(1)
+    edges = np.asarray(edges, dtype="d")
+    if (np.diff(edges) <= 0).any():
+        raise ValueError("edges must be strictly increasing")
+    counts = _rose_hist_(direction, value, int(nsector), edges)
+    total = counts.sum()
+    return (100 * counts / total if total else counts), edges
+
+
 #: Indices of the moments along the first axis of moment arrays
 N, SW, MX, MY, M2X, M2Y, CXY, M2D, XMIN, XMAX, YMIN, YMAX = range(12)
 

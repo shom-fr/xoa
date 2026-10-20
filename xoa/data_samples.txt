@@ -23,3 +23,6 @@ MODELS/CMEMS-GLORYS/glorys_gulfstream_3d.nc 8c07898627c6a1423a4fdb447ce382a0d69f
 
 # A single drifter of the GDP program
 OBS/DRIFTERS/gdp-6203641.csv 1c6f44491cfc20c39e73051fc1ac3e3b61d4d5c12f6937253aa67dbf98ef1e7b
+
+# Hourly wave parameters of the Pierres Noires buoy, from 2013 to 2024
+OBS/WAVES/wave_buoy_6200069_2013-2024.nc 50e148dabfa897f66c960305ef38b53f5ce727a29635c9e28ad77a7acba97ab8

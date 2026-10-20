@@ -797,6 +797,12 @@ class XoaPlotAccessor(object):
 
         return plot_stick(self._obj, *args, **kwargs)
 
+    def rose(self, *args, **kwargs):
+        """Plot a wind or wave rose, see :func:`xoa.plot.plot_rose`"""
+        from .plot import plot_rose
+
+        return plot_rose(self._obj, *args, **kwargs)
+
     def taylor(self, ref, *args, **kwargs):
         """Plot a Taylor diagram against a reference, see :func:`xoa.plot.plot_taylor`"""
         from .plot import plot_taylor

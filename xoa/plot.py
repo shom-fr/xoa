@@ -827,11 +827,6 @@ def add_colorbar(mappable, ax=None, da=None, **kwargs):
 _add_colorbar_ = add_colorbar
 
 
-def _get_meta_var_(obj, meta_name):
-    """Get a data variable from its generic meta name or return None"""
-    return xmeta.get_meta_specs(obj).search(obj, meta_name, errors="ignore")
-
-
 def _get_map_axes_(ax, extent, transform, map_kw, projection=None):
     """Create a map when there is no axes, or decorate the axes
 
@@ -970,7 +965,7 @@ def plot_field(
                     f"Cannot search the overlay field '{ofield}' without the ds parameter"
                 )
             name = ofield
-            ofield = _get_meta_var_(ds, name)
+            ofield = xmeta.get_variant(ds, name)
             if ofield is None:
                 raise exceptions.XoaError(f"Overlay field '{name}' not found in the dataset")
         spec.setdefault("colors", "k")
@@ -1285,12 +1280,12 @@ def plot_grid(
     # Background field, whose coordinates define the grid for the bathymetry
     field = None
     if kind == "bathy":
-        field = _get_meta_var_(obj, "bathy") if isinstance(obj, xr.Dataset) else None
+        field = xmeta.get_variant(obj, "bathy") if isinstance(obj, xr.Dataset) else None
         if field is None:
             exceptions.xoa_warn("No bathymetry found: plotting the mesh instead")
             kind = "mesh"
         else:
-            mask = _get_meta_var_(obj, "mask")
+            mask = xmeta.get_variant(obj, "mask")
             if mask is not None and set(mask.dims) == set(field.dims):
                 field = field.where(mask != 0)
             import cmocean  # noqa: F401 to register the cmo colormaps
@@ -1525,8 +1520,8 @@ def plot_stick(
     """
     if v is None:
         ds = u
-        u = _get_meta_var_(ds, "u")
-        v = _get_meta_var_(ds, "v")
+        u = xmeta.get_variant(ds, "u")
+        v = xmeta.get_variant(ds, "v")
         if u is None or v is None:
             raise exceptions.XoaError("Cannot find the u and v components in the dataset")
     if u.ndim != 1 or v.ndim != 1:
@@ -1812,6 +1807,60 @@ def plot_taylor(
     return cplot.plot_taylor(
         std, corr, ref_std=ref_std, diagram=diagram, labels=labels, values=values, **kwargs
     )
+
+
+def plot_rose(value, direction=None, **kwargs):
+    """Plot a wind or wave rose
+
+    The frequencies of the directions are stacked by bins of value. The
+    samples that are missing in the value or in the direction are ignored: mask
+    the bad quality ones before, for instance with :meth:`xarray.DataArray.where`.
+
+    Parameters
+    ----------
+    value: xarray.DataArray, xarray.Dataset
+        Wind speed or wave height, for instance. With a dataset, the first of the ``"wspd"``
+        and ``"hs"`` generic meta names that is found is used, and the direction is searched
+        with :mod:`xoa.meta` when not provided.
+    direction: None, xarray.DataArray
+        Direction in degrees, clockwise from the north, with the same shape as the value.
+        It is the direction that the wind or the waves come from or go to: this does not
+        change the plot. The ``"wfdir"``, ``"wtdir"``, ``"wdir"``, ``"th1p"`` and ``"dp"``
+        generic names are searched in a dataset.
+    kwargs:
+        Extra parameters, like ``nsector``, ``edges``, ``cmap`` or ``rmax``,
+        are passed to :func:`xoa.core.plot.plot_rose`.
+
+    Return
+    ------
+    xoa.core.plot.Rose
+
+    Example
+    -------
+    .. code-block:: python
+
+        plot_rose(ds.hs, ds.direction, nsector=12)
+        plot_rose(ds)  # variables are searched
+
+    See also
+    --------
+    xoa.core.plot.Rose
+    xoa.core.stats.rose_hist
+    """
+    ds = value
+    if isinstance(ds, xr.Dataset):
+        value = xmeta.get_variant(ds, ["wspd", "hs"])
+        if value is None:
+            raise exceptions.XoaError("Cannot find the wind speed or the wave height in the dataset")
+    if direction is None:
+        if not isinstance(ds, xr.Dataset):
+            raise exceptions.XoaError("The direction is required when the value is a data array")
+        direction = xmeta.get_variant(ds, ["wfdir", "wtdir", "wdir", "th1p", "dp"])
+        if direction is None:
+            raise exceptions.XoaError("Cannot find the direction in the dataset")
+    value, direction = xr.broadcast(value, direction)
+    kwargs.setdefault("label", get_label(value))
+    return cplot.plot_rose(direction.values, value.values, **kwargs)
 
 
 # %% Filters

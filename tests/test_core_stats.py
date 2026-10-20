@@ -4,6 +4,7 @@ Test the :mod:`xoa.core.stats` module
 """
 
 import numpy as np
+import pytest
 
 from xoa.core import stats as cstats
 
@@ -106,3 +107,28 @@ def test_moments_stable_with_large_offset():
     stats = cstats.moments2stats(mom)
     assert np.isclose(stats["var"][0], x.var(), rtol=1e-6)
     assert np.isclose(stats["mean"][0], x.mean(), rtol=1e-14)
+
+
+def test_rose_hist_sectors_and_bins():
+    direction = [0, 359, 10, 90, np.nan, 180, 270]
+    value = [1, 2, 6, 3, 1, np.nan, -1]
+    freq, edges = cstats.rose_hist(direction, value, nsector=4, edges=[0, 2, 4])
+    assert freq.shape == (4, 3)
+    assert np.allclose(freq.sum(), 100)
+    # North is the middle of the first sector, the last bin is open, below the first edge is ignored
+    assert np.allclose(freq[0], [25, 25, 25])
+    assert np.allclose(freq[1], [0, 25, 0])
+    assert not freq[2:].any()
+
+
+def test_rose_hist_default_edges_and_errors():
+    rng = np.random.default_rng(3)
+    freq, edges = cstats.rose_hist(rng.uniform(0, 360, 500), rng.uniform(0, 13, 500))
+    assert freq.shape == (16, edges.size)
+    assert edges[0] == 0 and np.all(np.diff(edges) > 0) and edges[-1] < 13
+    freq, edges = cstats.rose_hist([1.0], [np.nan])
+    assert not freq.any()
+    with pytest.raises(ValueError):
+        cstats.rose_hist([1.0, 2.0], [1.0])
+    with pytest.raises(ValueError):
+        cstats.rose_hist([1.0], [1.0], edges=[2, 1])

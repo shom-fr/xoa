@@ -424,3 +424,21 @@ class TestTaylor:
         )
         assert diagram.ax.get_ylim()[1] == 2
         assert len(diagram.ax.get_xticks()) == 3
+
+
+class TestRose:
+    def test_stacked_bars(self):
+        rng = np.random.default_rng(0)
+        rose = cplot.plot_rose(
+            rng.uniform(0, 360, 200), rng.uniform(0, 10, 200), nsector=8, edges=[0, 5], label="U"
+        )
+        assert len(rose.bars) == 2 and len(rose.bars[0]) == 8
+        assert rose.legend.get_title().get_text() == "U"
+        heights = sum(np.array([p.get_height() for p in bar]) for bar in rose.bars)
+        assert np.isclose(heights.sum(), 100)
+        assert rose.ax.get_theta_direction() == -1
+
+    def test_existing_rose_and_tuning(self):
+        rose = cplot.plot_rose([0.0], [1.0], rmax=50, legend=False)
+        assert rose.ax.get_ylim()[1] == 50 and rose.legend is None
+        assert cplot.plot_rose([90.0], [1.0], rose=rose) is rose
