@@ -59,15 +59,26 @@ def test_analysis_1d_and_nan_points(tide_ssh):
     assert xtide.harmonic_predict(coef1d, da.time.values).dims == ("time",)
 
 
-def test_analysis_keeps_spatial_coords_and_dask(tide_ssh):
+def get_ssh_with_lonlat(tide_ssh):
     da, *_ = tide_ssh
-    da = da.assign_coords(lon=("x", np.arange(TIDE_NX) * 1.0), lat=("y", np.arange(TIDE_NY) * 1.0))
-    coef = xtide.harmonic_analysis(da.chunk({"y": 1}), names=TIDE_NAMES, uncertainty=False)
+    return da.assign_coords(lon=("x", np.arange(TIDE_NX) * 1.0), lat=("y", np.arange(TIDE_NY) * 1.0))
+
+
+def test_analysis_keeps_spatial_coords(tide_ssh):
+    da = get_ssh_with_lonlat(tide_ssh)
+    coef = xtide.harmonic_analysis(da, names=TIDE_NAMES, uncertainty=False)
     assert "lon" in coef.coords and "lat" in coef.coords
-    ref = xtide.harmonic_analysis(da, names=TIDE_NAMES, uncertainty=False)
-    np.testing.assert_allclose(coef["amp"], ref["amp"])
     pred = xtide.harmonic_predict(coef, da.time.values[:5])
     assert pred.dims == ("time", "y", "x") and "lon" in pred.coords and "lat" in pred.coords
+
+
+def test_analysis_dask(tide_ssh):
+    pytest.importorskip("dask")
+    da = get_ssh_with_lonlat(tide_ssh)
+    coef = xtide.harmonic_analysis(da.chunk({"y": 1}), names=TIDE_NAMES, uncertainty=False)
+    ref = xtide.harmonic_analysis(da, names=TIDE_NAMES, uncertainty=False)
+    np.testing.assert_allclose(coef["amp"], ref["amp"])
+    assert "lon" in coef.coords
 
 
 def test_auto_names(tide_ssh):
