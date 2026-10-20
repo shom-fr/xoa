@@ -66,6 +66,7 @@ include = ["xoa", "xoa.*"]
 
 [tool.setuptools.package-data]
 "xoa" = ["*.txt", "*.ini"]
+"xoa.tide" = ["*.cfg", "*.ini"]
 "xoa.meta.configs" = ["*.cfg"]
 
 

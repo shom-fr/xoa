@@ -16,6 +16,7 @@ Package API
     xoa.core
     xoa.core.conserv
     xoa.core.dyn
+    xoa.core.filter
     xoa.core.geo
     xoa.core.grid
     xoa.core.interp
@@ -27,9 +28,11 @@ Package API
     xoa.core.poly
     xoa.core.regrid
     xoa.core.sigma
+    xoa.core.signal
     xoa.core.spline
     xoa.core.stats
     xoa.core.thermdyn
+    xoa.core.tide
     xoa.core.time
     xoa.data_samples
     xoa.dyn
@@ -46,6 +49,8 @@ Package API
     xoa.regrid
     xoa.stats
     xoa.thermdyn
+    xoa.tide
+    xoa.tide.plot
     xoa.weights
     xoa.sigma
 

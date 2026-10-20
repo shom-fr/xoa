@@ -24,7 +24,7 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 
-from xoa import filter as xfilter
+from xoa import tide as xtide
 
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
@@ -50,12 +50,12 @@ def make_series(step=1.0, ndays=30, name="ssh"):
 # Three filters for the tide
 # --------------------------
 #
-# :func:`~xoa.filter.tidal_filter` convolves a series with weights that are designed for
+# :func:`~xoa.tide.tidal_filter` convolves a series with weights that are designed for
 # hourly data: ``"demerliac"`` (25 hours), ``"godin"`` (70 hours) and ``"mean"``, a
 # 24 hour moving average. They are normalized so a constant signal is unchanged.
 
 ssh, slow = make_series()
-filtered = {name: xfilter.tidal_filter(ssh, name) for name in FILTERS}
+filtered = {name: xtide.tidal_filter(ssh, name) for name in FILTERS}
 
 fig, ax = plt.subplots(figsize=(9, 3), constrained_layout=True)
 ssh.plot(ax=ax, label="Raw", color="0.7")
@@ -83,7 +83,7 @@ response = {name: [] for name in FILTERS}
 for period in periods:
     wave = xr.DataArray(np.cos(2 * np.pi * hours / period), dims="time", coords={"time": time})
     for name in FILTERS:
-        out = xfilter.tidal_filter(wave, name).isel(time=slice(24 * 20, 24 * 40))
+        out = xtide.tidal_filter(wave, name).isel(time=slice(24 * 20, 24 * 40))
         response[name].append(float(abs(out).max()))
 
 fig, ax = plt.subplots(figsize=(7, 3), constrained_layout=True)
@@ -112,7 +112,7 @@ ssh_gap = ssh.copy()
 ssh_gap[24 * 10 : 24 * 10 + 6] = np.nan
 fig, axes = plt.subplots(1, 3, figsize=(10, 2.8), sharey=True, constrained_layout=True)
 for ax, na_thres in zip(axes, (0, 0.5, 1)):
-    out = xfilter.tidal_filter(ssh_gap, "godin", na_thres=na_thres)
+    out = xtide.tidal_filter(ssh_gap, "godin", na_thres=na_thres)
     slow.plot(ax=ax, color="k", ls=":")
     out.plot(ax=ax, color="C1")
     ax.set_title(f"Godin, na_thres={na_thres}")
@@ -129,7 +129,7 @@ for ax, na_thres in zip(axes, (0, 0.5, 1)):
 fig, ax = plt.subplots(figsize=(9, 2.8), constrained_layout=True)
 for step in (1, 0.5, 0.1):
     ssh_hf, _ = make_series(step)
-    out = xfilter.tidal_filter(ssh_hf, "demerliac")
+    out = xtide.tidal_filter(ssh_hf, "demerliac")
     out.plot(ax=ax, label=f"{int(step * 60)} min", lw=3 - 2 * step)
 slow.plot(ax=ax, color="k", ls=":", label="Slow signal")
 ax.legend(ncols=4, loc="upper center", bbox_to_anchor=(0.5, -0.2))
@@ -152,7 +152,7 @@ for title, da, kwargs in (
     ("with a gap in time", ssh_irregular, {}),
 ):
     try:
-        xfilter.tidal_filter(da, "demerliac", **kwargs)
+        xtide.tidal_filter(da, "demerliac", **kwargs)
         print(f"Series {title}: filtered")
     except Exception as exc:
         print(f"Series {title}: {type(exc).__name__}: {exc}")
@@ -163,5 +163,5 @@ for title, da, kwargs in (
 # propagates.
 
 regular = ssh_irregular.reindex(time=ssh.time)
-out = xfilter.tidal_filter(regular, "demerliac", na_thres=0.2)
+out = xtide.tidal_filter(regular, "demerliac", na_thres=0.2)
 print(f"{int(out.isnull().sum())} points are masked out of {out.size}")

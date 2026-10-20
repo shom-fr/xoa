@@ -404,3 +404,25 @@ def test_xoa_accessor_is_registered_on_import():
         "assert not hasattr(xr.Dataset, 'meta')"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+class TestTideAccessor:
+    def setup_method(self):
+        time = np.datetime64("2024-01-01", "s") + np.arange(240) * np.timedelta64(3600, "s")
+        h = np.cos(2 * np.pi * np.arange(240) / 12.42)
+        self.da = xr.DataArray(h, dims="time", coords={"time": time}, name="ssh")
+
+    def test_harmonic(self):
+        from xoa import tide
+
+        coef = self.da.xoa.harmonic_analysis(names=["M2", "S2"], uncertainty=False)
+        ref = tide.harmonic_analysis(self.da, names=["M2", "S2"], uncertainty=False)
+        np.testing.assert_allclose(coef.amp, ref.amp)
+        pred = coef.xoa.harmonic_predict(self.da.time.values)
+        np.testing.assert_allclose(pred, tide.harmonic_predict(ref, self.da.time.values))
+
+    def test_tidal_filter(self):
+        from xoa import tide
+
+        out = self.da.xoa.tidal_filter("demerliac")
+        xr.testing.assert_allclose(out, tide.tidal_filter(self.da, "demerliac"))

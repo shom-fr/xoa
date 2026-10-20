@@ -11,6 +11,7 @@ In-depth guides
     indepth.grids
     indepth.vertical
     indepth.dyn
+    indepth.tide
     indepth.regrid
     indepth.plot
     indepth.filtering

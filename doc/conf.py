@@ -168,6 +168,8 @@ TUTORIALS_ORDER = [
     "plot_mixed_layer",
     "plot_vertical_modes",
     "plot_croco_rossby",
+    "plot_tide_station",
+    "plot_tide_map",
     "plot_stataccum",
     "plot_mercator_argo",
     "plot_hycom_gdp",
@@ -198,6 +200,7 @@ sphinx_gallery_conf = {
             "../tutorials/regrid",
             "../tutorials/filtering",
             "../tutorials/dynamics",
+            "../tutorials/tides",
             "../tutorials/evaluation",
         ]
     ),
