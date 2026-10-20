@@ -30,6 +30,7 @@ import numpy as np
 from .. import exceptions
 from .. import misc
 from .grid import centers2edges
+from .stats import rose_hist
 
 # %% Maps
 
@@ -1016,3 +1017,154 @@ TAYLOR_INIT_KEYS = (
     "contour_kwargs",
     "ref_kwargs",
 )
+
+
+COMPASS_POINTS = ("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+
+
+class Rose:
+    """A rose of frequencies on a polar axes
+
+    The north is at the top and the directions are clockwise.
+    Each sector is a stack of bars, one per bin of value.
+
+    Parameters
+    ----------
+    fig: None, matplotlib.figure.Figure
+        A new figure by default
+    subplot: int, matplotlib.gridspec.SubplotSpec
+        Position of the axes in the figure
+    rmax: None, float
+        Maximal frequency in percent
+    rlabel_angle: float
+        Direction in degrees of the frequency labels
+    grid_kwargs: None, dict
+        Parameters of :meth:`matplotlib.axes.Axes.grid`
+
+    Attributes
+    ----------
+    ax: matplotlib.projections.polar.PolarAxes
+    bars: list
+        The :class:`matplotlib.container.BarContainer` objects, one per bin of value
+    legend: None, matplotlib.legend.Legend
+    """
+
+    def __init__(self, fig=None, subplot=111, rmax=None, rlabel_angle=22.5, grid_kwargs=None):
+        self.bars = []
+        self.legend = None
+        if fig is None:
+            fig = plt.figure(figsize=(5, 5))
+        ax = self.ax = fig.add_subplot(subplot, projection="polar")
+        ax.set_theta_zero_location("N")
+        ax.set_theta_direction(-1)
+        ax.set_xticks(np.radians(np.arange(0, 360, 45)))
+        ax.set_xticklabels(COMPASS_POINTS)
+        ax.set_rlabel_position(rlabel_angle)
+        ax.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=100, decimals=0))
+        ax.set_ylim(bottom=0, top=rmax, auto=rmax is None)
+        ax.grid(**{"linestyle": ":", "alpha": 0.6, **(grid_kwargs or {})})
+
+    def add_bars(
+        self, freq, edges, cmap="YlGnBu", colors=None, label="", legend=True, legend_kwargs=None
+    ):
+        """Add stacked bars
+
+        Parameters
+        ----------
+        freq: array_like(nsector, nbin)
+            Frequencies in percent, as returned by :func:`xoa.core.stats.rose_hist`
+        edges: array_like(nbin)
+            Lower edges of the bins of value
+        cmap: str, matplotlib.colors.Colormap
+            Colormap that gives the colors of the bins
+        colors: None, list
+            One color per bin, instead of the colormap
+        label: str
+            Label of the values, like ``"Hs [m]"``, used as the title of the legend
+        legend: bool
+            Add a legend of the bins
+        legend_kwargs: None, dict
+            Parameters of :meth:`matplotlib.axes.Axes.legend`
+
+        Return
+        ------
+        list
+            The :class:`matplotlib.container.BarContainer` objects
+        """
+        freq = np.asarray(freq, dtype="d")
+        nsector, nbin = freq.shape
+        edges = np.asarray(edges, dtype="d")
+        if colors is None:
+            colors = plt.get_cmap(cmap)(np.linspace(0.25, 1, nbin))
+        theta = np.radians(np.arange(nsector) * 360.0 / nsector)
+        bottom = np.zeros(nsector)
+        bars = []
+        for ibin in range(nbin):
+            text = f"{edges[ibin]:g}–{edges[ibin + 1]:g}" if ibin < nbin - 1 else f"≥ {edges[ibin]:g}"
+            bars.append(
+                self.ax.bar(
+                    theta,
+                    freq[:, ibin],
+                    width=np.radians(360.0 / nsector),
+                    bottom=bottom,
+                    color=colors[ibin],
+                    edgecolor="w",
+                    linewidth=0.4,
+                    label=text,
+                )
+            )
+            bottom = bottom + freq[:, ibin]
+        self.bars.extend(bars)
+        if legend:
+            kw = {
+                "title": label or None,
+                "loc": "upper left",
+                "bbox_to_anchor": (1.05, 1.0),
+                "frameon": False,
+            }
+            kw.update(legend_kwargs or {})
+            self.legend = self.ax.legend(**kw)
+        return bars
+
+
+#: Parameters of :class:`Rose` that can be passed to :func:`plot_rose`
+ROSE_INIT_KEYS = ("fig", "subplot", "rmax", "rlabel_angle", "grid_kwargs")
+
+
+def plot_rose(direction, value, nsector=16, edges=None, rose=None, **kwargs):
+    """Plot a rose of the frequencies of a direction and a value
+
+    Parameters
+    ----------
+    direction: array_like
+        Directions in degrees, clockwise from the north. Waves and winds usually
+        come *from* a direction and currents go *to* it: this does not change the plot.
+    value: array_like
+        Values, like speeds or heights, with the same size as the directions
+    nsector: int
+        Number of sectors, centered on the north
+    edges: None, array_like
+        Lower edges of the bins of value, see :func:`xoa.core.stats.rose_hist`
+    rose: None, Rose
+        Existing rose. It is created when not provided.
+    kwargs:
+        Parameters of :class:`Rose` when it is created, or of :meth:`Rose.add_bars`,
+        like ``cmap``, ``colors`` and ``label``.
+
+    Return
+    ------
+    Rose
+        The rose, which holds the axes in its ``ax`` attribute and the plotted artists
+
+    Example
+    -------
+    .. code-block:: python
+
+        plot_rose(wdir, wspd, edges=[0, 5, 10, 15, 20], label="Wind speed [m/s]")
+    """
+    freq, edges = rose_hist(direction, value, nsector=nsector, edges=edges)
+    if rose is None:
+        init = {key: kwargs.pop(key) for key in list(kwargs) if key in ROSE_INIT_KEYS}
+        rose = Rose(**init)
+    rose.add_bars(freq, edges, **kwargs)
+    return rose

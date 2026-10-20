@@ -37,7 +37,7 @@ how to use the low level routines. The tutorials show them at work, with figures
 
 The main ``xoa`` accessors give access to the high level functions through the ``plot``
 subaccessor, with the array or dataset as the first argument:
-``da.xoa.plot.field()``, ``grid()``, ``section()``, ``stick()`` and ``taylor(ref)``.
+``da.xoa.plot.field()``, ``grid()``, ``section()``, ``stick()``, ``rose()`` and ``taylor(ref)``.
 
 Two layers
 ==========
@@ -67,6 +67,9 @@ Two layers
     * - :func:`~xoa.plot.plot_taylor`
       - :func:`~xoa.core.plot.plot_taylor`
       - A Taylor diagram of arrays against a reference
+    * - :func:`~xoa.plot.plot_rose`
+      - :func:`~xoa.core.plot.plot_rose`
+      - A wind or wave rose of direction and value frequencies
     * - :func:`~xoa.plot.add_colorbar`
       - :func:`~xoa.core.plot.add_colorbar`
       - A shrunk and labelled colorbar
@@ -409,6 +412,38 @@ Without a reference array, already normalized statistics are drawn with the low 
     cplot.plot_taylor([0.9, 1.2, 0.7], [0.95, 0.8, -0.3], labels=["a", "b", "c"])
 
 The statistics themselves come from :func:`xoa.core.stats.taylor_stats`.
+
+Wind and wave roses
+===================
+
+:func:`~xoa.plot.plot_rose` shows how often the wind or the waves come from each direction,
+with stacked bars for the bins of speed or height. The north is at the top and the angles are
+clockwise.
+
+- The sectors are centered on the cardinal directions, so that a northerly wind is not split
+  in two sectors at 0°. Use ``nsector`` to change their number, 16 by default.
+- The frequencies are in percent of the samples that are valid in both the value and the
+  direction. The ones that are masked with ``NaN`` are ignored, so mask the bad quality data
+  before: flags may miss spikes.
+- ``edges`` are the lower edges of the bins of value. The last bin is open. They are rounded
+  values chosen from the data by default.
+- Winds and waves usually come *from* a direction, while currents go *to* it. This does not
+  change the plot: only the label of the direction does, so check the convention of your data.
+- With a dataset, the value and the direction are searched with :mod:`xoa.meta`, for instance
+  ``hs`` and ``direction``.
+
+The tuning parameters are the ones of :class:`~xoa.core.plot.Rose`: ``rmax``, ``rlabel_angle``
+and ``grid_kwargs``, and of :meth:`~xoa.core.plot.Rose.add_bars`: ``cmap``, ``colors``,
+``label`` and ``legend``. The binning alone is done by :func:`xoa.core.stats.rose_hist`.
+
+.. ipython:: python
+
+    rng = np.random.default_rng(0)
+    wdir = rng.normal(250, 40, 2000) % 360
+    wspd = xr.DataArray(rng.weibull(2, 2000) * 8, dims="time", attrs={"units": "m s-1"})
+
+    @savefig indepth.plot.rose.png width=4in
+    xplot.plot_rose(wspd, xr.DataArray(wdir, dims="time"), nsector=12)
 
 Low level routines
 ==================

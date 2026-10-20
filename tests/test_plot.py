@@ -850,3 +850,36 @@ class TestMinimap:
         )
         gbox, rbox, pbox = (a.get_position(original=True) for a in (glob, regional, parent))
         assert gbox.x1 <= pbox.x1 and rbox.x1 <= gbox.x0 + 1e-9 and rbox.x0 >= pbox.x0
+
+
+class TestRose:
+    @staticmethod
+    def get_ds(n=100):
+        rng = np.random.default_rng(0)
+        time = np.arange(n)
+        return xr.Dataset(
+            {
+                "hs": ("time", rng.uniform(0, 6, n), {"units": "m"}),
+                "direction": ("time", rng.uniform(0, 360, n), {"units": "degree"}),
+            },
+            coords={"time": time},
+        )
+
+    def test_dataset_variables_are_searched(self):
+        rose = xplot.plot_rose(self.get_ds(), nsector=8)
+        assert len(rose.bars[0]) == 8
+        assert "Significant wave height" in rose.legend.get_title().get_text()
+
+    def test_accessor_and_arrays(self):
+        ds = self.get_ds()
+        rose = ds.hs.xoa.plot.rose(ds.direction, edges=[0, 3])
+        assert len(rose.bars) == 2
+
+    def test_missing_variables(self):
+        ds = self.get_ds()
+        with pytest.raises(xoa.XoaError, match="direction is required"):
+            xplot.plot_rose(ds.hs)
+        with pytest.raises(xoa.XoaError, match="Cannot find the direction"):
+            xplot.plot_rose(ds[["hs"]])
+        with pytest.raises(xoa.XoaError, match="wind speed or the wave height"):
+            xplot.plot_rose(xr.Dataset({"foo": ("time", [1.0])}))
