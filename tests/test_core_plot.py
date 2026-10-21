@@ -497,5 +497,5 @@ class TestMapDecorations:
     def test_shadow(self):
         scalebar = cplot.add_scalebar(get_map(), shadow=True)
         compass = cplot.add_compass(get_map(), shadow={"offset": (3, -3)})
-        assert all(len(a.get_path_effects()) == 2 for a in scalebar + compass)
+        assert all(len(a.get_path_effects()) == 5 for a in scalebar + compass)
         assert all(not a.get_path_effects() for a in cplot.add_compass(get_map()))

@@ -618,20 +618,29 @@ def _axes_to_lonlat_(ax, xy):
 
 
 def _add_shadow_(artists, shadow):
-    """Add a drop shadow to artists with path effects
+    """Add a soft drop shadow to artists with path effects
 
-    ``shadow`` is True or a dict with the ``offset`` in points and ``alpha``.
+    ``shadow`` is True or a dict with the ``offset`` in points, the ``alpha``, the blur
+    ``width`` in points and the ``color``. The blur is made of a few strokes of increasing
+    widths and low opacities.
     """
     if not shadow:
         return
-    kw = {"offset": (2, -2), "alpha": 0.5, **(shadow if isinstance(shadow, dict) else {})}
+    kw = {"offset": (1, -1), "alpha": 0.5, "width": 2.0, "color": "k"}
+    kw.update(shadow if isinstance(shadow, dict) else {})
+    nlayer = 4
+    effects = [
+        mpatheffects.PathPatchEffect(
+            offset=kw["offset"],
+            facecolor=kw["color"],
+            edgecolor=kw["color"],
+            linewidth=kw["width"] * (i + 1) / nlayer,
+            alpha=kw["alpha"] / nlayer,
+        )
+        for i in reversed(range(nlayer))
+    ]
     for artist in artists:
-        shadow_effect = (
-            mpatheffects.SimpleLineShadow
-            if hasattr(artist, "set_solid_capstyle")
-            else mpatheffects.SimplePatchShadow
-        )(**kw)
-        artist.set_path_effects([shadow_effect, mpatheffects.Normal()])
+        artist.set_path_effects(effects + [mpatheffects.Normal()])
 
 
 def get_scalebar_length(max_length):
@@ -680,7 +689,8 @@ def add_scalebar(
     color: color
         Color of the dark segments, the labels and the frame
     shadow: bool, dict
-        Add a drop shadow, with ``offset`` in points and ``alpha`` when a dict.
+        Add a soft drop shadow. A dict gives its ``offset`` and blur ``width`` in points,
+        its ``alpha`` and its ``color``.
     zorder: float
     kwargs:
         Extra parameters are passed to :class:`matplotlib.text.Text`, like ``fontsize``.
@@ -788,7 +798,8 @@ def add_compass(
     color: color
         Color of the dark parts and of the "N"
     shadow: bool, dict
-        Add a drop shadow, with ``offset`` in points and ``alpha`` when a dict.
+        Add a soft drop shadow. A dict gives its ``offset`` and blur ``width`` in points,
+        its ``alpha`` and its ``color``.
     zorder: float
     kwargs:
         Extra parameters are passed to :class:`matplotlib.text.Text`, like ``fontsize``.

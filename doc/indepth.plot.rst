@@ -232,8 +232,8 @@ add them with ``scalebar=True`` and ``compass=True``, or dicts of parameters.
 - The compass points to the north of the meridian at its position, which is not the vertical
   with a conic or orthographic projection. The ``"simple"`` style is an arrow and the
   ``"fancy"`` one a rose.
-- Both are placed in a corner with ``loc``, and ``shadow=True`` or a dict of ``offset`` and
-  ``alpha`` adds a drop shadow.
+- Both are placed in a corner with ``loc``, and ``shadow=True`` or a dict of ``offset``,
+  ``width`` (blur), ``alpha`` and ``color`` adds a soft drop shadow.
 - The length and the angle are computed when they are added: set the extent before.
 
 .. ipython:: python
