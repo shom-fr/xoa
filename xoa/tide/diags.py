@@ -22,14 +22,16 @@ import xarray as xr
 from .. import exceptions
 from ..core import signal as signal_core
 from ..core import tide as tide_core
+from .data import get_time_dim
 
 # %% diagnostics
 
 
-def _apply_kernel_(func, dtype, template, *others, time_dim="time", **kwargs):
+def _apply_kernel_(func, dtype, template, *others, time_dim=None, **kwargs):
     # Apply a core kernel working on time-first (nt, ...) arrays to data arrays.
     # The axes are never moved, so time_dim must be the first dimension of all
     # inputs. Dask arrays are processed block by block (time is one chunk).
+    time_dim = get_time_dim(template, time_dim)
     for x in (template, *others):
         if x.dims[0] != time_dim:
             raise exceptions.XoaError(f"'{time_dim}' must be the first dimension, got {x.dims}")
@@ -64,7 +66,7 @@ def form_number(coef):
     return ((k1 + o1) / (m2 + s2)).rename("form_number")
 
 
-def high_waters(h, min_separation=9, time_dim="time"):
+def high_waters(h, min_separation=9, time_dim=None):
     """High waters of a regularly sampled series, at every point
 
     Parameters
@@ -74,7 +76,8 @@ def high_waters(h, min_separation=9, time_dim="time"):
     min_separation: int
         Minimal number of samples between two high waters (9 for hourly
         data and a semi-diurnal tide).
-    time_dim: str
+    time_dim: str, None
+        Searched with :func:`xoa.coords.get_tdim` when None.
 
     Return
     ------
@@ -88,7 +91,7 @@ def high_waters(h, min_separation=9, time_dim="time"):
     return mask.rename("high_water")
 
 
-def skew_surge(obs, pred, hw=None, half_window=3, time_dim="time"):
+def skew_surge(obs, pred, hw=None, half_window=3, time_dim=None):
     """Skew surge at each predicted high water, at every point
 
     It is the difference between the highest observed level around a predicted
@@ -103,7 +106,8 @@ def skew_surge(obs, pred, hw=None, half_window=3, time_dim="time"):
         High water mask, see :func:`high_waters`. It defaults to that of ``pred``.
     half_window: int
         Half width in samples of the window searched for the observed maximum.
-    time_dim: str
+    time_dim: str, None
+        Searched with :func:`xoa.coords.get_tdim` when None.
 
     Return
     ------
@@ -125,7 +129,7 @@ def skew_surge(obs, pred, hw=None, half_window=3, time_dim="time"):
     return surge.rename("skew_surge")
 
 
-def spring_high_waters(h, hw=None, quantile=0.75, half_window=6, time_dim="time"):
+def spring_high_waters(h, hw=None, quantile=0.75, half_window=6, time_dim=None):
     """High waters with the largest tidal range, i.e. spring tides
 
     The range of a high water is its level minus the lowest level within
@@ -140,7 +144,8 @@ def spring_high_waters(h, hw=None, quantile=0.75, half_window=6, time_dim="time"
     quantile: float
         Keep the high waters whose range is above this quantile.
     half_window: int
-    time_dim: str
+    time_dim: str, None
+        Searched with :func:`xoa.coords.get_tdim` when None.
 
     Return
     ------
@@ -161,7 +166,7 @@ def spring_high_waters(h, hw=None, quantile=0.75, half_window=6, time_dim="time"
     return mask.rename("spring_high_water")
 
 
-def tidal_range(h, window=13, time_dim="time"):
+def tidal_range(h, window=13, time_dim=None):
     """Tidal range as the max-min of a centred rolling window
 
     Parameters
@@ -170,7 +175,8 @@ def tidal_range(h, window=13, time_dim="time"):
         Array with ``time_dim`` first.
     window: int
         Window in samples, a bit more than one semi-diurnal cycle.
-    time_dim: str
+    time_dim: str, None
+        Searched with :func:`xoa.coords.get_tdim` when None.
 
     Return
     ------
@@ -181,7 +187,7 @@ def tidal_range(h, window=13, time_dim="time"):
     ).rename("tidal_range")
 
 
-def tidal_atlas(da, hw, offsets=range(-6, 7), time_dim="time"):
+def tidal_atlas(da, hw, offsets=range(-6, 7), time_dim=None):
     """Composite maps at fixed offsets from high water
 
     Parameters
@@ -193,7 +199,8 @@ def tidal_atlas(da, hw, offsets=range(-6, 7), time_dim="time"):
         see :func:`spring_high_waters`.
     offsets: iterable of int
         Offsets in samples with respect to the high water.
-    time_dim: str
+    time_dim: str, None
+        Searched with :func:`xoa.coords.get_tdim` when None.
 
     Return
     ------
@@ -203,5 +210,6 @@ def tidal_atlas(da, hw, offsets=range(-6, 7), time_dim="time"):
     """
     hw = np.flatnonzero(np.asarray(hw))
     offsets = np.asarray(list(offsets))
+    time_dim = get_time_dim(da, time_dim)
     maps = [da.isel({time_dim: hw + k}).mean(time_dim) for k in offsets]
     return xr.concat(maps, dim="offset").assign_coords(offset=offsets)

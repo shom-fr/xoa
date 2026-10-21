@@ -171,6 +171,13 @@ class TestPlotField:
         full = xplot.plot_field(get_temp(), cbar_kwargs={"shrink": 1.0})
         np.testing.assert_allclose(cbar_height / full.colorbar.ax.get_position().height, 0.7)
 
+    def test_scalebar_and_compass(self):
+        mappable = xplot.plot_field(get_temp(), scalebar=True, compass={"style": "fancy"})
+        texts = [t.get_text() for t in mappable.axes.texts]
+        assert "N" in texts and any(t.endswith(" km") for t in texts)
+        texts = [t.get_text() for t in xplot.plot_field(get_temp()).axes.texts]
+        assert "N" not in texts
+
     def test_colorbar_label_override(self):
         mappable = xplot.plot_field(get_temp(), cbar_kwargs={"label": "custom"})
         assert mappable.colorbar.ax.get_ylabel() == "custom"
@@ -874,6 +881,30 @@ class TestRose:
         ds = self.get_ds()
         rose = ds.hs.xoa.plot.rose(ds.direction, edges=[0, 3])
         assert len(rose.bars) == 2
+
+    def test_components_go_to(self):
+        n = 400
+        u = xr.DataArray(np.full(n, 3.0), dims="time", name="u", attrs={"units": "m s-1"})
+        v = xr.DataArray(np.full(n, 4.0), dims="time", name="v", attrs={"units": "m s-1"})
+        # Speed 5 m/s going to the north-east (atan2(3, 4) = 36.87 degrees)
+        for rose in (
+            xplot.plot_rose(u, v, nsector=36),
+            xplot.plot_rose(u.rename("a"), v.rename("b"), cartesian=True, nsector=36),
+            xplot.plot_rose(xr.Dataset({"uo": u.rename("uo"), "vo": v.rename("vo")}), nsector=36),
+        ):
+            assert "Speed" in rose.legend.get_title().get_text()
+            heights = sum(np.array([p.get_height() for p in bar]) for bar in rose.bars)
+            assert np.argmax(heights) == 4  # sector of 40 degrees
+        rose = xplot.plot_rose(u, v, from_=True, nsector=36)
+        heights = sum(np.array([p.get_height() for p in bar]) for bar in rose.bars)
+        assert np.argmax(heights) == 22  # sector of 220 degrees
+
+    def test_components_are_inferred(self):
+        ds = self.get_ds()
+        # a direction in degrees is not mistaken for a component, and an unknown array is a direction
+        assert len(xplot.plot_rose(ds.hs, ds.direction, nsector=8).bars[0]) == 8
+        assert xplot._is_cartesian_(ds.hs.rename("v")) and not xplot._is_cartesian_(ds.direction)
+        assert not xplot._is_cartesian_(ds.hs.rename("foo"))
 
     def test_missing_variables(self):
         ds = self.get_ds()

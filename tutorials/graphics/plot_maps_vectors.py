@@ -7,6 +7,7 @@ Plot fields and currents on maps
 In this tutorial, we show how to:
 
 * plot a field on a map, whose extent and labels are found from the data,
+* add a scale bar and a compass, optionally with a shadow or a glow,
 * compare several fields in a single figure,
 * overlay under-sampled arrows of the currents, optionally colored by the speed,
   with a reference arrow whose value is rounded,
@@ -57,6 +58,21 @@ speed.attrs.update(long_name="Surface current speed", units="m s-1")
 # with the name and units of the field.
 
 plot_field(ds.temp, cmap=cmocean.cm.thermal, map_kw=MAP_KW)
+
+# %%
+# Scale bar and compass
+# ---------------------
+#
+# They are off by default. The scale bar is a ground distance, and the compass follows the
+# meridians of the projection. Both accept a ``loc`` and an ``effect``, a shadow or a glow, for readability.
+
+plot_field(
+    ds.temp,
+    cmap=cmocean.cm.thermal,
+    map_kw=MAP_KW,
+    scalebar={"effect": "shadow"},
+    compass={"style": "fancy", "effect": "shadow"},
+)
 
 # %%
 # Locating the domain

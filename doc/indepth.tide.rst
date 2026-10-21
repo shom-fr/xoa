@@ -66,6 +66,9 @@ once and applied to all the points with a single matrix product.
 :class:`~xoa.tide.TidalHarmonic` keeps it for several analyses of the same time axis.
 
 The data must have time as their first dimension, followed by any others like ``y`` and ``x``.
+The time dimension is found with :func:`xoa.coords.get_tdim` (``time``, ``valid_time``, etc.)
+unless ``t_dim`` is given, and a dataset can be passed to find the sea surface height
+or the velocities with :mod:`xoa.meta`.
 The result is a :class:`xarray.Dataset` indexed by ``constituent``:
 
 - ``h0``, ``amp`` and ``phase``, with the white-noise uncertainties ``amp_std``
@@ -92,7 +95,8 @@ Do not chunk along time when using dask arrays; chunks along the other dimension
 Diagnostics
 ===========
 
-The diagnostics work on regularly sampled series with time as first dimension, at all points
+The diagnostics work on regularly sampled series with time as first dimension, found
+like in the analysis unless ``time_dim`` is given, at all points
 in parallel. The high waters are the local maxima separated by at least ``min_separation`` samples.
 The skew surge is the difference between the highest observed level around a predicted
 high water and the predicted level, whatever the timing offset.

@@ -1,19 +1,23 @@
 """
 Core tidal harmonic analysis and prediction (pure numpy/numba, no data, no xarray).
 
-SSH harmonic model:
+SSH harmonic model::
+
     h(t) = h0 + Σ_f amp_f · sin(ω_f · t + phase_f)
 
-Current harmonic model (rotating ellipses):
+Current harmonic model (rotating ellipses)::
+
     w(t) = u0 + i·v0 + Σ_f [A_f·exp(i·(ω_f·t + P_f)) + B_f·exp(-i·(ω_f·t - Q_f))]
     where  A = (semi_major + semi_minor) / 2,  B = (semi_major - semi_minor) / 2
            P = inclination + phase,             Q = inclination - phase
 
 The design matrix depends only on time → compute the pseudoinverse once,
-then apply to every grid point with a single matrix multiply:
+then apply to every grid point with a single matrix multiply::
+
     x = Ai @ h   shape (1+2*nf, ns)  from  (1+2*nf, nt) @ (nt, ns)
 
 Also contains pure-math helpers that carry no constituent-database dependency:
+
     - Doodson multiplier parsing     (doodson_multipliers)
     - Slow astronomical arguments    (astronomical_args)
     - Phase convention conversions   (local_to_greenwich, greenwich_to_local)
@@ -60,7 +64,7 @@ def doodson_multipliers(doodson):
 
 # %% astronomical arguments
 
-_JD_J1900_ = 2415020.0  # Julian Day of J1900.0  (1900-Jan-0.5 UT)
+_JD_J1900_ = 2415020.5  # Julian Day of 1900-01-01 00:00 UT, the epoch of Schureman Table 1
 _JD_UNIX_ = 2440587.5  # Julian Day of Unix epoch (1970-Jan-1 00:00:00 UTC)
 
 # s, h, p, N, p1 epoch values in degrees at J1900.0 (Schureman 1958 Table 1)
@@ -243,9 +247,11 @@ def predict_ssh(t, omega, h0, amp, phase):
 def solve_ssh_uncertainty(A, Ai, h, h0, amp, phase):
     """Amplitude and phase uncertainties from linearised least-squares theory.
 
-    For each constituent f at each spatial point s:
+    For each constituent f at each spatial point s::
+
         σ²_amp[f,s]   =  σ²_a[f,s] · cos²φ + σ²_b[f,s] · sin²φ
         σ²_phase[f,s] = (σ²_a[f,s] · sin²φ + σ²_b[f,s] · cos²φ) / amp²
+
     where φ = phase[f,s] and σ²_a, σ²_b are the diagonal variances of
     the coefficient covariance matrix C = σ²_res · Ai @ Ai^T.
 

@@ -62,3 +62,10 @@ def test_high_waters_skew_surge_and_springs():
     np.testing.assert_allclose(surge[hw & ~np.isnan(surge)], 0.1)
     spring = ctide.spring_mask(h, hw)
     assert 0 < spring.sum() < hw.sum() and not (spring & ~hw).any()
+
+
+def test_astronomical_args():
+    # Reference values of the mean longitudes at 2024-01-01 00:00 UTC
+    t = float(np.datetime64("2024-01-01", "s").astype(float))
+    s, h, p, N, Np, _ = ctide.astronomical_args(t)
+    np.testing.assert_allclose([s, h, p, Np], [156.019, 280.158, 339.86, 339.123], atol=0.05)

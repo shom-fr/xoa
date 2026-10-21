@@ -5,8 +5,10 @@ Test the :mod:`xoa.tide.harmonic` module
 
 import numpy as np
 import pytest
+import xarray as xr
 
 import xoa.tide as xtide
+from xoa.exceptions import XoaError
 from conftest import TIDE_NAMES, TIDE_NX, TIDE_NY, TIDE_TIME
 
 
@@ -95,3 +97,19 @@ def test_currents_roundtrip(tide_uv):
     u, v = xtide.harmonic_predict_uv(coef, da_u.time.values)
     np.testing.assert_allclose(u, da_u, atol=1e-8)
     np.testing.assert_allclose(v, da_v, atol=1e-8)
+
+
+def test_time_dim_and_variables_are_searched(tide_ssh, tide_uv):
+    da, *_ = tide_ssh
+    ref = xtide.harmonic_analysis(da, names=TIDE_NAMES)
+    renamed = da.rename(time="valid_time")
+    coef = xtide.harmonic_analysis(renamed.to_dataset(name="ssh"), names=TIDE_NAMES)
+    np.testing.assert_allclose(coef["amp"], ref["amp"])
+    assert xtide.harmonic_predict(coef, renamed.valid_time).dims == renamed.dims
+    da_u, da_v, *_ = tide_uv
+    coef = xtide.harmonic_analysis_uv(
+        xr.Dataset({"u": da_u, "v": da_v}), names=TIDE_NAMES, nodal=False
+    )
+    assert "semi_major" in coef
+    with pytest.raises(XoaError):
+        xtide.harmonic_analysis(xr.Dataset({"foo": da}))

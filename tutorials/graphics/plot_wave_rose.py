@@ -46,6 +46,7 @@ rose.ax.set_title("Significant wave height")
 
 edges = [0, 1, 2, 3, 4, 6, 8]
 fig = plt.figure(figsize=(9, 4.5))
+fig.subplots_adjust(right=0.72)  # room for the legend
 for i, (name, months) in enumerate({"Winter": [12, 1, 2], "Summer": [6, 7, 8]}.items()):
     sub = ds.isel(time=ds.time.dt.month.isin(months))
     rose = plot_rose(

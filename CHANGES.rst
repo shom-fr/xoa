@@ -6,6 +6,9 @@ Unreleased
 
 New features
 ------------
+- Add cartesian components to :func:`xoa.plot.plot_rose`: ``plot_rose(u, v)``, with the ``cartesian`` and ``from_`` arguments, and a fallback to the components of a dataset.
+- Add :func:`xoa.plot.add_scalebar` and :func:`xoa.plot.add_compass`, with an optional shadow or glow (``effect``), and the ``scalebar`` and ``compass`` arguments of :func:`xoa.plot.plot_field` and :func:`~xoa.plot.plot_grid`. See :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
+- Add :func:`xoa.dyn.get_u` and :func:`xoa.dyn.get_v` with variants, and the ``ugeo``, ``ux`` and ``ugeos`` meta specs (and their ``v`` counterparts) for eastward, grid-aligned and geostrophic velocities. :func:`xoa.tide.harmonic_analysis_uv` uses them with datasets.
 - Add the :mod:`xoa.tide` subpackage for tidal harmonic analysis and prediction, ellipses and diagnostics, and plots in :mod:`xoa.tide.plot`, based on :mod:`xoa.core.tide` and :mod:`xoa.core.signal`. See :ref:`indepth.tide`.
 - Move the tidal filters to :func:`xoa.tide.tidal_filter` and :func:`xoa.tide.demerliac`. The :mod:`xoa.filter` versions are deprecated.
 - Add the :mod:`xoa.core.filter` module with the public :func:`~xoa.core.filter.get_decimate_arg` and :func:`~xoa.core.filter.decimate_by_average` kernels of :func:`xoa.filter.decimate`.
@@ -88,6 +91,9 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix the Greenwich phases of :mod:`xoa.tide`: astronomical arguments 12 h off, M2/N2/2N2 nodal satellites, and the 90° shifts of the diurnal constituents. They now agree with utide at Brest within 0.5° for the main constituents.
+- Search the time dimension and the variables of :mod:`xoa.tide` with :mod:`xoa.coords` and :mod:`xoa.meta`: ``t_dim`` and ``time_dim`` default to None, :func:`~xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv` accept datasets, and ``valid_time`` is a known time name.
+- The legend of :class:`xoa.core.plot.Rose` is no longer cut off by the figure edge.
 - Fix :func:`xoa.grid.pad`, :func:`~xoa.grid.get_centers`, :func:`~xoa.grid.get_edges`, :func:`~xoa.grid.shift` and :func:`~xoa.grid.diff` for longitudes across the dateline.
 - Fix :func:`xoa.grid.apply_along_dim`, whose extra keywords were modified by the coordinate ones.
 - Fix the bilinear and bicubic interpolation and regridding of regular grids that span more than 180°, which gave missing values, and of global grids, whose cells between the last and first columns are now interpolated. Longitudes out of [-180, 180], like 0-360, are now accepted for grids and points.

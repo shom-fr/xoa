@@ -45,6 +45,32 @@ def test_get_sea_level():
     assert result is None
 
 
+def test_get_u_v():
+    """Test get_u and get_v with their variants"""
+    data = np.zeros((2, 2))
+
+    def make(*names):
+        return xr.Dataset({name: (("y", "x"), data) for name in names})
+
+    for names, kind in [
+        (("ugeo", "vgeo"), None),
+        (("uo", "vo"), None),
+        (("ux", "vy"), None),
+        (("u2d", "v2d"), None),
+        (("ugos", "vgos"), "geos"),
+        (("ubt", "vbt"), "bt"),
+    ]:
+        ds = make(*names)
+        assert dyn.get_u(ds, kind).name == names[0]
+        assert dyn.get_v(ds, kind).name == names[1]
+
+    ds = make("ugeo", "vgeo", "ugos", "vgos")
+    assert dyn.get_u(ds).name == "ugeo"
+    assert dyn.get_u(ds, "geos").name == "ugos"
+    assert dyn.get_v(ds, ["grid", "geos"]).name == "vgos"
+    assert dyn.get_u(make("ugos")) is None
+
+
 def test_flow2d():
     """Test flow2d function"""
     lon = xr.DataArray(np.arange(4), dims='lon')

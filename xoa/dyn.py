@@ -104,6 +104,94 @@ def get_sea_level(ds, variant=None, errors="ignore"):
     # return sea_level
 
 
+_UV_KINDS = {
+    "generic": ("u", "v"),
+    "geo": ("ugeo", "vgeo"),
+    "grid": ("ux", "vy"),
+    "geos": ("ugeos", "vgeos"),
+    "bt": ("ubt", "vbt"),
+    "bc": ("ubc", "vbc"),
+    "surf": ("usurf", "vsurf"),
+}
+
+UV_VARIANTS = xmisc.Choices(
+    {
+        None: "Currents, i.e. all but the geostrophic and baroclinic ones",
+        "generic": "velocity of unknown orientation",
+        "geo": "eastward and northward velocity",
+        "grid": "velocity along the grid axes",
+        "geos": "geostrophic velocity",
+        "bt": "barotropic velocity",
+        "bc": "baroclinic velocity",
+        "surf": "surface velocity",
+    },
+    parameter="variant",
+    description="Restrict checking to a given variant(s)",
+    multi=True,
+)
+
+_UV_DEFAULT = ("geo", "grid", "generic", "surf", "bt")
+
+
+def _get_uv_(ds, index, variant, errors):
+    variant = UV_VARIANTS[variant]
+    if variant is None:
+        variant = _UV_DEFAULT
+    names = [_UV_KINDS[kind][index] for kind in np.atleast_1d(variant)]
+    return xmeta.get_meta_specs(ds).get(ds, names, errors=errors)
+
+
+@UV_VARIANTS.format_function_docstring
+def get_u(ds, variant=None, errors="ignore"):
+    """Search for a eastward or along-X velocity variable in a dataset
+
+    The variants are searched in the given order with the :mod:`xoa.meta` specifications.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+    {variant}
+    errors: str
+        Error handling: ``"ignore"``, ``"warn"`` or ``"raise"``.
+
+    Return
+    ------
+    xarray.DataArray, None
+        The velocity array, or None if not found.
+
+    See also
+    --------
+    get_v
+    get_sea_level
+    """
+    return _get_uv_(ds, 0, variant, errors)
+
+
+@UV_VARIANTS.format_function_docstring
+def get_v(ds, variant=None, errors="ignore"):
+    """Search for a northward or along-Y velocity variable in a dataset
+
+    See :func:`get_u` for the details.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+    {variant}
+    errors: str
+        Error handling: ``"ignore"``, ``"warn"`` or ``"raise"``.
+
+    Return
+    ------
+    xarray.DataArray, None
+        The velocity array, or None if not found.
+
+    See also
+    --------
+    get_u
+    """
+    return _get_uv_(ds, 1, variant, errors)
+
+
 def _get_uv2d_(t, txy, gx, gy, gz, gt, guv):
     """Interpolate gridded u and v on track positions"""
     # Shape

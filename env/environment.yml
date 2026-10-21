@@ -6,6 +6,7 @@ channels:
 
 dependencies:
   - platformdirs
+  - cartopy
   - cmocean
   - configobj
   - gsw

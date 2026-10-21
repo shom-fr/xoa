@@ -442,3 +442,75 @@ class TestRose:
         rose = cplot.plot_rose([0.0], [1.0], rmax=50, legend=False)
         assert rose.ax.get_ylim()[1] == 50 and rose.legend is None
         assert cplot.plot_rose([90.0], [1.0], rose=rose) is rose
+
+    def test_legend_fits_in_figure(self):
+        rose = cplot.plot_rose([0.0, 90.0], [1.0, 5.0], label="Hs [m]")
+        assert rose.legend.get_window_extent().x1 <= rose.ax.figure.bbox.x1
+
+
+def get_map(projection=None, extent=(-12, 12, 35, 60)):
+    pytest.importorskip("cartopy")
+    ccrs, _ = cplot._import_cartopy_()
+    ax = plt.figure(figsize=(5, 5)).add_subplot(1, 1, 1, projection=projection or ccrs.PlateCarree())
+    ax.set_extent(extent, crs=ccrs.PlateCarree())
+    return ax
+
+
+class TestMapDecorations:
+    def test_scalebar_length(self):
+        assert cplot.get_scalebar_length(0.9) == 0.5
+        assert cplot.get_scalebar_length(230) == 200
+        assert cplot.get_scalebar_length(1000) == 1000
+        ax = get_map(extent=(-2, 2, 44.5, 45.5))
+        *segments, label = cplot.add_scalebar(ax, length=100, units="km", loc="lower right")
+        assert label.get_text() == "100 km"
+        width = sum(seg.get_width() for seg in segments)
+        # 100 km at 45N is 1.27 degrees of longitude out of 4: a bit less than a third
+        np.testing.assert_allclose(width, 1.27 / 4, rtol=0.03)
+        assert min(seg.get_x() for seg in segments) + width < 1
+
+    def test_scalebar_default_length_and_errors(self):
+        ax = get_map()
+        assert cplot.add_scalebar(ax, units="nmi")[-1].get_text().endswith("nmi")
+        with pytest.raises(xoa.exceptions.XoaError):
+            cplot.add_scalebar(ax, units="miles")
+        with pytest.raises(xoa.exceptions.XoaError):
+            cplot.add_scalebar(ax, loc="center")
+
+    @pytest.mark.parametrize("style,npoly", [("simple", 1), ("fancy", 8)])
+    def test_compass_styles(self, style, npoly):
+        artists = cplot.add_compass(get_map(), style=style)
+        assert sum(hasattr(a, "get_xy") for a in artists) == npoly
+        assert artists[-1].get_text() == "N"
+        with pytest.raises(xoa.exceptions.XoaError):
+            cplot.add_compass(get_map(), style="other")
+
+    def test_compass_follows_the_meridians(self):
+        pytest.importorskip("cartopy")
+        ccrs, _ = cplot._import_cartopy_()
+        # No rotation with a plate carree map: the label is right above the center
+        label = cplot.add_compass(get_map(), loc="lower left")[-1]
+        assert label.xyann[0] == pytest.approx(0, abs=1e-6)
+        # The meridians converge on a conic map
+        proj = ccrs.LambertConformal(central_longitude=0)
+        label = cplot.add_compass(get_map(proj), loc="upper left")[-1]
+        assert label.xyann[0] > 1  # west of the central meridian: the north leans eastwards
+
+    def test_effects(self):
+        def effects(ax):
+            return [len(p.get_path_effects()) for p in ax.patches + ax.texts]
+
+        ax = get_map()
+        cplot.add_scalebar(ax, effect=True)
+        assert effects(ax) == [0, 0, 4, 4, 5]  # the effects of the segments are in copies below them
+        ax = get_map()
+        cplot.add_compass(ax, effect=["shadow", "glow"], effect_kw={"shadow": {"offset": (3, -3)}})
+        assert all(n in (0, 8, 9) for n in effects(ax)) and 8 in effects(ax)
+        ax = get_map()
+        cplot.add_compass(ax, effect="glow", effect_kw={"color": "y"})
+        assert 4 in effects(ax)
+        ax = get_map()
+        cplot.add_compass(ax)
+        assert not any(effects(ax))
+        with pytest.raises(xoa.exceptions.XoaError):
+            cplot.add_compass(get_map(), effect="blur")

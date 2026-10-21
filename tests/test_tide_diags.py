@@ -48,3 +48,9 @@ def test_form_number():
         [1.0, 0.5, 0.2, 0.1], dims="constituent", coords={"constituent": ["M2", "S2", "K1", "O1"]}
     )
     assert float(xtide.form_number(xr.Dataset({"amp": amp}))) == pytest.approx(0.3 / 1.5)
+
+
+def test_time_dim_is_searched():
+    h = semidiurnal_series().rename(time="valid_time")
+    assert xtide.high_waters(h).dims == ("valid_time",)
+    assert xtide.high_waters(h, time_dim="valid_time").equals(xtide.high_waters(h))

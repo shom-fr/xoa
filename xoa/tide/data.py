@@ -28,6 +28,7 @@ from configobj import Section
 from validate import VdtValueError
 
 from .. import cfgm
+from .. import coords as xcoords
 from ..core import tide as tide_core
 
 _THISDIR = os.path.dirname(__file__)
@@ -120,6 +121,7 @@ def _load_constituent_db_():
             db[name] = {
                 "doodson": sec["doodson"],
                 "species": sec["species"],
+                "phase": sec["phase"],
                 "satellites": sec["satellites"],
                 "compound_of": compound_of or None,
             }
@@ -131,6 +133,16 @@ CONSTITUENT_DB = _load_constituent_db_()
 
 #: Constituent names
 CONSTITUENT_NAMES = list(CONSTITUENT_DB)
+
+
+# %% time dimension
+
+
+def get_time_dim(da, t_dim=None):
+    """Get the time dimension name, searched with :func:`xoa.coords.get_tdim` when None"""
+    if t_dim is not None:
+        return t_dim
+    return xcoords.get_tdim(da, errors="raise")
 
 
 # %% frequencies
@@ -245,7 +257,10 @@ def equilibrium_argument(names, t_ref):
     args = np.array([tau, s, h, p, Np, p1])
     return np.array(
         [
-            np.deg2rad(np.dot(tide_core.doodson_multipliers(CONSTITUENT_DB[n]["doodson"]), args))
+            np.deg2rad(
+                np.dot(tide_core.doodson_multipliers(CONSTITUENT_DB[n]["doodson"]), args)
+                + CONSTITUENT_DB[n]["phase"]
+            )
             % (2 * np.pi)
             for n in names
         ]
