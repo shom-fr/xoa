@@ -218,6 +218,34 @@ searched in the dataset given by ``ds``:
         ds=ds,
     )
 
+Scale bar and compass
+=====================
+
+:func:`~xoa.plot.add_scalebar` and :func:`~xoa.plot.add_compass` decorate a cartopy map, and
+:func:`~xoa.plot.plot_field`, :func:`~xoa.plot.plot_fields` and :func:`~xoa.plot.plot_grid`
+add them with ``scalebar=True`` and ``compass=True``, or dicts of parameters.
+
+- The scale bar has a round length, 1, 2 or 5 times a power of ten, that is at most a fifth
+  of the width of the axes, unless ``length`` is given. It is measured on the ground along
+  the horizontal direction of the axes at the position of the bar, so that it accounts
+  for the distortion of the projection.
+- The compass points to the north of the meridian at its position, which is not the vertical
+  with a conic or orthographic projection. The ``"simple"`` style is an arrow and the
+  ``"fancy"`` one a rose.
+- Both are placed in a corner with ``loc``, and ``shadow=True`` or a dict of ``offset`` and
+  ``alpha`` adds a drop shadow.
+- The length and the angle are computed when they are added: set the extent before.
+
+.. ipython:: python
+
+    @savefig indepth.plot.decorations.png width=5in
+    xplot.plot_field(
+        ds.temp,
+        cmap=cmocean.cm.thermal,
+        scalebar=dict(loc="lower right", shadow=True),
+        compass=dict(style="fancy", shadow=True),
+    )
+
 Colorbars
 =========
 
@@ -430,7 +458,12 @@ clockwise.
 - Winds and waves usually come *from* a direction, while currents go *to* it. This does not
   change the plot: only the label of the direction does, so check the convention of your data.
 - With a dataset, the value and the direction are searched with :mod:`xoa.meta`, for instance
-  ``hs`` and ``direction``.
+  ``hs`` and ``direction``. When there are none, the components of the currents or of the wind
+  are searched with :func:`xoa.dyn.get_u` and :func:`xoa.dyn.get_v`.
+- ``plot_rose(u, v)`` makes the rose of the speed and of the direction that the flow *goes to*.
+  The second argument is taken as a northward component when :mod:`xoa.meta` identifies it
+  as such and it has no angle units, and ``cartesian=True`` or ``False`` forces the choice.
+  Use ``from_=True`` for the direction it comes from, like the wind.
 
 The tuning parameters are the ones of :class:`~xoa.core.plot.Rose`: ``rmax``, ``rlabel_angle``
 and ``grid_kwargs``, and of :meth:`~xoa.core.plot.Rose.add_bars`: ``cmap``, ``colors``,

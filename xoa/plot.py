@@ -42,7 +42,9 @@ from .core import grid as cgrid
 from .core import plot as cplot
 from .core import stats as cstats
 from .core.plot import (  # noqa
+    add_compass,
     add_land,
+    add_scalebar,
     create_base_map,
     setup_map_axes,
     _import_cartopy_,
@@ -841,6 +843,13 @@ def _get_map_axes_(ax, extent, transform, map_kw, projection=None):
     return ax
 
 
+def _add_decorations_(ax, scalebar, compass):
+    """Add a scale bar and a compass, from True or dicts of parameters"""
+    for func, spec in ((add_scalebar, scalebar), (add_compass, compass)):
+        if spec:
+            func(ax, **(spec if isinstance(spec, dict) else {}))
+
+
 def _get_auto_cmap_kwargs_(field, kwargs):
     """Choose the colormap from the sign of the data and the ``plot`` options of xoa
 
@@ -874,6 +883,8 @@ def plot_field(
     map_kw=None,
     overlay_contours=None,
     ds=None,
+    scalebar=None,
+    compass=None,
     **kwargs,
 ):
     """Plot a field on a map
@@ -910,6 +921,9 @@ def plot_field(
         or the plotted field by default. Colors default to black.
     ds: None, xarray.Dataset
         Dataset where the meta names of overlay fields are searched
+    scalebar, compass: None, bool, dict
+        Add a scale bar or a compass with :func:`add_scalebar` or :func:`add_compass`.
+        A dict gives their parameters, like ``loc``, ``style`` or ``shadow``.
     kwargs:
         Extra parameters are passed to the plot method, like ``cmap``, ``vmin``,
         ``vmax`` or ``add_colorbar``. The colorbar is shrunk by default, which
@@ -975,6 +989,7 @@ def plot_field(
 
     if title:
         ax.set_title(title)
+    _add_decorations_(ax, scalebar, compass)
     return mappable
 
 
@@ -1020,7 +1035,8 @@ def plot_fields(
         Add labels like "a)" to the maps, see :class:`PanelLabeler`.
         A string is the `style` and a dict gives the other parameters.
     kwargs:
-        Extra parameters that are passed to :func:`plot_field`, like ``cmap`` or ``levels``
+        Extra parameters that are passed to :func:`plot_field`, like ``cmap``, ``levels``,
+        ``scalebar`` or ``compass``
 
     Return
     ------
@@ -1185,6 +1201,8 @@ def plot_grid(
     map_kw=None,
     edge_kw=None,
     center_kw=None,
+    scalebar=None,
+    compass=None,
     **kwargs,
 ):
     """Plot a horizontal grid
@@ -1246,6 +1264,8 @@ def plot_grid(
     center_kw: None, dict
         Parameters passed to :meth:`matplotlib.axes.Axes.plot` to draw the centers,
         like ``color`` or ``markersize``.
+    scalebar, compass: None, bool, dict
+        Add a scale bar or a compass, see :func:`plot_field`.
     kwargs:
         With the ``"bathy"`` and ``"resolution"`` kinds, extra parameters are passed
         to :func:`plot_field`.
@@ -1345,6 +1365,7 @@ def plot_grid(
                 linewidth=1.5,
                 transform=transform,
             )
+    _add_decorations_(ax, scalebar, compass)
     return ax
 
 
@@ -1809,8 +1830,37 @@ def plot_taylor(
     )
 
 
-def plot_rose(value, direction=None, **kwargs):
-    """Plot a wind or wave rose
+_ROSE_DIRECTIONS = ["wfdir", "wtdir", "wdir", "th1p", "dp"]
+_ROSE_V = ["vgeo", "vy", "v", "vsurf", "vbt", "vbc", "vgeos", "v10m", "vy10m", "vair"]
+
+
+def _is_cartesian_(da):
+    """Tell if an array is rather a northward component than a direction"""
+    if not isinstance(da, xr.DataArray):
+        return False
+    specs = xmeta.get_meta_specs(da)
+    if specs.match_data_var(da, _ROSE_DIRECTIONS) or str(da.attrs.get("units", "")).startswith(
+        "degree"
+    ):
+        return False
+    return bool(specs.match_data_var(da, _ROSE_V))
+
+
+def _get_uv_(ds):
+    """Eastward and northward components of the currents or the wind of a dataset"""
+    u, v = dyn.get_u(ds), dyn.get_v(ds)
+    if u is None or v is None:
+        u, v = xmeta.get_variant(ds, "u10m"), xmeta.get_variant(ds, "v10m")
+    if u is None or v is None:
+        raise exceptions.XoaError(
+            "Cannot find the wind speed or the wave height, nor the components "
+            "of the currents or the wind in the dataset"
+        )
+    return u, v
+
+
+def plot_rose(value, direction=None, cartesian=None, from_=False, **kwargs):
+    """Plot a wind, wave or current rose
 
     The frequencies of the directions are stacked by bins of value. The
     samples that are missing in the value or in the direction are ignored: mask
@@ -1819,14 +1869,26 @@ def plot_rose(value, direction=None, **kwargs):
     Parameters
     ----------
     value: xarray.DataArray, xarray.Dataset
-        Wind speed or wave height, for instance. With a dataset, the first of the ``"wspd"``
+        Wind speed or wave height, for instance, or the eastward component when
+        ``cartesian`` is true. With a dataset, the first of the ``"wspd"``
         and ``"hs"`` generic meta names that is found is used, and the direction is searched
         with :mod:`xoa.meta` when not provided.
+        When none is found, the components of the currents are searched with
+        :func:`xoa.dyn.get_u` and :func:`xoa.dyn.get_v`, then those of the wind.
     direction: None, xarray.DataArray
         Direction in degrees, clockwise from the north, with the same shape as the value.
         It is the direction that the wind or the waves come from or go to: this does not
         change the plot. The ``"wfdir"``, ``"wtdir"``, ``"wdir"``, ``"th1p"`` and ``"dp"``
         generic names are searched in a dataset.
+        It is the northward component when ``cartesian`` is true.
+    cartesian: None, bool
+        Are the arguments the eastward and northward components ``(u, v)`` instead of
+        ``(value, direction)``? The rose is then made of the speed and of its direction.
+        If None, ``direction`` is taken as a northward component when it is identified
+        as such with :mod:`xoa.meta` and has no angle units.
+    from_: bool
+        With components, use the direction the flow comes from, like the wind and
+        the waves, instead of the direction it goes to, like the currents.
     kwargs:
         Extra parameters, like ``nsector``, ``edges``, ``cmap`` or ``rmax``,
         are passed to :func:`xoa.core.plot.plot_rose`.
@@ -1841,6 +1903,8 @@ def plot_rose(value, direction=None, **kwargs):
 
         plot_rose(ds.hs, ds.direction, nsector=12)
         plot_rose(ds)  # variables are searched
+        plot_rose(ds.u, ds.v, from_=True)
+        plot_rose(ds.uo, ds.vo_alias, cartesian=True)  # when the components are not identified
 
     See also
     --------
@@ -1849,18 +1913,31 @@ def plot_rose(value, direction=None, **kwargs):
     """
     ds = value
     if isinstance(ds, xr.Dataset):
-        value = xmeta.get_variant(ds, ["wspd", "hs"])
-        if value is None:
-            raise exceptions.XoaError("Cannot find the wind speed or the wave height in the dataset")
+        if cartesian is None and direction is None:
+            cartesian = xmeta.get_variant(ds, ["wspd", "hs"]) is None
+        if cartesian:
+            value, direction = _get_uv_(ds)
+        else:
+            value = xmeta.get_variant(ds, ["wspd", "hs"])
+            if value is None:
+                raise exceptions.XoaError(
+                    "Cannot find the wind speed or the wave height in the dataset"
+                )
     if direction is None:
         if not isinstance(ds, xr.Dataset):
             raise exceptions.XoaError("The direction is required when the value is a data array")
-        direction = xmeta.get_variant(ds, ["wfdir", "wtdir", "wdir", "th1p", "dp"])
+        direction = xmeta.get_variant(ds, _ROSE_DIRECTIONS)
         if direction is None:
             raise exceptions.XoaError("Cannot find the direction in the dataset")
+    if cartesian is None:
+        cartesian = _is_cartesian_(direction)
     value, direction = xr.broadcast(value, direction)
+    if cartesian:
+        u, v = value, direction
+        value = np.hypot(u, v).assign_attrs(long_name="Speed", units=u.attrs.get("units", ""))
+        direction = np.degrees(np.arctan2(u, v)) + (180.0 if from_ else 0.0)
     kwargs.setdefault("label", get_label(value))
-    return cplot.plot_rose(direction.values, value.values, **kwargs)
+    return cplot.plot_rose(direction.values % 360.0, value.values, **kwargs)
 
 
 # %% Filters

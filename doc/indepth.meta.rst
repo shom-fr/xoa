@@ -272,7 +272,10 @@ These modules rely on the specs to offer high-level finders:
   ``"temp"`` (in situ), ``"ptemp"`` (potential), ``"ctemp"`` (conservative) for temperature, and ``"sal"``, ``"psal"``, ``"asal"``,
   ``"pfsal"`` for salinity.
 - :mod:`xoa.dyn`: :func:`~xoa.dyn.get_sea_level` with the variants ``"ssh"``, ``"adt"``,
-  ``"sla"``, ``"mdt"`` and ``"mss"``.
+  ``"sla"``, ``"mdt"`` and ``"mss"``, and :func:`~xoa.dyn.get_u` and :func:`~xoa.dyn.get_v`
+  with the variants ``"geo"`` (eastward and northward, ``ugeo``, ``uo``), ``"grid"`` (along the
+  grid axes, ``ux``, ``vy``), ``"geos"`` (geostrophic, ``ugeos``, ``ugos``), ``"bt"``, ``"bc"``,
+  ``"surf"`` and ``"generic"``. The geostrophic and baroclinic ones are not searched by default.
 
 .. _indepth.meta.zdepth:
 

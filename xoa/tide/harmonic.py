@@ -20,8 +20,10 @@ import numpy as np
 import xarray as xr
 
 from .. import exceptions
+from .. import dyn as xdyn
 from ..core import tide as tide_core
 from .data import (
+    get_time_dim,
     auto_constituents,
     equilibrium_argument,
     get_frequencies,
@@ -78,6 +80,8 @@ def _flat_coef_(coef, name, nf=None):
 
 
 def _prediction_da_(values, t_out, coef, ref, t_dim, long_name):
+    if t_dim is None:
+        t_dim = t_out.dims[0] if isinstance(t_out, xr.DataArray) else "time"
     spatial_dims = list(coef[ref].dims)
     spatial_shape = tuple(coef.sizes[d] for d in spatial_dims)
     coords = {t_dim: xr.DataArray(np.asarray(t_out), dims=[t_dim])}
@@ -108,8 +112,9 @@ class TidalHarmonic:
         Time axis of the data to be analysed.
     names: list of str, None
         Constituent names. They are selected with :func:`auto_constituents` when None.
-    t_dim: str
-        Name of the time dimension of the data arrays.
+    t_dim: str, None
+        Name of the time dimension of the data arrays, searched with
+        :func:`xoa.coords.get_tdim` when None.
     nodal: bool
         Apply the nodal corrections.
     rayleigh_min: float
@@ -121,7 +126,7 @@ class TidalHarmonic:
     Spatial chunking is fine.
     """
 
-    def __init__(self, t, names=None, t_dim="time", nodal=True, rayleigh_min=1.0):
+    def __init__(self, t, names=None, t_dim=None, nodal=True, rayleigh_min=1.0):
         t_sec = _to_seconds_(t)
         if names is None:
             names = auto_constituents((t_sec[-1] - t_sec[0]) / 86400.0, rayleigh_min)
@@ -151,7 +156,7 @@ class TidalHarmonic:
         The function takes arrays ``(nt, ns)`` and returns an array ``(ncoef, ns)``.
         Dask arrays are processed by spatial blocks, time being a single chunk.
         """
-        t_dim = self._t_dim
+        t_dim = get_time_dim(das[0], self._t_dim)
         sdims = [d for d in das[0].dims if d != t_dim]
         das = [da.transpose(t_dim, *sdims) for da in das]
 
@@ -253,7 +258,7 @@ class TidalHarmonic:
             sshape,
             attrs={"nodal": self.nodal, "phase_convention": "greenwich" if greenwich else "local"},
         )
-        return ds.assign_coords(_spatial_coords_(da, self._t_dim))
+        return ds.assign_coords(_spatial_coords_(da, get_time_dim(da, self._t_dim)))
 
     def analyse_uv(self, da_u, da_v):
         """Harmonic analysis of tidal currents
@@ -286,7 +291,7 @@ class TidalHarmonic:
             "phase": (flat[3 * nf + 2 :], {"units": "rad"}, True),
         }
         ds = _coef_dataset_(self.names, self.omega, self._t_ref, variables, sdims, sshape)
-        return ds.assign_coords(_spatial_coords_(da_u, self._t_dim))
+        return ds.assign_coords(_spatial_coords_(da_u, get_time_dim(da_u, self._t_dim)))
 
     def ensemble(self, coef, n_members=50, seed=None, inflate=1.0):
         """Ensemble of coefficient sets drawn from the analysis uncertainties
@@ -343,28 +348,44 @@ class TidalHarmonic:
 
 
 def harmonic_analysis(
-    da, names=None, t_dim="time", nodal=True, rayleigh_min=1.0, uncertainty=True, greenwich=False
+    da, names=None, t_dim=None, nodal=True, rayleigh_min=1.0, uncertainty=True, greenwich=False
 ):
     """One-shot harmonic analysis of a scalar data array
 
+    The time dimension is searched with :func:`xoa.coords.get_tdim` when ``t_dim`` is None.
+    With a dataset, the sea level is searched with :func:`xoa.dyn.get_sea_level`.
+
     See :meth:`TidalHarmonic.analyse` and :class:`TidalHarmonic` for the arguments.
     """
+    if isinstance(da, xr.Dataset):
+        da = xdyn.get_sea_level(da, errors="raise")
+    t_dim = get_time_dim(da, t_dim)
     return TidalHarmonic(da[t_dim].values, names, t_dim, nodal, rayleigh_min).analyse(
         da, uncertainty=uncertainty, greenwich=greenwich
     )
 
 
-def harmonic_analysis_uv(da_u, da_v, names=None, t_dim="time", nodal=True, rayleigh_min=1.0):
+def harmonic_analysis_uv(
+    da_u, da_v=None, names=None, t_dim=None, nodal=True, rayleigh_min=1.0
+):
     """One-shot harmonic analysis of tidal currents
+
+    The time dimension is searched with :func:`xoa.coords.get_tdim` when ``t_dim`` is None.
+    With a dataset as first argument, the velocities are searched with :func:`xoa.dyn.get_u` and :func:`~xoa.dyn.get_v`.
 
     See :meth:`TidalHarmonic.analyse_uv` and :class:`TidalHarmonic` for the arguments.
     """
+    if isinstance(da_u, xr.Dataset):
+        ds = da_u
+        da_u = xdyn.get_u(ds, errors="raise")
+        da_v = xdyn.get_v(ds, errors="raise")
+    t_dim = get_time_dim(da_u, t_dim)
     return TidalHarmonic(da_u[t_dim].values, names, t_dim, nodal, rayleigh_min).analyse_uv(
         da_u, da_v
     )
 
 
-def harmonic_predict(coef, t_out, t_dim="time", nodal=True):
+def harmonic_predict(coef, t_out, t_dim=None, nodal=True):
     """Predict a scalar signal from harmonic coefficients
 
     Parameters
@@ -372,7 +393,9 @@ def harmonic_predict(coef, t_out, t_dim="time", nodal=True):
     coef: xarray.Dataset
         Output of :func:`harmonic_analysis`. Its ``nodal`` attribute prevails over ``nodal``.
     t_out: array-like of datetime64 or float seconds
-    t_dim: str
+    t_dim: str, None
+        Name of the output time dimension: that of ``t_out`` when it is a data array, else
+        the time dimension of the coefficients' source, i.e. ``"time"``.
     nodal: bool
 
     Return
@@ -399,7 +422,7 @@ def harmonic_predict(coef, t_out, t_dim="time", nodal=True):
     return _prediction_da_(h, t_out, coef, "h0", t_dim, "Tidal prediction")
 
 
-def harmonic_predict_uv(coef, t_out, t_dim="time"):
+def harmonic_predict_uv(coef, t_out, t_dim=None):
     """Predict the currents from harmonic coefficients
 
     Parameters
@@ -407,7 +430,8 @@ def harmonic_predict_uv(coef, t_out, t_dim="time"):
     coef: xarray.Dataset
         Output of :func:`harmonic_analysis_uv`.
     t_out: array-like of datetime64 or float seconds
-    t_dim: str
+    t_dim: str, None
+        See :func:`harmonic_predict`.
 
     Return
     ------

@@ -22,6 +22,8 @@ They are used by the high level plotting functions of the :mod:`xoa.plot` module
 import inspect
 
 import matplotlib.collections as mcollections
+import matplotlib.patches as mpatches
+import matplotlib.patheffects as mpatheffects
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
@@ -29,6 +31,7 @@ import numpy as np
 
 from .. import exceptions
 from .. import misc
+from .geo import EARTH_RADIUS, haversine
 from .grid import centers2edges
 from .stats import rose_hist
 
@@ -584,6 +587,285 @@ def add_quiverkey(ax, quiver, value, units="", pos=(0.0, 1.03), **kwargs):
     return qkey
 
 
+# %% Scale bar and compass
+
+#: Length units of the scale bar in meters
+SCALEBAR_UNITS = {"m": 1.0, "km": 1e3, "nmi": 1852.0}
+
+_LOC_ANCHORS = {
+    "lower left": (0, 0),
+    "lower right": (1, 0),
+    "upper left": (0, 1),
+    "upper right": (1, 1),
+}
+
+
+def _get_anchor_(loc, pad):
+    """Position in axes coordinates and signs of the corner ``loc``"""
+    if loc not in _LOC_ANCHORS:
+        raise exceptions.XoaError(f"Invalid loc '{loc}'. Choose among: {', '.join(_LOC_ANCHORS)}")
+    ix, iy = _LOC_ANCHORS[loc]
+    return (pad if ix == 0 else 1 - pad), (pad if iy == 0 else 1 - pad), 1 - 2 * ix, 1 - 2 * iy
+
+
+def _axes_to_lonlat_(ax, xy):
+    """Longitudes and latitudes of points given in axes coordinates"""
+    ccrs, _ = _import_cartopy_()
+    ax.apply_aspect()
+    x, y = (ax.transAxes + ax.transData.inverted()).transform(np.atleast_2d(xy)).T
+    lon, lat = ccrs.Geodetic().transform_points(ax.projection, x, y)[:, :2].T
+    return lon, lat
+
+
+def _add_shadow_(artists, shadow):
+    """Add a drop shadow to artists with path effects
+
+    ``shadow`` is True or a dict with the ``offset`` in points and ``alpha``.
+    """
+    if not shadow:
+        return
+    kw = {"offset": (2, -2), "alpha": 0.5, **(shadow if isinstance(shadow, dict) else {})}
+    for artist in artists:
+        shadow_effect = (
+            mpatheffects.SimpleLineShadow
+            if hasattr(artist, "set_solid_capstyle")
+            else mpatheffects.SimplePatchShadow
+        )(**kw)
+        artist.set_path_effects([shadow_effect, mpatheffects.Normal()])
+
+
+def get_scalebar_length(max_length):
+    """Get the longest round length that is not above a maximal length
+
+    It is 1, 2 or 5 times a power of ten.
+    """
+    mag = 10 ** np.floor(np.log10(max_length))
+    return float(max(m for m in (1, 2, 5, 10) if m * mag <= max_length) * mag)
+
+
+def add_scalebar(
+    ax,
+    length=None,
+    units="km",
+    loc="lower left",
+    pad=0.04,
+    segments=2,
+    height=0.012,
+    color="k",
+    shadow=False,
+    zorder=10,
+    **kwargs,
+):
+    """Add a scale bar to a map
+
+    The length of the bar is the ground distance along the horizontal direction of the axes
+    at the position of the bar, so it accounts for the distortion of the projection.
+    It is computed when the function is called: call it after the extent is set.
+
+    Parameters
+    ----------
+    ax: cartopy.mpl.geoaxes.GeoAxes
+    length: None, float
+        Length of the bar in ``units``. It defaults to a round value, see
+        :func:`get_scalebar_length`, that is at most a fifth of the width of the axes.
+    units: {"m", "km", "nmi"}
+    loc: {"lower left", "lower right", "upper left", "upper right"}
+        Corner of the axes where the bar is placed
+    pad: float
+        Distance to the corner in axes coordinates
+    segments: int
+        Number of alternating black and white segments
+    height: float
+        Height of the bar in axes coordinates
+    color: color
+        Color of the dark segments, the labels and the frame
+    shadow: bool, dict
+        Add a drop shadow, with ``offset`` in points and ``alpha`` when a dict.
+    zorder: float
+    kwargs:
+        Extra parameters are passed to :class:`matplotlib.text.Text`, like ``fontsize``.
+
+    Return
+    ------
+    list
+        The artists: the segments and the label
+    """
+    if units not in SCALEBAR_UNITS:
+        raise exceptions.XoaError(
+            f"Invalid units '{units}'. Choose among: {', '.join(SCALEBAR_UNITS)}"
+        )
+    x0, y0, sx, sy = _get_anchor_(loc, pad)
+
+    # Meters per unit of axes width at the position of the bar
+    lon, lat = _axes_to_lonlat_(ax, [(x0, y0), (x0 + 0.01, y0)])
+    meters = haversine(lon[0], lat[0], lon[1], lat[1]) * EARTH_RADIUS * 100  # per axes width
+    scale = SCALEBAR_UNITS[units]
+    if length is None:
+        length = get_scalebar_length(0.2 * meters / scale)
+    width = length * scale / meters
+    xleft = x0 if sx > 0 else x0 - width
+    ybar = y0 if sy > 0 else y0 - height - 0.04  # room for the label under the corner
+
+    artists = []
+    dx = width / segments
+    for i in range(segments):
+        artists.append(
+            ax.add_patch(
+                mpatches.Rectangle(
+                    (xleft + i * dx, ybar),
+                    dx,
+                    height,
+                    transform=ax.transAxes,
+                    facecolor=color if i % 2 == 0 else "w",
+                    edgecolor=color,
+                    linewidth=0.8,
+                    zorder=zorder,
+                    clip_on=False,
+                )
+            )
+        )
+    kwargs = {"fontsize": "small", "fontweight": "bold", "color": color, **kwargs}
+    artists.append(
+        ax.text(
+            xleft + 0.5 * width,
+            ybar + height + 0.008,
+            f"{length:g} {units}",
+            transform=ax.transAxes,
+            ha="center",
+            va="bottom",
+            zorder=zorder,
+            **kwargs,
+        )
+    )
+    _add_shadow_(artists, shadow)
+    return artists
+
+
+def _compass_polygons_(style):
+    """Polygons of the compass styles pointing to the north, as (vertices, light fill)"""
+    if style == "simple":
+        return [([(0, 1), (-0.35, -0.7), (0, -0.35), (0.35, -0.7)], False)]
+    if style == "fancy":
+        polys = []
+        for k, length in enumerate((1.0, 0.6, 0.6, 0.6)):
+            a = np.radians(90.0 * k)  # clockwise from north
+            tip = (length * np.sin(a), length * np.cos(a))
+            for side, light in ((-1, False), (1, True)):
+                b = a + side * np.radians(45.0)
+                polys.append(([tip, (0, 0), (0.22 * np.sin(b), 0.22 * np.cos(b))], light))
+        return polys
+    raise exceptions.XoaError(f"Invalid style '{style}'. Choose among: simple, fancy")
+
+
+def add_compass(
+    ax,
+    loc="upper right",
+    size=40,
+    style="simple",
+    pad=0.08,
+    color="k",
+    shadow=False,
+    zorder=10,
+    **kwargs,
+):
+    """Add a compass to a map
+
+    The north points to the direction of the meridian at the position of the compass,
+    which differs from the vertical in some projections.
+    The angle is computed when the function is called.
+
+    Parameters
+    ----------
+    ax: cartopy.mpl.geoaxes.GeoAxes
+    loc: {"lower left", "lower right", "upper left", "upper right"}
+        Corner of the axes where the compass is placed
+    size: float
+        Height of the compass in points
+    style: {"simple", "fancy"}
+        A single arrow, or a rose with four split points and a ring
+    pad: float
+        Distance of the center to the corner in axes coordinates
+    color: color
+        Color of the dark parts and of the "N"
+    shadow: bool, dict
+        Add a drop shadow, with ``offset`` in points and ``alpha`` when a dict.
+    zorder: float
+    kwargs:
+        Extra parameters are passed to :class:`matplotlib.text.Text`, like ``fontsize``.
+
+    Return
+    ------
+    list
+        The artists: the polygons, the ring of the fancy style and the "N"
+    """
+    polygons = _compass_polygons_(style)
+    x0, y0, _, _ = _get_anchor_(loc, pad)
+
+    # Angle of the north with respect to the vertical of the display, clockwise
+    lon, lat = _axes_to_lonlat_(ax, [(x0, y0)])
+    ccrs, _ = _import_cartopy_()
+    xy = ax.projection.transform_points(
+        ccrs.Geodetic(), np.array([lon[0]] * 2), np.array([lat[0], lat[0] + 0.01])
+    )[:, :2]
+    dxy = np.diff(ax.transData.transform(xy), axis=0)[0]
+    angle = np.degrees(np.arctan2(dxy[0], dxy[1]))
+
+    radius = 0.5 * size  # points
+    trans = (
+        mtransforms.Affine2D().rotate_deg(-angle).scale(radius / 72.0)
+        + ax.figure.dpi_scale_trans
+        + mtransforms.ScaledTranslation(x0, y0, ax.transAxes)
+    )
+    artists = []
+    for verts, light in polygons:
+        artists.append(
+            ax.add_patch(
+                mpatches.Polygon(
+                    verts,
+                    closed=True,
+                    transform=trans,
+                    facecolor="w" if light else color,
+                    edgecolor=color,
+                    linewidth=0.8,
+                    zorder=zorder,
+                    clip_on=False,
+                )
+            )
+        )
+    if style == "fancy":
+        artists.append(
+            ax.add_patch(
+                mpatches.Circle(
+                    (0, 0),
+                    0.45,
+                    transform=trans,
+                    fill=False,
+                    edgecolor=color,
+                    linewidth=0.8,
+                    zorder=zorder,
+                    clip_on=False,
+                )
+            )
+        )
+    kwargs = {"fontsize": "small", "fontweight": "bold", "color": color, **kwargs}
+    rn = radius * 1.25  # label beyond the tip of the north arrow
+    artists.append(
+        ax.annotate(
+            "N",
+            (x0, y0),
+            xycoords="axes fraction",
+            xytext=(rn * np.sin(np.radians(angle)), rn * np.cos(np.radians(angle))),
+            textcoords="offset points",
+            ha="center",
+            va="center",
+            zorder=zorder,
+            **kwargs,
+        )
+    )
+    _add_shadow_(artists, shadow)
+    return artists
+
+
 def plot_sticks(ax, x, u, v, scale=None, color="steelblue", **kwargs):
     """Plot vectors as sticks anchored at ``y=0``
 
@@ -1124,7 +1406,19 @@ class Rose:
             }
             kw.update(legend_kwargs or {})
             self.legend = self.ax.legend(**kw)
+            self._fit_legend_()
         return bars
+
+    def _fit_legend_(self):
+        """Shrink the axes so that the legend fits in the figure"""
+        fig = self.ax.figure
+        for _ in range(3):
+            fig.canvas.draw()
+            overflow = self.legend.get_window_extent().x1 - fig.bbox.x1
+            if overflow <= 0:
+                break
+            x0, y0, w, h = self.ax.get_position().bounds
+            self.ax.set_position([x0, y0, w - overflow / fig.bbox.width * 1.02, h])
 
 
 #: Parameters of :class:`Rose` that can be passed to :func:`plot_rose`
