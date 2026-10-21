@@ -638,7 +638,7 @@ def _get_blur_effects_(kw):
 
 #: Default parameters of the effects of the map decorations
 EFFECT_DEFAULTS = {
-    "shadow": {"offset": (1, -1), "alpha": 0.5, "width": 2.0, "color": "k"},
+    "shadow": {"offset": (1, -1), "alpha": 0.3, "width": 2.0, "color": "k"},
     "glow": {"offset": (0, 0), "alpha": 1.0, "width": 3.0, "color": "w"},
 }
 
