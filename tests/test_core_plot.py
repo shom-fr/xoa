@@ -449,6 +449,7 @@ class TestRose:
 
 
 def get_map(projection=None, extent=(-12, 12, 35, 60)):
+    pytest.importorskip("cartopy")
     ccrs, _ = cplot._import_cartopy_()
     ax = plt.figure(figsize=(5, 5)).add_subplot(1, 1, 1, projection=projection or ccrs.PlateCarree())
     ax.set_extent(extent, crs=ccrs.PlateCarree())
@@ -485,6 +486,7 @@ class TestMapDecorations:
             cplot.add_compass(get_map(), style="other")
 
     def test_compass_follows_the_meridians(self):
+        pytest.importorskip("cartopy")
         ccrs, _ = cplot._import_cartopy_()
         # No rotation with a plate carree map: the label is right above the center
         label = cplot.add_compass(get_map(), loc="lower left")[-1]
