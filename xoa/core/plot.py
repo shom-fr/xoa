@@ -601,11 +601,15 @@ _LOC_ANCHORS = {
 
 
 def _get_anchor_(loc, pad):
-    """Position in axes coordinates and signs of the corner ``loc``"""
+    """Position in axes coordinates and signs of the corner ``loc``
+
+    ``pad`` is a float or a pair of floats along x and y.
+    """
     if loc not in _LOC_ANCHORS:
         raise exceptions.XoaError(f"Invalid loc '{loc}'. Choose among: {', '.join(_LOC_ANCHORS)}")
     ix, iy = _LOC_ANCHORS[loc]
-    return (pad if ix == 0 else 1 - pad), (pad if iy == 0 else 1 - pad), 1 - 2 * ix, 1 - 2 * iy
+    padx, pady = np.broadcast_to(pad, 2)
+    return (padx if ix == 0 else 1 - padx), (pady if iy == 0 else 1 - pady), 1 - 2 * ix, 1 - 2 * iy
 
 
 def _axes_to_lonlat_(ax, xy):
@@ -617,19 +621,12 @@ def _axes_to_lonlat_(ax, xy):
     return lon, lat
 
 
-def _add_shadow_(artists, shadow):
-    """Add a soft drop shadow to artists with path effects
-
-    ``shadow`` is True or a dict with the ``offset`` in points, the ``alpha``, the blur
-    ``width`` in points and the ``color``. The blur is made of a few strokes of increasing
-    widths and low opacities.
-    """
-    if not shadow:
-        return
-    kw = {"offset": (1, -1), "alpha": 0.5, "width": 2.0, "color": "k"}
-    kw.update(shadow if isinstance(shadow, dict) else {})
+def _get_blur_effects_(spec, defaults):
+    """Path effects of a soft shadow or glow, made of a few strokes of increasing widths"""
+    kw = dict(defaults)
+    kw.update(spec if isinstance(spec, dict) else {})
     nlayer = 4
-    effects = [
+    return [
         mpatheffects.PathPatchEffect(
             offset=kw["offset"],
             facecolor=kw["color"],
@@ -639,8 +636,41 @@ def _add_shadow_(artists, shadow):
         )
         for i in reversed(range(nlayer))
     ]
+
+
+def _add_effects_(ax, artists, shadow, glow, zorder):
+    """Add a soft drop shadow and/or a glow below artists with path effects
+
+    ``shadow`` and ``glow`` are True or dicts with the blur ``width`` in points, the
+    ``alpha`` and the ``color``, and the ``offset`` in points for the shadow.
+    The effects of a patch are drawn by an invisible copy placed below all the artists,
+    so that they do not hide the neighbor patches.
+    """
+    effects = []
+    if shadow:
+        effects += _get_blur_effects_(
+            shadow, {"offset": (1, -1), "alpha": 0.5, "width": 2.0, "color": "k"}
+        )
+    if glow:
+        effects += _get_blur_effects_(
+            glow, {"offset": (0, 0), "alpha": 1.0, "width": 3.0, "color": "w"}
+        )
+    if not effects:
+        return
     for artist in artists:
-        artist.set_path_effects(effects + [mpatheffects.Normal()])
+        if isinstance(artist, mpatches.Patch):
+            under = mpatches.PathPatch(
+                artist.get_path(),
+                transform=artist.get_transform(),
+                fill=False,
+                edgecolor="none",
+                zorder=zorder - 0.5,
+                clip_on=False,
+            )
+            ax.add_patch(under)
+            under.set_path_effects(effects)
+        else:
+            artist.set_path_effects(effects + [mpatheffects.Normal()])
 
 
 def get_scalebar_length(max_length):
@@ -662,6 +692,7 @@ def add_scalebar(
     height=0.012,
     color="k",
     shadow=False,
+    glow=False,
     zorder=10,
     **kwargs,
 ):
@@ -690,6 +721,9 @@ def add_scalebar(
         Color of the dark segments, the labels and the frame
     shadow: bool, dict
         Add a soft drop shadow. A dict gives its ``offset`` and blur ``width`` in points,
+        its ``alpha`` and its ``color``.
+    glow: bool, dict
+        Add a white glow, drawn over the shadow. A dict gives its blur ``width`` in points,
         its ``alpha`` and its ``color``.
     zorder: float
     kwargs:
@@ -737,17 +771,17 @@ def add_scalebar(
     kwargs = {"fontsize": "small", "fontweight": "bold", "color": color, **kwargs}
     artists.append(
         ax.text(
-            xleft + 0.5 * width,
+            x0,
             ybar + height + 0.008,
             f"{length:g} {units}",
             transform=ax.transAxes,
-            ha="center",
+            ha="left" if sx > 0 else "right",
             va="bottom",
             zorder=zorder,
             **kwargs,
         )
     )
-    _add_shadow_(artists, shadow)
+    _add_effects_(ax, artists, shadow, glow, zorder)
     return artists
 
 
@@ -772,9 +806,10 @@ def add_compass(
     loc="upper right",
     size=40,
     style="simple",
-    pad=0.08,
+    pad=None,
     color="k",
     shadow=False,
+    glow=False,
     zorder=10,
     **kwargs,
 ):
@@ -793,12 +828,16 @@ def add_compass(
         Height of the compass in points
     style: {"simple", "fancy"}
         A single arrow, or a rose with four split points and a ring
-    pad: float
-        Distance of the center to the corner in axes coordinates
+    pad: None, float
+        Distance of the center to the corner in axes coordinates. By default, it leaves
+        room for the arrow and the "N" inside the axes.
     color: color
         Color of the dark parts and of the "N"
     shadow: bool, dict
         Add a soft drop shadow. A dict gives its ``offset`` and blur ``width`` in points,
+        its ``alpha`` and its ``color``.
+    glow: bool, dict
+        Add a white glow, drawn over the shadow. A dict gives its blur ``width`` in points,
         its ``alpha`` and its ``color``.
     zorder: float
     kwargs:
@@ -810,6 +849,11 @@ def add_compass(
         The artists: the polygons, the ring of the fancy style and the "N"
     """
     polygons = _compass_polygons_(style)
+    if pad is None:
+        ax.apply_aspect()
+        margin = 0.625 * size + 12  # points: the arrow, the "N" and some room
+        bbox = ax.get_window_extent()
+        pad = margin / (np.array([bbox.width, bbox.height]) * 72.0 / ax.figure.dpi)
     x0, y0, _, _ = _get_anchor_(loc, pad)
 
     # Angle of the north with respect to the vertical of the display, clockwise
@@ -873,7 +917,7 @@ def add_compass(
             **kwargs,
         )
     )
-    _add_shadow_(artists, shadow)
+    _add_effects_(ax, artists, shadow, glow, zorder)
     return artists
 
 
