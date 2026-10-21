@@ -923,7 +923,7 @@ def plot_field(
         Dataset where the meta names of overlay fields are searched
     scalebar, compass: None, bool, dict
         Add a scale bar or a compass with :func:`add_scalebar` or :func:`add_compass`.
-        A dict gives their parameters, like ``loc``, ``style``, ``shadow`` or ``glow``.
+        A dict gives their parameters, like ``loc``, ``style`` or ``effect``.
     kwargs:
         Extra parameters are passed to the plot method, like ``cmap``, ``vmin``,
         ``vmax`` or ``add_colorbar``. The colorbar is shrunk by default, which

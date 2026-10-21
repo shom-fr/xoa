@@ -494,19 +494,21 @@ class TestMapDecorations:
         label = cplot.add_compass(get_map(proj), loc="upper left")[-1]
         assert label.xyann[0] > 1  # west of the central meridian: the north leans eastwards
 
-    def test_shadow_and_glow(self):
+    def test_effects(self):
         def effects(ax):
             return [len(p.get_path_effects()) for p in ax.patches + ax.texts]
 
         ax = get_map()
-        cplot.add_scalebar(ax, shadow=True)
+        cplot.add_scalebar(ax, effect=True)
         assert effects(ax) == [0, 0, 4, 4, 5]  # the effects of the segments are in copies below them
         ax = get_map()
-        cplot.add_compass(ax, shadow={"offset": (3, -3)}, glow=True)
+        cplot.add_compass(ax, effect=["shadow", "glow"], effect_kw={"shadow": {"offset": (3, -3)}})
         assert all(n in (0, 8, 9) for n in effects(ax)) and 8 in effects(ax)
         ax = get_map()
-        cplot.add_compass(ax, glow=True)
+        cplot.add_compass(ax, effect="glow", effect_kw={"color": "y"})
         assert 4 in effects(ax)
         ax = get_map()
         cplot.add_compass(ax)
         assert not any(effects(ax))
+        with pytest.raises(xoa.exceptions.XoaError):
+            cplot.add_compass(get_map(), effect="blur")

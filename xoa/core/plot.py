@@ -621,10 +621,8 @@ def _axes_to_lonlat_(ax, xy):
     return lon, lat
 
 
-def _get_blur_effects_(spec, defaults):
+def _get_blur_effects_(kw):
     """Path effects of a soft shadow or glow, made of a few strokes of increasing widths"""
-    kw = dict(defaults)
-    kw.update(spec if isinstance(spec, dict) else {})
     nlayer = 4
     return [
         mpatheffects.PathPatchEffect(
@@ -638,23 +636,38 @@ def _get_blur_effects_(spec, defaults):
     ]
 
 
-def _add_effects_(ax, artists, shadow, glow, zorder):
+#: Default parameters of the effects of the map decorations
+EFFECT_DEFAULTS = {
+    "shadow": {"offset": (1, -1), "alpha": 0.5, "width": 2.0, "color": "k"},
+    "glow": {"offset": (0, 0), "alpha": 1.0, "width": 3.0, "color": "w"},
+}
+
+
+def _get_effect_names_(effect):
+    """Names of the effects, in the drawing order, from True, a name or a sequence of names"""
+    if effect is None or effect is False:
+        return []
+    names = ["shadow"] if effect is True else [effect] if isinstance(effect, str) else effect
+    for name in names:
+        if name not in EFFECT_DEFAULTS:
+            raise exceptions.XoaError(
+                f"Invalid effect '{name}'. Choose among: {', '.join(EFFECT_DEFAULTS)}"
+            )
+    return [name for name in EFFECT_DEFAULTS if name in names]
+
+
+def _add_effects_(ax, artists, effect, effect_kw, zorder):
     """Add a soft drop shadow and/or a glow below artists with path effects
 
-    ``shadow`` and ``glow`` are True or dicts with the blur ``width`` in points, the
-    ``alpha`` and the ``color``, and the ``offset`` in points for the shadow.
     The effects of a patch are drawn by an invisible copy placed below all the artists,
     so that they do not hide the neighbor patches.
     """
     effects = []
-    if shadow:
-        effects += _get_blur_effects_(
-            shadow, {"offset": (1, -1), "alpha": 0.5, "width": 2.0, "color": "k"}
-        )
-    if glow:
-        effects += _get_blur_effects_(
-            glow, {"offset": (0, 0), "alpha": 1.0, "width": 3.0, "color": "w"}
-        )
+    for name in _get_effect_names_(effect):
+        kw = dict(EFFECT_DEFAULTS[name])
+        effect_kw = effect_kw or {}
+        kw.update(effect_kw.get(name, {}) if set(effect_kw) & set(EFFECT_DEFAULTS) else effect_kw)
+        effects += _get_blur_effects_(kw)
     if not effects:
         return
     for artist in artists:
@@ -691,8 +704,8 @@ def add_scalebar(
     segments=2,
     height=0.012,
     color="k",
-    shadow=False,
-    glow=False,
+    effect=None,
+    effect_kw=None,
     zorder=10,
     **kwargs,
 ):
@@ -719,12 +732,13 @@ def add_scalebar(
         Height of the bar in axes coordinates
     color: color
         Color of the dark segments, the labels and the frame
-    shadow: bool, dict
-        Add a soft drop shadow. A dict gives its ``offset`` and blur ``width`` in points,
-        its ``alpha`` and its ``color``.
-    glow: bool, dict
-        Add a white glow, drawn over the shadow. A dict gives its blur ``width`` in points,
-        its ``alpha`` and its ``color``.
+    effect: None, bool, str, list(str)
+        Add a ``"shadow"``, a ``"glow"`` or both, which are drawn below the artists
+        to make them stand out. True is a shorthand for the shadow.
+    effect_kw: None, dict
+        Parameters of the effects: the blur ``width`` in points, the ``alpha``,
+        the ``color`` and, for the shadow, the ``offset`` in points. Give a dict per effect
+        to set them separately, like ``{"glow": {"color": "y"}}``.
     zorder: float
     kwargs:
         Extra parameters are passed to :class:`matplotlib.text.Text`, like ``fontsize``.
@@ -781,7 +795,7 @@ def add_scalebar(
             **kwargs,
         )
     )
-    _add_effects_(ax, artists, shadow, glow, zorder)
+    _add_effects_(ax, artists, effect, effect_kw, zorder)
     return artists
 
 
@@ -808,8 +822,8 @@ def add_compass(
     style="simple",
     pad=None,
     color="k",
-    shadow=False,
-    glow=False,
+    effect=None,
+    effect_kw=None,
     zorder=10,
     **kwargs,
 ):
@@ -833,12 +847,13 @@ def add_compass(
         room for the arrow and the "N" inside the axes.
     color: color
         Color of the dark parts and of the "N"
-    shadow: bool, dict
-        Add a soft drop shadow. A dict gives its ``offset`` and blur ``width`` in points,
-        its ``alpha`` and its ``color``.
-    glow: bool, dict
-        Add a white glow, drawn over the shadow. A dict gives its blur ``width`` in points,
-        its ``alpha`` and its ``color``.
+    effect: None, bool, str, list(str)
+        Add a ``"shadow"``, a ``"glow"`` or both, which are drawn below the artists
+        to make them stand out. True is a shorthand for the shadow.
+    effect_kw: None, dict
+        Parameters of the effects: the blur ``width`` in points, the ``alpha``,
+        the ``color`` and, for the shadow, the ``offset`` in points. Give a dict per effect
+        to set them separately, like ``{"glow": {"color": "y"}}``.
     zorder: float
     kwargs:
         Extra parameters are passed to :class:`matplotlib.text.Text`, like ``fontsize``.
@@ -917,7 +932,7 @@ def add_compass(
             **kwargs,
         )
     )
-    _add_effects_(ax, artists, shadow, glow, zorder)
+    _add_effects_(ax, artists, effect, effect_kw, zorder)
     return artists
 
 

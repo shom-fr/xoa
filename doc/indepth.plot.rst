@@ -232,9 +232,9 @@ add them with ``scalebar=True`` and ``compass=True``, or dicts of parameters.
 - The compass points to the north of the meridian at its position, which is not the vertical
   with a conic or orthographic projection. The ``"simple"`` style is an arrow and the
   ``"fancy"`` one a rose.
-- Both are placed in a corner with ``loc``, and ``shadow=True`` or a dict of ``offset``,
-  ``width`` (blur), ``alpha`` and ``color`` adds a soft drop shadow, and ``glow`` adds a white
-  halo, alone or over the shadow.
+- Both are placed in a corner with ``loc``. ``effect`` draws a ``"shadow"``, a ``"glow"`` or
+  both (``["shadow", "glow"]``) below them, and ``effect_kw`` sets the blur ``width``,
+  the ``alpha``, the ``color`` and the shadow ``offset``, for each effect if it is a dict of dicts.
 - The length and the angle are computed when they are added: set the extent before.
 
 .. ipython:: python
@@ -243,8 +243,8 @@ add them with ``scalebar=True`` and ``compass=True``, or dicts of parameters.
     xplot.plot_field(
         ds.temp,
         cmap=cmocean.cm.thermal,
-        scalebar=dict(loc="lower right", shadow=True),
-        compass=dict(style="fancy", shadow=True),
+        scalebar=dict(loc="lower right", effect="shadow"),
+        compass=dict(style="fancy", effect="shadow"),
     )
 
 Colorbars

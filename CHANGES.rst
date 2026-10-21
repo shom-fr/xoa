@@ -7,7 +7,7 @@ Unreleased
 New features
 ------------
 - Add cartesian components to :func:`xoa.plot.plot_rose`: ``plot_rose(u, v)``, with the ``cartesian`` and ``from_`` arguments, and a fallback to the components of a dataset.
-- Add :func:`xoa.plot.add_scalebar` and :func:`xoa.plot.add_compass`, with an optional drop shadow, and the ``scalebar`` and ``compass`` arguments of :func:`xoa.plot.plot_field` and :func:`~xoa.plot.plot_grid`. See :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
+- Add :func:`xoa.plot.add_scalebar` and :func:`xoa.plot.add_compass`, with an optional shadow or glow (``effect``), and the ``scalebar`` and ``compass`` arguments of :func:`xoa.plot.plot_field` and :func:`~xoa.plot.plot_grid`. See :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
 - Add :func:`xoa.dyn.get_u` and :func:`xoa.dyn.get_v` with variants, and the ``ugeo``, ``ux`` and ``ugeos`` meta specs (and their ``v`` counterparts) for eastward, grid-aligned and geostrophic velocities. :func:`xoa.tide.harmonic_analysis_uv` uses them with datasets.
 - Add the :mod:`xoa.tide` subpackage for tidal harmonic analysis and prediction, ellipses and diagnostics, and plots in :mod:`xoa.tide.plot`, based on :mod:`xoa.core.tide` and :mod:`xoa.core.signal`. See :ref:`indepth.tide`.
 - Move the tidal filters to :func:`xoa.tide.tidal_filter` and :func:`xoa.tide.demerliac`. The :mod:`xoa.filter` versions are deprecated.
