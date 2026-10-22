@@ -139,7 +139,7 @@ def add_land(ax, scale="110m", color=None, **kwargs):
     return ax.add_feature(cfeature.LAND.with_scale(scale), **kwargs)
 
 
-def setup_map_axes(
+def decorate_map(
     ax,
     extent=None,
     transform=None,
@@ -149,6 +149,7 @@ def setup_map_axes(
     land_scale="110m",
     coastlines=False,
     bbox=True,
+    fancy=False,
     **kwargs,
 ):
     """Decorate a cartopy axes
@@ -172,6 +173,9 @@ def setup_map_axes(
         Add the coastlines
     bbox: bool
         Keep the frame of the axes visible
+    fancy: bool, dict
+        Add a black and white frame with :func:`add_fancy_map_frame`.
+        A dict gives its parameters.
     kwargs:
         Extra parameters starting with ``"gridlines_"`` are passed
         to :meth:`cartopy.mpl.geoaxes.GeoAxes.gridlines`.
@@ -203,10 +207,12 @@ def setup_map_axes(
         gl = ax.gridlines(**kwgl)
         gl.xlabel_style = {"size": 7}
         gl.ylabel_style = {"size": 7}
+    if fancy:
+        add_fancy_map_frame(ax, **(fancy if isinstance(fancy, dict) else {}))
     return ax
 
 
-def create_base_map(
+def create_map(
     extent,
     figsize=(8, 8),
     projection=None,
@@ -230,7 +236,7 @@ def create_base_map(
         Coordinate system of the extent, which defaults to ``PlateCarree``
     title: None, str
     kwargs:
-        Extra parameters are passed to :func:`setup_map_axes`
+        Extra parameters are passed to :func:`decorate_map`
 
     Return
     ------
@@ -240,15 +246,27 @@ def create_base_map(
     projection = get_projection(projection, extent)
     fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111, projection=projection)
-    setup_map_axes(ax, extent, transform, **kwargs)
+    decorate_map(ax, extent, transform, **kwargs)
     if title:
         ax.set_title(title)
     return fig, ax
 
 
-#: Keys of the parameters of :func:`setup_map_axes` that may be passed to a function
+#: Former names of :func:`create_map` and :func:`decorate_map`
+create_base_map = create_map
+setup_map_axes = decorate_map
+
+#: Keys of the parameters of :func:`decorate_map` that may be passed to a function
 #: that draws on existing axes
-AX_SETUP_KEYS = ("gridlines", "gridlines_labels_on", "land", "land_scale", "coastlines", "bbox")
+AX_SETUP_KEYS = (
+    "gridlines",
+    "gridlines_labels_on",
+    "land",
+    "land_scale",
+    "coastlines",
+    "bbox",
+    "fancy",
+)
 
 
 # %% Colorbars
@@ -933,6 +951,219 @@ def add_compass(
         )
     )
     _add_effects_(ax, artists, effect, effect_kw, zorder)
+    return artists
+
+
+#: Sides of a map frame: axis along which it runs, position in axes coordinates, outward direction
+_FRAME_SIDES = {
+    "bottom": (0, 0.0, (0, -1)),
+    "top": (0, 1.0, (0, 1)),
+    "left": (1, 0.0, (-1, 0)),
+    "right": (1, 1.0, (1, 0)),
+}
+
+
+def _lonlat_to_axes_(ax, lon, lat):
+    """Axes coordinates of points given in degrees"""
+    ccrs, _ = _import_cartopy_()
+    x, y = ax.projection.transform_points(ccrs.Geodetic(), lon, lat)[:, :2].T
+    return (ax.transData + ax.transAxes.inverted()).transform(np.array([x, y]).T)
+
+
+def _get_frame_gridliners_(ax):
+    """Gridliners of an axes, created if needed, with the cartopy longitude and latitude locators
+
+    A gridliner that is created has no line and no label.
+    """
+    from cartopy.mpl.gridliner import Gridliner, classic_locator
+    from cartopy.mpl.ticker import LatitudeLocator, LongitudeLocator
+
+    gridliners = [a for a in ax.artists if isinstance(a, Gridliner)]
+    if not gridliners:
+        gl = ax.gridlines()
+        gl.xlines = gl.ylines = False
+        gridliners = [gl]
+    for gl in gridliners:  # Not PlateCarree gridliners get the generic locator
+        if gl.xlocator is classic_locator:
+            gl.xlocator = LongitudeLocator()
+        if gl.ylocator is classic_locator:
+            gl.ylocator = LatitudeLocator()
+    return gridliners
+
+
+def _get_frame_ticks_(ax, side, ticks):
+    """Positions of the ticks along a side, in axes coordinates, and the extent of the side"""
+    iaxis = _FRAME_SIDES[side][0]
+    edge = np.linspace(0, 1, 101)
+    ends = []
+    for fixed in (0.0, 1.0):
+        xy = np.array([edge, np.full_like(edge, fixed)]).T
+        lon, lat = _axes_to_lonlat_(ax, xy if iaxis == 0 else xy[:, ::-1])
+        ends.append(np.degrees(np.unwrap(np.radians(lon))) if iaxis == 0 else lat)
+    if not np.allclose(*ends, atol=1e-6 * max(1.0, np.abs(ends[0]).max())):
+        raise exceptions.XoaError(
+            "A fancy frame needs a projection whose meridians and parallels are "
+            "parallel to the edges of the map, like PlateCarree or Mercator."
+        )
+    vmin, vmax = ends[0].min(), ends[0].max()
+    if ticks is None:
+        gl = _get_frame_gridliners_(ax)[-1]
+        ticks = (gl.xlocator, gl.ylocator)[iaxis]
+    ticks = np.asarray(ticks.tick_values(vmin, vmax) if hasattr(ticks, "tick_values") else ticks)
+    ticks = ticks[(ticks >= vmin) & (ticks <= vmax)]
+
+    lon_mid, lat_mid = _axes_to_lonlat_(ax, np.array([[0.5, 0.5]]))
+    ones = np.ones_like(ticks)
+    pos = _lonlat_to_axes_(
+        ax,
+        ticks if iaxis == 0 else lon_mid * ones,
+        lat_mid * ones if iaxis == 0 else ticks,
+    )[:, iaxis]
+    return np.sort(pos[(pos > 1e-6) & (pos < 1 - 1e-6)])
+
+
+def add_fancy_map_frame(
+    ax,
+    width=5.0,
+    sides=("bottom", "left", "top", "right"),
+    colors=("k", "w"),
+    xticks=None,
+    yticks=None,
+    inside=False,
+    linewidth=0.6,
+    edgecolor="k",
+    zorder=5,
+):
+    """Add a black and white alternating frame to a map, like GMT does
+
+    The frame is cut at the longitudes and latitudes of the gridlines, which are created
+    without lines nor labels if the axes has none. Their locators are the cartopy
+    longitude and latitude ones, for all projections.
+    It requires a projection whose meridians and parallels are parallel
+    to the edges of the map, like ``PlateCarree`` or ``Mercator``.
+    Existing tick labels are moved away by the width of the frame.
+
+    Parameters
+    ----------
+    ax: cartopy.mpl.geoaxes.GeoAxes
+    width: float
+        Width of the frame in points
+    sides: list(str)
+        Sides to decorate among "bottom", "left", "top" and "right"
+    colors: tuple
+        Colors of the first and second alternating segments
+    xticks, yticks: None, array_like, matplotlib.ticker.Locator
+        Longitudes and latitudes where the frame is cut.
+        They default to the locators of the gridlines of the axes.
+    inside: bool
+        Draw the frame inside the map, rather than outside
+    linewidth, edgecolor:
+        Properties of the thin lines that outline the frame
+    zorder: float
+
+    Return
+    ------
+    list(matplotlib.artist.Artist)
+        The artists of the frame
+
+    Example
+    -------
+    .. code-block:: python
+
+        ax = create_map([-8, 0, 46, 50], gridlines=False)[1]
+        add_fancy_map_frame(ax, width=6)
+
+    See also
+    --------
+    decorate_map
+    """
+    sides = (sides,) if isinstance(sides, str) else tuple(sides)
+    for side in sides:
+        if side not in _FRAME_SIDES:
+            raise exceptions.XoaError(
+                f"Invalid side '{side}'. Choose among: {', '.join(_FRAME_SIDES)}"
+            )
+    ax.apply_aspect()
+    fig = ax.figure
+    sign = -1 if inside else 1
+
+    def get_transform(dx, dy):
+        """Axes coordinates shifted by (dx, dy) points"""
+        return ax.transAxes + mtransforms.ScaledTranslation(dx / 72, dy / 72, fig.dpi_scale_trans)
+
+    def style(artist):
+        artist.set_clip_on(False)
+        artist.set_zorder(zorder)
+        return ax.add_artist(artist)
+
+    artists = []
+    for side in sides:
+        iaxis, fixed, out = _FRAME_SIDES[side]
+        pos = _get_frame_ticks_(ax, side, (xticks, yticks)[iaxis])
+        bounds = np.concatenate([[0.0], np.sort(pos), [1.0]])
+
+        def seg(a, b):
+            return [(a, fixed), (b, fixed)] if iaxis == 0 else [(fixed, a), (fixed, b)]
+
+        dx, dy = sign * width * np.array(out)
+        mid = get_transform(dx / 2, dy / 2)
+        artists.append(
+            style(
+                mcollections.LineCollection(
+                    [seg(0, 1)], colors=colors[0], linewidths=width, transform=mid
+                )
+            )
+        )
+        artists.append(
+            style(
+                mcollections.LineCollection(
+                    [seg(a, b) for a, b in zip(bounds[1::2], bounds[2::2])],
+                    colors=colors[1],
+                    linewidths=width,
+                    transform=mid,
+                )
+            )
+        )
+        for offset in ((0, 0), (dx, dy)):
+            artists.append(
+                style(
+                    mcollections.LineCollection(
+                        [seg(0, 1)],
+                        colors=edgecolor,
+                        linewidths=linewidth,
+                        transform=get_transform(*offset),
+                    )
+                )
+            )
+
+    if not inside:
+        for gl in _get_frame_gridliners_(ax):
+            if {"bottom", "top"} & set(sides):
+                gl.xpadding += width
+            if {"left", "right"} & set(sides):
+                gl.ypadding += width
+
+    # Corners
+    for horiz in ("bottom", "top"):
+        for vert in ("left", "right"):
+            if horiz in sides and vert in sides:
+                cx, cy = _FRAME_SIDES[vert][1], _FRAME_SIDES[horiz][1]
+                sx, sy = sign * (2 * cx - 1), sign * (2 * cy - 1)
+                anchor = mtransforms.Affine2D().scale(1 / 72) + fig.dpi_scale_trans
+                trans = anchor + mtransforms.ScaledTranslation(cx, cy, ax.transAxes)
+                artists.append(
+                    style(
+                        mpatches.Rectangle(
+                            (0, 0),
+                            sx * width,
+                            sy * width,
+                            facecolor=colors[1],
+                            edgecolor=edgecolor,
+                            linewidth=linewidth,
+                            transform=trans,
+                        )
+                    )
+                )
     return artists
 
 

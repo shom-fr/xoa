@@ -37,8 +37,10 @@ def get_lonlat(nx, ny, x1=100.0, y1=100.0):
 
 
 def test_moved_helpers_are_still_available_from_xoa_plot():
-    for name in "add_land", "create_base_map", "setup_map_axes", "_import_cartopy_":
+    for name in "add_land", "create_map", "decorate_map", "_import_cartopy_":
         assert getattr(xplot, name) is getattr(cplot, name)
+    for old, new in ("create_base_map", "create_map"), ("setup_map_axes", "decorate_map"):
+        assert getattr(xplot, old) is getattr(xplot, new)
 
 
 class TestStrides:
@@ -476,6 +478,51 @@ class TestMapDecorations:
             cplot.add_scalebar(ax, units="miles")
         with pytest.raises(xoa.exceptions.XoaError):
             cplot.add_scalebar(ax, loc="center")
+
+    def test_fancy_frame_follows_the_gridlines(self):
+        ax = get_map()
+        ax.gridlines().xlocator = matplotlib.ticker.FixedLocator([-5, 0, 5])
+        base, white, *_ = cplot.add_fancy_map_frame(ax, sides="bottom", width=4)
+        assert np.allclose(base.get_colors()[0][:3], 0)
+        # Bottom: black, white, black, white from the left edge, cut at -5, 0 and 5
+        xs = [seg[:, 0] for seg in white.get_segments()]
+        assert len(xs) == 2
+        assert xs[0][0] < xs[0][1] < xs[1][0] < xs[1][1]
+        assert np.allclose([xs[0][0], xs[1][0]], [7 / 24, 17 / 24])
+
+    def test_fancy_frame_sides_corners_and_padding(self):
+        ax = get_map()
+        gl = ax.gridlines(draw_labels=True)
+        pad = gl.xpadding, gl.ypadding
+        artists = cplot.add_fancy_map_frame(ax, width=6)
+        assert len(artists) == 4 * 4 + 4
+        assert (gl.xpadding, gl.ypadding) == (pad[0] + 6, pad[1] + 6)
+        artists = cplot.add_fancy_map_frame(get_map(), sides=("left",), inside=True)
+        assert len(artists) == 4
+
+    def test_fancy_frame_forces_cartopy_locators(self):
+        ccrs, _ = cplot._import_cartopy_()
+        for proj in None, ccrs.Mercator():
+            ax = get_map(proj, (-12, 12, 35, 55))
+            assert cplot.add_fancy_map_frame(ax, sides="bottom")
+            (gl,) = [a for a in ax.artists if hasattr(a, "xlocator")]
+            assert type(gl.xlocator).__name__ == "LongitudeLocator"
+            assert type(gl.ylocator).__name__ == "LatitudeLocator"
+            assert not gl.xlines and not gl.ylines
+
+    def test_fancy_frame_errors(self):
+        with pytest.raises(xoa.XoaError, match="side"):
+            cplot.add_fancy_map_frame(get_map(), sides="middle")
+        ccrs, _ = cplot._import_cartopy_()
+        with pytest.raises(xoa.XoaError, match="parallel"):
+            cplot.add_fancy_map_frame(get_map(ccrs.LambertConformal(), (-10, 10, 40, 55)))
+
+    def test_fancy_map_creation(self):
+        pytest.importorskip("cartopy")
+        _, ax = cplot.create_map([-8, 0, 46, 50], fancy=True)
+        assert len(ax.collections) == 16 and len(ax.patches) == 4
+        _, ax = cplot.create_map([-8, 0, 46, 50], fancy=dict(sides="bottom"), gridlines=False)
+        assert len(ax.collections) == 4 and not ax.patches
 
     @pytest.mark.parametrize("style,npoly", [("simple", 1), ("fancy", 8)])
     def test_compass_styles(self, style, npoly):

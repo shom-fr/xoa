@@ -6,6 +6,8 @@ Unreleased
 
 New features
 ------------
+- Rename :func:`xoa.plot.create_base_map` and :func:`~xoa.plot.setup_map_axes` to :func:`~xoa.plot.create_map` and :func:`~xoa.plot.decorate_map`. The old names remain as aliases.
+- Add :func:`xoa.plot.add_fancy_map_frame` and the ``fancy`` option of :func:`xoa.plot.decorate_map`, for a GMT-like black and white frame.
 - Ignore the missing time steps of 1D series in :func:`xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv`.
 - Add cartesian components to :func:`xoa.plot.plot_rose`: ``plot_rose(u, v)``, with the ``cartesian`` and ``from_`` arguments, and a fallback to the components of a dataset.
 - Add :func:`xoa.plot.add_scalebar` and :func:`xoa.plot.add_compass`, with an optional shadow or glow (``effect``), and the ``scalebar`` and ``compass`` arguments of :func:`xoa.plot.plot_field` and :func:`~xoa.plot.plot_grid`. See :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.

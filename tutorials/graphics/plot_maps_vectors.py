@@ -8,6 +8,7 @@ In this tutorial, we show how to:
 
 * plot a field on a map, whose extent and labels are found from the data,
 * add a scale bar and a compass, optionally with a shadow or a glow,
+* frame a map in the style of GMT,
 * compare several fields in a single figure,
 * overlay under-sampled arrows of the currents, optionally colored by the speed,
   with a reference arrow whose value is rounded,
@@ -73,6 +74,14 @@ plot_field(
     scalebar={"effect": "shadow"},
     compass={"style": "fancy", "effect": "shadow"},
 )
+
+# %%
+# Fancy frame
+# -----------
+#
+# A black and white frame, cut at the gridlines, is added with ``fancy`` in ``map_kw``.
+
+plot_field(ds.temp, cmap=cmocean.cm.thermal, map_kw={**MAP_KW, "fancy": True})
 
 # %%
 # Locating the domain

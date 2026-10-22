@@ -43,9 +43,12 @@ from .core import plot as cplot
 from .core import stats as cstats
 from .core.plot import (  # noqa
     add_compass,
+    add_fancy_map_frame,
     add_land,
     add_scalebar,
     create_base_map,
+    create_map,
+    decorate_map,
     setup_map_axes,
     _import_cartopy_,
 )
@@ -838,8 +841,8 @@ def _get_map_axes_(ax, extent, transform, map_kw, projection=None):
     if ax is None:
         if projection is not None:
             kw.setdefault("projection", projection)
-        return create_base_map(extent, **kw)[1]
-    setup_map_axes(ax, extent, transform, **{k: v for k, v in kw.items() if k in _AX_SETUP_KEYS})
+        return create_map(extent, **kw)[1]
+    decorate_map(ax, extent, transform, **{k: v for k, v in kw.items() if k in _AX_SETUP_KEYS})
     return ax
 
 
@@ -909,9 +912,9 @@ def plot_field(
     margin: float
         Margin added to the extent. See :func:`xoa.geo.get_extent`.
     map_kw: None, dict
-        Parameters that decorate the map, as accepted by :func:`setup_map_axes`.
+        Parameters that decorate the map, as accepted by :func:`decorate_map`.
         When ``ax`` is not provided, ``figsize`` and ``projection`` are also
-        accepted, as in :func:`create_base_map`.
+        accepted, as in :func:`create_map`.
     overlay_contours: None, True, list(dict)
         Line contours drawn over the field. ``True`` is a shorthand for a single
         contour of the field. Each item is a dict of parameters passed to

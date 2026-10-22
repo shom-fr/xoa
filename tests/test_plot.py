@@ -122,27 +122,27 @@ class TestGetLabel:
 
 
 class TestMapAxes:
-    def test_create_base_map(self):
-        fig, ax = xplot.create_base_map([10.0, 15.0, 40.0, 44.0], title="title", figsize=(4, 3))
+    def test_create_map(self):
+        fig, ax = xplot.create_map([10.0, 15.0, 40.0, 44.0], title="title", figsize=(4, 3))
         assert ax.get_title() == "title"
         assert tuple(fig.get_size_inches()) == (4, 3)
         extent = ax.get_extent(crs=xplot._import_cartopy_()[0].PlateCarree())
         np.testing.assert_allclose(extent, [10.0, 15.0, 40.0, 44.0], atol=1e-6)
 
-    def test_setup_map_axes_options(self):
+    def test_decorate_map_options(self):
         ccrs, _ = xplot._import_cartopy_()
 
         def feature_artists(ax):
             return [c for c in ax.get_children() if type(c).__name__ == "FeatureArtist"]
 
         ax = plt.figure().add_subplot(111, projection=ccrs.PlateCarree())
-        xplot.setup_map_axes(ax, [0, 10, 0, 10])
+        xplot.decorate_map(ax, [0, 10, 0, 10])
         assert len(ax.artists) == 1
         assert not feature_artists(ax)
         assert ax.spines["geo"].get_visible()
 
         ax = plt.figure().add_subplot(111, projection=ccrs.PlateCarree())
-        xplot.setup_map_axes(ax, [0, 10, 0, 10], gridlines=False, land=True, bbox=False)
+        xplot.decorate_map(ax, [0, 10, 0, 10], gridlines=False, land=True, bbox=False)
         assert len(ax.artists) == 0
         assert len(feature_artists(ax)) == 1
         assert not ax.spines["geo"].get_visible()
