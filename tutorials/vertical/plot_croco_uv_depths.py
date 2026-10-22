@@ -60,7 +60,8 @@ print(ds.u.dims, ds.v.dims, ds.z_rho.dims)
 #    half a step further (86.5, 88.5, ...).
 #    The rho neighbours of a u point are thus two cells apart here and the
 #    next one is not in the file, so the values at u and v points are only illustrative.
-#    On a full output, ``xi_u`` is ``xi_rho[:-1] + 0.5`` and ``get_centers`` aligns them.
+#    On a full output, ``xi_u`` is ``xi_rho[:-1] + 0.5`` and :func:`~xoa.grid.get_centers` aligns
+#    them.
 
 
 def rho2u(da):

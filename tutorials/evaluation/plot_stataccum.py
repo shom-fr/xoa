@@ -93,9 +93,9 @@ ax.legend()
 # -----------------
 #
 # We now reduce all the spatial dimensions at each time step. Statistics are weighted
-# by the layer thicknesses, which are deduced from the ``z`` coordinate, and by the grid
-# cell sizes, which are deduced from the longitudes and latitudes.
-# These are the weights that ``StatAccum`` computes internally.
+# by the layer thicknesses, which :func:`~xoa.grid.get_dz` deduces from the ``z`` coordinate,
+# and by the grid cell sizes, which :func:`~xoa.grid.get_dx_dy` deduces from the longitudes
+# and latitudes. These are the weights that :class:`~xoa.stats.StatAccum` computes internally.
 # They are very heterogeneous, as shown below.
 
 dz = get_dz(temp)

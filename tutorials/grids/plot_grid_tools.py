@@ -54,7 +54,7 @@ print(f"dy: {dy.min().item() / 1e3:.1f} - {dy.max().item() / 1e3:.1f} km")
 
 # %%
 # The resolution shrinks along x towards the poles, as meridians get closer.
-# The ``get_median_resolution`` function gives a single value in degrees, which is
+# The :func:`~xoa.grid.get_median_resolution` function gives a single value in degrees, which is
 # convenient to choose the resolution of another dataset.
 
 print(grid.get_median_resolution(temp))
@@ -72,8 +72,8 @@ plot_grid(temp)
 # Large grids are under-sampled to stay readable. By default, the stride is adapted
 # to the size of the map, so that cells are at least ``min_spacing`` pixels apart on screen,
 # whatever the number of cells, the projection or the rotation of the grid.
-# Here is a grid of 400 x 300 points, that is drawn with only a few tens of lines,
-# and whose displayed centers are the ones of the coarse cells.
+# Here is a grid of 400 x 300 points, from :func:`xoa.core.grid.create_rotated_grid`, that is
+# drawn with only a few tens of lines, and whose displayed centers are the ones of the coarse cells.
 
 big = create_rotated_grid(400, 300, 18.5, -36.0, 25.0, 4.0, 2.5)
 big = xr.Dataset(

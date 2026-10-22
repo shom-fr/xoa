@@ -7,7 +7,8 @@ Mixed layer, thermocline and isotherms
 In this tutorial, we show how to:
 
 * compute the mixed layer depth with a temperature or a density criterion,
-* find the depth of an isotherm and the temperature at a given depth with ``isoslice``,
+* find the depth of an isotherm and the temperature at a given depth with
+  :func:`~xoa.interp.isoslice`,
 * check the diagnostics on a vertical profile and on a section.
 
 The data are a GLORYS reanalysis of the Gulf Stream region. The concepts are explained
@@ -56,7 +57,8 @@ sigma0.attrs.update(long_name="Potential density anomaly", units="kg m-3")
 # Mixed layer depth
 # -----------------
 #
-# The mixed layer is the surface layer whose properties are homogeneous. Its depth is where
+# The mixed layer is the surface layer whose properties are homogeneous.
+# Its depth, given by :func:`~xoa.thermdyn.mixed_layer_depth`, is where
 # the temperature has decreased by a given amount (``deltatemp``, 0.2 degC by default)
 # or the density has increased by a given amount (``deltadens``, 0.03 kg m-3) with respect
 # to the surface. The array must have a depth coordinate with a ``positive`` attribute.

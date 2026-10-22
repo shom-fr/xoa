@@ -247,8 +247,9 @@ m = plot_field(
 axes[1].plot(obs.lon, obs.lat, "k.", transform=pc)
 
 # %%
-# The ``xoa`` accessor does the same in one call, and it caches the tree of the grid,
-# so that successive calls with other targets do not rebuild it.
+# The :meth:`~xarray.DataArray.xoa.get_neighbors` method of the ``xoa`` accessor does the same
+# in one call, and it caches the tree of the grid, so that successive calls with other targets
+# do not rebuild it.
 
 dist, idx = grid.xoa.get_neighbors(obs, k=3, units="km")
 print(dist.dims)

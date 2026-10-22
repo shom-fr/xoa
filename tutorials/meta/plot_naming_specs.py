@@ -67,10 +67,10 @@ with meta.set_meta_specs(specs):
 # -------------------------
 #
 # The same specifications are written in a configuration file, which is better for a model
-# that you use often. The ``name`` is the specialized name and ``decode`` renames
-# the arrays to the generic names and completes their attributes. The ``register`` section
-# gives a name to the specifications, which is needed to recall them.
-# We write the file in a temporary directory.
+# that you use often. The ``name`` is the specialized name and
+# :meth:`~xarray.Dataset.xoa.decode` renames the arrays to the generic names and completes their
+# attributes. The ``register`` section gives a name to the specifications, which is needed to
+# recall them. We write the file in a temporary directory.
 
 content = """
 [register]
@@ -107,8 +107,8 @@ print(xoa.get_meta_config_file("croco"))
 # ----------------
 #
 # Registered specifications are recalled by their name and are candidates when
-# the ones that match a dataset are looked for, so that ``set_meta_specs`` is not needed
-# any more. The ones that know the most names of a dataset are inferred.
+# the ones that match a dataset are looked for, so that :class:`~xoa.meta.set_meta_specs` is not
+# needed any more. The ones that know the most names of a dataset are inferred.
 
 meta.register_meta_specs(str(path))
 print(meta.is_registered_meta_specs("mymodel"))

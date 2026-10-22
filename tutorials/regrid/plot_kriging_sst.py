@@ -163,7 +163,8 @@ add_colorbar(sc, axes[1], label="°C")
 # Fit the semi-variogram
 # ----------------------
 #
-# The empirical semi-variogram of the anomalies is fitted with the available models.
+# The empirical semi-variogram of the anomalies, from :func:`~xoa.krig.empirical_variogram`,
+# is fitted with the available :class:`~xoa.krig.VariogramModel` models.
 # The nugget accounts for the noise and the unresolved small scales, the sill for the
 # variance at large distances, and the range for the correlation length.
 # The distances are in km, and the fit error helps choosing the model.

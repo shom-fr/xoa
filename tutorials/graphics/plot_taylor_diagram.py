@@ -49,8 +49,8 @@ models = xr.concat(
 # %%
 # One point per model
 # -------------------
-# The statistics are computed over ``time`` and ``x``. The remaining ``model``
-# dimension creates the points, whose labels are the coordinates.
+# :func:`~xoa.plot.plot_taylor` computes the statistics over ``time`` and ``x``.
+# The remaining ``model`` dimension creates the points, whose labels are the coordinates.
 # A blurred drop shadow is added to the markers with :func:`xoa.plot.add_shadow`.
 # The artists of the diagram are available as attributes, like ``markers`` and ``reference``.
 # It must be called in the same cell as the plot, since the figure is captured

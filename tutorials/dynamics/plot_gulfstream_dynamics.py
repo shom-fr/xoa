@@ -113,7 +113,9 @@ add_shadow(quiver, ax=ax, width=2, xoffset=1, yoffset=-1, alpha=0.6)
 # -----------
 #
 # The functions of :mod:`xoa.dyn` are also available as methods of the ``xoa`` accessor
-# of a dataset that contains the currents.
+# of a dataset that contains the currents, like :meth:`~xarray.Dataset.xoa.get_rossby`,
+# :meth:`~xarray.Dataset.xoa.get_div`, :meth:`~xarray.Dataset.xoa.get_strain` and
+# :meth:`~xarray.Dataset.xoa.get_okuboweiss`.
 # All of them are computed with numba and accept extra leading dimensions, like time,
 # and dask arrays.
 
@@ -333,6 +335,7 @@ for t, m in masks.items():
 
 # %%
 # Polygons are not limited to vortices: you can use any shape, like the contour of a region
-# or a shapely geometry, to extract or average any field. The ``get_polygon_mask`` method of the
-# ``xoa`` accessor does the same from a data array or a dataset.
+# or a shapely geometry, to extract or average any field. The
+# :meth:`~xarray.Dataset.xoa.get_polygon_mask` method of the ``xoa`` accessor does the same from a
+# data array or a dataset.
 plt.show()

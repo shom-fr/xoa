@@ -64,7 +64,8 @@ def plot_selection(ax, grid, sel, color="C3", title=None):
 
 
 # %%
-# Two grids are used: a rectangular one and a rotated curvilinear one.
+# Two grids are used: a rectangular one and a rotated curvilinear one, made with
+# :func:`xoa.core.grid.create_rotated_grid`.
 
 lon = xr.DataArray(np.arange(-7.0, -2.0, 0.1), dims="lon", name="lon")
 lat = xr.DataArray(np.arange(45.0, 49.5, 0.1), dims="lat", name="lat")
@@ -86,8 +87,9 @@ curv = xr.Dataset(
 # ---------------------------
 #
 # On a rectangular grid, a box is exactly a pair of slices, so no mask is needed.
-# The result is a :class:`~xoa.geo.GeoSelection`, whose ``isel`` attribute is passed to
-# :meth:`xarray.DataArray.isel`, or that is applied directly with ``apply``.
+# :func:`~xoa.geo.get_geosel` returns a :class:`~xoa.geo.GeoSelection`, whose ``isel`` attribute
+# is passed to :meth:`xarray.DataArray.isel`, or that is applied directly with
+# :meth:`~xoa.geo.GeoSelection.apply`.
 # The longitudes of a box can cross the dateline: ``lon=(170, -170)``.
 
 sel = get_geosel(rect, lon=(-5.5, -3.5), lat=(46, 48))
@@ -102,8 +104,8 @@ print(sub.shape)
 #
 # The same box is not a rectangle of indices anymore. With ``fit="outer"``, the smallest
 # window that covers the box is returned with a mask of the points that are inside it,
-# applied by ``apply`` (or ``mask=False`` to keep them). With ``fit="inner"``, the
-# largest window with only points inside is returned, and no mask is needed.
+# applied by :meth:`~xoa.geo.GeoSelection.apply` (or ``mask=False`` to keep them). With
+# ``fit="inner"``, the largest window with only points inside is returned, and no mask is needed.
 
 box = dict(lon=(-5.2, -3.8), lat=(46.2, 47.4))
 fig, axes = new_map(2)
@@ -118,7 +120,8 @@ for ax, fit in zip(axes, ["outer", "inner"]):
 # --------------------
 #
 # A circle is given by its center and radius, in meters or in kilometers with ``units``,
-# and a polygon by its vertices. Several arrays are selected in a single call.
+# and a polygon by its vertices. The :class:`~xoa.geo.GeoSelector` class analyses the grid once,
+# to make several selections, which can be applied to several arrays.
 
 selector = GeoSelector(curv)
 circle = selector.select(circle=(-4.5, 47.0, 100), units="km")
@@ -199,10 +202,10 @@ print(curv.isel(sel.isel).sst.values, sel.dist.values.round(1))
 # -------------------------------------
 #
 # The selector analyses the grid once and makes as many selections as needed, which is
-# also done by the ``get_geosel`` method of the ``xoa`` accessor, that caches it, while its
-# ``geosel`` method applies the selection to the object directly.
-# The :func:`~xoa.geo.with_geosel` decorator adds a ``geosel`` argument to any function
-# that takes an array or dataset as first argument.
+# also done by the :meth:`~xarray.DataArray.xoa.get_geosel` method of the ``xoa`` accessor, that
+# caches it, while its :meth:`~xarray.DataArray.xoa.geosel` method applies the selection to the
+# object directly. The :func:`~xoa.geo.with_geosel` decorator adds a ``geosel`` argument to any
+# function that takes an array or dataset as first argument.
 
 
 @with_geosel

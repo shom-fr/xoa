@@ -59,6 +59,9 @@ Methods
     DataArray.xoa.harmonic_analysis
     DataArray.xoa.tidal_filter
     DataArray.xoa.get_polygon_mask
+    DataArray.xoa.get_neighbors
+    DataArray.xoa.get_geosel
+    DataArray.xoa.geosel
 
 
 Dataset
@@ -106,6 +109,9 @@ Methods
     Dataset.xoa.get_okuboweiss
     Dataset.xoa.harmonic_predict
     Dataset.xoa.get_polygon_mask
+    Dataset.xoa.get_neighbors
+    Dataset.xoa.get_geosel
+    Dataset.xoa.geosel
     Dataset.decode_sigma.decode
     Dataset.decode_sigma.get_sigma_terms
 

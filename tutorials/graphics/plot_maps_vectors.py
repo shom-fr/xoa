@@ -79,7 +79,8 @@ plot_field(
 # Locating the domain
 # -------------------
 #
-# A minimap shows where the data are. It is drawn from the coordinates of any object,
+# A minimap, drawn by :func:`~xoa.plot.plot_minimap`, shows where the data are.
+# It is drawn from the coordinates of any object,
 # here as a box over a small map. With ``parent``, it is an inset of the main axes, at the
 # location ``loc``, which keeps the figure compact and the minimap close to what it locates.
 
@@ -87,7 +88,8 @@ ax = plot_field(ds.temp, cmap=cmocean.cm.thermal, map_kw=MAP_KW).axes
 plot_minimap(ds, parent=ax, loc="lower right", plot_coords="box")
 
 # %%
-# A double minimap adds a global map, with the location as a single point.
+# A double minimap, drawn by :func:`~xoa.plot.plot_double_minimap`, adds a global map,
+# with the location as a single point.
 # The regional map is placed on the left of the global one.
 
 ax = plot_field(ds.sal, cmap=cmocean.cm.haline, map_kw=MAP_KW).axes
@@ -119,8 +121,8 @@ fig, axes = plot_fields(
 # Currents as arrows
 # ------------------
 #
-# The arrows are under-sampled so that they stay readable, with a stride that is adapted to
-# the size of the axes. They are drawn over a field, here the speed.
+# The arrows of :func:`~xoa.plot.plot_vectors` are under-sampled so that they stay readable, with a
+# stride that is adapted to the size of the axes. They are drawn over a field, here the speed.
 # A reference arrow is added above the left corner of the map, with a round value
 # that is close to the strong arrows, like 0.5 m s-1 here. Pass ``key=False`` to remove it.
 
@@ -136,8 +138,8 @@ plot_vectors(ds.u, ds.v, color="speed", stride=3, map_kw=MAP_KW, title="Stride 3
 # Current time series
 # -------------------
 #
-# Along a single axis, a current series is drawn as sticks anchored on a line,
-# like a tidal current at a mooring. Here the series is synthetic.
+# Along a single axis, :func:`~xoa.plot.plot_stick` draws a current series as sticks anchored on a
+# line, like a tidal current at a mooring. Here the series is synthetic.
 
 time = np.array("2020-01-01", dtype="M8[h]") + np.arange(72)
 phase = 2 * np.pi * np.arange(72) / 12.42

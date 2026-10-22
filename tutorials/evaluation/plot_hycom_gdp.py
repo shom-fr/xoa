@@ -188,6 +188,8 @@ vh15 = regrid1d(hycom["v"], d15).squeeze(drop=True).mean(dim="time")
 #
 # The geographic extent is easily computed with the :func:`xoa.geo.get_extent` function.
 # The background currents are plotted with the :func:`xoa.plot.plot_flow` function.
+# A reference arrow with a round value is added with :func:`xoa.core.plot.get_quiverkey_value`
+# and :func:`xoa.core.plot.add_quiverkey`, and a minimap with :func:`xoa.plot.plot_double_minimap`.
 
 pmerc = ccrs.Mercator()
 pcarr = ccrs.PlateCarree()
