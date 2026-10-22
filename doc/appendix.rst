@@ -6,3 +6,4 @@ Appendices
 
     appendix.options
     appendix.meta
+    appendix.tide

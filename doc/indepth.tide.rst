@@ -43,17 +43,85 @@ Their angular frequencies come from :func:`~xoa.tide.get_frequencies`.
 .. ipython:: python
 
     import xoa.tide as xtide
-    xtide.CONSTITUENT_NAMES
+    xtide.get_constituent_names()
     2 * 3.14159 / xtide.get_frequencies(["M2", "K1"]) / 3600  # periods in hours
 
 The database is read from ``tide.cfg`` and checked with the specifications of ``tide.ini``,
 using :mod:`xoa.cfgm`. A ``tide.cfg`` file located next to the xoa user config file
-(see :func:`xoa.get_default_user_config_file`) completes or overrides the default sections.
+(see :func:`xoa.get_default_user_config_file`) completes or overrides the default sections,
+and :class:`~xoa.tide.set_constituents` uses any other file (see :ref:`indepth.tide.custom`).
+The default constituents, the file syntax and an example are in the :ref:`appendix.tide` appendix.
 
 Two constituents can only be separated by an analysis if the record is longer than
 their beat period (Rayleigh criterion). :func:`~xoa.tide.auto_constituents` selects
 the constituents that a record resolves, :func:`~xoa.tide.beat_period` and
 :func:`~xoa.tide.unresolved_pairs` check your own choice.
+
+.. _indepth.tide.custom:
+
+Adding or changing constituents
+===============================
+
+The database is a plain text file, so you can add constituents or change the default ones
+without touching xoa. Write a file with one section per constituent, for instance
+:file:`tide.cfg` in your working directory, with the long-period constituent MSf and the
+shallow-water constituent 2MS6 that is made of twice M2 and once S2::
+
+    [MSf]
+    doodson = 073.555
+    species = 0
+
+    [2MS6]
+    doodson = 673.555
+    species = 6
+    [[compound_of]]
+    [[[M2]]]
+    multiplier = 2
+    [[[S2]]]
+    multiplier = 1
+
+and make it the current database with :class:`~xoa.tide.set_constituents`.
+It completes the default constituents, or replaces them with ``replace=True``.
+Used as a context manager, it restores the previous database when it exits::
+
+    import xoa.tide as xtide
+
+    xtide.set_constituents("tide.cfg")  # until the next call
+    xtide.get_constituent_names()
+
+    with xtide.set_constituents("tide.cfg", replace=True):
+        coef = xtide.harmonic_analysis(ssh, names=["MSf", "2MS6"])
+
+The constituents are then available by name, like the default ones.
+:func:`~xoa.tide.reset_constituents` goes back to the defaults,
+:func:`~xoa.tide.get_constituents` and :func:`~xoa.tide.get_constituent_names` give
+the current database and its names, and a dict can be given instead of a file.
+For all your sessions, put a :file:`tide.cfg` file in the directory of the xoa user config
+file, like :file:`~/.config/xoa/tide.cfg`, whose path is returned by
+:func:`xoa.tide.data.get_user_cfg_file`: it completes the default constituents.
+
+The :ref:`appendix.tide` appendix lists the default constituents and their file, and
+describes all the keys.
+The Doodson number sets the frequency, which is the way to check what you wrote:
+``2 * np.pi / xtide.get_frequencies(["MSf"]) / 86400`` is the period in days, about 14.77 here.
+The satellites only give the nodal corrections: without them, the amplitude factor is 1 and the
+phase correction is 0, which is right for a constituent without nodal modulation.
+The nodal corrections of a compound constituent are those of its sources.
+
+Some points deserve attention:
+
+- A section with the name of a default constituent replaces it entirely, and the keys that you
+  do not write take their defaults, with no satellites for instance. Start from the section of the
+  :ref:`default file <appendix.tide.default>` to change a single value.
+- The files are validated with the :ref:`specifications <appendix.tide.specs>`, and an error
+  names the faulty key. It is raised by :class:`~xoa.tide.set_constituents`, which then leaves
+  the current database unchanged.
+- The sources complete the default constituents, not the current ones: nested calls do not
+  accumulate.
+- The sources of a compound constituent must be constituents of the database.
+- Close constituents are only separated by long records. Check your choice with
+  :func:`~xoa.tide.beat_period` and :func:`~xoa.tide.unresolved_pairs`.
+  :func:`~xoa.tide.auto_constituents` ignores the compound constituents.
 
 .. _indepth.tide.harmonic:
 
