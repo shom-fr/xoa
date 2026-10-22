@@ -146,6 +146,7 @@ TUTORIALS_ORDER = [
     "plot_naming",
     "plot_naming_specs",
     "plot_maps_vectors",
+    "plot_map_decorations",
     "plot_colormaps_effects",
     "plot_taylor_diagram",
     "plot_wave_rose",
