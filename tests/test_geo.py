@@ -8,7 +8,7 @@ import numpy as np
 import xarray as xr
 
 from xoa.core import geo as core_geo
-from xoa import geo
+from xoa import exceptions, geo
 
 
 class TestDistance:
@@ -197,3 +197,158 @@ def test_clusterize_seed():
     again = geo.clusterize(ds, npmax=8, split=True, seed=3)
     for c0, c1 in zip(first, again):
         np.testing.assert_array_equal(c0.indices, c1.indices)
+
+
+class TestGeoSel:
+    @pytest.fixture
+    def rect(self):
+        lon = xr.DataArray(np.arange(0.0, 360.0, 10.0), dims="x", name="lon")
+        lat = xr.DataArray(np.arange(-60.0, 61.0, 10.0), dims="y", name="lat")
+        data = xr.DataArray(
+            np.random.default_rng(0).random((lat.size, lon.size)),
+            dims=("y", "x"),
+            coords={"lon": lon, "lat": lat},
+            name="temp",
+        )
+        return data
+
+    @pytest.fixture
+    def curv(self):
+        x, y = np.meshgrid(np.arange(20.0), np.arange(15.0))
+        lon = xr.DataArray(10 + 0.5 * x - 0.2 * y, dims=("y", "x"), name="lon")
+        lat = xr.DataArray(40 + 0.5 * y + 0.2 * x, dims=("y", "x"), name="lat")
+        data = xr.DataArray(
+            np.arange(lon.size, dtype="d").reshape(lon.shape),
+            dims=("y", "x"),
+            coords={"lon": lon, "lat": lat},
+            name="temp",
+        )
+        return xr.Dataset({"temp": data, "tt": xr.DataArray(np.arange(20.0), dims="x")})
+
+    @pytest.fixture
+    def cloud(self):
+        lon = xr.DataArray([0.0, 10.0, 179.0, -179.0], dims="n", name="lon")
+        lat = xr.DataArray([0.0, 10.0, 0.0, 0.0], dims="n", name="lat")
+        return xr.DataArray(np.arange(4.0), dims="n", coords={"lon": lon, "lat": lat})
+
+    def test_box_rect(self, rect):
+        sel = geo.get_geosel(rect, lon=(15.0, 45.0), lat=(-25.0, 5.0))
+        assert sel.isel == {"x": slice(2, 5), "y": slice(4, 7)} and sel.mask is None
+        sub = sel.apply(rect)
+        assert sub.shape == (3, 3)
+        xr.testing.assert_equal(sub, rect.isel(sel.isel))
+
+    def test_box_rect_dateline_pad(self, rect):
+        sel = geo.get_geosel(rect, lon=(355.0, 5.0), lat=(0.0, 0.0), pad=1)
+        np.testing.assert_array_equal(rect.lon[sel.isel["x"]], [350.0, 0.0, 10.0])
+
+    def test_box_curv(self, curv):
+        box = dict(lon=(12.0, 16.0), lat=(43.0, 46.0))
+        sel = geo.get_geosel(curv, **box)
+        assert set(sel.isel) == {"y", "x"} and sel.mask.dims == ("y", "x")
+        sub = sel.apply(curv)
+        # Variables with a missing dimension are not masked, the others are
+        assert sub.tt.isnull().sum() == 0
+        assert int(sub.temp.notnull().sum()) == int(sel.mask.sum())
+        lon, lat = sub.lon, sub.lat
+        inside = (lon >= 12) & (lon <= 16) & (lat >= 43) & (lat <= 46)
+        np.testing.assert_array_equal(sub.temp.notnull(), inside)
+        assert sel.apply(curv, mask=False).temp.notnull().all()
+        inner = geo.get_geosel(curv, fit="inner", **box)
+        assert inner.mask is None
+        assert inner.apply(curv).temp.notnull().all()
+
+    def test_apply_several(self, curv):
+        sel = geo.get_geosel(curv, circle=(13.0, 44.0, 150.0), units="km")
+        a, b = sel.apply(curv.temp, curv.tt)
+        assert a.dims == ("y", "x") and b.dims == ("x",)
+
+    def test_selector_reuse(self, curv):
+        selector = geo.GeoSelector(curv)
+        sel = geo.get_geosel(selector, polygon=[[11, 42], [16, 42], [14, 46]])
+        assert sel.mask is not None
+        sel = geo.get_geosel(selector, lon=(12, 16), lat=(43, 46), pad="edges")
+        sel0 = geo.get_geosel(selector, lon=(12, 16), lat=(43, 46))
+        assert int(sel.mask.sum()) > int(sel0.mask.sum())
+
+    def test_pad_units(self, rect):
+        sel0 = geo.get_geosel(rect, circle=(100.0, 20.0, 1000.0), units="km")
+        circle = (100.0, 20.0, 1000.0)
+        sel1 = geo.get_geosel(rect, circle=circle, units="km", pad=500, pad_units="km")
+        sel2 = geo.get_geosel(rect, circle=(100.0, 20.0, 1500.0), units="km")
+        assert sel1.isel == sel2.isel
+        np.testing.assert_array_equal(sel1.mask, sel2.mask)
+        size = lambda sel: sel.isel["x"].stop - sel.isel["x"].start  # noqa: E731
+        assert size(sel1) > size(sel0)
+
+    def test_nearest_scalar(self, rect):
+        sel = geo.get_geosel(rect, nearest=(358.0, 11.0))
+        assert sel.isel == {"x": 0, "y": 7}
+        assert float(sel.dist) > 0
+        assert float(rect.isel(sel.isel).lon) == 0.0
+        with pytest.raises(exceptions.XoaError):
+            geo.get_geosel(rect, nearest=(100.0, 11.0), max_dist=10.0, units="km")
+
+    def test_nearest_vector(self, curv):
+        sel = geo.get_geosel(curv, nearest=([11.0, 14.0], [41.0, 44.0]), units="km")
+        sub = curv.temp.isel(sel.isel)
+        assert sub.dims == ("target",)
+        assert sel.dist.attrs["units"] == "km"
+        ref = geo.get_neighbors(curv, ([11.0, 14.0], [41.0, 44.0]), k=1)[1]
+        for dim in sel.isel:
+            np.testing.assert_array_equal(sel.isel[dim].values, ref[dim].values)
+
+    def test_cloud(self, cloud):
+        sel = geo.get_geosel(cloud, lon=(170.0, -170.0), lat=(-1.0, 1.0))
+        assert sel.isel == {"n": slice(2, 4)}
+        sel = geo.get_geosel(cloud, circle=(0.0, 0.0, 1.0), units="km", pad=2000, pad_units="km")
+        assert sel.isel == {"n": slice(0, 2)}
+        with pytest.raises(ValueError):
+            geo.get_geosel(cloud, lon=(0.0, 1.0), pad=1)
+        sel = geo.get_geosel(cloud, nearest=(9.0, 9.0))
+        assert sel.isel == {"n": 1}
+
+    def test_tuple(self, rect):
+        sel = geo.get_geosel((rect.lon, rect.lat), lon=(15.0, 45.0))
+        assert sel.isel["x"] == slice(2, 5)
+        with pytest.raises(exceptions.XoaError):
+            geo.GeoSelector(([1.0, 2.0], [1.0, 2.0]))
+
+    def test_scalar_lonlat_is_nearest(self, rect, curv):
+        sel = geo.get_geosel(rect, lon=358.0, lat=11.0)
+        assert sel.isel == geo.get_geosel(rect, nearest=(358.0, 11.0)).isel
+        sub = geo.geosel(curv, lon=12.0, lat=44.0)
+        ref = curv.isel(geo.get_geosel(curv, nearest=(12.0, 44.0)).isel)
+        xr.testing.assert_equal(sub, ref)
+        with pytest.raises(exceptions.XoaError):
+            geo.get_geosel(rect, lon=358.0, lat=(0.0, 10.0))
+        with pytest.raises(exceptions.XoaError):
+            geo.get_geosel(rect, lon=358.0)
+
+    def test_errors(self, rect):
+        with pytest.raises(exceptions.XoaError):
+            geo.get_geosel(rect)
+        with pytest.raises(exceptions.XoaError):
+            geo.get_geosel(rect, lon=(0, 1), circle=(0, 0, 1))
+        with pytest.raises(exceptions.XoaError):
+            geo.get_geosel(rect, nearest=(0, 0), lon=(0, 1))
+
+    def test_decorator(self, rect):
+        @geo.with_geosel
+        def func(da, factor=1):
+            """Doc"""
+            return da * factor
+
+        out = func(rect, factor=2, geosel=dict(lon=(15.0, 45.0), lat=(-25.0, 5.0)))
+        assert out.shape == (3, 3)
+        assert func(rect).shape == rect.shape
+        sel = geo.get_geosel(rect, lon=(15.0, 45.0))
+        assert func(rect, geosel=sel).shape == (13, 3)
+        assert "geosel" in func.__doc__ and func.__name__ == "func"
+
+    def test_geosel(self, curv):
+        sub = geo.geosel(curv, circle=(13.0, 44.0, 150.0), units="km")
+        sel = geo.get_geosel(curv, circle=(13.0, 44.0, 150.0), units="km")
+        xr.testing.assert_equal(sub, sel.apply(curv))
+        assert sub.temp.isnull().any()
+        assert not geo.geosel(curv.temp, circle=(13.0, 44.0, 150.0), units="km", mask=False).isnull().any()

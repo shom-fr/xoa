@@ -153,6 +153,7 @@ TUTORIALS_ORDER = [
     "plot_grid_tools",
     "plot_distances",
     "plot_neighbors",
+    "plot_geosel",
     "plot_sigma_levels",
     "plot_layer_thicknesses",
     "plot_croco_uv_depths",
@@ -223,8 +224,16 @@ ipython_warning_is_error = False
 # %% User directives
 
 
+def _close_figures(app, docname, source):
+    """Close the figures that the ``ipython`` directives of the previous pages left open"""
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
 def setup(app):
     app.add_css_file('custom.css')
+    app.connect("source-read", _close_figures)
 
     app.add_object_type(
         'confopt',

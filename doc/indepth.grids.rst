@@ -147,6 +147,63 @@ Distances and directions on the sphere are computed by :func:`xoa.geo.haversine`
 of a vector ``(u, v)``. See the :ref:`sphx_glr_tutorials_grids_plot_distances.py` tutorial.
 
 
+Geographic selection with :mod:`xoa.geo`
+----------------------------------------
+
+The :func:`xoa.geo.get_geosel` function finds the indices of the points of a grid or of a cloud
+of points that are in a box (``lon=(a, b), lat=(c, d)``, where the longitudes may cross the
+dateline), a circle (``circle=(lon, lat, radius)``), a polygon, or the nearest to a point
+(``nearest=(lon, lat)``, or scalar ``lon`` and ``lat``, like ``isel(lon=35, lat=45)``). It accepts a dataset, a data array or a ``(lon, lat)`` pair of
+data arrays, and returns a :class:`xoa.geo.GeoSelection`, with the ``isel`` indexers
+and an optional ``mask``, that is applied to any number of arrays with
+:meth:`~xoa.geo.GeoSelection.apply`.
+The :class:`xoa.geo.GeoSelector` class analyses the coordinates once, to make several selections,
+which the ``get_geosel`` method of the ``xoa`` accessor also does, while its ``geosel`` method
+selects the object directly (``ds.xoa.geosel(lon=(-6, -3), lat=(47, 49))``), like the
+:func:`xoa.geo.geosel` function, and
+the :func:`xoa.geo.with_geosel` decorator adds a ``geosel`` argument to a function.
+Numeric versions with flat arrays are in :mod:`xoa.core.geo`.
+
+.. code-block:: python
+
+    sel = get_geosel(ds, circle=(-4.5, 48, 50), units="km", pad="edges")
+    sub = sel.apply(ds)  # isel, then nan outside of the circle
+    sel = get_geosel(ds, nearest=(-4.5, 48))
+    ds.isel(sel.isel)  # like ds.isel(lon=3, lat=7)
+
+The result depends on the kind of coordinates:
+
+- **Rectangular grid** (1D ``lon`` and ``lat``): a box is exactly made of slices, and there is
+  no mask. A circle or a polygon needs a mask.
+- **Curvilinear grid** (2D ``lon`` and ``lat``): the window is a rectangle of indices,
+  that contains points outside of the shape.
+- **Cloud of points**: the indices of the points inside, which is all that ``isel`` needs.
+
+With ``fit="outer"``, the default, the window is the smallest one that contains all the
+points inside, and the ``mask`` tells which of its points are really inside. With ``fit="inner"``,
+the window is the largest rectangle of indices with only points inside, and there is no mask.
+Use it to get a block of data without missing values.
+
+The ``pad`` argument grows the shape. In grid points (``pad_units="points"``, the default),
+the step is estimated locally from the cell edges, as given by :func:`xoa.core.grid.edges`,
+so that it follows stretched and rotated grids: ``pad=1`` adds about one point around the shape,
+and ``pad="edges"``, which is ``0.5``, selects the points whose cell touches it, as needed to
+draw the selection with ``pcolormesh``. The margin can also be a distance (``"m"``, ``"km"``)
+or an arc (``"deg"``), which is the only choice for a cloud of points.
+
+.. note::
+
+    - A padded window is clipped at the border of the grid, with no extrapolation.
+    - On a curvilinear grid, ``"edges"`` is an estimate based on the extent of the cells, that
+      can miss a cell that touches the shape by a corner only.
+    - With a rectangular grid and a box, a distance margin is computed at the highest latitude
+      of the box, and may select a few more points than needed at the other latitudes.
+    - As for neighbors, a nearest point beyond ``max_dist`` has an index of -1 when there are
+      several targets, and raises an error with a single target.
+
+See the :ref:`sphx_glr_tutorials_grids_plot_geosel.py` tutorial.
+
+
 .. _indepth.grids.regrid:
 
 Regridding with :mod:`xoa.regrid`
