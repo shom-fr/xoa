@@ -10,6 +10,8 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import importlib
+import inspect
 import os
 import sys
 from matplotlib import MatplotlibDeprecationWarning
@@ -50,6 +52,7 @@ extensions = [
     "IPython.sphinxext.ipython_console_highlighting",
     'genoptions',
     'genmetaspecs',
+    'gentide',
     'genlogos',
     'genfigs',
     'sphinxarg.ext',
@@ -100,6 +103,27 @@ html_theme_options = {
 
 # %% Autosumarry
 autosummary_generate = True
+autosummary_ignore_module_all = False  # document what a module lists in __all__, even if imported
+
+
+def _set_reexports_as_all(modname, prefixes):
+    """List the objects that a package re-exports as its `__all__`, to have them documented"""
+    mod = importlib.import_module(modname)
+    mod.__all__ = [
+        name
+        for name, obj in vars(mod).items()
+        if not name.startswith("_")
+        and (inspect.isfunction(obj) or inspect.isclass(obj))
+        and getattr(obj, "__module__", "").startswith(prefixes)
+    ]
+
+
+for _modname, _prefixes in {
+    "xoa.meta": ("xoa.meta",),
+    "xoa.plot": ("xoa.plot", "xoa.core.plot"),
+    "xoa.tide": ("xoa.tide",),
+}.items():
+    _set_reexports_as_all(_modname, _prefixes)
 
 # %% Intersphinx
 intersphinx_mapping = {
@@ -107,7 +131,7 @@ intersphinx_mapping = {
     'cmocean': ('https://matplotlib.org/cmocean/', None),
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None),
     'matplotlib': ('https://matplotlib.org/stable/', None),
-    'numba:': ('https://numba.readthedocs.io/en/stable/', None),
+    'numba': ('https://numba.readthedocs.io/en/stable/', None),
     'numpy': ("https://numpy.org/doc/stable/", None),
     'pandas': ('https://pandas.pydata.org/docs/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/', None),
@@ -231,9 +255,16 @@ def _close_figures(app, docname, source):
     plt.close("all")
 
 
+def _skip_class_aliases(app, what, name, obj, skip, options):
+    """Do not document the aliases of classes, like the deprecated ``CFDataArrayAccessor``"""
+    if inspect.isclass(obj) and obj.__name__ != name:
+        return True
+
+
 def setup(app):
     app.add_css_file('custom.css')
     app.connect("source-read", _close_figures)
+    app.connect("autodoc-skip-member", _skip_class_aliases)
 
     app.add_object_type(
         'confopt',

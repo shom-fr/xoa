@@ -9,6 +9,9 @@ from .. import exceptions
 from .. import misc
 from . import configs
 from . import general
+from .categories import MetaCoordSpecs, MetaVarSpecs  # noqa: F401
+from .general import MetaSpecs  # noqa: F401
+from .sglocator import SGLocator  # noqa: F401
 
 
 _THISDIR = os.path.dirname(__file__)
