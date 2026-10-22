@@ -73,7 +73,7 @@ add_gebco(mappable.axes)
 # ---------------
 #
 # ``fancy=True`` adds a black and white frame cut at the gridlines. The tick labels are
-# moved away by its width, which is set with a dict like ``fancy={"width": 8}``.
+# moved away by its width in points, which is set with a dict like ``fancy={"width": 4}``.
 # It requires a projection whose meridians and parallels are parallel to the map edges,
 # like the default Mercator one.
 
@@ -84,7 +84,7 @@ mappable = plot_field(
     colors="w",
     linewidths=0.8,
     add_colorbar=False,
-    map_kw={"figsize": (6, 4.6), "fancy": {"width": 7}},
+    map_kw={"figsize": (6, 4.6), "fancy": {"width": 4}},
 )
 add_gebco(mappable.axes)
 
@@ -92,7 +92,7 @@ add_gebco(mappable.axes)
 # Scale bar and compass
 # ---------------------
 #
-# They are placed in the corners, with a shadow to stay readable over the bathymetry.
+# They are placed in the corners, with a glow and a shadow to stay readable over the bathymetry.
 
 mappable = plot_field(
     ds.temp,
@@ -101,9 +101,9 @@ mappable = plot_field(
     colors="w",
     linewidths=0.8,
     add_colorbar=False,
-    map_kw={"figsize": (6, 4.6), "fancy": {"width": 7}},
-    scalebar={"loc": "lower left", "effect": "shadow"},
-    compass={"style": "fancy", "effect": "shadow"},
+    map_kw={"figsize": (6, 4.6), "fancy": {"width": 4}},
+    scalebar={"loc": "lower left", "effect": "glow"},
+    compass={"style": "fancy", "loc": "upper left", "effect": "shadow"},
 )
 ax = mappable.axes
 add_gebco(ax)
