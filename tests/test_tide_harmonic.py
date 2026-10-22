@@ -61,6 +61,29 @@ def test_analysis_1d_and_nan_points(tide_ssh):
     assert xtide.harmonic_predict(coef1d, da.time.values).dims == ("time",)
 
 
+def test_analysis_1d_with_gaps(tide_ssh, tide_uv):
+    da, *_ = tide_ssh
+    da1 = da.isel(y=1, x=1)
+    ref = xtide.harmonic_analysis(da1, names=TIDE_NAMES)
+    gaps = da1.copy()
+    gaps[np.random.default_rng(0).random(gaps.size) < 0.08] = np.nan
+    coef = xtide.harmonic_analysis(gaps, names=TIDE_NAMES)
+    np.testing.assert_allclose(coef["amp"], ref["amp"], atol=1e-8)
+    np.testing.assert_allclose(coef["phase"], ref["phase"], atol=1e-8)
+    assert coef["amp_std"].notnull().all()
+
+    u, v = (a.isel(y=1, x=1).copy() for a in tide_uv[:2])
+    ref = xtide.harmonic_analysis_uv(u, v, names=TIDE_NAMES)
+    u[::5] = np.nan
+    coef = xtide.harmonic_analysis_uv(u, v, names=TIDE_NAMES)
+    np.testing.assert_allclose(coef["semi_major"], ref["semi_major"], atol=1e-8)
+
+    with pytest.warns(UserWarning, match="missing"):
+        xtide.harmonic_analysis(gaps.where(np.arange(gaps.size) % 2 == 0), names=TIDE_NAMES)
+    with pytest.raises(XoaError):
+        xtide.harmonic_analysis(gaps.where(np.arange(gaps.size) < 5), names=TIDE_NAMES)
+
+
 def get_ssh_with_lonlat(tide_ssh):
     da, *_ = tide_ssh
     return da.assign_coords(lon=("x", np.arange(TIDE_NX) * 1.0), lat=("y", np.arange(TIDE_NY) * 1.0))

@@ -150,6 +150,31 @@ class TidalHarmonic:
         self._M = tide_core.design_matrix_currents(t_rel, self.omega)
         self._Mi = tide_core.design_matrix_currents_pinv(self._M)
 
+    def _design_(self, kind, *das):
+        """Design matrix and pseudo-inverse, restricted to the valid steps of 1D series
+
+        Only 1D data (observations) are checked for missing values, to avoid loading
+        large arrays. Return ``(M, Mi, ok)`` where ``ok`` is None when nothing is dropped.
+        """
+        M, Mi = (self._A, self._Ai) if kind == "ssh" else (self._M, self._Mi)
+        if any(da.ndim != 1 for da in das):
+            return M, Mi, None
+        ok = np.logical_and.reduce([np.isfinite(da.values) for da in das])
+        if ok.all():
+            return M, Mi, None
+        if ok.sum() < M.shape[1]:
+            raise exceptions.XoaError(
+                f"Not enough valid time steps ({ok.sum()}) to fit {M.shape[1]} coefficients"
+            )
+        dropped = 1 - ok.mean()
+        if dropped > 0.1:
+            exceptions.xoa_warn(f"{dropped:.0%} of the time steps are missing and ignored")
+        M = M[ok]
+        pinv = (
+            tide_core.design_matrix_pinv if kind == "ssh" else tide_core.design_matrix_currents_pinv
+        )
+        return M, pinv(M), ok
+
     def _apply_(self, func, ncoef, *das):
         """Apply a block function to arrays (time, ...) and return the flat (ncoef, ns) result
 
@@ -182,6 +207,7 @@ class TidalHarmonic:
         ----------
         da: xarray.DataArray
             Array with the time dimension first.
+            Missing time steps of a 1D series are ignored.
         uncertainty: bool
             Compute the 1-sigma amplitude and phase uncertainties,
             with the white-noise assumption.
@@ -199,9 +225,11 @@ class TidalHarmonic:
             attribute is ``"greenwich"`` or ``"local"``.
         """
         nf = len(self.names)
-        A, Ai = self._A, self._Ai
+        A, Ai, ok = self._design_("ssh", da)
 
         def block(h):
+            if ok is not None:
+                h = h[ok]
             h0, amp, phase = tide_core.solve_ssh(Ai, h)
             out = [h0[None], amp, phase]
             if uncertainty:
@@ -275,9 +303,11 @@ class TidalHarmonic:
             ``inclination`` and ``phase``, in radians for angles.
         """
         nf = len(self.names)
-        Mi = self._Mi
+        _, Mi, ok = self._design_("uv", da_u, da_v)
 
         def block(u, v):
+            if ok is not None:
+                u, v = u[ok], v[ok]
             u0, v0, smaj, smin, incl, phas = tide_core.solve_currents(Mi, u, v)
             return np.vstack([u0[None], v0[None], smaj, smin, incl, phas])
 
