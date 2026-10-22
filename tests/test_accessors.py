@@ -426,3 +426,23 @@ class TestTideAccessor:
 
         out = self.da.xoa.tidal_filter("demerliac")
         xr.testing.assert_allclose(out, tide.tidal_filter(self.da, "demerliac"))
+
+
+def test_accessor_get_geosel():
+    import xarray as xr
+    import numpy as np
+    import xoa  # noqa: F401
+
+    lon = xr.DataArray(np.arange(0.0, 40.0, 10.0), dims="x", name="lon")
+    lat = xr.DataArray(np.arange(0.0, 30.0, 10.0), dims="y", name="lat")
+    da = xr.DataArray(np.ones((3, 4)), dims=("y", "x"), coords={"lon": lon, "lat": lat})
+    sel = da.xoa.get_geosel(lon=(5.0, 25.0), lat=(0.0, 10.0))
+    assert sel.isel == {"x": slice(1, 3), "y": slice(0, 2)}
+    assert da.xoa.get_geoselector() is da.xoa.get_geoselector()
+    assert da.xoa.get_geosel(nearest=(11.0, 9.0)).isel == {"x": 1, "y": 1}
+    sub = da.xoa.geosel(lon=(5.0, 25.0), lat=(0.0, 10.0))
+    assert sub.shape == (2, 2)
+    sub = da.xoa.geosel(circle=(10.0, 10.0, 1200.0), units="km")
+    assert sub.isnull().any() and sub.notnull().any()
+    assert not da.xoa.geosel(circle=(10.0, 10.0, 1200.0), units="km", mask=False).isnull().any()
+    assert float(da.xoa.geosel(nearest=(11.0, 9.0)).lon) == 10.0

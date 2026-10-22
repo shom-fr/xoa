@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Add geographic selection in a box, circle or polygon, or nearest to a point, on rectangular and curvilinear grids and clouds of points: :func:`xoa.geo.get_geosel`, :class:`xoa.geo.GeoSelector`, :class:`xoa.geo.GeoSelection`, :func:`xoa.geo.with_geosel`, with ``fit`` and ``pad`` options and the :func:`xoa.geo.geosel` function and accessor method, based on :class:`xoa.core.geo.GeoSelector`. See :ref:`sphx_glr_tutorials_grids_plot_geosel.py`.
 - Add the :ref:`sphx_glr_tutorials_graphics_plot_map_decorations.py` tutorial: GEBCO background, fancy frame, scale bar, compass and minimap.
 - Rename :func:`xoa.plot.create_base_map` and :func:`~xoa.plot.setup_map_axes` to :func:`~xoa.plot.create_map` and :func:`~xoa.plot.decorate_map`. The old names remain as aliases.
 - Add :func:`xoa.plot.add_fancy_map_frame` and the ``fancy`` option of :func:`xoa.plot.decorate_map`, for a GMT-like black and white frame.

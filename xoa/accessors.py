@@ -851,6 +851,35 @@ class _GridMixin_:
         tree = self.get_kdtree(**_pop_tree_kwargs_(kwargs))
         return get_neighbors(tree, target, k=k, radius=radius, units=units, output=output, **kwargs)
 
+    def get_geoselector(self, **kwargs):
+        """Get the :class:`xoa.geo.GeoSelector` of the points, which is built once and cached"""
+        from .geo import GeoSelector
+
+        cache = getattr(self, "_geoselector", None)
+        if cache is None or cache[0] != kwargs:
+            cache = self._geoselector = (kwargs, GeoSelector(self._obj, **kwargs))
+        return cache[1]
+
+    def get_geosel(self, *args, sphere_radius=None, **kwargs):
+        """Select the points near a point or in a shape, see :func:`xoa.geo.get_geosel`
+
+        The selector is cached for successive calls, see :meth:`get_geoselector`.
+        """
+        from .geo import get_geosel
+
+        radius = {} if sphere_radius is None else {"radius": sphere_radius}
+        return get_geosel(self.get_geoselector(**radius), *args, **kwargs)
+
+    def geosel(self, *args, mask=True, **kwargs):
+        """Select the object in a box, a circle or a polygon, or at the nearest point
+
+        It applies the selection of :meth:`get_geosel`, whose arguments it takes,
+        to the object, like :func:`xoa.geo.geosel` but with the cached selector.
+        With ``mask=False``, the points of the window that are outside of the shape
+        are not set to nan.
+        """
+        return self.get_geosel(*args, **kwargs).apply(self._obj, mask=mask)
+
 
 class _DynDataArrayMixin_:
     """Provide the dynamics methods that work on a sea surface height"""
