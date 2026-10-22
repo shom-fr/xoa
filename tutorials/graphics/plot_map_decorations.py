@@ -20,6 +20,8 @@ See also: :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
 # ---------------
 
 import matplotlib.pyplot as plt
+import matplotlib.patheffects as pe
+from matplotlib.ticker import StrMethodFormatter
 
 import xoa
 from xoa import meta
@@ -55,18 +57,29 @@ def add_gebco(ax, layer="GEBCO_LATEST"):
 # %%
 # The map is created by :func:`~xoa.plot.plot_field`, whose ``map_kw`` accepts the options of
 # :func:`~xoa.plot.decorate_map`. The temperature is drawn as white contours to let the
-# bathymetry show through.
+# bathymetry show through. They are labelled with a formatter that appends the units,
+# and an outline that keeps the labels readable.
 
-mappable = plot_field(
-    ds.temp,
-    method="contour",
-    levels=range(16, 29, 2),
-    colors="w",
-    linewidths=0.8,
-    add_colorbar=False,
-    map_kw={"figsize": (6, 4.6)},
-)
-add_gebco(mappable.axes)
+
+def plot_temp(**kwargs):
+    """Plot the temperature contours over GEBCO and return the axes"""
+    cs = plot_field(
+        ds.temp,
+        method="contour",
+        levels=range(16, 29, 2),
+        colors="w",
+        linewidths=0.8,
+        add_colorbar=False,
+        **kwargs,
+    )
+    ax = cs.axes
+    for label in ax.clabel(cs, fmt=StrMethodFormatter("{x:.0f}°C"), fontsize=7):
+        label.set_path_effects([pe.withStroke(linewidth=2, foreground="0.2")])
+    add_gebco(ax)
+    return ax
+
+
+ax = plot_temp(map_kw={"figsize": (6, 4.6)})
 
 # %%
 # The fancy frame
@@ -77,16 +90,7 @@ add_gebco(mappable.axes)
 # It requires a projection whose meridians and parallels are parallel to the map edges,
 # like the default Mercator one.
 
-mappable = plot_field(
-    ds.temp,
-    method="contour",
-    levels=range(16, 29, 2),
-    colors="w",
-    linewidths=0.8,
-    add_colorbar=False,
-    map_kw={"figsize": (6, 4.6), "fancy": {"width": 4}},
-)
-add_gebco(mappable.axes)
+ax = plot_temp(map_kw={"figsize": (6, 4.6), "fancy": {"width": 4}})
 
 # %%
 # Scale bar and compass
@@ -94,19 +98,11 @@ add_gebco(mappable.axes)
 #
 # They are placed in the corners, with a glow and a shadow to stay readable over the bathymetry.
 
-mappable = plot_field(
-    ds.temp,
-    method="contour",
-    levels=range(16, 29, 2),
-    colors="w",
-    linewidths=0.8,
-    add_colorbar=False,
+ax = plot_temp(
     map_kw={"figsize": (6, 4.6), "fancy": {"width": 4}},
     scalebar={"loc": "lower left", "effect": "glow"},
     compass={"style": "fancy", "loc": "upper left", "effect": "shadow"},
 )
-ax = mappable.axes
-add_gebco(ax)
 
 # %%
 # The minimap
