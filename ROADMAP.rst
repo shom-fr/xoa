@@ -12,42 +12,36 @@ Facilitate here means that it must be possible to perform
 complex operations in a few lines, without having to know all the
 API and all the parameters to obtain a suitable and accurate result.
 
+xoa provides the numerical building blocks and the generic naming layer.
+The numeric kernels are accelerated with :mod:`numba` and exposed
+through :mod:`xarray` accessors.
 
-Full regridding capabilities
-----------------------------
-
-Extend :mod:`xoa.regrid` into a comprehensive regridding framework
-with full support for structured and unstructured grids,
-including curvilinear and staggered ocean model grids.
-All core interpolation routines will be accelerated with
-:mod:`numba` and exposed through a high-level :mod:`xarray` interface,
-so that regridding a dataset is a one-liner.
-
-Oceanographic grid operators
-----------------------------
-
-Classical differential operators on ocean grids are available in :mod:`xoa.dyn`:
-vorticity, divergence, strain, Okubo-Weiss parameter and geostrophic currents,
-accelerated with :mod:`numba` for collocated grids.
-They will be extended to handle staggered grids natively,
-and to other diagnostics commonly used in physical oceanography.
-
-Graphics
---------
-
-Add specialized oceanographic diagram types:
-
-- **Taylor diagrams** for multi-model or multi-variable skill assessment.
-- **Target diagrams** for compact representation of model biases
-  and root-mean-square differences.
-
-Geographic tools
+Next diagnostics
 ----------------
 
-Provide more efficient geographic utilities,
-starting with spherical nearest-neighbour searches
-based on ball-tree or k-d tree structures suited
-for latitude/longitude coordinates.
-These tools will speed up operations like
-observation-to-model matching and spatial selection.
+- **Transports and sections**: volume, heat and salt transports across a section,
+  normal velocity and stream function, based on :func:`xoa.grid.vintegrate`
+  and the velocity getters of :mod:`xoa.dyn`.
+- **Integrated contents**: heat and salt contents and dynamic height.
+- **Spectra and scales**: variance spectra in frequency and wavenumber,
+  coherence and wavelets, with proper handling of masks and irregular grids.
+- **Water masses**: T-S diagrams with density classes and isopycnal depths.
+- **Waves**: directional spectra, integrated parameters and Stokes drift,
+  as a follow-up of :func:`xoa.plot.plot_rose`.
 
+Tools
+-----
+
+- Parallel numba kernels for large grids.
+- More regridding and kriging options with the same one-line interface.
+- More tutorials, as the entry point of each new feature.
+
+Ecosystem
+---------
+
+Some domains are developed on top of xoa and are out of its scope:
+
+- **shoot**: detection and tracking of eddies and fronts.
+- **armoor**: evaluation of ocean models.
+
+Staggered grids are not handled natively.
