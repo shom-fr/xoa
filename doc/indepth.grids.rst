@@ -281,7 +281,7 @@ and interpolate horizontally, on regular, rectangular and curvilinear grids, wit
 Vertical regridding
 -------------------
 
-Vertical regridding is particularly important for ocean models. The :func:`~xoa.regrid.isoslice`
+Vertical regridding is particularly important for ocean models. The :func:`~xoa.interp.isoslice`
 function can extract data on isobaric or isopycnal surfaces.
 
 

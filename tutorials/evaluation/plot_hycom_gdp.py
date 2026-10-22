@@ -168,7 +168,7 @@ drifter["v"] = (
 )
 
 # %%
-# We make a 4D linear interpolation the Hycom velocity to the drifter positions with :func:`xoa.regrid.grid2loc`.
+# We make a 4D linear interpolation the Hycom velocity to the drifter positions with :func:`xoa.interp.grid2loc`.
 
 uloc = grid2loc(hycom["u"], drifter)
 vloc = grid2loc(hycom["v"], drifter)

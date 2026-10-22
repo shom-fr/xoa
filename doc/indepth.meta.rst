@@ -150,9 +150,9 @@ Coordinates also have ``axis`` (X, Y, Z, T or F).
     since they have no attributes. It is filled from the coordinates, so it
     is better to edit the coordinates than this section.
 
-The other sections (:metasec:`registration <[registration]>`,
-:metasec:`sglocator <[sglocator]>`, :metasec:`vertical <[vertical]>` and
-:metasec:`accessors <[accessors]>`) are described in :ref:`appendix.meta.sections`.
+The other sections (:metasec:`register`,
+:metasec:`sglocator`, :metasec:`vertical` and
+:metasec:`accessors`) are described in :ref:`appendix.meta.sections`.
 The ``sglocator`` one handles the staggered grid locations of the names, like
 ``"lon_rho"`` or ``"u_u"``. See the example :ref:`indepth.meta.hycom`.
 
