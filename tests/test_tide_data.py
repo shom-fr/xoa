@@ -5,6 +5,7 @@ Test the :mod:`xoa.tide.data` module
 
 import numpy as np
 import pytest
+import xarray as xr
 from validate import VdtValueError
 
 import xoa.tide as xtide
@@ -18,11 +19,106 @@ def test_is_satellites():
         is_satellites("0.1 1 0")
 
 
+@pytest.fixture(autouse=True)
+def reset_constituents():
+    """Do not leak the constituents that a test sets"""
+    yield
+    xtide.reset_constituents()
+
+
+MSF_CFG = """
+[MSf]
+doodson = 073.555
+species = 0
+
+[2MS6]
+doodson = 673.555
+species = 6
+[[compound_of]]
+[[[M2]]]
+multiplier = 2
+[[[S2]]]
+multiplier = 1
+"""
+
+
+@pytest.fixture
+def cfg_file(tmp_path):
+    path = tmp_path / "tide.cfg"
+    path.write_text(MSF_CFG)
+    return path
+
+
 def test_constituent_db():
-    assert {"M2", "S2", "K1", "O1", "M4"} <= set(xtide.CONSTITUENT_NAMES)
-    assert xtide.CONSTITUENT_DB["M4"]["compound_of"] == [("M2", 2)]
-    assert xtide.CONSTITUENT_DB["M2"]["compound_of"] is None
-    assert len(xtide.CONSTITUENT_DB["K1"]["satellites"]) == 4
+    db = xtide.get_constituents()
+    assert isinstance(db, xtide.ConstituentDB)
+    assert {"M2", "S2", "K1", "O1", "M4"} <= set(xtide.get_constituent_names())
+    assert db.names == xtide.get_constituent_names()
+    assert db["M4"]["compound_of"] == [("M2", 2)]
+    assert db["M2"]["compound_of"] is None
+    assert len(db["K1"]["satellites"]) == 4
+
+
+def test_set_constituents_extend(cfg_file):
+    default_names = xtide.get_constituent_names()
+    db = xtide.set_constituents(cfg_file).db
+    assert xtide.get_constituents() is db
+    assert xtide.get_constituent_names() == default_names + ["MSf", "2MS6"]
+    assert db["2MS6"]["compound_of"] == [("M2", 2), ("S2", 1)]
+    period = 2 * np.pi / xtide.get_frequencies(["MSf"]) / 86400
+    np.testing.assert_allclose(period, 14.765, atol=1e-3)
+    assert xtide.get_default_constituents().names == default_names  # unchanged
+    xtide.reset_constituents()
+    assert xtide.get_constituent_names() == default_names
+
+
+def test_set_constituents_context(cfg_file):
+    default_names = xtide.get_constituent_names()
+    with xtide.set_constituents(cfg_file, replace=True) as db:
+        assert db.names == ["MSf", "2MS6"]
+        assert xtide.get_constituent_names() == ["MSf", "2MS6"]
+        assert xtide.auto_constituents(400) == ["MSf"]
+    assert xtide.get_constituent_names() == default_names
+    with xtide.set_constituents(cfg_file):
+        with xtide.set_constituents({"X1": {"doodson": "145.555", "species": 1}}):
+            # Sources complete the default constituents, not the current ones
+            assert "X1" in xtide.get_constituent_names()
+            assert "MSf" not in xtide.get_constituent_names()
+        assert "X1" not in xtide.get_constituent_names()
+        assert "MSf" in xtide.get_constituent_names()
+
+
+def test_set_constituents_override(tmp_path):
+    path = tmp_path / "tide.cfg"
+    path.write_text("[M2]\ndoodson = 255.555\nspecies = 2\n")
+    with xtide.set_constituents(path):
+        assert xtide.get_constituents()["M2"]["satellites"] == []  # replaced as a whole
+    assert len(xtide.get_constituents()["M2"]["satellites"]) > 0
+
+
+def test_set_constituents_error(tmp_path):
+    path = tmp_path / "bad.cfg"
+    path.write_text("[X1]\ndoodson = 145.555\nspecies = 1\nsatellites = 0.1 1 0\n")
+    before = xtide.get_constituents()
+    with pytest.raises(Exception):
+        xtide.set_constituents(path)
+    assert xtide.get_constituents() is before
+
+
+def test_user_constituents_file(cfg_file, monkeypatch):
+    monkeypatch.setattr(xtide.data, "get_user_cfg_file", lambda: str(cfg_file))
+    xtide.reset_constituents()
+    assert "MSf" in xtide.get_constituent_names()
+
+
+def test_analysis_with_set_constituents(cfg_file):
+    time = np.datetime64("2024-01-01") + np.arange(60 * 24) * np.timedelta64(1, "h")
+    hours = np.arange(time.size)
+    with xtide.set_constituents(cfg_file):
+        omega = xtide.get_frequencies(["MSf"])[0] * 3600
+        da = xr.DataArray(0.3 * np.cos(omega * hours), dims="time", coords={"time": time})
+        out = xtide.harmonic_analysis(da, names=["M2", "S2", "MSf"], uncertainty=False)
+    assert float(out.amp.sel(constituent="MSf")) == pytest.approx(0.3, abs=0.05)
 
 
 def test_frequencies():

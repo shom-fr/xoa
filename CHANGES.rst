@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Add :class:`xoa.tide.set_constituents` to use your own tidal constituents files, globally or within a context, with :func:`~xoa.tide.get_constituents`, :func:`~xoa.tide.get_constituent_names` and :func:`~xoa.tide.reset_constituents`. The constituents are read when needed, and ``CONSTITUENT_DB`` and ``CONSTITUENT_NAMES`` are removed. See :ref:`appendix.tide`.
 - Link the xoa functions, classes and accessor methods in the tutorials, and list the ``get_neighbors``, ``get_geosel`` and ``geosel`` accessor methods.
 - Add geographic selection in a box, circle or polygon, or nearest to a point, on rectangular and curvilinear grids and clouds of points: :func:`xoa.geo.get_geosel`, :class:`xoa.geo.GeoSelector`, :class:`xoa.geo.GeoSelection`, :func:`xoa.geo.with_geosel`, with ``fit`` and ``pad`` options and the :func:`xoa.geo.geosel` function and accessor method, based on :class:`xoa.core.geo.GeoSelector`. See :ref:`sphx_glr_tutorials_grids_plot_geosel.py`.
 - Add the :ref:`sphx_glr_tutorials_graphics_plot_map_decorations.py` tutorial: GEBCO background, fancy frame, scale bar, compass and minimap.

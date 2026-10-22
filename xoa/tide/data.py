@@ -24,7 +24,7 @@ Schureman, P. (1958). Manual of Harmonic Analysis and Prediction of Tides.
 import os
 
 import numpy as np
-from configobj import Section
+from configobj import ConfigObj, Section
 from validate import VdtValueError
 
 from .. import cfgm
@@ -96,43 +96,143 @@ def get_user_cfg_file():
     return os.path.join(os.path.dirname(get_default_user_config_file()), "tide.cfg")
 
 
-def _load_constituent_db_():
-    """Load the constituent database from the default and the user files
+class ConstituentDB(dict):
+    """The tidal constituents, as a dict indexed by names
 
-    The sections of the user file ``tide.cfg``, located next to the xoa user
-    config file, complete or replace those of the default file.
+    Each item is a dict with the ``doodson``, ``species``, ``phase``, ``satellites``
+    and ``compound_of`` keys, as specified in the :ref:`appendix.tide` appendix.
+
+    Parameters
+    ----------
+    sources:
+        Files, :class:`dict` or :class:`~configobj.ConfigObj` instances,
+        read in this order: the sections of the last ones complete or replace
+        those of the first ones.
+        They are validated with the specifications of the ``tide.ini`` file.
     """
-    cfgmanager = cfgm.ConfigManager(
-        INI_FILE, interpolation=False, validator={"satellites": is_satellites}
-    )
-    db = {}
-    for cfgfile in CFG_FILE, get_user_cfg_file():
-        if not os.path.exists(cfgfile):
-            continue
-        cfg = cfgmanager.load(cfgfile, validate="raise")
-        for name, sec in cfg.items():
-            if not isinstance(sec, Section):
+
+    def __init__(self, *sources):
+        super().__init__()
+        cfgmanager = cfgm.ConfigManager(
+            INI_FILE, interpolation=False, validator={"satellites": is_satellites}
+        )
+        for source in sources:
+            if isinstance(source, ConstituentDB):
+                self.update(source)
                 continue
-            compound_of = [
-                (k, v["multiplier"])
-                for k, v in sec.get("compound_of", {}).items()
-                if isinstance(v, Section)
-            ]
-            db[name] = {
-                "doodson": sec["doodson"],
-                "species": sec["species"],
-                "phase": sec["phase"],
-                "satellites": sec["satellites"],
-                "compound_of": compound_of or None,
-            }
-    return db
+            if isinstance(source, dict) and not isinstance(source, ConfigObj):
+                source = ConfigObj(source)
+            elif not isinstance(source, ConfigObj):
+                source = os.fspath(source)
+            cfg = cfgmanager.load(source, validate="raise")
+            for name, sec in cfg.items():
+                if not isinstance(sec, Section):
+                    continue
+                compound_of = [
+                    (k, v["multiplier"])
+                    for k, v in sec.get("compound_of", {}).items()
+                    if isinstance(v, Section)
+                ]
+                self[name] = {
+                    "doodson": sec["doodson"],
+                    "species": sec["species"],
+                    "phase": sec["phase"],
+                    "satellites": sec["satellites"],
+                    "compound_of": compound_of or None,
+                }
+
+    @property
+    def names(self):
+        """The names of the constituents"""
+        return list(self)
 
 
-#: Constituent database
-CONSTITUENT_DB = _load_constituent_db_()
+_CONSTITUENTS_CACHE = {"current": None}
 
-#: Constituent names
-CONSTITUENT_NAMES = list(CONSTITUENT_DB)
+
+def get_default_constituents():
+    """Get the default constituents, completed by the user file when it exists
+
+    This ignores the changes of :class:`set_constituents`.
+
+    Return
+    ------
+    ConstituentDB
+    """
+    user_file = get_user_cfg_file()
+    return ConstituentDB(CFG_FILE, *([user_file] if os.path.exists(user_file) else []))
+
+
+def get_constituents():
+    """Get the current constituents
+
+    They are the default ones, completed by the :file:`tide.cfg` file of the user config
+    directory, unless :class:`set_constituents` has changed them.
+    They are read on the first call.
+
+    Return
+    ------
+    ConstituentDB
+    """
+    if _CONSTITUENTS_CACHE["current"] is None:
+        _CONSTITUENTS_CACHE["current"] = get_default_constituents()
+    return _CONSTITUENTS_CACHE["current"]
+
+
+def get_constituent_names():
+    """Get the names of the current constituents
+
+    Return
+    ------
+    list of str
+    """
+    return get_constituents().names
+
+
+class set_constituents(object):
+    """Set the current constituents, globally or within a context
+
+    Parameters
+    ----------
+    sources:
+        Files, :class:`dict` or :class:`~configobj.ConfigObj` instances,
+        like those of :class:`ConstituentDB`, for instance ``"tide.cfg"``
+        in the working directory.
+    replace: bool
+        Use the sources alone, instead of completing the default constituents
+        and those of the user file.
+
+    Example
+    -------
+    .. code-block:: python
+
+        xtide.set_constituents("tide.cfg")  # until the next call
+        with xtide.set_constituents("tide.cfg", replace=True) as db:
+            ...  # only the constituents of the file
+
+    See also
+    --------
+    get_constituents
+    reset_constituents
+    """
+
+    def __init__(self, *sources, replace=False):
+        # The new database is built first, so that an error leaves the current one unchanged
+        base = [] if replace else [get_default_constituents()]
+        self.db = ConstituentDB(*base, *sources)
+        self.old_db = _CONSTITUENTS_CACHE["current"]
+        _CONSTITUENTS_CACHE["current"] = self.db
+
+    def __enter__(self):
+        return self.db
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        _CONSTITUENTS_CACHE["current"] = self.old_db
+
+
+def reset_constituents():
+    """Go back to the default constituents, read again at the next use"""
+    _CONSTITUENTS_CACHE["current"] = None
 
 
 # %% time dimension
@@ -160,11 +260,9 @@ def get_frequencies(names):
     numpy.ndarray
         Array of size ``nf``
     """
+    db = get_constituents()
     return np.array(
-        [
-            np.dot(tide_core.doodson_multipliers(CONSTITUENT_DB[n]["doodson"]), DOODSON_SPEEDS)
-            for n in names
-        ]
+        [np.dot(tide_core.doodson_multipliers(db[n]["doodson"]), DOODSON_SPEEDS) for n in names]
     )
 
 
@@ -183,9 +281,10 @@ def auto_constituents(record_days, rayleigh_min=1.0):
     Return
     ------
     list of str
-        Subset of non-compound :data:`CONSTITUENT_NAMES`, sorted by frequency
+        Subset of the non-compound current constituents, sorted by frequency
     """
-    names = [n for n in CONSTITUENT_NAMES if CONSTITUENT_DB[n]["compound_of"] is None]
+    db = get_constituents()
+    names = [n for n, c in db.items() if c["compound_of"] is None]
     freqs = get_frequencies(names) * 86400.0 / (2 * np.pi)  # cycles per day
     order = np.argsort(freqs)
     names, freqs = [names[i] for i in order], freqs[order]
@@ -251,6 +350,7 @@ def equilibrium_argument(names, t_ref):
     ----------
     B. Simon (2007), Analyse Harmonique des Marées, table 5.3.
     """
+    db = get_constituents()
     s, h, p, _, Np, p1 = tide_core.astronomical_args(t_ref)
     # τ = 15°·t_UTC_hours + h − s (mean lunar civil time angle)
     tau = (15.0 * (t_ref % 86400) / 3600 + h - s) % 360.0
@@ -258,8 +358,7 @@ def equilibrium_argument(names, t_ref):
     return np.array(
         [
             np.deg2rad(
-                np.dot(tide_core.doodson_multipliers(CONSTITUENT_DB[n]["doodson"]), args)
-                + CONSTITUENT_DB[n]["phase"]
+                np.dot(tide_core.doodson_multipliers(db[n]["doodson"]), args) + db[n]["phase"]
             )
             % (2 * np.pi)
             for n in names
@@ -287,7 +386,7 @@ def nodal_corrections(t_ref, names):
     f = np.ones(len(names))
     u = np.zeros(len(names))
     for i, name in enumerate(names):
-        c = CONSTITUENT_DB[name]
+        c = get_constituents()[name]
         if c["compound_of"]:
             f[i], u[i] = 1.0, 0.0
             for comp_name, mult in c["compound_of"]:

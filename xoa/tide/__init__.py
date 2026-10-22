@@ -23,13 +23,17 @@ See the :ref:`indepth.tide` section.
 # limitations under the License.
 
 from .data import (  # noqa: F401
-    CONSTITUENT_DB,
-    CONSTITUENT_NAMES,
+    ConstituentDB,
     auto_constituents,
     beat_period,
     equilibrium_argument,
+    get_constituent_names,
+    get_constituents,
+    get_default_constituents,
     get_frequencies,
     nodal_corrections,
+    reset_constituents,
+    set_constituents,
     unresolved_pairs,
 )
 from .diags import (  # noqa: F401
