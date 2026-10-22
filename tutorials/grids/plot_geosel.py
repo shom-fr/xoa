@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
-Select data in a box, a circle or a polygon
-===========================================
+Select data at a point, in a box, a circle or a polygon
+=======================================================
 
 In this tutorial, we show how to:
 
@@ -11,7 +11,8 @@ In this tutorial, we show how to:
 * choose between the smallest window that covers the shape and a mask (``outer``),
   or the largest window with only points inside (``inner``),
 * add a margin of grid points, down to the cell edges, or of a distance,
-* find the nearest point, and reuse a selection for several arrays.
+* select a point, with scalar ``lon`` and ``lat``, or the nearest points to targets,
+* reuse a selection for several arrays.
 
 Distances are great circle ones, and the shapes can cross the dateline.
 See also: :ref:`sphx_glr_tutorials_grids_plot_neighbors.py`.
@@ -183,11 +184,21 @@ for ax, pad, pad_units in zip(axes, [0, "edges", 30], ["points", "points", "km"]
     plot_selection(ax, curv, sel, title=f"pad={pad!r} {pad_units}")
 
 # %%
-# Nearest point
-# -------------
+# Selecting a point
+# -----------------
 #
-# A scalar target gives indices, like ``isel(lon=35, lat=45)``. Several targets give a
-# pointwise selection along a ``target`` dimension, and the distances to them.
+# Scalar ``lon`` and ``lat`` select the nearest point, like ``isel(lon=35, lat=45)`` does with
+# indices, on any kind of grid or on a cloud of points. The :func:`~xoa.geo.geosel` function and
+# the :meth:`~xarray.Dataset.xoa.geosel` accessor method return the data at that point, without
+# the horizontal dimensions.
+
+print(curv.xoa.geosel(lon=-4.5, lat=46.5))
+
+# %%
+# To get the indices and the distance to the point instead, give ``nearest=(lon, lat)`` to
+# :func:`~xoa.geo.get_geosel`. A scalar target gives integers, like ``isel`` does.
+# Several targets give a pointwise selection along a ``target`` dimension, and the distances
+# to them.
 
 sel = get_geosel(rect, nearest=(-4.53, 47.02), units="km")
 print(sel.isel, float(sel.dist))
@@ -216,4 +227,3 @@ def mean_sst(ds):
 print(mean_sst(curv))
 print(mean_sst(curv, geosel=dict(circle=(-4.5, 47.0, 50), units="km")))
 print(curv.xoa.geosel(lon=(-5, -4), lat=(46, 47)).sst.shape)
-print(curv.xoa.geosel(lon=-4.5, lat=46.5))
