@@ -75,7 +75,9 @@ The result is a :class:`xarray.Dataset` indexed by ``constituent``:
   and ``phase_std``,
 - ``t_ref``, the middle of the record that the phases refer to, in the attributes.
 
-Missing values propagate: a point with a gap gives NaN coefficients.
+Missing values of a 1D series (observations) are ignored: only the valid time steps are fitted,
+with an error if there are too few and a warning if more than 10% are dropped.
+Gridded data are not checked: a point with a gap gives NaN coefficients.
 Do not chunk along time when using dask arrays; chunks along the other dimensions are fine.
 
 .. rubric:: Pitfalls

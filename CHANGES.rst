@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Ignore the missing time steps of 1D series in :func:`xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv`.
 - Add cartesian components to :func:`xoa.plot.plot_rose`: ``plot_rose(u, v)``, with the ``cartesian`` and ``from_`` arguments, and a fallback to the components of a dataset.
 - Add :func:`xoa.plot.add_scalebar` and :func:`xoa.plot.add_compass`, with an optional shadow or glow (``effect``), and the ``scalebar`` and ``compass`` arguments of :func:`xoa.plot.plot_field` and :func:`~xoa.plot.plot_grid`. See :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
 - Add :func:`xoa.dyn.get_u` and :func:`xoa.dyn.get_v` with variants, and the ``ugeo``, ``ux`` and ``ugeos`` meta specs (and their ``v`` counterparts) for eastward, grid-aligned and geostrophic velocities. :func:`xoa.tide.harmonic_analysis_uv` uses them with datasets.
