@@ -409,7 +409,7 @@ def plot_ts(
 
 minimap_plot_coords = xmisc.Choices(
     {
-        "auto": "infer from coords",
+        "auto": "infer from coords: lines for 1D series, outline for 2D grids, else points",
         "box": "rectangle of coords extent",
         "filledbox": "filled rectangle of coords extent",
         "points": "scatter plot",
@@ -460,7 +460,7 @@ def plot_minimap(
     land_scale="110m",
     plot_coords="auto",
     coords_markersize=10,
-    coords_linewidth=2,
+    coords_linewidth=1.5,
     coords_color="tab:red",
     coords_facecolor=0.2,
     **kwargs,
@@ -618,6 +618,12 @@ def plot_minimap(
             plot_coords = "auto"
         if plot_coords == "auto":
             if lon.dims == lat.dims and lon.ndim == 1 and lon.size > 0:
+                plot_coords = "lines"
+            elif lon.dims == lat.dims and lon.ndim == 2:  # Outline of the grid
+                lon, lat = (
+                    np.concatenate([a[0], a[1:, -1], a[-1, -2::-1], a[-2:0:-1, 0], a[:1, 0]])
+                    for a in (lon.values, lat.values)
+                )
                 plot_coords = "lines"
             else:
                 lon, lat = xr.broadcast(lon, lat)

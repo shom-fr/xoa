@@ -95,6 +95,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Draw the outline of 2D grids with ``plot_coords="auto"`` in :func:`xoa.plot.plot_minimap` instead of all the points, and default ``coords_linewidth`` to 1.5.
 - Fix the Greenwich phases of :mod:`xoa.tide`: astronomical arguments 12 h off, M2/N2/2N2 nodal satellites, and the 90° shifts of the diurnal constituents. They now agree with utide at Brest within 0.5° for the main constituents.
 - Search the time dimension and the variables of :mod:`xoa.tide` with :mod:`xoa.coords` and :mod:`xoa.meta`: ``t_dim`` and ``time_dim`` default to None, :func:`~xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv` accept datasets, and ``valid_time`` is a known time name.
 - The legend of :class:`xoa.core.plot.Rose` is no longer cut off by the figure edge.

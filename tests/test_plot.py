@@ -845,6 +845,17 @@ class TestMinimap:
         ax2 = xplot.plot_minimap(self.get_ds(), ax=[0.1, 0.1, 0.2])
         assert ax2.get_position(original=True).x0 == pytest.approx(0.1)
 
+    def test_2d_grid_is_drawn_as_its_outline(self):
+        lon, lat = np.meshgrid(np.arange(-8.0, -4.0), np.arange(44.0, 47.0))
+        ds = xr.Dataset(coords={"lon": (("y", "x"), lon), "lat": (("y", "x"), lat)})
+        ax = xplot.plot_minimap(ds)
+        (line,) = ax.lines
+        x, y = line.get_data()
+        assert len(x) == 2 * (3 + 4) - 4 + 1  # Each edge point once, and the closing one
+        assert (x[0], y[0]) == (x[-1], y[-1]) == (-8.0, 44.0)
+        assert set(zip(x, y)) == {(a, b) for a, b in zip(lon.ravel(), lat.ravel()) if a in (-8, -5) or b in (44, 46)}
+        assert line.get_linewidth() == 1.5
+
     def test_invalid_loc(self):
         fig, parent = plt.subplots()
         with pytest.raises(xoa.XoaError, match="Invalid loc"):
