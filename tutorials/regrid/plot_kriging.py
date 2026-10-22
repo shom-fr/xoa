@@ -36,7 +36,8 @@ xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 # %%
-# The truth is white noise that is smoothed to get a correlation length of about 40 km,
+# The truth is white noise that is smoothed with :func:`~xoa.filter.smooth` and a kernel from
+# :func:`~xoa.filter.generate_kernel` to get a correlation length of about 40 km,
 # on a regular grid. It is sampled at 150 random positions.
 
 rng = np.random.default_rng(3)
@@ -66,7 +67,8 @@ obs = xr.DataArray(
 #
 # The semi-variogram is half the mean squared difference of the pairs of points,
 # as a function of their distance. It tells how fast the points get uncorrelated.
-# We restrict it to the distances where there are enough pairs, and we fit a model
+# :func:`~xoa.krig.empirical_variogram` computes it. We restrict it to the distances where
+# there are enough pairs, and :class:`~xoa.krig.VariogramModel` fits a model
 # with a nugget (noise), a sill (variance) and a range (correlation length).
 
 ev = empirical_variogram(obs, nbin=15, dist_units="km", distmax=120)

@@ -68,8 +68,8 @@ print(ds)
 # 2. Compute the ``z_rho`` and ``z_w`` heights, that are negative in the ocean
 # 3. Assign them as coordinates
 #
-# Note that the ``decode_sigma`` subaccessor of the :ref:`xoa <accessors>` accessor
-# calls the :func:`xoa.sigma.decode_cf_sigma` function.
+# Note that the :attr:`~xarray.Dataset.xoa.decode_sigma` subaccessor of the :ref:`xoa <accessors>`
+# accessor calls the :func:`xoa.sigma.decode_cf_sigma` function.
 
 ds = ds.xoa.decode_sigma()
 print(ds.z_rho)
@@ -100,7 +100,7 @@ z = xr.DataArray(
 )
 
 # %%
-# Let's interpolate the temperature.
+# Let's interpolate the temperature with :func:`xoa.regrid.regrid1d`.
 
 tempz = regrid1d(temp, z, extrap="top")
 

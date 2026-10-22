@@ -153,7 +153,8 @@ with tempfile.TemporaryDirectory() as tmpdir:
 # Regrid to a curvilinear grid
 # ----------------------------
 #
-# Grids may also be curvilinear, like this rotated one.
+# Grids may also be curvilinear, like this rotated one from
+# :func:`xoa.core.grid.create_rotated_grid`.
 # Points that are outside the source domain are set to nan.
 
 grid = create_rotated_grid(30, 20, 18.5, -36.0, 25.0, 4.0, 2.5)
@@ -328,7 +329,8 @@ print({title: int(field.notnull().sum()) for title, field in list(fields.items()
 # Use the accessors
 # -----------------
 #
-# All of that is also available from the ``xoa`` accessors, which build the
+# All of that is also available from the :meth:`~xarray.DataArray.xoa.regrid` and
+# :meth:`~xarray.DataArray.xoa.interp` methods of the ``xoa`` accessors, which build the
 # regridder or the interpolator on the fly.
 
 print(temp.xoa.regrid(dst, method="bilinear").shape)

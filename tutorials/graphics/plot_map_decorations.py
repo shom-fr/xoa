@@ -108,6 +108,7 @@ ax = plot_temp(
 # The minimap
 # -----------
 #
-# The minimap is an inset of the map that shows where the data are.
+# The minimap of :func:`~xoa.plot.plot_minimap` is an inset of the map that shows where
+# the data are.
 
 plot_minimap(ds, parent=ax, loc="lower right", plot_coords="box")

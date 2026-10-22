@@ -34,6 +34,8 @@ ds
 
 # %%
 # The waves come mostly from the west. The direction is the one they come from.
+# :func:`~xoa.plot.plot_rose` draws the rose, which is also available as the
+# :meth:`~xoa.accessors.XoaPlotAccessor.rose` method of the ``plot`` accessor.
 
 rose = plot_rose(ds.hs, ds.direction)
 rose.ax.set_title("Significant wave height")

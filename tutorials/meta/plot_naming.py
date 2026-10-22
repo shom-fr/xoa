@@ -58,7 +58,9 @@ for name, ds in datasets.items():
 # ------------------------------------
 #
 # Since the search relies on the generic names, a function does not need to know
-# which model it is applied to. Here we map the surface speed of the two CMEMS models.
+# which model it is applied to. Here we map the surface speed of the two CMEMS models,
+# and :func:`xoa.coords.get_zdim` and :func:`xoa.coords.get_tdim` find the vertical and time
+# dimensions.
 
 
 def get_surface_speed(ds):
@@ -80,8 +82,9 @@ fig, axes = plot_fields(
 #
 # The specifications that are used are inferred from the dataset or set by the user.
 # Some come with xoa for a few models, like Mercator for the CMEMS products,
-# which know their own names. ``decode`` renames the arrays to their generic names
-# and completes their attributes, and ``encode`` gives back the specialized names.
+# which know their own names. :meth:`~xarray.Dataset.xoa.decode` renames the arrays to their
+# generic names and completes their attributes, and :meth:`~xarray.Dataset.xoa.encode` gives back
+# the specialized names.
 # The accessor reads the specifications when it is first used on a dataset,
 # so we open the dataset within the context.
 
