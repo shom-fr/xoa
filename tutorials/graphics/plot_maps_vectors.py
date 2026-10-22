@@ -65,6 +65,7 @@ plot_field(ds.temp, cmap=cmocean.cm.thermal, map_kw=MAP_KW)
 #
 # They are off by default. The scale bar is a ground distance, and the compass follows the
 # meridians of the projection. Both accept a ``loc`` and an ``effect``, a shadow or a glow, for readability.
+# See :ref:`sphx_glr_tutorials_graphics_plot_map_decorations.py` for a complete example.
 
 plot_field(
     ds.temp,

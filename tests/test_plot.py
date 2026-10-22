@@ -122,27 +122,27 @@ class TestGetLabel:
 
 
 class TestMapAxes:
-    def test_create_base_map(self):
-        fig, ax = xplot.create_base_map([10.0, 15.0, 40.0, 44.0], title="title", figsize=(4, 3))
+    def test_create_map(self):
+        fig, ax = xplot.create_map([10.0, 15.0, 40.0, 44.0], title="title", figsize=(4, 3))
         assert ax.get_title() == "title"
         assert tuple(fig.get_size_inches()) == (4, 3)
         extent = ax.get_extent(crs=xplot._import_cartopy_()[0].PlateCarree())
         np.testing.assert_allclose(extent, [10.0, 15.0, 40.0, 44.0], atol=1e-6)
 
-    def test_setup_map_axes_options(self):
+    def test_decorate_map_options(self):
         ccrs, _ = xplot._import_cartopy_()
 
         def feature_artists(ax):
             return [c for c in ax.get_children() if type(c).__name__ == "FeatureArtist"]
 
         ax = plt.figure().add_subplot(111, projection=ccrs.PlateCarree())
-        xplot.setup_map_axes(ax, [0, 10, 0, 10])
+        xplot.decorate_map(ax, [0, 10, 0, 10])
         assert len(ax.artists) == 1
         assert not feature_artists(ax)
         assert ax.spines["geo"].get_visible()
 
         ax = plt.figure().add_subplot(111, projection=ccrs.PlateCarree())
-        xplot.setup_map_axes(ax, [0, 10, 0, 10], gridlines=False, land=True, bbox=False)
+        xplot.decorate_map(ax, [0, 10, 0, 10], gridlines=False, land=True, bbox=False)
         assert len(ax.artists) == 0
         assert len(feature_artists(ax)) == 1
         assert not ax.spines["geo"].get_visible()
@@ -844,6 +844,17 @@ class TestMinimap:
         assert ax.get_position(original=True).x0 == pytest.approx(0.9)
         ax2 = xplot.plot_minimap(self.get_ds(), ax=[0.1, 0.1, 0.2])
         assert ax2.get_position(original=True).x0 == pytest.approx(0.1)
+
+    def test_2d_grid_is_drawn_as_its_outline(self):
+        lon, lat = np.meshgrid(np.arange(-8.0, -4.0), np.arange(44.0, 47.0))
+        ds = xr.Dataset(coords={"lon": (("y", "x"), lon), "lat": (("y", "x"), lat)})
+        ax = xplot.plot_minimap(ds)
+        (line,) = ax.lines
+        x, y = line.get_data()
+        assert len(x) == 2 * (3 + 4) - 4 + 1  # Each edge point once, and the closing one
+        assert (x[0], y[0]) == (x[-1], y[-1]) == (-8.0, 44.0)
+        assert set(zip(x, y)) == {(a, b) for a, b in zip(lon.ravel(), lat.ravel()) if a in (-8, -5) or b in (44, 46)}
+        assert line.get_linewidth() == 1.5
 
     def test_invalid_loc(self):
         fig, parent = plt.subplots()

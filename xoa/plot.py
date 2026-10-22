@@ -43,9 +43,12 @@ from .core import plot as cplot
 from .core import stats as cstats
 from .core.plot import (  # noqa
     add_compass,
+    add_fancy_map_frame,
     add_land,
     add_scalebar,
     create_base_map,
+    create_map,
+    decorate_map,
     setup_map_axes,
     _import_cartopy_,
 )
@@ -406,7 +409,7 @@ def plot_ts(
 
 minimap_plot_coords = xmisc.Choices(
     {
-        "auto": "infer from coords",
+        "auto": "infer from coords: lines for 1D series, outline for 2D grids, else points",
         "box": "rectangle of coords extent",
         "filledbox": "filled rectangle of coords extent",
         "points": "scatter plot",
@@ -457,7 +460,7 @@ def plot_minimap(
     land_scale="110m",
     plot_coords="auto",
     coords_markersize=10,
-    coords_linewidth=2,
+    coords_linewidth=1.5,
     coords_color="tab:red",
     coords_facecolor=0.2,
     **kwargs,
@@ -615,6 +618,12 @@ def plot_minimap(
             plot_coords = "auto"
         if plot_coords == "auto":
             if lon.dims == lat.dims and lon.ndim == 1 and lon.size > 0:
+                plot_coords = "lines"
+            elif lon.dims == lat.dims and lon.ndim == 2:  # Outline of the grid
+                lon, lat = (
+                    np.concatenate([a[0], a[1:, -1], a[-1, -2::-1], a[-2:0:-1, 0], a[:1, 0]])
+                    for a in (lon.values, lat.values)
+                )
                 plot_coords = "lines"
             else:
                 lon, lat = xr.broadcast(lon, lat)
@@ -838,8 +847,8 @@ def _get_map_axes_(ax, extent, transform, map_kw, projection=None):
     if ax is None:
         if projection is not None:
             kw.setdefault("projection", projection)
-        return create_base_map(extent, **kw)[1]
-    setup_map_axes(ax, extent, transform, **{k: v for k, v in kw.items() if k in _AX_SETUP_KEYS})
+        return create_map(extent, **kw)[1]
+    decorate_map(ax, extent, transform, **{k: v for k, v in kw.items() if k in _AX_SETUP_KEYS})
     return ax
 
 
@@ -909,9 +918,9 @@ def plot_field(
     margin: float
         Margin added to the extent. See :func:`xoa.geo.get_extent`.
     map_kw: None, dict
-        Parameters that decorate the map, as accepted by :func:`setup_map_axes`.
+        Parameters that decorate the map, as accepted by :func:`decorate_map`.
         When ``ax`` is not provided, ``figsize`` and ``projection`` are also
-        accepted, as in :func:`create_base_map`.
+        accepted, as in :func:`create_map`.
     overlay_contours: None, True, list(dict)
         Line contours drawn over the field. ``True`` is a shorthand for a single
         contour of the field. Each item is a dict of parameters passed to

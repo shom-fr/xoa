@@ -77,7 +77,7 @@ Two layers
       -
       - ``"Long name [units]"`` from the meta-data
     * - (re-exported)
-      - :func:`~xoa.core.plot.create_base_map`, :func:`~xoa.core.plot.setup_map_axes`,
+      - :func:`~xoa.core.plot.create_map`, :func:`~xoa.core.plot.decorate_map`,
         :func:`~xoa.core.plot.add_land`
       - Decorated cartopy maps
 
@@ -175,7 +175,7 @@ when a map is drawn.
 - :func:`~xoa.plot.plot_field` and :func:`~xoa.plot.plot_grid` create the map when no axes is
   provided, from the extent of the data computed with :func:`xoa.geo.get_extent` (a
   ``margin`` can be added to the field). Their ``map_kw`` parameter holds the
-  options of :func:`~xoa.core.plot.setup_map_axes` (``gridlines``,
+  options of :func:`~xoa.core.plot.decorate_map` (``gridlines``,
   ``gridlines_labels_on``, ``land``, ``land_scale``, ``coastlines``, ``bbox``), plus ``figsize``
   and ``projection`` for the creation of the figure.
 - On axes that you provide, only the decoration keys are applied, so that panels of
@@ -246,6 +246,25 @@ add them with ``scalebar=True`` and ``compass=True``, or dicts of parameters.
         scalebar=dict(loc="lower right", effect="shadow"),
         compass=dict(style="fancy", effect="shadow"),
     )
+
+Fancy frame
+===========
+
+:func:`~xoa.plot.add_fancy_map_frame` adds a GMT-like frame of alternating black and white
+segments around a map. It is requested at the creation of a map with ``fancy=True`` or a dict
+of parameters, like ``map_kw=dict(fancy=dict(width=8))`` with the plot functions.
+
+- The segments are cut at the longitudes and latitudes of the gridlines, with the cartopy
+  longitude and latitude locators for all projections. Gridlines without lines nor labels
+  are added if there are none. The tick labels are moved away from the map by the width
+  of the frame.
+- It needs a projection whose meridians and parallels are parallel to the edges of the map,
+  like ``PlateCarree`` or ``Mercator``, and raises an error otherwise.
+
+.. ipython:: python
+
+    @savefig indepth.plot.fancy.png width=5in
+    xplot.plot_field(ds.temp, cmap=cmocean.cm.thermal, map_kw=dict(fancy=True))
 
 Colorbars
 =========

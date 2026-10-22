@@ -6,6 +6,9 @@ Unreleased
 
 New features
 ------------
+- Add the :ref:`sphx_glr_tutorials_graphics_plot_map_decorations.py` tutorial: GEBCO background, fancy frame, scale bar, compass and minimap.
+- Rename :func:`xoa.plot.create_base_map` and :func:`~xoa.plot.setup_map_axes` to :func:`~xoa.plot.create_map` and :func:`~xoa.plot.decorate_map`. The old names remain as aliases.
+- Add :func:`xoa.plot.add_fancy_map_frame` and the ``fancy`` option of :func:`xoa.plot.decorate_map`, for a GMT-like black and white frame.
 - Ignore the missing time steps of 1D series in :func:`xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv`.
 - Add cartesian components to :func:`xoa.plot.plot_rose`: ``plot_rose(u, v)``, with the ``cartesian`` and ``from_`` arguments, and a fallback to the components of a dataset.
 - Add :func:`xoa.plot.add_scalebar` and :func:`xoa.plot.add_compass`, with an optional shadow or glow (``effect``), and the ``scalebar`` and ``compass`` arguments of :func:`xoa.plot.plot_field` and :func:`~xoa.plot.plot_grid`. See :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
@@ -92,6 +95,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Draw the outline of 2D grids with ``plot_coords="auto"`` in :func:`xoa.plot.plot_minimap` instead of all the points, and default ``coords_linewidth`` to 1.5.
 - Fix the Greenwich phases of :mod:`xoa.tide`: astronomical arguments 12 h off, M2/N2/2N2 nodal satellites, and the 90° shifts of the diurnal constituents. They now agree with utide at Brest within 0.5° for the main constituents.
 - Search the time dimension and the variables of :mod:`xoa.tide` with :mod:`xoa.coords` and :mod:`xoa.meta`: ``t_dim`` and ``time_dim`` default to None, :func:`~xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv` accept datasets, and ``valid_time`` is a known time name.
 - The legend of :class:`xoa.core.plot.Rose` is no longer cut off by the figure edge.
