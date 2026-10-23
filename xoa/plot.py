@@ -51,7 +51,7 @@ from .core.plot import (  # noqa
     create_map,
     decorate_map,
     setup_map_axes,
-    _import_cartopy_,
+    import_cartopy,
 )
 
 _AX_SETUP_KEYS = cplot.AX_SETUP_KEYS
@@ -561,7 +561,7 @@ def plot_minimap(
     xoa.geo.get_extent
     """
     # Create map
-    ccrs, cfeature = _import_cartopy_()
+    ccrs, cfeature = import_cartopy()
     pcar = ccrs.PlateCarree()
     loc = _opt(loc, "plot.minimap_loc")
     size = _opt(size, "plot.minimap_size")
@@ -856,10 +856,30 @@ def add_colorbar(mappable, ax=None, da=None, **kwargs):
 _add_colorbar_ = add_colorbar
 
 
-def _get_map_axes_(ax, extent, transform, map_kw, projection=None):
+def get_map_axes(ax, extent, transform, map_kw, projection=None):
     """Create a map when there is no axes, or decorate the axes
 
-    ``projection`` is the default one, which can be overridden in ``map_kw``.
+    Parameters
+    ----------
+    ax: None, cartopy.mpl.geoaxes.GeoAxes
+        Existing map axes, or None to create a new map with :func:`create_map`
+    extent: list
+        Geographic extent as ``[xmin, xmax, ymin, ymax]``
+    transform: cartopy.crs.CRS
+        Coordinate system of the extent, used to decorate existing axes
+    map_kw: None, dict
+        Parameters of :func:`create_map`, or of :func:`decorate_map` for existing axes
+    projection: None, str, cartopy.crs.Projection
+        Default projection of a new map, which can be overridden in `map_kw`
+
+    Return
+    ------
+    cartopy.mpl.geoaxes.GeoAxes
+
+    See also
+    --------
+    create_map
+    decorate_map
     """
     kw = dict(map_kw or {})
     if ax is None:
@@ -977,13 +997,13 @@ def plot_field(
     plot_grid
     plot_section
     """
-    ccrs, _ = _import_cartopy_()
+    ccrs, _ = import_cartopy()
     if transform is None:
         transform = ccrs.PlateCarree()
     lon = xcoords.get_lon(field)
     lat = xcoords.get_lat(field)
     extent = xgeo.get_extent(field, margin=margin)
-    ax = _get_map_axes_(ax, extent, transform, map_kw)
+    ax = get_map_axes(ax, extent, transform, map_kw)
 
     if isinstance(kwargs.get("cmap"), str) and kwargs["cmap"] == "auto":
         auto = _get_auto_cmap_kwargs_(field, kwargs)
@@ -1326,7 +1346,7 @@ def plot_grid(
     """
     from . import grid as xgrid
 
-    ccrs, _ = _import_cartopy_()
+    ccrs, _ = import_cartopy()
     if transform is None:
         transform = ccrs.PlateCarree()
     if kind not in ("mesh", "bathy", "resolution"):
@@ -1353,7 +1373,7 @@ def plot_grid(
         centers = kind == "mesh"
 
     # Axes
-    lon, lat = xgrid._get_lonlat_yx_(obj)
+    lon, lat = xgrid.get_lonlat_2d(obj)
     extent = xgeo.get_extent((lon.values, lat.values), margin=0.05)
     if ax is None and "figsize" not in (map_kw or {}):
         # Figure adapted to the aspect ratio of the map, to avoid white margins
@@ -1362,7 +1382,7 @@ def plot_grid(
         map_kw = {**(map_kw or {}), "figsize": (width, np.clip(7.0 * aspect, 3.0, 8.0))}
     map_kw = dict(map_kw or {})
     map_kw["projection"] = projection or map_kw.get("projection", "ortho")
-    ax = _get_map_axes_(ax, extent, transform, map_kw)
+    ax = get_map_axes(ax, extent, transform, map_kw)
 
     # Background field
     if kind == "resolution":
@@ -1692,12 +1712,12 @@ def plot_vectors(
     """
     from . import grid as xgrid
 
-    ccrs, _ = _import_cartopy_()
+    ccrs, _ = import_cartopy()
     if transform is None:
         transform = ccrs.PlateCarree()
-    lon, lat = xgrid._get_lonlat_yx_(u)
+    lon, lat = xgrid.get_lonlat_2d(u)
     extent = xgeo.get_extent((lon.values, lat.values), margin=margin)
-    ax = _get_map_axes_(ax, extent, transform, map_kw)
+    ax = get_map_axes(ax, extent, transform, map_kw)
     dims = lon.dims
     uu, vv = u.transpose(*dims).values, v.transpose(*dims).values
     min_spacing = _opt(min_spacing, "plot.vectors_min_spacing")

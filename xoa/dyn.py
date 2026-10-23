@@ -366,17 +366,9 @@ def _get_dx_dy_(u, dx, dy):
     return dx, dy
 
 
-def _name_(da, ref, name, long_name, units):
-    """Name an output and give it clean attributes, while its coordinates keep theirs"""
-    da = xcoords.copy_coord_attrs(da, ref)
-    da.name = name
-    da.attrs = {"long_name": long_name, "units": units}
-    return da
-
-
 def _normalize_(da, u, divisor, name, long_name):
     """Divide a diagnostic by a scale to make it dimensionless"""
-    return _name_((da / divisor).transpose(*u.dims), u, name, long_name, "1")
+    return xcoords.set_name_attrs((da / divisor).transpose(*u.dims), u, name, long_name, "1")
 
 
 def _apply_kinematics_(func, nout, u, v, dx, dy, z, names, long_names, units):
@@ -409,7 +401,7 @@ def _apply_kinematics_(func, nout, u, v, dx, dy, z, names, long_names, units):
         res = (res,)
     out = []
     for da, name, long_name, unit in zip(res, names, long_names, units):
-        out.append(_name_(da.transpose(*u.dims), u, name, long_name, unit))
+        out.append(xcoords.set_name_attrs(da.transpose(*u.dims), u, name, long_name, unit))
     return out[0] if nout == 1 else tuple(out)
 
 
@@ -438,7 +430,23 @@ _DOC_NORMALIZE_ = {
 }
 
 
-def _format_uv_doc_(func):
+def format_uv_docstring(func):
+    """Decorator that inserts the description of the velocity parameters in a docstring
+
+    The ``{parameters}`` placeholder of the docstring is replaced by the description
+    of the `u`, `v`, `dx`, `dy` and `z` parameters, and of `normalize`
+    for the functions that have it.
+
+    Parameters
+    ----------
+    func: callable
+        Function whose name starts with ``get_``
+
+    Return
+    ------
+    callable
+        The same function, with its docstring formatted
+    """
     # The indentation of docstrings is already removed
     scale = _DOC_NORMALIZE_.get(func.__name__[4:])
     normalize = (
@@ -451,7 +459,7 @@ def _format_uv_doc_(func):
     return func
 
 
-@_format_uv_doc_
+@format_uv_docstring
 def get_relvort(u, v, dx=None, dy=None, z=None):
     """Compute the relative vorticity, in s-1
 
@@ -471,7 +479,7 @@ def get_relvort(u, v, dx=None, dy=None, z=None):
     )
 
 
-@_format_uv_doc_
+@format_uv_docstring
 def get_div(u, v, dx=None, dy=None, z=None, normalize=False):
     """Compute the horizontal divergence, in s-1
 
@@ -489,12 +497,12 @@ def get_div(u, v, dx=None, dy=None, z=None, normalize=False):
         cdyn.div, 1, u, v, dx, dy, z, ["div"], ["Horizontal divergence"], ["s-1"]
     )
     if normalize:
-        corio = get_coriolis(xgrid._get_lonlat_yx_(u)[1])
+        corio = get_coriolis(xgrid.get_lonlat_2d(u)[1])
         div = _normalize_(div, u, corio, "div", "Divergence / f")
     return div
 
 
-@_format_uv_doc_
+@format_uv_docstring
 def get_strain(u, v, dx=None, dy=None, z=None, normalize=False):
     """Compute the normal and shear strains, in s-1
 
@@ -524,14 +532,14 @@ def get_strain(u, v, dx=None, dy=None, z=None, normalize=False):
         ["s-1", "s-1"],
     )
     if normalize:
-        corio = abs(get_coriolis(xgrid._get_lonlat_yx_(u)[1]))
+        corio = abs(get_coriolis(xgrid.get_lonlat_2d(u)[1]))
         strains = tuple(
             _normalize_(da, u, corio, da.name, da.long_name + " / |f|") for da in strains
         )
     return strains
 
 
-@_format_uv_doc_
+@format_uv_docstring
 def get_okuboweiss(u, v, dx=None, dy=None, z=None, normalize=False):
     """Compute the Okubo-Weiss parameter, in s-2
 
@@ -620,7 +628,7 @@ def get_geos(ssh, dx=None, dy=None):
     dx, dy = _get_dx_dy_(ssh, dx, dy)
     dx = xr.DataArray(dx) if np.ndim(dx) == 0 else dx
     dy = xr.DataArray(dy) if np.ndim(dy) == 0 else dy
-    lon, lat = xgrid._get_lonlat_yx_(ssh)
+    lon, lat = xgrid.get_lonlat_2d(ssh)
     corio = get_coriolis(lat)
     core_dims = [ydim, xdim]
     ug, vg = xr.apply_ufunc(
@@ -644,7 +652,7 @@ def get_geos(ssh, dx=None, dy=None):
         ("ugeos", "vgeos"),
         ("Zonal geostrophic current", "Meridional geostrophic current"),
     ):
-        out.append(_name_(da.transpose(*ssh.dims), ssh, name, long_name, "m s-1"))
+        out.append(xcoords.set_name_attrs(da.transpose(*ssh.dims), ssh, name, long_name, "m s-1"))
     return tuple(out)
 
 
@@ -727,7 +735,7 @@ def get_cyclogeos(
     if np.ndim(dy) == 0:
         dy = xr.DataArray(dy)
     ug, vg = get_geos(ssh, dx=dx, dy=dy)
-    corio = get_coriolis(xgrid._get_lonlat_yx_(ssh)[1])
+    corio = get_coriolis(xgrid.get_lonlat_2d(ssh)[1])
     core_dims = [ydim, xdim]
     uc, vc = xr.apply_ufunc(
         cdyn.cyclogeos,
@@ -759,7 +767,7 @@ def get_cyclogeos(
         ("ucgeos", "vcgeos"),
         ("Zonal cyclogeostrophic current", "Meridional cyclogeostrophic current"),
     ):
-        out.append(_name_(da.transpose(*ssh.dims), ssh, name, long_name, "m s-1"))
+        out.append(xcoords.set_name_attrs(da.transpose(*ssh.dims), ssh, name, long_name, "m s-1"))
     return tuple(out)
 
 
@@ -818,7 +826,7 @@ def get_rossby_radius(n2, z=None, lat=None, zrange=None, fmin=1e-5):
     with np.errstate(divide="ignore", invalid="ignore"):
         rd = xr.where(corio >= fmin, nint / (np.pi * corio), np.nan)
     rd = rd.transpose(*[d for d in n2.dims if d in rd.dims], ...)
-    return _name_(rd, n2, "rd", "Rossby radius of deformation", "m")
+    return xcoords.set_name_attrs(rd, n2, "rd", "Rossby radius of deformation", "m")
 
 
 def _mode_dims_(res, ref, *drop):
@@ -954,7 +962,7 @@ class VerticalModes:
             da = _mode_dims_(da, n2)
             if "mode" in da.dims:
                 da = da.assign_coords(mode=np.arange(nmodes))
-            out.append(_name_(da, n2, name, long_name, units))
+            out.append(xcoords.set_name_attrs(da, n2, name, long_name, units))
         self.modes, self.c, self.dz = out
 
         # Deformation radii
@@ -965,7 +973,9 @@ class VerticalModes:
             corio = abs(get_coriolis(float(lat) if np.ndim(lat) == 0 else lat))
             with np.errstate(divide="ignore", invalid="ignore"):
                 rd = xr.where(corio >= fmin, self.c / corio, np.nan)
-            self.rd = _name_(rd, n2, "rd", "Deformation radius of the vertical modes", "m")
+            self.rd = xcoords.set_name_attrs(
+                rd, n2, "rd", "Deformation radius of the vertical modes", "m"
+            )
             self.rd = _mode_dims_(self.rd, self.c)
 
     def __repr__(self):
@@ -1099,7 +1109,7 @@ class VerticalModes:
         energy = sum(self.decomp(c) ** 2 for c in comps)
         total = sum((c**2 * self.dz).sum(self.zdim) / self.dz.sum(self.zdim) for c in comps)
         share = energy / total
-        return _name_(share, u, "energy_share", "Share of the kinetic energy", "1")
+        return xcoords.set_name_attrs(share, u, "energy_share", "Share of the kinetic energy", "1")
 
     def truncation_error(self, da, nmodes):
         """Get the error of recomposing profiles with a limited number of modes

@@ -56,7 +56,7 @@ def get_contour_polygons(field, level, containing=None):
 
     if field.ndim != 2:
         raise exceptions.XoaError("The field must be two-dimensional")
-    lon, lat = xgrid._get_lonlat_yx_(field)
+    lon, lat = xgrid.get_lonlat_2d(field)
     lonv, latv = lon.values, lat.values
     values = np.ma.masked_invalid(field.transpose(*lon.dims).values)
     generator = contour_generator(lonv, latv, values)

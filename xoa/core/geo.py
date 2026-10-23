@@ -107,6 +107,31 @@ def normalize_longitude(lon):
     return lon
 
 
+def normalize_longitudes(lon):
+    """Put longitudes in the [-180, 180] range, leaving the ones that already are
+
+    Contrary to :func:`normalize_longitude`, it works on arrays.
+
+    Parameters
+    ----------
+    lon: array_like
+        Longitudes in degrees
+
+    Return
+    ------
+    numpy.ndarray
+        Longitudes in [-180, 180], which is `lon` itself when no change is needed
+
+    See also
+    --------
+    normalize_longitude
+    """
+    lon = np.asarray(lon)
+    if lon.size and (lon.min() < -180 or lon.max() > 180):
+        lon = np.where((lon < -180) | (lon > 180), (lon + 180) % 360 - 180, lon)
+    return lon
+
+
 @numba.vectorize(
     [
         numba.int32(numba.int32, numba.int32),

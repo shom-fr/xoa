@@ -26,20 +26,7 @@ from . import exceptions
 from . import grid as xgrid
 from .core import grid as cgrid
 from .core import mask as cmask
-
-
-def _as_polygons_(polygon):
-    """Convert polygons to a list of (lon, lat) arrays of shape (n, 2)"""
-    if hasattr(polygon, "geoms"):  # Multi-geometry
-        return [p for g in polygon.geoms for p in _as_polygons_(g)]
-    if hasattr(polygon, "exterior"):  # Polygon, whose holes are ignored
-        return [np.asarray(polygon.exterior.coords, dtype="d")[:, :2]]
-    if isinstance(polygon, (list, tuple)) and len(polygon) and not np.ndim(polygon[0]) == 1:
-        return [p for g in polygon for p in _as_polygons_(g)]
-    poly = np.asarray(polygon, dtype="d")
-    if poly.ndim != 2 or poly.shape[1] != 2 or len(poly) < 3:
-        raise exceptions.XoaError("A polygon must be an array of at least 3 (lon, lat) pairs")
-    return [poly]
+from .core import poly as cpoly
 
 
 def get_polygon_mask(obj, polygon, threshold=0.5):
@@ -73,7 +60,7 @@ def get_polygon_mask(obj, polygon, threshold=0.5):
     --------
     xoa.core.mask.polygon_mask
     """
-    lon, lat = xgrid._get_lonlat_yx_(obj)
+    lon, lat = xgrid.get_lonlat_2d(obj)
     lonv, latv = lon.values, lat.values
     kwargs = {}
     if threshold is not None:
@@ -83,7 +70,7 @@ def get_polygon_mask(obj, polygon, threshold=0.5):
             threshold=threshold,
         )
     mask = np.zeros(lonv.shape, dtype=bool)
-    for poly in _as_polygons_(polygon):
+    for poly in cpoly.as_polygons(polygon):
         mask |= cmask.polygon_mask(poly, lonv, latv, **kwargs)
     return xr.DataArray(
         mask,

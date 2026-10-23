@@ -39,8 +39,21 @@ from .stats import rose_hist
 # %% Maps
 
 
-def _import_cartopy_():
-    """Import cartopy lazily"""
+def import_cartopy():
+    """Import cartopy lazily, with an explicit error message when it is missing
+
+    Return
+    ------
+    module
+        The :mod:`cartopy.crs` module
+    module
+        The :mod:`cartopy.feature` module
+
+    Raises
+    ------
+    ImportError
+        When cartopy is not installed
+    """
     try:
         import cartopy.crs as ccrs
         import cartopy.feature as cfeature
@@ -78,7 +91,7 @@ def get_projection(projection=None, extent=None):
     ------
     cartopy.crs.Projection
     """
-    ccrs, _ = _import_cartopy_()
+    ccrs, _ = import_cartopy()
     if projection is None:
         projection = "mercator"
     if not isinstance(projection, str):
@@ -135,7 +148,7 @@ def add_land(ax, scale=None, color=None, **kwargs):
     ------
     cartopy.mpl.feature_artist.FeatureArtist
     """
-    ccrs, cfeature = _import_cartopy_()
+    ccrs, cfeature = import_cartopy()
     scale = _opt(scale, "plot.map_land_scale")
     color = _opt(color, "plot.map_land_color")
     if color is None:
@@ -192,7 +205,7 @@ def decorate_map(
     ------
     cartopy.mpl.geoaxes.GeoAxes
     """
-    ccrs, _ = _import_cartopy_()
+    ccrs, _ = import_cartopy()
     gridlines = _opt(gridlines, "plot.map_gridlines")
     gridlines_labels_on = _opt(gridlines_labels_on, "plot.map_gridlines_labels_on")
     land = _opt(land, "plot.map_land")
@@ -648,7 +661,7 @@ def _get_anchor_(loc, pad):
 
 def _axes_to_lonlat_(ax, xy):
     """Longitudes and latitudes of points given in axes coordinates"""
-    ccrs, _ = _import_cartopy_()
+    ccrs, _ = import_cartopy()
     ax.apply_aspect()
     x, y = (ax.transAxes + ax.transData.inverted()).transform(np.atleast_2d(xy)).T
     lon, lat = ccrs.Geodetic().transform_points(ax.projection, x, y)[:, :2].T
@@ -925,7 +938,7 @@ def add_compass(
 
     # Angle of the north with respect to the vertical of the display, clockwise
     lon, lat = _axes_to_lonlat_(ax, [(x0, y0)])
-    ccrs, _ = _import_cartopy_()
+    ccrs, _ = import_cartopy()
     xy = ax.projection.transform_points(
         ccrs.Geodetic(), np.array([lon[0]] * 2), np.array([lat[0], lat[0] + 0.01])
     )[:, :2]
@@ -999,7 +1012,7 @@ _FRAME_SIDES = {
 
 def _lonlat_to_axes_(ax, lon, lat):
     """Axes coordinates of points given in degrees"""
-    ccrs, _ = _import_cartopy_()
+    ccrs, _ = import_cartopy()
     x, y = ax.projection.transform_points(ccrs.Geodetic(), lon, lat)[:, :2].T
     return (ax.transData + ax.transAxes.inverted()).transform(np.array([x, y]).T)
 
