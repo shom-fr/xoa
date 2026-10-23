@@ -286,7 +286,7 @@ def plot_tidal_ellipses(
     matplotlib.collections.LineCollection
         The ellipses. Use ``.axes`` and ``.figure`` to get the axes and figure.
     """
-    ccrs, _ = cplot._import_cartopy_()
+    ccrs, _ = cplot.import_cartopy()
     transform = transform or ccrs.PlateCarree()
     c = _select_constituent_(coef, constituent)
     smaj = c["semi_major"]
@@ -313,7 +313,7 @@ def plot_tidal_ellipses(
         lat_v.min() - 2 * spacing,
         lat_v.max() + 2 * spacing,
     ]
-    ax = xplot._get_map_axes_(ax, extent, transform, map_kw)
+    ax = xplot.get_map_axes(ax, extent, transform, map_kw)
     if background is not None:
         xplot.plot_field(background, ax=ax, **(background_kw or {}))
 
@@ -519,7 +519,7 @@ def plot_cotidal(
         span = np.nanmax(phase) - np.nanmin(phase)
         step = next((st for st in (1, 2, 5, 10, 15, 30, 45, 60) if span / st <= 12), 90)
         phase_levels = np.arange(0, 360, step)
-    ccrs, _ = cplot._import_cartopy_()
+    ccrs, _ = cplot.import_cartopy()
     cs = ax.contour(
         lon,
         lat,

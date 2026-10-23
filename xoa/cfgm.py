@@ -27,10 +27,11 @@ import re
 import shutil
 import sys
 import traceback
+from argparse import SUPPRESS, ArgumentParser
 from argparse import Action as AP_Action
-from argparse import ArgumentParser, _HelpAction
 from argparse import HelpFormatter as ArgHelpFormatter
 from collections import OrderedDict
+from contextlib import contextmanager
 from warnings import warn
 
 try:
@@ -1140,26 +1141,24 @@ class ConfigManager:
             parser["add_help"] = False
             parser = ArgumentParser(**parser)
 
-        # Add short and long helps
-        old_conflict_handler = parser._optionals.conflict_handler
-        parser._optionals.conflict_handler = "resolve"
-        parser.add_argument(
-            "-h",
-            "--help",
-            action=_AP_ShortHelpAction,
-            help="show a reduced help and exit",
-        )
-        parser.add_argument(
-            "--long-help",
-            action=_HelpAction,
-            help="show an extended help and exit",
-        )
-        parser.add_argument(
-            "--short-help",
-            action=_AP_VeryShortHelpAction,
-            help="show a very reduced help and exit",
-        )
-        parser._optionals.conflict_handler = old_conflict_handler
+        # Add short and long helps, replacing the default help
+        with _ap_resolve_conflicts_(parser):
+            parser.add_argument(
+                "-h",
+                "--help",
+                action=_AP_ShortHelpAction,
+                help="show a reduced help and exit",
+            )
+            parser.add_argument(
+                "--long-help",
+                action="help",
+                help="show an extended help and exit",
+            )
+            parser.add_argument(
+                "--short-help",
+                action=_AP_VeryShortHelpAction,
+                help="show a very reduced help and exit",
+            )
 
         # Add extra options first
         if extraopts:
@@ -1344,18 +1343,15 @@ class ConfigManager:
         # Configuration options
         self.arg_parse(parser, parse=False)
         if rst:
-            formatter = ArgHelpFormatter(max_help_position=0)
-            for action_group in parser._action_groups:
+            formatter = ArgHelpFormatter(parser.prog, max_help_position=4)
+            for action_group in _ap_groups_(parser):
                 formatter.start_section(action_group.title)
                 formatter.add_text(action_group.description)
-                formatter.add_arguments(action_group._group_actions)
+                formatter.add_arguments(_ap_group_actions_(action_group))
                 formatter.end_section()
             shelp = formatter.format_help()
         else:
             shelp = parser.format_help()
-
-        # Encoding
-        shelp = shelp.encode(sys.getdefaultencoding(), "replace")
 
         # Convert to rst
         if rst:
@@ -1520,13 +1516,13 @@ def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
                 rhelp.append(f".. program:: {prog}\n")
                 rhelp.extend(
                     [
-                        secfmt.format(locals()),
+                        secfmt.format(secname=secname),
                         "\n\t.. code-block:: bash\n\n\t\t" + usage,
                     ]
                 )
                 multiline = True
             else:
-                rhelp.extend([secfmt.format(locals()), ""])
+                rhelp.extend([secfmt.format(secname=secname), ""])
                 if m.group(2) is not None:
                     rhelp.extend(["", "\t" + m.group(2)])
                     multiline = True
@@ -1563,7 +1559,7 @@ def opt2rst(shelp, prog=None, secfmt=":{secname}:", descname="Description"):
             multiline = False
             if secname == "Usage":
                 secname = descname
-                rhelp.extend([secfmt.format(locals()), ""])
+                rhelp.extend([secfmt.format(secname=secname), ""])
 
     return "\n".join(rhelp)
 
@@ -2101,13 +2097,13 @@ def print_short_help(parser, formatter=None, compressed=False):
     """Print all help of a parser instance but those of groups"""
     if isinstance(parser, ArgumentParser):
         if formatter is None:
-            formatter = parser._get_formatter()
+            formatter = parser.formatter_class(prog=parser.prog)
 
         # usage
         if compressed is True:
             compressed = [
                 "-h",
-                "-help",
+                "--help",
                 "--long-help",
                 "--short-help",
                 "--cfgfile",
@@ -2124,43 +2120,93 @@ def print_short_help(parser, formatter=None, compressed=False):
                     if optstr in compressed:
                         return True
 
-            actions = list(filter(valid_option, parser._actions))
+            actions = list(filter(valid_option, _ap_actions_(parser)))
             actions.append(fake_action)
         else:
-            actions = parser._actions
-        formatter.add_usage(parser.usage, actions, parser._mutually_exclusive_groups)
+            actions = _ap_actions_(parser)
+        formatter.add_usage(parser.usage, actions, _ap_mutex_groups_(parser))
 
         # description
         formatter.add_text(parser.description)
 
-        # positionals, optionals and user-defined groups
-        for action_group in parser._action_groups:
-            if action_group.title in [
-                "positional arguments",
-                "optional arguments",
-            ]:
-                formatter.start_section(action_group.title)
-                formatter.add_text(action_group.description)
-                formatter.add_arguments(action_group._group_actions)
-                formatter.end_section()
+        # positionals and optionals, but not the groups of the configuration
+        for action_group in _ap_main_groups_(parser):
+            formatter.start_section(action_group.title)
+            formatter.add_text(action_group.description)
+            formatter.add_arguments(_ap_group_actions_(action_group))
+            formatter.end_section()
 
         # epilog
         formatter.add_text(parser.epilog)
 
         # determine help from format above
-        parser._print_message(formatter.format_help(), sys.stdout)
+        sys.stdout.write(formatter.format_help())
 
 
-class _AP_ShortHelpAction(_HelpAction):
+class _AP_HelpAction(AP_Action):
+    """Base class of the help actions, which take no value"""
+
+    def __init__(self, option_strings, dest=SUPPRESS, default=SUPPRESS, help=None):
+        super().__init__(
+            option_strings=option_strings, dest=dest, default=default, nargs=0, help=help
+        )
+
+
+class _AP_ShortHelpAction(_AP_HelpAction):
     def __call__(self, parser, namespace, values, option_string=None):
         print_short_help(parser)
         parser.exit()
 
 
-class _AP_VeryShortHelpAction(_HelpAction):
+class _AP_VeryShortHelpAction(_AP_HelpAction):
     def __call__(self, parser, namespace, values, option_string=None):
         print_short_help(parser, compressed=True)
         parser.exit()
+
+
+# %% Access to the argparse internals
+# argparse has no public way to list the actions and groups of a parser,
+# nor to replace an option of a parser that is given by the user.
+# These internals are only accessed here, to ease the maintenance.
+
+
+def _ap_actions_(parser):
+    """All the actions of a parser"""
+    return parser._actions
+
+
+def _ap_mutex_groups_(parser):
+    """Mutually exclusive groups of a parser, for the usage"""
+    return parser._mutually_exclusive_groups
+
+
+def _ap_groups_(parser):
+    """All the argument groups of a parser"""
+    return parser._action_groups
+
+
+def _ap_main_groups_(parser):
+    """Default groups of positional and optional arguments of a parser
+
+    They are identified as objects, since their titles depend on the python version.
+    """
+    return [parser._positionals, parser._optionals]
+
+
+def _ap_group_actions_(group):
+    """Actions of an argument group"""
+    return group._group_actions
+
+
+@contextmanager
+def _ap_resolve_conflicts_(parser):
+    """Let new options replace the existing ones of a parser, like ``-h``"""
+    old_conflict_handler = parser._optionals.conflict_handler
+    parser._optionals.conflict_handler = "resolve"
+    try:
+        yield parser
+    finally:
+        parser._optionals.conflict_handler = old_conflict_handler
 
 
 # %% Sphinx extension

@@ -36,7 +36,7 @@ def get_lonlat(nx, ny, x1=100.0, y1=100.0):
 
 
 def test_moved_helpers_are_still_available_from_xoa_plot():
-    for name in "add_land", "create_map", "decorate_map", "_import_cartopy_":
+    for name in "add_land", "create_map", "decorate_map", "import_cartopy":
         assert getattr(xplot, name) is getattr(cplot, name)
     for old, new in ("create_base_map", "create_map"), ("setup_map_axes", "decorate_map"):
         assert getattr(xplot, old) is getattr(xplot, new)
@@ -450,7 +450,7 @@ class TestRose:
 
 def get_map(projection=None, extent=(-12, 12, 35, 60)):
     pytest.importorskip("cartopy")
-    ccrs, _ = cplot._import_cartopy_()
+    ccrs, _ = cplot.import_cartopy()
     ax = plt.figure(figsize=(5, 5)).add_subplot(
         1, 1, 1, projection=projection or ccrs.PlateCarree()
     )
@@ -501,7 +501,7 @@ class TestMapDecorations:
         assert len(artists) == 4
 
     def test_fancy_frame_forces_cartopy_locators(self):
-        ccrs, _ = cplot._import_cartopy_()
+        ccrs, _ = cplot.import_cartopy()
         for proj in None, ccrs.Mercator():
             ax = get_map(proj, (-12, 12, 35, 55))
             assert cplot.add_fancy_map_frame(ax, sides="bottom")
@@ -513,7 +513,7 @@ class TestMapDecorations:
     def test_fancy_frame_errors(self):
         with pytest.raises(xoa.XoaError, match="side"):
             cplot.add_fancy_map_frame(get_map(), sides="middle")
-        ccrs, _ = cplot._import_cartopy_()
+        ccrs, _ = cplot.import_cartopy()
         with pytest.raises(xoa.XoaError, match="parallel"):
             cplot.add_fancy_map_frame(get_map(ccrs.LambertConformal(), (-10, 10, 40, 55)))
 
@@ -534,7 +534,7 @@ class TestMapDecorations:
 
     def test_compass_follows_the_meridians(self):
         pytest.importorskip("cartopy")
-        ccrs, _ = cplot._import_cartopy_()
+        ccrs, _ = cplot.import_cartopy()
         # No rotation with a plate carree map: the label is right above the center
         label = cplot.add_compass(get_map(), loc="lower left")[-1]
         assert label.xyann[0] == pytest.approx(0, abs=1e-6)
@@ -626,7 +626,7 @@ class TestPlotOptions:
     def test_mesh_spacing_option(self):
         ax = get_map()
         lon, lat = np.meshgrid(np.linspace(-5, 5, 50), np.linspace(40, 50, 50))
-        pcar = cplot._import_cartopy_()[0].PlateCarree()
+        pcar = cplot.import_cartopy()[0].PlateCarree()
         default = cplot.get_strides("auto", lon, lat, ax, pcar)
         with xoa.set_options("plot", mesh_min_spacing=60):
             assert min(cplot.get_strides("auto", lon, lat, ax, pcar)) > max(default)

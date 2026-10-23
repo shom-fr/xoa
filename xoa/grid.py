@@ -1213,8 +1213,35 @@ def ds2grid_dict(obj, mask=None, lon_name=None, lat_name=None, time_name=None, b
     return grid
 
 
-def _get_lonlat_yx_(obj):
-    """Get 2D longitudes and latitudes with (y, x) dimensions"""
+def get_lonlat_2d(obj):
+    """Get 2D longitudes and latitudes with (y, x) dimensions
+
+    1D longitudes and latitudes of a rectilinear grid are broadcasted
+    against each other, and 2D ones of a curvilinear grid are returned
+    as is. In both cases, the arrays are transposed to (y, x).
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D
+
+    Return
+    ------
+    xarray.DataArray
+        2D longitudes with (y, x) dimensions
+    xarray.DataArray
+        2D latitudes with (y, x) dimensions
+
+    Raises
+    ------
+    xoa.exceptions.XoaError
+        When the broadcasted longitudes and latitudes are not 2D
+
+    See also
+    --------
+    xoa.coords.get_lon
+    xoa.coords.get_lat
+    """
     lon = xcoords.get_lon(obj)
     lat = xcoords.get_lat(obj)
     lat, lon = xr.broadcast(lat, lon)
@@ -1253,7 +1280,7 @@ def get_resolution(obj, radius=xgeo.EARTH_RADIUS):
     get_median_resolution
     xoa.core.grid.compute_resolution
     """
-    lon, lat = _get_lonlat_yx_(obj)
+    lon, lat = get_lonlat_2d(obj)
     dx, dy = cgrid.compute_resolution(lon.values, lat.values, radius=radius)
     attrs = {"units": "m"}
     return (
@@ -1292,7 +1319,7 @@ def get_dx_dy(obj, radius=xgeo.EARTH_RADIUS):
     get_resolution
     xoa.core.grid.compute_centered_resolution
     """
-    lon, lat = _get_lonlat_yx_(obj)
+    lon, lat = get_lonlat_2d(obj)
     dx, dy = cgrid.compute_centered_resolution(lon.values, lat.values, radius=radius)
     attrs = {"units": "m"}
     return (
@@ -1330,7 +1357,7 @@ def get_median_resolution(obj):
     get_resolution
     xoa.core.grid.median_resolution_deg
     """
-    lon, lat = _get_lonlat_yx_(obj)
+    lon, lat = get_lonlat_2d(obj)
     return cgrid.median_resolution_deg(lon.values, lat.values)
 
 
@@ -1362,7 +1389,7 @@ def get_edge_extents(obj, edges="all", n_cells=1):
     --------
     xoa.geo.get_extent
     """
-    lon, lat = _get_lonlat_yx_(obj)
+    lon, lat = get_lonlat_2d(obj)
     ydim, xdim = lon.dims
     slices = {
         "north": {ydim: slice(-n_cells, None)},

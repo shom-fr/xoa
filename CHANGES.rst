@@ -7,6 +7,8 @@ Unreleased
 New features
 ------------
 - Switch from black and flake8 to ruff for linting and formatting, with a pre-commit configuration.
+- Make public the helpers that were used outside their module: :func:`xoa.core.plot.import_cartopy`, :func:`xoa.plot.get_map_axes`, :func:`xoa.core.interp.get_source_matrix`, :func:`xoa.geo.pop_tree_kwargs` and :func:`xoa.dyn.format_uv_docstring`. Add :func:`xoa.core.geo.normalize_longitudes`, :func:`xoa.core.poly.as_polygons` and :func:`xoa.coords.set_name_attrs`.
+- Add :func:`xoa.grid.get_lonlat_2d` to get 2D longitudes and latitudes with (y, x) dimensions.
 - Add ``plot`` options used as defaults by the plot functions, load options from a file with :func:`xoa.load_options` and :class:`xoa.set_options`, validate options. ``CBAR_SHRINK`` becomes ``plot.colorbar_shrink``. See :doc:`configure`.
 - Rewrite the :ref:`roadmap`: next diagnostics, and the shoot and armoor ecosystem.
 - Show a larger surge, concise dates and the predicted tide in the skew surge plot of :ref:`sphx_glr_tutorials_tides_plot_tide_station.py`.
@@ -103,6 +105,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix the ``-h`` and ``--short-help`` options of :meth:`xoa.cfgm.ConfigManager.arg_parse`, which lost the options section since python 3.10, and :meth:`~xoa.cfgm.ConfigManager.arg_long_help`, which failed. :mod:`xoa.cfgm` no longer uses the private ``argparse._HelpAction``.
 - Draw the outline of 2D grids with ``plot_coords="auto"`` in :func:`xoa.plot.plot_minimap` instead of all the points, and default ``coords_linewidth`` to 1.5.
 - Fix the Greenwich phases of :mod:`xoa.tide`: astronomical arguments 12 h off, M2/N2/2N2 nodal satellites, and the 90° shifts of the diurnal constituents. They now agree with utide at Brest within 0.5° for the main constituents.
 - Search the time dimension and the variables of :mod:`xoa.tide` with :mod:`xoa.coords` and :mod:`xoa.meta`: ``t_dim`` and ``time_dim`` default to None, :func:`~xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv` accept datasets, and ``valid_time`` is a known time name.

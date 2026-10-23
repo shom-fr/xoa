@@ -86,6 +86,37 @@ def copy_coord_attrs(da, ref):
     return da
 
 
+def set_name_attrs(da, ref, name, long_name, units):
+    """Name a computed array and set its attributes, while its coordinates keep theirs
+
+    The attributes of `da` are replaced by its long name and units,
+    and those of its coordinates are copied from `ref`
+    with :func:`copy_coord_attrs`.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Computed array, which is updated in place
+    ref: xarray.DataArray, xarray.Dataset
+        Object whose coordinate attributes are copied, like an input of the computation
+    name: str
+        Name of the array
+    long_name: str
+        Long name of the array
+    units: str
+        Units of the array
+
+    Return
+    ------
+    xarray.DataArray
+        The same array as `da`
+    """
+    da = copy_coord_attrs(da, ref)
+    da.name = name
+    da.attrs = {"long_name": long_name, "units": units}
+    return da
+
+
 def get_lon(da, errors="raise", **kwargs):
     """Get the longitude coordinate
 

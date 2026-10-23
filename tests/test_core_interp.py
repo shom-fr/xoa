@@ -640,19 +640,19 @@ class TestSourceMatrixCopies:
     """The data are copied only when needed, and never modified"""
 
     def test_single_field_is_not_copied(self):
-        from xoa.core.interp import _get_source_matrix_
+        from xoa.core.interp import get_source_matrix
 
         data = np.random.rand(6, 8)
-        matrix = _get_source_matrix_(data)
+        matrix = get_source_matrix(data)
         assert matrix.shape == (48, 1)
         assert np.shares_memory(matrix, data)
         np.testing.assert_array_equal(matrix[:, 0], data.ravel())
 
     def test_several_fields_are_copied_once_in_the_layout_of_the_kernels(self):
-        from xoa.core.interp import _get_source_matrix_
+        from xoa.core.interp import get_source_matrix
 
         data = np.random.rand(3, 2, 6, 8)
-        matrix = _get_source_matrix_(data)
+        matrix = get_source_matrix(data)
         assert matrix.shape == (48, 6)
         assert matrix.flags.c_contiguous
         assert not np.shares_memory(matrix, data)
@@ -660,13 +660,13 @@ class TestSourceMatrixCopies:
 
     @pytest.mark.parametrize("shape", [(6, 8), (3, 6, 8)])
     def test_mask_does_not_modify_the_input(self, shape):
-        from xoa.core.interp import _get_source_matrix_
+        from xoa.core.interp import get_source_matrix
 
         data = np.random.rand(*shape)
         ref = data.copy()
         mask = np.ones((6, 8), bool)
         mask[2, 3] = False
-        matrix = _get_source_matrix_(data, mask)
+        matrix = get_source_matrix(data, mask)
         np.testing.assert_array_equal(data, ref)
         assert np.all(np.isnan(matrix[2 * 8 + 3]))
         assert np.isnan(matrix).sum() == matrix.shape[1]
