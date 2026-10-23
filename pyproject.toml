@@ -25,6 +25,7 @@ dependencies = [
     "platformdirs",
     "cmocean",
     "configobj",
+    "dask",
     "gsw",
     "netCDF4",
     "numba",
