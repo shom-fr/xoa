@@ -193,6 +193,7 @@ Bug fixes
 
 Documentation
 -------------
+- Add the :ref:`indepth.performance` guide: the working dimension kept in place, dask chunks, threads or processes, and the speed or memory trade-off. Document the coordinates, the missing values and the ``binning`` method of :func:`xoa.regrid.regrid1d`.
 - Rename "Using the modules" section to "In-depth guides".
 - Added in the in-depth guide to metadata mentions of :mod:`xoa.coords`, :mod:`xoa.dyn` and :mod:`xoa.thermdyn` helper function to access coordinates and physical variables like lon or temp.
 - Added in-depth guides about sigma-like coordinates, grids and regridding, and filtering.

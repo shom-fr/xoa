@@ -201,7 +201,9 @@ What uses them
 - :func:`xoa.plot.plot_ts` converts to ``z`` with :func:`~xoa.coords.get_z` before
   computing the pressure with ``gsw.p_from_z``.
 - :func:`xoa.regrid.regrid1d` works with any coordinate you give it: interpolate
-  from ``z`` to ``z`` or from ``depth`` to ``depth``, and convert before, never across.
+  from ``z`` to ``z`` or from ``depth`` to ``depth``. When the input and output coordinates
+  both have a ``positive`` attribute and they differ, like a ``depth`` regridded to ``z`` levels,
+  it negates the input coordinate. Without these attributes, convert before.
 
 Pitfalls
 ========
@@ -213,7 +215,8 @@ Pitfalls
   Without this attribute, the name decides, and ``depth`` is taken as positive down.
   Set the attribute of your coordinates when their sign is not the usual one.
 - **Mixing signs in a regridding or an isoline.** Values and bounds must have the same sign:
-  ``-15`` m is a ``z``, ``15`` m is a ``depth``.
+  ``-15`` m is a ``z``, ``15`` m is a ``depth``. Only :func:`xoa.regrid.regrid1d` converts
+  its input coordinate, and only when the ``positive`` attributes of both coordinates are set.
 - **A dimension called** ``z``. A vertical dimension named like the ``z`` coordinate,
   or a dimension coordinate holding level indices, is read as a ``z`` coordinate.
   A 2D ``z`` computed from the thicknesses cannot be assigned to a dataset with a ``z``
