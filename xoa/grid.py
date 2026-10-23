@@ -179,7 +179,8 @@ def map_along_dim(func, da, dim, *coords, out_dim=None, out_size=None, dtype=Non
         Output size along `out_dim`, which defaults to the size of the coordinates
         along `out_dim` if any, else to the size of `da` along `dim`
     dtype: None, numpy.dtype
-        Output data type, which defaults to the type of `da` promoted to float
+        Output data type, which defaults to the type of `da` if it is a float,
+        else to float64
     kwargs: dict
         Extra keywords are passed to `func`
 
@@ -214,7 +215,7 @@ def map_along_dim(func, da, dim, *coords, out_dim=None, out_size=None, dtype=Non
     if out_size is None:
         out_size = next((c.sizes[out_dim] for c in coords if out_dim in c.dims), da.sizes[dim])
     if dtype is None:
-        dtype = np.result_type(da.dtype, float)
+        dtype = da.dtype if np.issubdtype(da.dtype, np.floating) else np.dtype("d")
 
     # Dimensions of the output, with dim as working dimension
     renamed = []

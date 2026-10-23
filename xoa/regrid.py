@@ -28,7 +28,7 @@ import xarray as xr
 from . import coords as xcoords
 from . import exceptions, meta, misc, weights
 from . import grid as xgrid
-from .core import num, regrid
+from .core import regrid
 from .core.num import CsrMatrix
 from .core.regrid import XYRegridder as CoreXYRegridder
 
@@ -88,36 +88,6 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     true = 2
 
 
-def _wrapper1d_(vari, *args, func_name, **kwargs):
-    """To make sure arrays have a 2D shape
-
-    Output array is reshaped back accordingly.
-    """
-
-    # The function to call
-    func = getattr(regrid, func_name)
-
-    # To 2D
-    args = [vari] + list(args)
-    eshapes = []
-    for arr in args:
-        eshape = list(arr.shape[:-1])
-        if len(eshapes) and len(eshape) < len(eshapes[-1]):
-            eshape = [1] * (len(eshapes[-1]) - len(eshape)) + eshape
-        eshapes.append(eshape)
-    eshapes = np.array(eshapes, dtype='l')
-    args = [num.as_float_array(arr).reshape(-1, arr.shape[-1]) for arr in args]
-    func_code = getattr(func, "func_code", getattr(func, "__code__"))
-    if "eshapes" in func_code.co_varnames[: func_code.co_argcount]:
-        args = args + [eshapes]
-
-    # Call
-    varo = func(*args, **kwargs)
-
-    # From 2D
-    return varo.reshape(tuple(eshapes.max(axis=0)) + varo.shape[-1:])
-
-
 def _get_dims_(da, coord, dim):
     """Get the input and output dimensions of :func:`regrid1d`"""
     if not isinstance(dim, (tuple, list)):
@@ -161,7 +131,9 @@ def regrid1d(
     The input and output coordinates may vary along other dimensions,
     which useful for instance for vertical interpolation in coastal
     ocean models.
-    Since it uses :func:`xarray.apply_ufunc`, it supports dask arrays.
+    The dimension is kept in place with :func:`xoa.grid.map_along_dim`, so the arrays
+    are not transposed, and dask arrays are processed by blocks: only the working
+    dimension must be a single chunk.
     The core computation is performed by the numba-accelerated routines
     of :mod:`xoa.core.regrid`.
 
@@ -202,7 +174,7 @@ def regrid1d(
         Max size for a gap to be interpolated when ``drop_na`` is True.
         Size is not checked when ``maxgap`` is zero.
     dask: str
-        See :func:`xarray.apply_ufunc`.
+        Unused, kept for compatibility.
 
     Returns
     -------
@@ -228,7 +200,7 @@ def regrid1d(
     xoa.core.regrid.hermit1d
     xoa.core.regrid.cellave1d
     xoa.core.regrid.extrap1d
-    xarray.apply_ufunc
+    xoa.grid.map_along_dim
     """
     # Ensure nanosecond precision for datetime coordinates
     da = xcoords.ensure_ns_datetime(da)
@@ -278,12 +250,10 @@ def regrid1d(
         coord_in = cfspecs_in.search_coord_from_dim(da, dim_in, errors="raise")
         coord_in_name = coord_in.name
 
-    # Coordinate arguments
-    output_sizes = {dim_out: coord.sizes[dim_out]}
-    input_core_dims = [[dim_in]]
+    # Coordinates, or edges for the cell methods
     method = regrid1d_methods[method]
     coord_out = coord
-    exclude_dims = {dim_in, dim_out}
+    out_size = coord.sizes[dim_out]
     if int(method) < 0:
         idimin = coord_in.get_axis_num(dim_in)
         idimout = coord.get_axis_num(dim_out)
@@ -295,17 +265,8 @@ def regrid1d(
             coord = edges["out"]
         else:
             coord = xgrid.get_edges(coord, dim_out)
-        namein = coord_in.dims[idimin]
-        nameout = coord.dims[idimout]
-        input_core_dims.extend([[namein], [nameout]])
-        exclude_dims = {dim_in, dim_out, namein, nameout}
-    else:
-        exclude_dims = {dim_in, dim_out}
-        input_core_dims.extend([[dim_in], [dim_out]])
-    output_core_dims = [[dim_out]]
-    for cname in coord.coords:
-        if cname != coord.name:
-            coord = coord.drop_vars(cname)
+        coord_in = coord_in.rename({coord_in.dims[idimin]: dim_in})
+        coord = coord.rename({coord.dims[idimout]: dim_out})
 
     # Interpolation function name and arguments
     func_name = str(method) + "1d"
@@ -313,9 +274,8 @@ def regrid1d(
         raise exceptions.XoaRegridError(
             "cellerr regrid method works only with 1D input and output coordinates"
         )
-    # func = getattr(interp, func_name)
     extrap = str(extrap_modes[extrap])
-    func_kwargs = {"func_name": func_name, "extrap": extrap}
+    func_kwargs = {"extrap": extrap}
     if method == "hermit":
         func_kwargs.update(bias=bias, tension=tension)
     if drop_na:
@@ -325,25 +285,17 @@ def regrid1d(
             )
         func_kwargs.update(drop_na=drop_na, maxgap=maxgap)
 
-    # Apply
-    da_out = xr.apply_ufunc(
-        _wrapper1d_,
+    # Apply along the dimension, which is kept in place
+    da_out = xgrid.map_along_dim(
+        getattr(regrid, func_name),
         da,
+        dim_in,
         coord_in,
         coord,
-        join="override",
-        kwargs=func_kwargs,
-        input_core_dims=input_core_dims,
-        output_core_dims=output_core_dims,
-        exclude_dims=exclude_dims,
-        dask_gufunc_kwargs={"output_sizes": output_sizes},
-        dask=dask,
+        out_dim=dim_out,
+        out_size=out_size,
+        **func_kwargs,
     )
-
-    # Transpose
-    dims = list(da.dims)
-    dims[dims.index(dim_in)] = dim_out
-    da_out = da_out.transpose(..., *dims, missing_dims="ignore")
 
     # Add output coordinates
     coord_out_name = coord_out.name if coord_out.name else coord_in.name
@@ -377,7 +329,7 @@ def extrap1d(da, dim, mode, dask='parallelized'):
         Extrapolation mode as one of the following:
         {extrap_modes.rst_with_links}
     dask: str
-        See :func:`xarray.apply_ufunc`.
+        Unused, kept for compatibility.
 
     Returns
     -------
@@ -394,25 +346,14 @@ def extrap1d(da, dim, mode, dask='parallelized'):
     --------
     regrid1d
     xoa.core.regrid.extrap1d
-    xarray.apply_ufunc
+    xoa.grid.map_along_dim
     """
     if isinstance(da, xr.Dataset):
         return da.map(
             lambda var: extrap1d(var, dim, mode, dask) if dim in var.dims else var,
             keep_attrs=True,
         )
-    da_out = xr.apply_ufunc(
-        _wrapper1d_,
-        da,
-        join="override",
-        kwargs={"func_name": "extrap1d", "mode": str(extrap_modes[mode])},
-        input_core_dims=[[dim]],
-        output_core_dims=[[dim]],
-        exclude_dims={dim},
-        dask=dask,
-        dask_gufunc_kwargs={"output_sizes": da.sizes},
-    )
-    da_out = da_out.transpose(*da.dims)
+    da_out = xgrid.map_along_dim(regrid.extrap1d, da, dim, mode=str(extrap_modes[mode]))
     da_out = da_out.assign_coords(da.coords)
     da_out.attrs.update(da.attrs)
     da_out.encoding.update(da.encoding)

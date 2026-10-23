@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- :func:`xoa.regrid.regrid1d` and :func:`xoa.regrid.extrap1d` no longer move the working dimension last, which makes them faster and lighter, and process dask arrays by blocks with :func:`xoa.grid.map_along_dim`.
 - Add :func:`xoa.grid.map_along_dim` to apply a function along a dimension that is kept in place, with coordinates of any subset of the dimensions and dask arrays processed with :func:`dask.array.map_blocks`, and :func:`xoa.core.num.view_along_axis` and :func:`xoa.core.num.broadcast_along_axis` to view arrays as ``(nouter, n, ninner)`` in numba kernels.
 - Switch from black and flake8 to ruff for linting and formatting, with a pre-commit configuration.
 - Make public the helpers that were used outside their module: :func:`xoa.core.plot.import_cartopy`, :func:`xoa.plot.get_map_axes`, :func:`xoa.core.interp.get_source_matrix`, :func:`xoa.geo.pop_tree_kwargs` and :func:`xoa.dyn.format_uv_docstring`. Add :func:`xoa.core.geo.normalize_longitudes`, :func:`xoa.core.poly.as_polygons` and :func:`xoa.coords.set_name_attrs`.
@@ -92,6 +93,7 @@ New features
 
 Breaking changes
 ----------------
+- The 1D kernels of :mod:`xoa.core.regrid` (:func:`~xoa.core.regrid.nearest1d`, :func:`~xoa.core.regrid.linear1d`, :func:`~xoa.core.regrid.cubic1d`, :func:`~xoa.core.regrid.hermit1d` and :func:`~xoa.core.regrid.cellave1d`) no longer take an ``eshapes`` argument: they take arrays that are broadcasted like with numpy except along an ``axis``, which is kept in place. :func:`~xoa.core.regrid.extrap1d` also takes an ``axis``. The ``dask`` argument of :func:`xoa.regrid.regrid1d` and :func:`xoa.regrid.extrap1d` is no longer used.
 - :func:`xoa.sigma.decode_sigma` and the ``ocean_*`` functions of :mod:`xoa.sigma` now return a ``z`` array, which is positive up, instead of a ``depth`` array that was negative. :func:`xoa.grid.dz2depth` and :func:`xoa.grid.decode_dz2depth` return a ``z`` array when ``positive="up"``, and :func:`xoa.grid.decode_dz2depth` no longer overwrites a dimension coordinate that has the same name. Use :func:`xoa.coords.get_depth` to get a depth.
 - :func:`xoa.coords.get_vertical` now uses the meta specs of its argument and looks for a depth, a ``z`` and then an altitude. The ``z`` name is no longer an alternative name of the ``level`` coordinate, and the ``z`` entry of the ``hycom`` configuration is now a ``depth`` entry.
 - :func:`xoa.grid.get_edges` now extrapolates the outer edges linearly by default (``mode="linear_extrap"``) instead of replicating the end values. Pass ``mode="edge"`` to recover the previous behaviour. This also changes the edges inferred by the ``cellave`` method of :func:`xoa.regrid.regrid1d`.
@@ -106,6 +108,8 @@ Deprecations
 
 Bug fixes
 ---------
+- :func:`xoa.regrid.extrap1d` failed with dask arrays of more than one dimension.
+- The ``cellave`` method of :func:`xoa.regrid.regrid1d` gave random results when the output coordinates have a dimension that the data does not have.
 - Fix the ``-h`` and ``--short-help`` options of :meth:`xoa.cfgm.ConfigManager.arg_parse`, which lost the options section since python 3.10, and :meth:`~xoa.cfgm.ConfigManager.arg_long_help`, which failed. :mod:`xoa.cfgm` no longer uses the private ``argparse._HelpAction``.
 - Draw the outline of 2D grids with ``plot_coords="auto"`` in :func:`xoa.plot.plot_minimap` instead of all the points, and default ``coords_linewidth`` to 1.5.
 - Fix the Greenwich phases of :mod:`xoa.tide`: astronomical arguments 12 h off, M2/N2/2N2 nodal satellites, and the 90° shifts of the diurnal constituents. They now agree with utide at Brest within 0.5° for the main constituents.
@@ -443,4 +447,3 @@ Bug fixes
 
 Documentation
 -------------
-

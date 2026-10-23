@@ -66,9 +66,9 @@ def test_nearest1d():
     xxi, yyi, vari, xxo, yyo, eshapes = get_regrid1d_data()
 
     # Interpolation
-    varon = regrid.nearest1d(vari, yyi, yyo, eshapes)
-    yyon = regrid.nearest1d(yyi, yyi, yyo, eshapes)
-    xxon = regrid.nearest1d(xxi, yyi, yyo, eshapes)
+    varon = regrid.nearest1d(vari, yyi, yyo)
+    yyon = regrid.nearest1d(yyi, yyi, yyo)
+    xxon = regrid.nearest1d(xxi, yyi, yyo)
     varon_true = vfunc(y=yyon, x=xxon)
     varon_true[np.isnan(varon)] = np.nan
     np.testing.assert_allclose(varon_true, varon)
@@ -79,7 +79,7 @@ def test_linear1d():
     xxi, yyi, vari, xxo, yyo, eshapes = get_regrid1d_data()
 
     # Interpolation
-    varol = regrid.linear1d(vari, yyi, yyo, eshapes)
+    varol = regrid.linear1d(vari, yyi, yyo)
     assert not np.isnan(varol).all()
     varol_true = vfunc(y=yyo, x=xxo)
     varol_true[np.isnan(varol)] = np.nan
@@ -91,7 +91,7 @@ def test_cubic1d():
     xxi, yyi, vari, xxo, yyo, eshapes = get_regrid1d_data()
 
     # Interpolation
-    varoh = regrid.cubic1d(vari, yyi, yyo, eshapes)
+    varoh = regrid.cubic1d(vari, yyi, yyo)
     assert not np.isnan(varoh).all()
     assert np.nanmax(varoh) <= np.nanmax(vari)
     assert np.nanmin(varoh) >= np.nanmin(vari)
@@ -102,7 +102,7 @@ def test_hermit1d():
     xxi, yyi, vari, xxo, yyo, eshapes = get_regrid1d_data()
 
     # Interpolation
-    varoh = regrid.hermit1d(vari, yyi, yyo, eshapes)
+    varoh = regrid.hermit1d(vari, yyi, yyo)
     assert not np.isnan(varoh).all()
     assert np.nanmax(varoh) <= np.nanmax(vari)
     assert np.nanmin(varoh) >= np.nanmin(vari)
@@ -123,8 +123,8 @@ def test_regrid1d_nans_in_coords(method):
 
     # Interpolations
     func = getattr(regrid, method + "1d")
-    varol = func(vari[:, 3:-3], yyi[:, 3:-3], yyo[:, 3:-3], eshapes)
-    varoln = func(vari, yyin, yyon, eshapes)
+    varol = func(vari[:, 3:-3], yyi[:, 3:-3], yyo[:, 3:-3])
+    varoln = func(vari, yyin, yyon)
     np.testing.assert_allclose(varol, varoln[:, 3:-3])
 
 
@@ -132,69 +132,47 @@ def test_linear1d_drop_na():
     # Get data
     xxi, yyi, vari, xxo, yyo, eshapes = get_regrid1d_data(yomax=-20)
 
-    varo = regrid.linear1d(vari, yyi, yyo, eshapes, drop_na=True)
+    varo = regrid.linear1d(vari, yyi, yyo, drop_na=True)
     assert not np.isnan(varo).any()
     varo_true = vfunc(y=yyo, x=xxo)
     np.testing.assert_allclose(varo_true, varo)
 
-    varo0 = regrid.linear1d(vari, yyi, yyo, eshapes, drop_na=False)
-    varo1 = regrid.linear1d(vari, yyi, yyo, eshapes, drop_na=True, maxgap=1)
+    varo0 = regrid.linear1d(vari, yyi, yyo, drop_na=False)
+    varo1 = regrid.linear1d(vari, yyi, yyo, drop_na=True, maxgap=1)
     np.testing.assert_allclose(varo0, varo1)
 
 
 @pytest.mark.parametrize("method", ["nearest", "linear", "cubic", "hermit"])
-def test_interp1d_eshapes(method):
+def test_interp1d_broadcast(method):
     # Get data and func
     xxi, yyi, vari, xxo, yyo, eshapes = get_regrid1d_data(nx=18, mask=False, irregular=False)
-    eshapes = np.repeat([[3, 6]], 3, axis=0)
+    vari, yyi, yyo = (arr.reshape(3, 6, -1) for arr in (vari, yyi, yyo))
     func = getattr(regrid, method + "1d")
 
     # Reference
-    varol_ref = func(vari, yyi, yyo, eshapes).reshape(3, 6, -1)
+    varol_ref = func(vari, yyi, yyo)
+    assert varol_ref.shape == yyo.shape
 
-    # missing dim 0 for vari
-    vari0 = vari.reshape(3, 6, -1)[0]
-    eshapes0 = eshapes.copy()
-    eshapes0[0, 0] = 1
-    varol0 = func(vari0, yyi, yyo, eshapes0).reshape(3, 6, -1)
+    # Missing dim 0 or 1 for vari: broadcasted
+    varol0 = func(vari[:1], yyi, yyo)
     np.testing.assert_allclose(varol_ref[0], varol0[0])
     np.testing.assert_allclose(varol_ref[0], varol0[1])
-
-    # missing dim 1 for vari
-    vari1 = vari.reshape(3, 6, -1)[:, 0]
-    eshapes1 = eshapes.copy()
-    eshapes1[0, 1] = 1
-    varol1 = func(vari1, yyi, yyo, eshapes1).reshape(3, 6, -1)
+    varol1 = func(vari[:, :1], yyi, yyo)
     np.testing.assert_allclose(varol_ref[:, 0], varol1[:, 0])
     np.testing.assert_allclose(varol_ref[:, 0], varol1[:, 1])
+    varol0 = func(vari[0], yyi, yyo)  # fewer dims
+    np.testing.assert_allclose(varol_ref[0], varol0[1])
 
-    # missing dim 0 for yyi
-    yyi0 = yyi.reshape(3, 6, -1)[0]
-    eshapes0 = eshapes.copy()
-    eshapes0[1, 0] = 1
-    varol0 = func(vari, yyi0, yyo, eshapes0).reshape(3, 6, -1)
-    np.testing.assert_allclose(varol_ref, varol0)
+    # Missing dim 0 or 1 for the coordinates, which are the same along it
+    np.testing.assert_allclose(varol_ref, func(vari, yyi[:1], yyo))
+    np.testing.assert_allclose(varol_ref, func(vari, yyi[:, :1], yyo))
+    np.testing.assert_allclose(varol_ref, func(vari, yyi, yyo[:1]))
+    np.testing.assert_allclose(varol_ref, func(vari, yyi, yyo[:, :1]))
+    np.testing.assert_allclose(varol_ref, func(vari, yyi[0, 0], yyo[0, 0]))  # 1D
 
-    # missing dim 1 for yyi
-    yyi1 = yyi.reshape(3, 6, -1)[:, 0]
-    eshapes1 = eshapes.copy()
-    eshapes1[1, 1] = 1
-    varol1 = func(vari, yyi1, yyo, eshapes1).reshape(3, 6, -1)
-    np.testing.assert_allclose(varol_ref, varol1)
-
-    # missing dim 0 for yyo
-    yyo0 = yyo.reshape(3, 6, -1)[0]
-    eshapes0 = eshapes.copy()
-    eshapes0[2, 0] = 1
-    varol0 = func(vari, yyi, yyo0, eshapes0).reshape(3, 6, -1)
-    np.testing.assert_allclose(varol_ref, varol0)
-
-    # missing dim 1 for yyo
-    yyo1 = yyo.reshape(3, 6, -1)[:, 0]
-    eshapes1 = eshapes.copy()
-    eshapes1[2, 1] = 1
-    varol1 = func(vari, yyi, yyo1, eshapes1).reshape(3, 6, -1)
-    np.testing.assert_allclose(varol_ref, varol1)
+    # Working axis in the middle
+    varol_mid = func(*(np.moveaxis(arr, -1, 1) for arr in (vari, yyi, yyo)), axis=1)
+    np.testing.assert_allclose(varol_ref, np.moveaxis(varol_mid, 1, -1))
 
 
 def test_cellave1d():
@@ -212,7 +190,6 @@ def test_cellave1d():
     yyob = np.resize(yob, (nx, nyo + 1))
     dyo = (yob[1] - yob[0]) * 0.49
     yyob += np.random.uniform(-dyo, dyo, yyob.shape)
-    eshapes = np.full((3, 1), nx)
 
     # input
     u, v = np.mgrid[-3 : 3 : nx * 1j, -3 : 3 : nyi * 1j] - 2
@@ -220,16 +197,16 @@ def test_cellave1d():
     vari[int(nx / 3) : int(2 * nx / 3), int(nyi / 3) : int(2 * nyi / 3)] = np.nan
 
     # conserv, no extrap
-    varoc = regrid.cellave1d(vari, yyib, yyob, eshapes, conserv=True, extrap="no")
+    varoc = regrid.cellave1d(vari, yyib, yyob, conserv=True, extrap="no")
     sumi = np.nansum(vari * np.diff(yyib, axis=1), axis=1)
     sumo = np.nansum(varoc * np.diff(yyob, axis=1), axis=1)
     np.testing.assert_allclose(sumi, sumo)
 
     # average, no extrap
-    regrid.cellave1d(vari, yyib, yyob, eshapes, conserv=0, extrap="no")
+    regrid.cellave1d(vari, yyib, yyob, conserv=0, extrap="no")
 
     # average, extrap
-    varoe = regrid.cellave1d(vari, yyib, yyob, eshapes, conserv=False, extrap="both")
+    varoe = regrid.cellave1d(vari, yyib, yyob, conserv=False, extrap="both")
     assert not np.isnan(varoe[0]).any()
 
 
