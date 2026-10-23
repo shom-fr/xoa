@@ -310,6 +310,93 @@ def _lonlat_ds():
     return xr.Dataset(coords={"lon": lon, "lat": lat})
 
 
+def _interp_along_axis_(data, zi, zo, axis):
+    """Linear interpolation with np.interp, by columns, for map_along_dim"""
+    from xoa.core.num import broadcast_along_axis
+
+    (vv, vzi, vzo), outer, inner = broadcast_along_axis(data, zi, zo, axis=axis)
+    no, ni = int(np.prod(outer)), int(np.prod(inner))
+    out = np.empty((no, vzo.shape[1], ni))
+    for io in range(no):
+        for p in range(ni):
+            out[io, :, p] = np.interp(
+                vzo[io % vzo.shape[0], :, p % vzo.shape[2]],
+                vzi[io % vzi.shape[0], :, p % vzi.shape[2]],
+                vv[io % vv.shape[0], :, p % vv.shape[2]],
+                left=np.nan,
+                right=np.nan,
+            )
+    return out.reshape(outer + (vzo.shape[1],) + inner)
+
+
+@pytest.mark.parametrize(
+    "vdims,zidims,zodims,odims",
+    [
+        (("z", "x"), ("z",), ("depth",), ("depth", "x")),
+        (("z", "x"), ("z", "x"), ("depth", "x"), ("depth", "x")),
+        (("x", "z"), ("x", "z"), ("depth",), ("x", "depth")),
+        (("t", "z", "y", "x"), ("z",), ("depth",), ("t", "depth", "y", "x")),
+        (("t", "z", "y", "x"), ("z", "y", "x"), ("depth",), ("t", "depth", "y", "x")),
+        (("t", "z", "y", "x"), ("t", "z", "y", "x"), ("depth",), ("t", "depth", "y", "x")),
+        (("t", "z", "y", "x"), ("t", "z"), ("depth",), ("t", "depth", "y", "x")),
+        (("t", "z", "y", "x"), ("z", "x"), ("depth",), ("t", "depth", "y", "x")),
+        (("t", "z", "y", "x"), ("z", "y", "x"), ("depth", "y", "x"), ("t", "depth", "y", "x")),
+        (("z", "t", "y", "x"), ("y", "x", "z"), ("depth",), ("depth", "t", "y", "x")),
+        (("z", "x"), ("z",), ("depth", "t"), ("t", "depth", "x")),  # extra dim
+    ],
+)
+@pytest.mark.parametrize("use_dask", [False, True])
+def test_map_along_dim(vdims, zidims, zodims, odims, use_dask):
+    rng = np.random.default_rng(0)
+    sizes = {"t": 3, "z": 6, "y": 4, "x": 5, "depth": 8}
+    data = xr.DataArray(
+        rng.random([sizes[d] for d in vdims]),
+        dims=vdims,
+        coords={"x": np.arange(sizes["x"])},
+        name="temp",
+        attrs={"units": "degC"},
+    )
+    zbase = np.linspace(-100, 0, sizes["z"]).reshape([-1 if d == "z" else 1 for d in zidims])
+    zi = xr.DataArray(
+        zbase * (1 + 0.3 * rng.random([1 if d == "z" else sizes[d] for d in zidims])), dims=zidims
+    ).broadcast_like(xr.DataArray(np.empty([sizes[d] for d in zidims]), dims=zidims))
+    zobase = np.linspace(-95, 0, sizes["depth"]).reshape(
+        [-1 if d == "depth" else 1 for d in zodims]
+    )
+    zo = xr.DataArray(
+        zobase * (1 + 0.1 * rng.random([1 if d == "depth" else sizes[d] for d in zodims])),
+        dims=zodims,
+    )
+    if use_dask:
+        data = data.chunk({d: 2 for d in vdims if d != "z"})
+
+    out = grid.map_along_dim(_interp_along_axis_, data, "z", zi, zo, out_dim="depth")
+
+    assert out.dims == odims
+    assert out.name == "temp" and out.attrs == {"units": "degC"}
+    assert "x" in out.coords
+    if use_dask:
+        assert out.chunks is not None
+        assert out.chunksizes["depth"] == (sizes["depth"],)
+    # Reference with np.interp on each column
+    ref = xr.apply_ufunc(
+        lambda v, a, b: np.interp(b, a, v, left=np.nan, right=np.nan),
+        data.compute(),
+        zi,
+        zo,
+        input_core_dims=[["z"], ["z"], ["depth"]],
+        output_core_dims=[["depth"]],
+        vectorize=True,
+    ).transpose(*odims)
+    np.testing.assert_allclose(out.values, ref.values)
+
+
+def test_map_along_dim_errors():
+    da = xr.DataArray(np.ones((2, 3)), dims=("z", "x"))
+    with pytest.raises(xoa.exceptions.XoaError):
+        grid.map_along_dim(lambda *a, axis: a[0], da, "z", xr.DataArray(np.ones(3), dims="x"))
+
+
 def test_get_lonlat_2d():
     ds = _lonlat_ds()
     lon, lat = grid.get_lonlat_2d(ds)

@@ -3,6 +3,7 @@ Test the :mod:`xoa.core.num` module
 """
 
 import numpy as np
+import pytest
 
 from xoa.core import num
 
@@ -122,3 +123,34 @@ def test_is_float():
     assert num.is_float(np.dtype("f8"))
     assert not num.is_float(np.arange(2))
     assert not num.is_float(np.zeros(2, "f2"))
+
+
+class TestAlongAxis:
+    def test_view_along_axis(self):
+        arr = np.arange(2 * 3 * 4 * 5.0).reshape(2, 3, 4, 5)
+        view = num.view_along_axis(arr, 1)
+        assert view.shape == (2, 3, 20)
+        assert np.shares_memory(view, arr)
+        np.testing.assert_array_equal(view[1, :, 7], arr[1, :, 1, 2])
+        assert num.view_along_axis(arr, -1).shape == (24, 5, 1)
+        assert num.view_along_axis(arr, 0).shape == (1, 2, 60)
+
+    def test_broadcast_along_axis(self):
+        data = np.ones((3, 10, 4, 5))
+        depth = np.ones((10, 4, 5))
+        levels = np.ones((20, 1, 1))
+        (vd, vz, vl), outer, inner = num.broadcast_along_axis(data, depth, levels, axis=1)
+        assert (outer, inner) == ((3,), (4, 5))
+        assert vd.shape == (3, 10, 20) and vz.shape == (1, 10, 20) and vl.shape == (1, 20, 1)
+        assert np.shares_memory(vd, data) and np.shares_memory(vz, depth)
+
+    def test_broadcast_along_axis_partly(self):
+        data = np.ones((3, 10, 4, 5))
+        depth = np.arange(50.0).reshape(10, 1, 5)  # broadcasted along y only: a copy
+        (_, vz), _, _ = num.broadcast_along_axis(data, depth, axis=1)
+        assert vz.shape == (1, 10, 20)
+        np.testing.assert_array_equal(vz[0, :, 7], depth[:, 0, 2])
+
+    def test_broadcast_along_axis_error(self):
+        with pytest.raises(ValueError):
+            num.broadcast_along_axis(np.ones((3, 10)), np.ones((4, 10)), axis=1)

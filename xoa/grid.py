@@ -147,6 +147,140 @@ def apply_along_dim(
     return dso
 
 
+def map_along_dim(func, da, dim, *coords, out_dim=None, out_size=None, dtype=None, **kwargs):
+    """Apply a function along a dimension that is kept in place
+
+    Contrary to :func:`xarray.apply_ufunc`, the working dimension is not moved
+    to the end, so the arrays are not transposed and copied: the function can view
+    them as ``(nouter, n, ninner)`` with :func:`xoa.core.num.broadcast_along_axis`.
+
+    The coordinates, like the input and output coordinates of an interpolation,
+    may have any subset of the dimensions of the data array, plus other ones,
+    which are put first in the output.
+    Dask arrays are processed with :func:`dask.array.map_blocks`: only the working
+    dimension must be a single chunk, and the other chunks are kept.
+
+    Parameters
+    ----------
+    func: callable
+        Function called as ``func(data, *coords, axis=axis, **kwargs)`` with numpy
+        arrays that have all the dimensions of the output, in the same order,
+        with a size of 1 for those they don't have.
+        It returns an array of the shape of the output.
+    da: xarray.DataArray
+        Data array
+    dim: str
+        Working dimension
+    coords: xarray.DataArray
+        Other arrays that have `dim` or `out_dim`
+    out_dim: str, None
+        Output dimension, which defaults to `dim`
+    out_size: int, None
+        Output size along `out_dim`, which defaults to the size of the coordinates
+        along `out_dim` if any, else to the size of `da` along `dim`
+    dtype: None, numpy.dtype
+        Output data type, which defaults to the type of `da` promoted to float
+    kwargs: dict
+        Extra keywords are passed to `func`
+
+    Return
+    ------
+    xarray.DataArray
+        Array with the dimensions of `da`, `dim` being replaced by `out_dim`,
+        and the other dimensions of the coordinates first.
+        Its coordinates are those of `da` that don't have `dim`, and its name and
+        attributes are those of `da`.
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import numpy as np, xarray as xr
+        @suppress
+        from xoa.grid import map_along_dim
+        def double(data, axis):
+            return np.repeat(data, 2, axis=axis)
+
+        da = xr.DataArray(np.ones((3, 4, 5)), dims=("time", "z", "x"))
+        map_along_dim(double, da, "z", out_size=8).dims
+
+    See also
+    --------
+    xoa.core.num.broadcast_along_axis
+    xoa.regrid.regrid1d
+    """
+    out_dim = out_dim or dim
+    if out_size is None:
+        out_size = next((c.sizes[out_dim] for c in coords if out_dim in c.dims), da.sizes[dim])
+    if dtype is None:
+        dtype = np.result_type(da.dtype, float)
+
+    # Dimensions of the output, with dim as working dimension
+    renamed = []
+    for coord in coords:
+        if out_dim != dim and out_dim in coord.dims:
+            if dim in coord.dims:
+                raise exceptions.XoaError(f"An array cannot have both '{dim}' and '{out_dim}'")
+            coord = coord.rename({out_dim: dim})
+        if dim not in coord.dims:
+            raise exceptions.XoaError(f"Arrays must have the '{dim}' or '{out_dim}' dimension")
+        renamed.append(coord)
+    extra = []
+    for coord in renamed:
+        extra.extend(d for d in coord.dims if d not in da.dims and d not in extra)
+    dims = tuple(extra) + da.dims
+    axis = dims.index(dim)
+
+    # Arrays with all the dimensions, the missing ones being of size 1
+    arrays = []
+    for arr in [da] + renamed:
+        arr = arr.transpose(*[d for d in dims if d in arr.dims])
+        arrays.append(arr.data.reshape([arr.sizes.get(d, 1) for d in dims]))
+
+    # Apply
+    if not any(hasattr(arr, "dask") for arr in arrays):
+        out = func(*arrays, axis=axis, **kwargs)
+    else:
+        import dask.array
+
+        # The chunks of the output come from the first dask array that has the dimension
+        ref_chunks = []
+        for i in range(len(dims)):
+            size = max(arr.shape[i] for arr in arrays)
+            chunks = next(
+                (
+                    arr.chunks[i]
+                    for arr in arrays
+                    if hasattr(arr, "dask") and arr.shape[i] == size and size > 1
+                ),
+                (size,),
+            )
+            ref_chunks.append(chunks)
+        arrays = [
+            dask.array.asarray(arr).rechunk(
+                tuple(
+                    -1 if (i == axis or n == 1) else ref_chunks[i] for i, n in enumerate(arr.shape)
+                )
+            )
+            for arr in arrays
+        ]
+        ref_chunks[axis] = (out_size,)
+        out = dask.array.map_blocks(
+            func,
+            *arrays,
+            axis=axis,
+            chunks=tuple(ref_chunks),
+            dtype=dtype,
+            meta=np.array((), dtype=dtype),
+            **kwargs,
+        )
+
+    out_dims = tuple(out_dim if d == dim else d for d in dims)
+    coords = {name: coord for name, coord in da.coords.items() if dim not in coord.dims}
+    return xr.DataArray(out, dims=out_dims, coords=coords, name=da.name, attrs=da.attrs)
+
+
 def _lon_names_(da, name_kwargs=None):
     """Flag the longitude coordinates in the per-coordinate keywords"""
     name_kwargs = {name: dict(kw) for name, kw in (name_kwargs or {}).items()}
