@@ -26,7 +26,7 @@ import numpy as np
 from ..exceptions import xoa_warn
 from .geo import closest_point_fast, diff_lon, normalize_longitudes, relative_cell_coords
 from .grid import check_grid_type, is_periodic_lon
-from .num import EPSILON
+from .num import EPSILON, as_float_array, broadcast_along_axis
 from .spline import (
     bicubic_frac,
     bilinear_frac,
@@ -447,36 +447,72 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
     return vo
 
 
-@numba.guvectorize(
-    [
-        (
-            numba.float64[:],
-            numba.float64[:],
-            numba.float64[:],
-            numba.boolean,
-            numba.float64[:],
+@numba.njit(nogil=True, cache=NOT_CI)
+def _isoslice_col_(var, values, isoval, reverse):
+    """Value of var where values crosses isoval in a column, the last crossing found"""
+    nz = var.size
+    isovar = np.nan
+    if reverse:
+        istart, istop, istep = nz - 1, 1, -1
+    else:
+        istart, istop, istep = 0, nz - 2, 1
+    for i in range(istart, istop + istep, istep):
+        if (values[i] >= isoval and values[i + istep] <= isoval) or (
+            values[i] <= isoval and values[i + istep] >= isoval
+        ):
+            if values[i + istep] == values[i]:
+                isovar = values[i]
+            else:
+                isovar = var[i + istep] + (isoval - values[i + istep]) * (
+                    var[i] - var[i + istep]
+                ) / (values[i] - values[i + istep])
+    return isovar
+
+
+@numba.njit(parallel=True, cache=NOT_CI)
+def _isoslice_kernel_(var, values, isoval, reverse):
+    """Loop on the columns of (m, n, m) arrays, the outer and inner m being 1 or the size"""
+    no = max(var.shape[0], values.shape[0], isoval.shape[0])
+    ni = max(var.shape[2], values.shape[2], isoval.shape[2])
+    out = np.empty((no, ni), dtype=var.dtype)
+    for ic in numba.prange(no * ni):
+        io = ic // ni
+        p = ic % ni
+        out[io, p] = _isoslice_col_(
+            var[io % var.shape[0], :, p % var.shape[2]],
+            values[io % values.shape[0], :, p % values.shape[2]],
+            isoval[io % isoval.shape[0], 0, p % isoval.shape[2]],
+            reverse,
         )
-    ],
-    "(nz),(nz),(),()->()",
-)
-def isoslice(var, values, isoval, reverse, isovar):
-    """Extract data from var where values==isoval
+    return out
+
+
+def isoslice(var, values, isoval, reverse=False, axis=-1):
+    """Extract data from var where values==isoval, along an axis
+
+    The value of `var` is linearly interpolated where `values` crosses `isoval`.
+    When there are several crossings, the last one found is kept.
+    The columns are processed in parallel, and the axis is kept in place.
 
     Parameters
     ----------
     var: array_like
-        array from which the data are extracted
+        Array from which the data are extracted
     values: array_like
-        array on which a research of isoval is made
-    isoval: float
-        value of interest on which we perform research in values array
+        Array on which a research of isoval is made, broadcastable with `var`
+    isoval: float, array_like
+        Value of interest on which we perform research in values array.
+        It is broadcastable to the shape of `var` without `axis`, or to the shape
+        of `var` with a size of 1 along `axis`.
     reverse: bool
-        search from the last index instead of the first one
+        Search from the last index instead of the first one
+    axis: int
+        Working axis
 
     Return
     ------
-    isovar : array_like
-           Sliced array based on var where values==isoval
+    numpy.ndarray
+        Sliced array based on var where values==isoval, without `axis`
 
     Example
     -------
@@ -486,27 +522,18 @@ def isoslice(var, values, isoval, reverse, isovar):
 
         dep_at_t20 = isoslice(dep, temp, 20)   # depth at temperature=20°C
         temp_at_z15 = isoslice(temp, dep, -15) # temperature at depth=-15m
-
-
     """
-    nz = var.shape[-1]
-    isovar[0] = np.nan
-    if reverse:
-        istart, istop, istep = nz - 1, 1, -1
-    else:
-        istart, istop, istep = 0, nz - 2, 1
-
-    # From the top
-    for i in numba.prange(istart, istop + istep, istep):
-        if (values[i] >= isoval[0] and values[i + istep] <= isoval[0]) or (
-            values[i] <= isoval[0] and values[i + istep] >= isoval[0]
-        ):
-            if values[i + istep] == values[i]:
-                isovar[0] = values[i]
-            else:
-                isovar[0] = var[i + istep] + (isoval[0] - values[i + istep]) * (
-                    var[i] - var[i + istep]
-                ) / (values[i] - values[i + istep])
+    var = as_float_array(var)
+    values = as_float_array(values)
+    isoval = np.asarray(isoval, dtype="d")
+    ndim = max(var.ndim, values.ndim)
+    axis = axis % ndim
+    if isoval.ndim < ndim:  # isoval does not have the working axis
+        isoval = isoval.reshape((1,) * (ndim - 1 - isoval.ndim) + isoval.shape)
+        isoval = np.expand_dims(isoval, axis)
+    (var, values, isoval), outer, inner = broadcast_along_axis(var, values, isoval, axis=axis)
+    out = _isoslice_kernel_(var, values, isoval, bool(reverse))
+    return out.reshape(outer + inner)
 
 
 # %% XYT point interpolation
