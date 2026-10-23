@@ -109,6 +109,7 @@ Deprecations
 
 Bug fixes
 ---------
+- The ``bias`` and ``tension`` arguments of :func:`xoa.regrid.regrid1d` were ignored by the ``hermit`` method, and ``drop_na`` was not rejected by the ``cellave`` method.
 - :func:`xoa.regrid.extrap1d` failed with dask arrays of more than one dimension.
 - The ``cellave`` method of :func:`xoa.regrid.regrid1d` gave random results when the output coordinates have a dimension that the data does not have.
 - Fix the ``-h`` and ``--short-help`` options of :meth:`xoa.cfgm.ConfigManager.arg_parse`, which lost the options section since python 3.10, and :meth:`~xoa.cfgm.ConfigManager.arg_long_help`, which failed. :mod:`xoa.cfgm` no longer uses the private ``argparse._HelpAction``.

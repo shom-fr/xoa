@@ -194,6 +194,23 @@ class TestRegrid1d:
         assert float(vo[-1]) == 5.0
 
 
+def test_regrid1d_hermit_bias_tension():
+    zi = xr.DataArray(np.linspace(0, 10, 11), dims="z")
+    vi = xr.DataArray(np.sin(zi.values), dims="z", coords={"z": zi})
+    zo = xr.DataArray(np.linspace(0.5, 9.5, 10), dims="z")
+    vo = regrid.regrid1d(vi, zo, method="hermit")
+    vob = regrid.regrid1d(vi, zo, method="hermit", bias=0.5, tension=0.5)
+    assert not np.allclose(vo, vob)
+
+
+def test_regrid1d_cellave_drop_na():
+    zi = xr.DataArray(np.arange(4.0), dims="z")
+    vi = xr.DataArray(np.arange(4.0), dims="z", coords={"z": zi})
+    zo = xr.DataArray(np.linspace(0, 3, 7), dims="z")
+    with pytest.raises(xoa.exceptions.XoaRegridError):
+        regrid.regrid1d(vi, zo, method="cellave", drop_na=True)
+
+
 @pytest.mark.parametrize(
     "mode,expected",
     [

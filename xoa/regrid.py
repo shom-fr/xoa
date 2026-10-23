@@ -270,10 +270,10 @@ def regrid1d(
     func_name = str(method) + "1d"
     extrap = str(extrap_modes[extrap])
     func_kwargs = {"extrap": extrap}
-    if method == "hermit":
+    if method == regrid1d_methods.hermit:
         func_kwargs.update(bias=bias, tension=tension)
     if drop_na:
-        if method == "cellave":
+        if method == regrid1d_methods.cellave:
             raise exceptions.XoaRegridError(
                 "The cellave regrid method does not support the drop_na parameter"
             )
