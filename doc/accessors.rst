@@ -135,3 +135,4 @@ has the following methods.
 
 .. autoclass:: xoa.accessors.XoaPlotAccessor
     :members:
+    :no-index:
