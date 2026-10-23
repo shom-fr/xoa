@@ -23,14 +23,14 @@ import xarray as xr
 
 from . import coords as xcoords
 from . import grid as xgrid
-from .dyn import _format_uv_doc_, _name_, get_coriolis, get_relvort
+from .dyn import format_uv_docstring, get_coriolis, get_relvort
 
 
 def _result_(da, name, long_name, *refs):
     """Name a dimensionless result after the first data array of the inputs"""
     ref = next((r for r in refs if isinstance(r, xr.DataArray)), None)
     if ref is not None:
-        return _name_(da, ref, name, long_name, "1")
+        return xcoords.set_name_attrs(da, ref, name, long_name, "1")
     return xr.DataArray(da, name=name, attrs={"long_name": long_name, "units": "1"})
 
 
@@ -45,7 +45,7 @@ def _get_abs_coriolis_(lat, *refs):
     return corio.where(corio > 0)
 
 
-@_format_uv_doc_
+@format_uv_docstring
 def get_rossby(u, v, dx=None, dy=None, z=None):
     """Compute the Rossby number, which is dimensionless
 
@@ -64,7 +64,7 @@ def get_rossby(u, v, dx=None, dy=None, z=None):
     relvort = get_relvort(u, v, dx=dx, dy=dy, z=z)
     corio = get_coriolis(xgrid.get_lonlat_2d(u)[1])
     rossby = relvort / corio
-    return _name_(rossby.transpose(*u.dims), u, "rossby", "Rossby number", "1")
+    return xcoords.set_name_attrs(rossby.transpose(*u.dims), u, "rossby", "Rossby number", "1")
 
 
 def get_burger(length, rd=None, n2=None, h=None, lat=None):

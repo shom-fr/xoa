@@ -24,7 +24,7 @@ import numpy as np
 import numba
 
 from ..exceptions import xoa_warn
-from .geo import closest_point_fast, diff_lon, relative_cell_coords
+from .geo import closest_point_fast, diff_lon, normalize_longitudes, relative_cell_coords
 from .grid import check_grid_type, is_periodic_lon
 from .num import EPSILON
 from .spline import (
@@ -746,20 +746,25 @@ def interp_transect(
 # %% XYInterpolator
 
 
-def _normalize_lon_(lon):
-    """Put longitudes in [-180, 180], leaving the ones that already are"""
-    lon = np.asarray(lon)
-    if lon.size and (lon.min() < -180 or lon.max() > 180):
-        lon = np.where((lon < -180) | (lon > 180), (lon + 180) % 360 - 180, lon)
-    return lon
-
-
-def _get_source_matrix_(data, mask=None):
+def get_source_matrix(data, mask=None):
     """Get the ``(n_src, K)`` matrix of the kernels from ``(..., ny, nx)`` data
 
     The matrix is C-contiguous and masked points are set to nan.
     The input is never modified, and it is copied only when needed: not at all for a
     single contiguous field without mask, and once otherwise.
+
+    Parameters
+    ----------
+    data: numpy.ndarray
+        Source data whose last two dimensions are the horizontal ones,
+        the other ones being flattened to ``K`` kernels
+    mask: None, numpy.ndarray
+        Boolean array of shape ``(ny, nx)`` that is True at valid points
+
+    Return
+    ------
+    numpy.ndarray
+        Array of shape ``(ny * nx, K)``
     """
     ny, nx = data.shape[-2:]
     nex = int(np.prod(data.shape[:-2])) if data.ndim > 2 else 1
@@ -809,7 +814,7 @@ class XYInterpolator:
         self.bias = bias
         self.tension = tension
 
-        dst_lon = _normalize_lon_(np.asarray(dst_lon, dtype=np.float64))
+        dst_lon = normalize_longitudes(np.asarray(dst_lon, dtype=np.float64))
         dst_lat = np.asarray(dst_lat, dtype=np.float64)
         if dst_lon.ndim == 0:
             dst_lon = dst_lon.reshape(1)
@@ -888,7 +893,7 @@ class XYInterpolator:
         if len(grid['lon'].shape) != 2:
             raise ValueError("source grid 'lon' and 'lat' must be 2D arrays")
 
-        grid['lon'] = _normalize_lon_(grid['lon'])
+        grid['lon'] = normalize_longitudes(grid['lon'])
 
         if np.any(grid['lat'] < -90) or np.any(grid['lat'] > 90):
             raise ValueError('source grid latitudes must be in range [-90, 90]')
@@ -979,7 +984,7 @@ class XYInterpolator:
         K = int(np.prod(extra)) if extra else 1
 
         mask = self.src_grid.get('mask') if skipna else None
-        X = _get_source_matrix_(data, mask)  # (n_src, K)
+        X = get_source_matrix(data, mask)  # (n_src, K)
         out = np.empty((n_dst, K), dtype=np.float64)
 
         if self.method == 'bilinear':

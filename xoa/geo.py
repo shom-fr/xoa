@@ -702,8 +702,22 @@ GeoKDTree.query.__doc__ = GeoKDTree.query.__doc__.format(**locals())
 GeoKDTree.query_radius.__doc__ = GeoKDTree.query_radius.__doc__.format(**locals())
 
 
-def _pop_tree_kwargs_(kwargs):
-    """Pop the :class:`GeoKDTree` parameters from query ones, `radius` being `sphere_radius`"""
+def pop_tree_kwargs(kwargs):
+    """Pop the :class:`GeoKDTree` parameters from query ones
+
+    The ``radius`` parameter of :class:`GeoKDTree` is given as ``sphere_radius``,
+    since ``radius`` is the search radius of the queries.
+
+    Parameters
+    ----------
+    kwargs: dict
+        Parameters of a query and of the tree, which is updated in place
+
+    Return
+    ------
+    dict
+        Parameters of :class:`GeoKDTree`
+    """
     tkw = {name: kwargs.pop(name) for name in ("leafsize",) if name in kwargs}
     if "sphere_radius" in kwargs:
         tkw["radius"] = kwargs.pop("sphere_radius")
@@ -742,7 +756,7 @@ def get_neighbors(obj, target, k=None, radius=None, units="m", output="index", *
     """
     if k is None and radius is None:
         raise exceptions.XoaError("Either k or radius must be given")
-    tree = obj if isinstance(obj, GeoKDTree) else GeoKDTree(obj, **_pop_tree_kwargs_(kwargs))
+    tree = obj if isinstance(obj, GeoKDTree) else GeoKDTree(obj, **pop_tree_kwargs(kwargs))
     if k is not None:
         return tree.query(target, k=k, max_dist=radius, units=units, output=output, **kwargs)
     return tree.query_radius(target, radius, units=units, output=output, **kwargs)
@@ -897,7 +911,7 @@ class GeoSelector:
         ------
         GeoSelection
         """
-        from .mask import _as_polygons_
+        from .core.poly import as_polygons
 
         scale = _get_scale_(units)
         if sum(v is not None for v in (circle, polygon, lon if lon is not None else lat)) != 1:
@@ -905,7 +919,7 @@ class GeoSelector:
         if circle is not None:
             shape = _geo.Circle(circle[0], circle[1], circle[2] / scale, self.core.radius)
         elif polygon is not None:
-            polys = _as_polygons_(polygon)
+            polys = as_polygons(polygon)
             if len(polys) != 1:
                 raise exceptions.XoaError("A single polygon is expected")
             shape = _geo.Polygon(polys[0])

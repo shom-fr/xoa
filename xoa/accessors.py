@@ -833,9 +833,9 @@ class _GridMixin_:
 
         The tree is rebuilt when the parameters are different from the previous call.
         """
-        from .geo import GeoKDTree, _pop_tree_kwargs_
+        from .geo import GeoKDTree, pop_tree_kwargs
 
-        kwargs = _pop_tree_kwargs_(kwargs)
+        kwargs = pop_tree_kwargs(kwargs)
         cache = getattr(self, "_kdtree", None)
         if cache is None or cache[0] != kwargs:
             cache = self._kdtree = (kwargs, GeoKDTree(self._obj, **kwargs))
@@ -846,9 +846,9 @@ class _GridMixin_:
 
         The tree is cached for successive calls, see :meth:`get_kdtree`.
         """
-        from .geo import get_neighbors, _pop_tree_kwargs_
+        from .geo import get_neighbors, pop_tree_kwargs
 
-        tree = self.get_kdtree(**_pop_tree_kwargs_(kwargs))
+        tree = self.get_kdtree(**pop_tree_kwargs(kwargs))
         return get_neighbors(tree, target, k=k, radius=radius, units=units, output=output, **kwargs)
 
     def get_geoselector(self, **kwargs):

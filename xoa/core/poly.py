@@ -23,10 +23,43 @@ import os
 import numba as nb
 import numpy as np
 
+from ..exceptions import XoaError
 from .geo import DEG2RAD, EARTH_RADIUS, diff_lon, normalize_longitude
 from .num import EPSILON
 
 NOT_CI = os.environ.get("CI", "false") == "false"
+
+
+def as_polygons(polygon):
+    """Convert polygons to a list of (lon, lat) arrays of shape (n, 2)
+
+    Parameters
+    ----------
+    polygon: array_like, shapely.Polygon, shapely.MultiPolygon, list
+        A polygon as an array of at least 3 (lon, lat) pairs or a shapely polygon,
+        whose holes are ignored, or a multi-geometry or list of them
+
+    Return
+    ------
+    list of numpy.ndarray
+
+    Raises
+    ------
+    xoa.exceptions.XoaError
+        When a polygon is not an array of at least 3 (lon, lat) pairs
+    """
+    if hasattr(polygon, "geoms"):  # Multi-geometry
+        return [p for g in polygon.geoms for p in as_polygons(g)]
+    if hasattr(polygon, "exterior"):  # Polygon, whose holes are ignored
+        return [np.asarray(polygon.exterior.coords, dtype="d")[:, :2]]
+    if isinstance(polygon, (list, tuple)) and len(polygon) and np.ndim(polygon[0]) != 1:
+        return [p for g in polygon for p in as_polygons(g)]
+    poly = np.asarray(polygon, dtype="d")
+    if poly.ndim != 2 or poly.shape[1] != 2 or len(poly) < 3:
+        raise XoaError("A polygon must be an array of at least 3 (lon, lat) pairs")
+    return [poly]
+
+
 # %% Area
 
 

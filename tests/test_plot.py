@@ -80,7 +80,7 @@ class TestLazyCartopy:
         monkeypatch.setitem(sys.modules, "cartopy", None)
         monkeypatch.setitem(sys.modules, "cartopy.crs", None)
         with pytest.raises(ImportError, match="cartopy is required"):
-            xplot._import_cartopy_()
+            xplot.import_cartopy()
 
 
 class TestGetLabel:
@@ -126,11 +126,11 @@ class TestMapAxes:
         fig, ax = xplot.create_map([10.0, 15.0, 40.0, 44.0], title="title", figsize=(4, 3))
         assert ax.get_title() == "title"
         assert tuple(fig.get_size_inches()) == (4, 3)
-        extent = ax.get_extent(crs=xplot._import_cartopy_()[0].PlateCarree())
+        extent = ax.get_extent(crs=xplot.import_cartopy()[0].PlateCarree())
         np.testing.assert_allclose(extent, [10.0, 15.0, 40.0, 44.0], atol=1e-6)
 
     def test_decorate_map_options(self):
-        ccrs, _ = xplot._import_cartopy_()
+        ccrs, _ = xplot.import_cartopy()
 
         def feature_artists(ax):
             return [c for c in ax.get_children() if type(c).__name__ == "FeatureArtist"]
@@ -148,7 +148,7 @@ class TestMapAxes:
         assert not ax.spines["geo"].get_visible()
 
     def test_add_land(self):
-        ccrs, _ = xplot._import_cartopy_()
+        ccrs, _ = xplot.import_cartopy()
         ax = plt.figure().add_subplot(111, projection=ccrs.PlateCarree())
         n0 = len(ax.get_children())
         xplot.add_land(ax, scale="110m", color="red")
@@ -184,14 +184,14 @@ class TestPlotField:
 
     def test_margin(self):
         temp = get_temp()
-        ccrs, _ = xplot._import_cartopy_()
+        ccrs, _ = xplot.import_cartopy()
         pcar = ccrs.PlateCarree()
         ext0 = xplot.plot_field(temp, add_colorbar=False).axes.get_extent(pcar)
         ext1 = xplot.plot_field(temp, add_colorbar=False, margin=0.2).axes.get_extent(pcar)
         assert ext1[0] < ext0[0] and ext1[1] > ext0[1]
 
     def test_own_axes(self):
-        ccrs, _ = xplot._import_cartopy_()
+        ccrs, _ = xplot.import_cartopy()
         fig, axes = plt.subplots(1, 2, subplot_kw={"projection": ccrs.Mercator()})
         for ax in axes:
             mappable = xplot.plot_field(
@@ -653,7 +653,7 @@ class TestAddColorbar:
         assert xplot.add_colorbar(mappable).ax.get_ylabel() == ""
 
     def test_shared_colorbar_on_several_axes(self):
-        ccrs, _ = xplot._import_cartopy_()
+        ccrs, _ = xplot.import_cartopy()
         fig, axes = plt.subplots(1, 2, subplot_kw={"projection": ccrs.Mercator()})
         for ax in axes:
             mappable = xplot.plot_field(get_temp(), ax=ax, add_colorbar=False)

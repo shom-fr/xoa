@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Make public the helpers that were used outside their module: :func:`xoa.core.plot.import_cartopy`, :func:`xoa.plot.get_map_axes`, :func:`xoa.core.interp.get_source_matrix`, :func:`xoa.geo.pop_tree_kwargs` and :func:`xoa.dyn.format_uv_docstring`. Add :func:`xoa.core.geo.normalize_longitudes`, :func:`xoa.core.poly.as_polygons` and :func:`xoa.coords.set_name_attrs`.
 - Add :func:`xoa.grid.get_lonlat_2d` to get 2D longitudes and latitudes with (y, x) dimensions.
 - Add ``plot`` options used as defaults by the plot functions, load options from a file with :func:`xoa.load_options` and :class:`xoa.set_options`, validate options. ``CBAR_SHRINK`` becomes ``plot.colorbar_shrink``. See :doc:`configure`.
 - Rewrite the :ref:`roadmap`: next diagnostics, and the shoot and armoor ecosystem.
