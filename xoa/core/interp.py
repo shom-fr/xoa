@@ -20,8 +20,8 @@ or numpy.ndarray type.
 # limitations under the License.
 import os
 
-import numpy as np
 import numba
+import numpy as np
 
 from ..exceptions import xoa_warn
 from .geo import closest_point_fast, diff_lon, normalize_longitudes, relative_cell_coords
@@ -440,9 +440,7 @@ def grid2locs(xxi, yyi, zzi, ti, vi, xo, yo, zo, to):
                                     i + ii,
                                 ] * ((1 - a) * (1 - ii) + a * ii) * (
                                     (1 - b) * (1 - jj) + b * jj
-                                ) * (
-                                    (1 - c[ie % nexz]) * (1 - kk) + c[ie % nexz] * kk
-                                ) * (
+                                ) * ((1 - c[ie % nexz]) * (1 - kk) + c[ie % nexz] * kk) * (
                                     (1 - d) * (1 - ll) + d * ll
                                 )
 

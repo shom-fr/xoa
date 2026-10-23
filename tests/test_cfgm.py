@@ -1,7 +1,7 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.cfgm` module
 """
+
 from argparse import ArgumentParser
 
 import pytest

@@ -1,10 +1,8 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.exceptions` module
 """
 
 import pytest
-import warnings
 
 from xoa import exceptions
 

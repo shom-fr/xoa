@@ -1,19 +1,19 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.grid` module
 """
 
 import functools
 import warnings
+
 import numpy as np
-import xarray as xr
 import pytest
+import xarray as xr
 
 import xoa
 from xoa import grid
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def get_da():
     x = xr.DataArray(np.arange(4), dims='x')
     y = xr.DataArray(np.arange(3), dims='y')
@@ -108,7 +108,9 @@ def test_float_operators_vs_xarray(chunked):
     ref = da.pad({"y": (2, 1)}, mode="edge").pad({"x": 1}, mode="edge")
     np.testing.assert_array_equal(dap, ref)
     np.testing.assert_allclose(dapl[:, 1], da[:, 0] + (da[:, 0] - da[:, 1]), rtol=1e-6)
-    np.testing.assert_allclose(dac, 0.25 * (da[:, :-1, :-1] + da[:, 1:, :-1] + da[:, :-1, 1:] + da[:, 1:, 1:]), rtol=1e-6)
+    np.testing.assert_allclose(
+        dac, 0.25 * (da[:, :-1, :-1] + da[:, 1:, :-1] + da[:, :-1, 1:] + da[:, 1:, 1:]), rtol=1e-6
+    )
     np.testing.assert_allclose(dae[..., 1:-1], 0.5 * (da[..., :-1] + da[..., 1:]), rtol=1e-6)
     np.testing.assert_allclose(dae[..., 0], da[..., 0] + 0.5 * (da[..., 0] - da[..., 1]), rtol=1e-6)
     np.testing.assert_array_equal(daed[..., 0], da[..., 0])
@@ -326,7 +328,9 @@ def test_get_lonlat_2d():
     np.testing.assert_allclose(lat2, lat)
     # Not 2D
     with pytest.raises(xoa.exceptions.XoaError):
-        grid.get_lonlat_2d(xr.DataArray([0.0, 1.0], dims="lon", coords={"lon": [0.0, 1.0], "lat": 0.0}))
+        grid.get_lonlat_2d(
+            xr.DataArray([0.0, 1.0], dims="lon", coords={"lon": [0.0, 1.0], "lat": 0.0})
+        )
 
 
 def test_get_resolution():

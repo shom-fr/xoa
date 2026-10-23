@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Xoa options
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,10 +17,10 @@ Xoa options
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import copy
-import re
 import os
-import warnings
 import platform
+import re
+import warnings
 from importlib.metadata import version as im_get_version
 
 from . import exceptions
@@ -271,7 +271,7 @@ def resolve_option(value, option):
     return value
 
 
-class set_options(object):
+class set_options:
     """Set configuration options
 
     Parameters

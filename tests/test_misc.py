@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.misc` module
 """
 
 import re
 
-import pytest
 import numpy as np
+import pytest
 
 from xoa import misc
 

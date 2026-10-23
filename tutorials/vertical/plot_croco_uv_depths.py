@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Depths of the sigma levels at the u and v points of a CROCO grid
 ================================================================
@@ -18,8 +17,8 @@ See also: :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`.
 # Initialisations
 # ---------------
 
-import xarray as xr
 import matplotlib.pyplot as plt
+import xarray as xr
 
 import xoa
 import xoa.meta as xmeta
@@ -109,8 +108,10 @@ z2 = {"u": rho2u(ds.z_rho), "v": rho2v(ds.z_rho)}
 
 for loc in "uv":
     diff = abs(z1[loc] - z2[loc])
-    print(f"{loc}: max difference = {float(diff.max()):.2f} m "
-          f"for max depth = {float(abs(z2[loc]).max()):.0f} m")
+    print(
+        f"{loc}: max difference = {float(diff.max()):.2f} m "
+        f"for max depth = {float(abs(z2[loc]).max()):.0f} m"
+    )
 
 # %%
 # The heights of the level near the bottom, along a west-east line across the slope. The u points
@@ -119,7 +120,9 @@ for loc in "uv":
 
 row = dict(eta_rho=14, s_rho=1)
 fig, ax = plt.subplots(figsize=(7, 3.2), constrained_layout=True)
-ax.plot(ds.lon_rho.isel(eta_rho=14), ds.z_rho.isel(**row), "o", ms=4, color="0.3", label="rho points")
+ax.plot(
+    ds.lon_rho.isel(eta_rho=14), ds.z_rho.isel(**row), "o", ms=4, color="0.3", label="rho points"
+)
 ax.plot(ds.lon_u.isel(eta_rho=14), z1["u"].isel(**row), "s", ms=4, mfc="none", label="u, method 1")
 ax.plot(ds.lon_u.isel(eta_rho=14), z2["u"].isel(**row), "x", ms=4, label="u, method 2")
 ax.set_xlabel("Longitude [°E]")

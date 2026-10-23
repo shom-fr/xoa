@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Map the Gulf Stream temperature from sparse observations
 ========================================================
@@ -23,11 +22,11 @@ The basics are in the :ref:`sphx_glr_tutorials_regrid_plot_kriging.py` tutorial.
 
 import time
 
-import numpy as np
-import xarray as xr
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cmocean
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 
 import xoa
 from xoa import meta

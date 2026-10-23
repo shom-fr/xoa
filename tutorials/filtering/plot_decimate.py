@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Decimate scattered observations
 ===============================
@@ -20,10 +19,10 @@ See also: :ref:`sphx_glr_tutorials_regrid_plot_kriging.py`,
 # Initialisations
 # ---------------
 
+import cmocean
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
-import cmocean
 
 from xoa import filter as xfilter
 from xoa.plot import add_colorbar

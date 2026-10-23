@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Advect particles in the Gulf Stream currents
 ============================================
@@ -21,11 +20,11 @@ See also: :ref:`sphx_glr_tutorials_dynamics_plot_gulfstream_dynamics.py`.
 # Initialisations
 # ---------------
 
-import numpy as np
-import xarray as xr
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cmocean  # noqa
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 
 import xoa
 import xoa.meta as xmeta
@@ -87,9 +86,7 @@ print(tracks.sizes)
 # slow waters or recirculate in the eddies.
 
 days = (tracks.time - tracks.time[0]) / np.timedelta64(1, "D")
-fig, ax = plt.subplots(
-    figsize=(7.5, 5.5), subplot_kw={"projection": PCAR}, constrained_layout=True
-)
+fig, ax = plt.subplots(figsize=(7.5, 5.5), subplot_kw={"projection": PCAR}, constrained_layout=True)
 plot_field(speed, ax=ax, cmap="Greys", alpha=0.6, add_colorbar=False, map_kw=MAP_KW)
 for k in range(tracks.sizes["particles"]):
     sc = ax.scatter(

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Dimensionless numbers of the Gulf Stream
 ========================================
@@ -23,15 +22,15 @@ See also: :ref:`sphx_glr_tutorials_dynamics_plot_vertical_modes.py`, :ref:`sphx_
 # Initialisations
 # ---------------
 
+import cmocean  # noqa
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
-import cmocean  # noqa
 
 import xoa
-import xoa.meta as xmeta
 import xoa.dyn as xdyn
 import xoa.grid as xgrid
+import xoa.meta as xmeta
 import xoa.numbers as xnum
 import xoa.thermdyn as xthermdyn
 from xoa.plot import plot_fields

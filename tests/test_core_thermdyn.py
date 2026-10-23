@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.core.thermdyn` module
 """
@@ -31,5 +30,7 @@ def test_temp_roundtrip():
 
 def test_convert_same_kind_is_identity():
     t = np.array([10.0, 12.0])
-    np.testing.assert_array_equal(thermdyn.convert_temp(t, t, -10.0, 45.0, 0.0, "ptemp", "ptemp", "psal"), t)
+    np.testing.assert_array_equal(
+        thermdyn.convert_temp(t, t, -10.0, 45.0, 0.0, "ptemp", "ptemp", "psal"), t
+    )
     np.testing.assert_array_equal(thermdyn.convert_sal(t, -10.0, 45.0, 0.0, "psal", "psal"), t)

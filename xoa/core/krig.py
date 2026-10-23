@@ -22,7 +22,6 @@ which sets their units, and positions are longitudes and latitudes in degrees.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-
 import warnings
 
 import numba
@@ -170,7 +169,7 @@ def clamp_variogram_params(n, s, r, nrelmax=0.2):
     return min(max(n, 0), nrelmax * s), s, max(r, 0)
 
 
-class MatrixSolver(object):
+class MatrixSolver:
     """Factorize a kriging matrix once to solve for many right-hand sides
 
     - A positive definite matrix, like the covariance matrix of the simple kriging, is

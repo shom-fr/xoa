@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Filter fields in space
 ======================
@@ -21,16 +20,16 @@ See also: :ref:`sphx_glr_tutorials_filtering_plot_filter_time.py`,
 # Initialisations
 # ---------------
 
-import numpy as np
-import xarray as xr
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cmocean
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 
 import xoa
 from xoa import filter as xfilter
 from xoa import grid as xgrid
-from xoa.plot import plot_field, plot_minimap, add_colorbar
+from xoa.plot import add_colorbar, plot_field, plot_minimap
 
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})

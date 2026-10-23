@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Numeric thermodynamics utilities based on :mod:`gsw`
 
@@ -10,6 +9,7 @@ Kinds of temperature are ``"temp"`` (in situ), ``"ptemp"`` (potential) and ``"ct
 (conservative), and kinds of salinity are ``"psal"`` (practical), ``"asal"`` (absolute)
 and ``"pfsal"`` (preformed).
 """
+
 import numpy as np
 
 

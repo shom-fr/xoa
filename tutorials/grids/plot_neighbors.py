@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Find neighbors on the sphere
 ============================
@@ -20,10 +19,10 @@ See also: :ref:`sphx_glr_tutorials_regrid_plot_kriging.py`.
 # Initialisations
 # ---------------
 
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
 
 import xoa  # noqa: F401
 from xoa.geo import GeoKDTree

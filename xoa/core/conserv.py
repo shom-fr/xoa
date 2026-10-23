@@ -23,8 +23,8 @@ import os
 import numba
 import numpy as np
 
-from .num import EPSILON
 from .geo import normalize_longitude
+from .num import EPSILON
 from .poly import compute_overlap_area, spherical_area, unwrap_longitudes
 
 NOT_CI = os.environ.get("CI", "false") == "false"

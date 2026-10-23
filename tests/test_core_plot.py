@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.core.plot` module
 """
@@ -13,8 +12,8 @@ import pytest
 
 import xoa
 from xoa import plot as xplot
-from xoa.core import plot as cplot
 from xoa.core import grid as cgrid
+from xoa.core import plot as cplot
 
 
 @pytest.fixture(autouse=True)
@@ -452,7 +451,9 @@ class TestRose:
 def get_map(projection=None, extent=(-12, 12, 35, 60)):
     pytest.importorskip("cartopy")
     ccrs, _ = cplot.import_cartopy()
-    ax = plt.figure(figsize=(5, 5)).add_subplot(1, 1, 1, projection=projection or ccrs.PlateCarree())
+    ax = plt.figure(figsize=(5, 5)).add_subplot(
+        1, 1, 1, projection=projection or ccrs.PlateCarree()
+    )
     ax.set_extent(extent, crs=ccrs.PlateCarree())
     return ax
 
@@ -548,7 +549,13 @@ class TestMapDecorations:
 
         ax = get_map()
         cplot.add_scalebar(ax, effect=True)
-        assert effects(ax) == [0, 0, 4, 4, 5]  # the effects of the segments are in copies below them
+        assert effects(ax) == [
+            0,
+            0,
+            4,
+            4,
+            5,
+        ]  # the effects of the segments are in copies below them
         ax = get_map()
         cplot.add_compass(ax, effect=["shadow", "glow"], effect_kw={"shadow": {"offset": (3, -3)}})
         assert all(n in (0, 8, 9) for n in effects(ax)) and 8 in effects(ax)

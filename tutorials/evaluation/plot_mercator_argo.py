@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Compare Mercator to ARGO
 ========================
@@ -16,24 +15,22 @@ The concepts are explained in the :ref:`indepth.meta` guide.
 See also: :ref:`sphx_glr_tutorials_evaluation_plot_hycom_gdp.py`.
 """
 
-
 # %%
 # Initialisations
 # ---------------
-import xarray as xr
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import gsw
-import cmocean
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import xarray as xr
 
 import xoa
-import xoa.grid as xgrid
-import xoa.regrid as xregrid
-import xoa.meta as xmeta
 import xoa.coords as xcoords
 import xoa.geo as xgeo
+import xoa.grid as xgrid
+import xoa.meta as xmeta
 import xoa.plot as xplot
+import xoa.regrid as xregrid
 
 mpl.rc("axes", grid=True)
 xr.set_options(display_style="text")

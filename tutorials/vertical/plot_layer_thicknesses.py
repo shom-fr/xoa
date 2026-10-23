@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Depths and layer thicknesses
 ============================
@@ -22,14 +21,14 @@ See also: :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`,
 # Initialisations
 # ---------------
 
+import cmocean  # noqa
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
-import cmocean  # noqa
 
 import xoa
 import xoa.meta as xmeta
-from xoa.grid import dz2depth, dz2z, get_dz, z2dz
+from xoa.grid import dz2depth, dz2z, z2dz
 from xoa.plot import plot_fields
 
 xr.set_options(display_style="text")
@@ -69,9 +68,7 @@ zt = dz2z(dz.isel(**point))
 fig, ax = plt.subplots(figsize=(7, 3.2), constrained_layout=True)
 for k in range(zt.sizes["depth"]):
     ax.plot(zt.time, zt.isel(depth=k), color="0.2", lw=1)
-ax.fill_between(
-    zt.time, zt.isel(depth=0), zt.isel(depth=1), color=cmocean.cm.deep(0.3), alpha=0.5
-)
+ax.fill_between(zt.time, zt.isel(depth=0), zt.isel(depth=1), color=cmocean.cm.deep(0.3), alpha=0.5)
 ax.set_ylabel("Interface height [m]")
 ax.set_title("Hycom layers at a point")
 
@@ -115,7 +112,9 @@ ubar = (u * dzc).sum("sig_rho") / dzc.sum("sig_rho")
 vbar = (v * dzc).sum("sig_rho") / dzc.sum("sig_rho")
 speed_bar = np.hypot(ubar, vbar).rename("speed_bar")
 speed_bar.attrs.update(long_name="Depth-averaged speed", units="m s-1")
-speed_surf = np.hypot(u.isel(sig_rho=-1), v.isel(sig_rho=-1))  # The last level is the surface.rename("speed_surf")
+speed_surf = np.hypot(
+    u.isel(sig_rho=-1), v.isel(sig_rho=-1)
+)  # The last level is the surface.rename("speed_surf")
 speed_surf.attrs.update(long_name="Surface speed", units="m s-1")
 depth_bottom = dzc.sum("sig_rho").rename("column")
 depth_bottom.attrs.update(long_name="Water column thickness", units="m")

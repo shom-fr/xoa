@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 xarray and pandas xoa accessors
 
@@ -25,7 +24,7 @@ from . import exceptions
 from .misc import ERRORS
 
 
-class _BasicMetaAccessor_(object):
+class _BasicMetaAccessor_:
     """Base class for meta-aware xarray accessors"""
 
     def __init__(self, obj, meta_specs=None):
@@ -764,7 +763,7 @@ class _InterpRegridMixin_:
         )
 
 
-class XoaPlotAccessor(object):
+class XoaPlotAccessor:
     """Plotting methods of the main xoa accessors, that call the :mod:`xoa.plot` functions
 
     The accessed array or dataset is passed as the first argument.
@@ -1065,6 +1064,7 @@ def register_cf_accessors(name='xcf'):
         Use :func:`register_meta_accessors` instead.
     """
     import warnings
+
     from . import XoaDeprecationWarning
 
     warnings.warn(

@@ -20,13 +20,13 @@ or numpy.ndarray type.
 # limitations under the License.
 import os
 
-import numpy as np
 import numba
+import numpy as np
 
 from ..exceptions import xoa_warn
 from .conserv import compute_conservative_weights
-from .grid import centers2edges, check_grid_type, edges2bounds, unwrap_grid_longitudes
 from .geo import normalize_longitudes
+from .grid import centers2edges, check_grid_type, edges2bounds, unwrap_grid_longitudes
 from .interp import XYInterpolator, get_source_matrix
 from .num import (
     EMPTY_OFFSETS,

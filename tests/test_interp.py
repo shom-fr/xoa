@@ -1,28 +1,27 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.interp` module
 """
 
-import numpy as np
-import xarray as xr
-import pytest
+import os
+import tempfile
 
-from xoa import interp
+import numpy as np
+import pytest
+import xarray as xr
 from test_core_interp import (
     get_grid2locs_coords,
     get_sheared_curvilinear_grid,
     relloc_sheared_curvilinear_grid,
     vfunc,
 )
-import os
-import tempfile
+
 import xoa
+from xoa import interp
 from xoa.interp import Interpolator
 from xoa.regrid import Regridder
 
 
 class TestGrid2loc:
-
     def test_full(self):
         """Full 4D interpolation with member, time, depth, lon, lat"""
         np.random.seed(0)
@@ -103,13 +102,13 @@ class TestGrid2loc:
         )
         xo = xr.DataArray([2.5, 7.5], dims="npts")
         yo = xr.DataArray([2.5, 7.5], dims="npts")
-        zo = xr.DataArray([-50., -25.], dims="npts")
+        zo = xr.DataArray([-50.0, -25.0], dims="npts")
         loc = xr.Dataset(coords={"lon": xo, "lat": yo, "depth": zo})
 
         vo = interp.grid2loc(vi, loc)
         assert vo.shape == (2,)
         assert not np.isnan(vo).all()
-        np.testing.assert_allclose(vo, [1., 1.])
+        np.testing.assert_allclose(vo, [1.0, 1.0])
 
     def test_curvilinear(self):
         """Horizontal-only interpolation on a genuinely curvilinear grid
@@ -146,11 +145,8 @@ class TestGrid2loc:
 
 
 class TestIsoslice:
-
     def test_1d(self):
-        depth = xr.DataArray(
-            np.linspace(-50, 0.0, 6), dims="z", attrs={"long_name": "Depth"}
-        )
+        depth = xr.DataArray(np.linspace(-50, 0.0, 6), dims="z", attrs={"long_name": "Depth"})
         values = xr.DataArray(np.linspace(10, 20.0, 6), dims="z")
         isoval = 15.0
 

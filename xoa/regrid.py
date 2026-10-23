@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Regridding utilities.
 
@@ -23,18 +22,13 @@ from :mod:`xoa.core.regrid`.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import numpy as np
 import xarray as xr
 
-from . import exceptions
-from . import misc
-from . import meta
 from . import coords as xcoords
+from . import exceptions, meta, misc, weights
 from . import grid as xgrid
-from . import weights
-from .core import num
-from .core import regrid
+from .core import num, regrid
 from .core.num import CsrMatrix
 from .core.regrid import XYRegridder as CoreXYRegridder
 

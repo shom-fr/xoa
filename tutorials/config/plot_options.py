@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Set the options of xoa
 ======================
@@ -24,9 +23,9 @@ the ``xoa info`` command.
 import pathlib
 import tempfile
 
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 
 import xoa
 import xoa.meta as xmeta
@@ -62,9 +61,9 @@ with xmeta.set_meta_specs("mercator"):
     ds = xoa.open_data_sample("MODELS/CMEMS-GLORYS/glorys_gulfstream_3d.nc").xoa.decode()
 ds = ds.isel(time=0, depth=0)
 fields = {
-    "Speed (positive)": np.hypot(ds.u, ds.v).rename("speed").assign_attrs(
-        long_name="Speed", units="m s-1"
-    ),
+    "Speed (positive)": np.hypot(ds.u, ds.v)
+    .rename("speed")
+    .assign_attrs(long_name="Speed", units="m s-1"),
     "Sea surface height (both signs)": (ds.ssh - ds.ssh.mean()).assign_attrs(
         long_name="Anomaly", units="m"
     ),
@@ -72,7 +71,9 @@ fields = {
         long_name="Minus temperature", units="degC"
     ),
 }
-kw = dict(cmap="auto", figsize=(10, 3.4), map_kw={"land": True, "gridlines_labels_on": ["bottom", "left"]})
+kw = dict(
+    cmap="auto", figsize=(10, 3.4), map_kw={"land": True, "gridlines_labels_on": ["bottom", "left"]}
+)
 plot_fields(fields, **kw)
 
 # %%

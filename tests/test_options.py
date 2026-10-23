@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.options` module
 """
 
 import pytest
 
-from xoa import options
-from xoa import exceptions
+from xoa import exceptions, options
 
 
 class TestOptionsManagement:

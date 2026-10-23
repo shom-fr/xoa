@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.thermdyn` module
 """
 
 import numpy as np
-import xarray as xr
 import pytest
+import xarray as xr
 
 from xoa import thermdyn
 
@@ -18,7 +17,9 @@ class TestMixedLayerDepth:
         depth = xr.DataArray(
             np.linspace(-50, 0.0, 6), dims="z", attrs={"long_name": "Depth", "positive": "up"}
         )
-        temp = xr.DataArray(np.linspace(10, 20.0, 6), dims="z", coords={"depth": depth}, name="temp")
+        temp = xr.DataArray(
+            np.linspace(10, 20.0, 6), dims="z", coords={"depth": depth}, name="temp"
+        )
         mld = thermdyn.mixed_layer_depth(temp, method="deltatemp")
         np.testing.assert_allclose(mld, 1)
         assert mld.long_name == "Mixed layer depth"
@@ -43,7 +44,9 @@ class TestMixedLayerDepth:
         depth = xr.DataArray(
             np.linspace(-50, 0.0, 6), dims="z", attrs={"long_name": "Depth", "positive": "up"}
         )
-        temp = xr.DataArray(np.linspace(10, 20.0, 6), dims="z", coords={"depth": depth}, name="temp")
+        temp = xr.DataArray(
+            np.linspace(10, 20.0, 6), dims="z", coords={"depth": depth}, name="temp"
+        )
         mld = thermdyn.mixed_layer_depth(temp)
         np.testing.assert_allclose(mld, 1)
 
@@ -62,8 +65,10 @@ class TestMixedLayerDepth:
             np.linspace(-50, 0.0, 6), dims="z", attrs={"long_name": "Depth", "positive": "up"}
         )
         dens = xr.DataArray(
-            np.linspace(1030, 1025.0, 6), dims="z",
-            coords={"depth": depth}, name="dens",
+            np.linspace(1030, 1025.0, 6),
+            dims="z",
+            coords={"depth": depth},
+            name="dens",
         )
         mld = thermdyn.mixed_layer_depth(dens, method="deltadens", deltadens=1.0)
         assert mld.dims == ()
@@ -74,7 +79,9 @@ class TestMixedLayerDepth:
         depth = xr.DataArray(
             np.linspace(-50, 0.0, 6), dims="z", attrs={"long_name": "Depth", "positive": "up"}
         )
-        temp = xr.DataArray(np.linspace(10, 20.0, 6), dims="z", coords={"depth": depth}, name="temp")
+        temp = xr.DataArray(
+            np.linspace(10, 20.0, 6), dims="z", coords={"depth": depth}, name="temp"
+        )
         temp2d = temp.expand_dims("lon").transpose(..., "lon")
         depth2d = depth.expand_dims("lon").transpose(..., "lon")
         temp2d.coords["depth"] = depth2d
@@ -89,8 +96,9 @@ class TestTemperature:
 
     def test_is_temp(self):
         """Test temperature identification"""
-        temp = xr.DataArray([15, 16, 17], dims="z", name="temp",
-                           attrs={"standard_name": "sea_water_temperature"})
+        temp = xr.DataArray(
+            [15, 16, 17], dims="z", name="temp", attrs={"standard_name": "sea_water_temperature"}
+        )
         assert thermdyn.is_temp(temp)
 
         not_temp = xr.DataArray([35, 35.5], dims="z", name="sal")
@@ -98,10 +106,12 @@ class TestTemperature:
 
     def test_get_temp(self):
         """Test getting temperature from dataset"""
-        ds = xr.Dataset({
-            "temp": xr.DataArray([15, 16, 17], dims="z"),
-            "sal": xr.DataArray([35, 35.5, 36], dims="z")
-        })
+        ds = xr.Dataset(
+            {
+                "temp": xr.DataArray([15, 16, 17], dims="z"),
+                "sal": xr.DataArray([35, 35.5, 36], dims="z"),
+            }
+        )
         temp = thermdyn.get_temp(ds, errors="ignore")
         assert temp is not None
         assert temp.name == "temp"
@@ -118,8 +128,9 @@ class TestDensity:
 
     def test_is_dens(self):
         """Test density identification"""
-        dens = xr.DataArray([1025, 1026, 1027], dims="z", name="dens",
-                           attrs={"standard_name": "sea_water_density"})
+        dens = xr.DataArray(
+            [1025, 1026, 1027], dims="z", name="dens", attrs={"standard_name": "sea_water_density"}
+        )
         assert thermdyn.is_dens(dens)
 
         not_dens = xr.DataArray([15, 16], dims="z", name="temp")
@@ -127,10 +138,12 @@ class TestDensity:
 
     def test_get_dens(self):
         """Test getting density from dataset"""
-        ds = xr.Dataset({
-            "dens": xr.DataArray([1025, 1026, 1027], dims="z"),
-            "temp": xr.DataArray([15, 16, 17], dims="z")
-        })
+        ds = xr.Dataset(
+            {
+                "dens": xr.DataArray([1025, 1026, 1027], dims="z"),
+                "temp": xr.DataArray([15, 16, 17], dims="z"),
+            }
+        )
         dens = thermdyn.get_dens(ds, errors="ignore")
         assert dens is not None
         assert dens.name == "dens"
@@ -147,8 +160,9 @@ class TestSalinity:
 
     def test_is_sal(self):
         """Test salinity identification"""
-        sal = xr.DataArray([35, 35.5, 36], dims="z", name="sal",
-                          attrs={"standard_name": "sea_water_salinity"})
+        sal = xr.DataArray(
+            [35, 35.5, 36], dims="z", name="sal", attrs={"standard_name": "sea_water_salinity"}
+        )
         assert thermdyn.is_sal(sal)
 
         not_sal = xr.DataArray([15, 16], dims="z", name="temp")
@@ -156,10 +170,12 @@ class TestSalinity:
 
     def test_get_sal(self):
         """Test getting salinity from dataset"""
-        ds = xr.Dataset({
-            "sal": xr.DataArray([35, 35.5, 36], dims="z"),
-            "temp": xr.DataArray([15, 16, 17], dims="z")
-        })
+        ds = xr.Dataset(
+            {
+                "sal": xr.DataArray([35, 35.5, 36], dims="z"),
+                "temp": xr.DataArray([15, 16, 17], dims="z"),
+            }
+        )
         sal = thermdyn.get_sal(ds, errors="ignore")
         assert sal is not None
         assert sal.name == "sal"
@@ -180,7 +196,10 @@ class TestN2:
         zz = z if positive == "up" else -z
         coords = {"z": ("z", zz, {"positive": positive, "standard_name": "altitude"})}
         temp = xr.DataArray(
-            4.0 + 16.0 * np.exp(z / 200.0), dims="z", coords=coords, name="temp",
+            4.0 + 16.0 * np.exp(z / 200.0),
+            dims="z",
+            coords=coords,
+            name="temp",
             attrs={"standard_name": "sea_water_potential_temperature"},
         )
         sal = xr.DataArray(35.0 - 0.5 * np.exp(z / 300.0), dims="z", coords=coords, name="sal")
@@ -210,15 +229,25 @@ class TestN2:
         temp, sal = self.get_profile(positive="down")
         down = thermdyn.get_n2(temp, sal, lat=45.0)
         np.testing.assert_allclose(down, up)
-        rev = thermdyn.get_n2(temp.isel(z=slice(None, None, -1)), sal.isel(z=slice(None, None, -1)), lat=45.0)
+        rev = thermdyn.get_n2(
+            temp.isel(z=slice(None, None, -1)), sal.isel(z=slice(None, None, -1)), lat=45.0
+        )
         np.testing.assert_allclose(rev.isel(z=slice(None, None, -1)), up)
 
     def test_extra_dimensions_latitudes_and_z(self):
         temp, sal = self.get_profile()
         lat = xr.DataArray([30.0, 45.0, 60.0], dims="lat", attrs={"standard_name": "latitude"})
         lon = xr.DataArray([0.0, 5.0], dims="lon", attrs={"standard_name": "longitude"})
-        cube_t = temp.expand_dims(lat=lat, lon=lon).transpose("lat", "z", "lon").assign_coords(lat=lat, lon=lon)
-        cube_s = sal.expand_dims(lat=lat, lon=lon).transpose("lat", "z", "lon").assign_coords(lat=lat, lon=lon)
+        cube_t = (
+            temp.expand_dims(lat=lat, lon=lon)
+            .transpose("lat", "z", "lon")
+            .assign_coords(lat=lat, lon=lon)
+        )
+        cube_s = (
+            sal.expand_dims(lat=lat, lon=lon)
+            .transpose("lat", "z", "lon")
+            .assign_coords(lat=lat, lon=lon)
+        )
         n2 = thermdyn.get_n2(cube_t, cube_s)  # lat and lon are found
         assert n2.dims == ("lat", "z", "lon")
         np.testing.assert_allclose(
@@ -237,7 +266,9 @@ class TestN2:
         pt = thermdyn.get_n2(temp, sal, lat=45.0)
         insitu = thermdyn.get_n2(temp, sal, lat=45.0, temp_kind="temp")
         assert not np.allclose(pt, insitu)
-        np.testing.assert_allclose(pt.isel(z=slice(4, None)), insitu.isel(z=slice(4, None)), rtol=0.05)
+        np.testing.assert_allclose(
+            pt.isel(z=slice(4, None)), insitu.isel(z=slice(4, None)), rtol=0.05
+        )
 
     def test_missing_values_and_dask(self):
         temp, sal = self.get_profile()
@@ -273,29 +304,56 @@ class TestKinds:
         return temp, sal, sa, ct
 
     def test_choices_and_aliases(self):
-        for alias, kind in [("conservative", "ctemp"), ("ctemp", "ctemp"), ("potential", "ptemp"),
-                            ("insitu", "temp"), (None, None)]:
+        for alias, kind in [
+            ("conservative", "ctemp"),
+            ("ctemp", "ctemp"),
+            ("potential", "ptemp"),
+            ("insitu", "temp"),
+            (None, None),
+        ]:
             assert thermdyn.TEMP_KINDS[alias] == kind
-        for alias, kind in [("absolute", "asal"), ("asal", "asal"), ("practical", "psal"),
-                            ("preformed", "pfsal")]:
+        for alias, kind in [
+            ("absolute", "asal"),
+            ("asal", "asal"),
+            ("practical", "psal"),
+            ("preformed", "pfsal"),
+        ]:
             assert thermdyn.SAL_KINDS[alias] == kind
         with pytest.raises(Exception):
             thermdyn.TEMP_KINDS["atemp"]
 
     def test_variants(self):
-        ds = xr.Dataset({"x": xr.DataArray([1.0], dims="z", attrs={
-            "standard_name": "sea_water_conservative_temperature"})})
+        ds = xr.Dataset(
+            {
+                "x": xr.DataArray(
+                    [1.0], dims="z", attrs={"standard_name": "sea_water_conservative_temperature"}
+                )
+            }
+        )
         assert thermdyn.get_temp(ds, "conservative", errors="ignore") is not None
         assert thermdyn.get_temp(ds, "ptemp", errors="ignore") is None
 
     def test_infer(self):
         temp, sal, sa, ct = self.get_state()
         assert thermdyn._get_temp_kind_(temp, None) == "ptemp"
-        assert thermdyn._get_temp_kind_(temp.assign_attrs(standard_name="sea_water_temperature"), None) == "temp"
-        assert thermdyn._get_temp_kind_(temp.assign_attrs(standard_name="sea_water_conservative_temperature"), None) == "ctemp"
+        assert (
+            thermdyn._get_temp_kind_(temp.assign_attrs(standard_name="sea_water_temperature"), None)
+            == "temp"
+        )
+        assert (
+            thermdyn._get_temp_kind_(
+                temp.assign_attrs(standard_name="sea_water_conservative_temperature"), None
+            )
+            == "ctemp"
+        )
         assert thermdyn._get_temp_kind_(temp, "conservative") == "ctemp"
         assert thermdyn._get_sal_kind_(sal, None) == "psal"
-        assert thermdyn._get_sal_kind_(sal.assign_attrs(standard_name="sea_water_absolute_salinity"), None) == "asal"
+        assert (
+            thermdyn._get_sal_kind_(
+                sal.assign_attrs(standard_name="sea_water_absolute_salinity"), None
+            )
+            == "asal"
+        )
 
     def test_n2_equivalent_kinds(self):
         temp, sal, sa, ct = self.get_state()
@@ -314,7 +372,9 @@ class TestKinds:
         kelvin = (temp + 273.15).assign_attrs(units="kelvin")
         np.testing.assert_allclose(
             thermdyn.get_n2(kelvin, sal, lat=45.0, temp_kind="ptemp"),
-            thermdyn.get_n2(temp, sal, lat=45.0), rtol=1e-10)
+            thermdyn.get_n2(temp, sal, lat=45.0),
+            rtol=1e-10,
+        )
 
     def test_convert_sal(self):
         temp, sal, sa, ct = self.get_state()
@@ -340,10 +400,14 @@ class TestKinds:
         assert not np.allclose(insitu, temp)
         np.testing.assert_allclose(
             thermdyn.convert_temp(insitu, "ptemp", sal=sal, lat=45.0, temp_kind="temp"),
-            temp, rtol=1e-8)
+            temp,
+            rtol=1e-8,
+        )
         # With absolute salinity
         np.testing.assert_allclose(
-            thermdyn.convert_temp(temp, "ctemp", sal=sal.copy(data=sa), sal_kind="asal", lat=45.0), ct)
+            thermdyn.convert_temp(temp, "ctemp", sal=sal.copy(data=sa), sal_kind="asal", lat=45.0),
+            ct,
+        )
         # Same kind needs no salinity, but different kinds do
         np.testing.assert_allclose(thermdyn.convert_temp(temp, "ptemp"), temp)
         with pytest.raises(Exception, match="salinity"):

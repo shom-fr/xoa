@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Select data at a point, in a box, a circle or a polygon
 =======================================================
@@ -22,10 +21,10 @@ See also: :ref:`sphx_glr_tutorials_grids_plot_neighbors.py`.
 # Initialisations
 # ---------------
 
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
 
 import xoa  # noqa: F401
 from xoa.core.grid import create_rotated_grid

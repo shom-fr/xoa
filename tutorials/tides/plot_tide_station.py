@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Analyse and predict the tide of a station
 =========================================
@@ -20,10 +19,10 @@ See also: :ref:`sphx_glr_tutorials_tides_plot_tide_map.py`.
 # Initialisations
 # ---------------
 
-import numpy as np
-import xarray as xr
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 
 from xoa import tide as xtide
 from xoa.tide import plot as tplot

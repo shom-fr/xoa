@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Decorate a map
 ==============
@@ -19,8 +18,8 @@ See also: :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
 # Initialisations
 # ---------------
 
-import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
+import matplotlib.pyplot as plt
 from matplotlib.ticker import StrMethodFormatter
 
 import xoa

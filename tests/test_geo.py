@@ -1,13 +1,11 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.geo` and :mod:`xoa.core.geo` modules
 """
 
-import pytest
 import numpy as np
+import pytest
 import xarray as xr
 
-from xoa.core import geo as core_geo
 from xoa import exceptions, geo
 
 
@@ -351,4 +349,8 @@ class TestGeoSel:
         sel = geo.get_geosel(curv, circle=(13.0, 44.0, 150.0), units="km")
         xr.testing.assert_equal(sub, sel.apply(curv))
         assert sub.temp.isnull().any()
-        assert not geo.geosel(curv.temp, circle=(13.0, 44.0, 150.0), units="km", mask=False).isnull().any()
+        assert (
+            not geo.geosel(curv.temp, circle=(13.0, 44.0, 150.0), units="km", mask=False)
+            .isnull()
+            .any()
+        )

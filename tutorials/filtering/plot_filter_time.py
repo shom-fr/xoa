@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Filter time series: remove the tide
 ===================================
@@ -20,9 +19,9 @@ See also: :ref:`sphx_glr_tutorials_filtering_plot_filter_space.py`.
 # Initialisations
 # ---------------
 
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 
 from xoa import tide as xtide
 

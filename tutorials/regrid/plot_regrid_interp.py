@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Regrid and interpolate horizontally
 ===================================
@@ -25,16 +24,16 @@ import os
 import tempfile
 import time
 
-import numpy as np
-import xarray as xr
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cmocean
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 
 import xoa
 from xoa import geo, interp, regrid, weights
-from xoa.plot import add_colorbar, plot_field
 from xoa.core.grid import create_rotated_grid
+from xoa.plot import add_colorbar, plot_field
 
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
@@ -96,7 +95,9 @@ extent = geo.get_extent(temp, margin=0.02)
 fig, axes = plt.subplots(
     2, 2, figsize=(9, 7), subplot_kw={"projection": ccrs.Mercator()}, constrained_layout=True
 )
-kw = dict(vmin=float(temp.min()), vmax=float(temp.max()), cmap=cmocean.cm.thermal, add_colorbar=False)
+kw = dict(
+    vmin=float(temp.min()), vmax=float(temp.max()), cmap=cmocean.cm.thermal, add_colorbar=False
+)
 fields = {"source": temp, **results}
 for ax, (title, field) in zip(axes.flat, fields.items()):
     mappable = plot_field(
@@ -178,7 +179,9 @@ fig, axes = plt.subplots(
 kw = dict(map_kw={"gridlines_labels_on": ["bottom"]}, add_colorbar=False)
 plot_field(on_rotated, ax=axes[0], title="rotated grid", cmap=cmocean.cm.thermal, **kw)
 plot_field(back, ax=axes[1], title="back to the source grid", cmap=cmocean.cm.thermal, **kw)
-diff = plot_field(back - temp, ax=axes[2], title="difference", cmap=cmocean.cm.balance, vmin=-1, vmax=1, **kw)
+diff = plot_field(
+    back - temp, ax=axes[2], title="difference", cmap=cmocean.cm.balance, vmin=-1, vmax=1, **kw
+)
 extent_rot = geo.get_extent(on_rotated, margin=0.05)
 for ax in axes:
     ax.set_extent(extent_rot, crs=ccrs.PlateCarree())
@@ -280,7 +283,12 @@ coast = xr.Dataset(
 )
 naive = regrid.Regridder(temp, coast, "bilinear").regrid(temp)
 masked = regrid.Regridder(temp, coast, "bilinear").regrid(temp, skipna=True)
-print("missing points by default:", int(naive.isnull().sum()), "- with skipna:", int(masked.isnull().sum()))
+print(
+    "missing points by default:",
+    int(naive.isnull().sum()),
+    "- with skipna:",
+    int(masked.isnull().sum()),
+)
 
 # %%
 # The ``na_thres`` parameter controls how many missing neighbours are tolerated.

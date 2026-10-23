@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 This module provides 1d to nD grid utilities to get information
 or perform operations on a grid.
@@ -22,13 +21,12 @@ For operations between different grids, please see :mod:`xoa.regrid`.
 import numpy as np
 import xarray as xr
 
-from . import exceptions
-from . import misc
-from . import meta
 from . import coords as xcoords
+from . import exceptions, meta, misc
 from . import geo as xgeo
 from .core import grid as cgrid
 from .core import num as cnum
+
 
 def apply_along_dim(
     ds,

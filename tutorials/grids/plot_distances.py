@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Distances and directions on the sphere
 ======================================
@@ -21,11 +20,11 @@ See also: :ref:`sphx_glr_tutorials_grids_plot_neighbors.py`, :ref:`sphx_glr_tuto
 # Initialisations
 # ---------------
 
+import cmocean  # noqa
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
-import matplotlib.pyplot as plt
-import cmocean  # noqa
 
 import xoa
 from xoa import geo
@@ -77,8 +76,15 @@ ax.set_xticks(range(len(ports)), list(ports), rotation=45, ha="right")
 ax.set_yticks(range(len(ports)), list(ports))
 for i in range(len(ports)):
     for j in range(len(ports)):
-        ax.text(j, i, f"{dist[i, j]:.0f}", ha="center", va="center",
-                color="w" if dist[i, j] > 2000 else "k", fontsize=8)
+        ax.text(
+            j,
+            i,
+            f"{dist[i, j]:.0f}",
+            ha="center",
+            va="center",
+            color="w" if dist[i, j] > 2000 else "k",
+            fontsize=8,
+        )
 fig.colorbar(mappable, ax=ax, shrink=0.8, label="Distance [km]")
 ax.set_title("Distances between ports")
 
@@ -115,7 +121,9 @@ speed = step / dt
 angle = geo.bearing(lon[:-1], lat[:-1], lon[1:], lat[1:])
 print(f"Travelled {step.sum() / 1e3:.0f} km in {dt.sum() / 86400:.0f} days")
 
-fig, axes = plt.subplots(1, 3, figsize=(10, 3.2), gridspec_kw={"width_ratios": (1.1, 1.4, 0.8)}, constrained_layout=True)
+fig, axes = plt.subplots(
+    1, 3, figsize=(10, 3.2), gridspec_kw={"width_ratios": (1.1, 1.4, 0.8)}, constrained_layout=True
+)
 axes[2].remove()
 axes[2] = fig.add_subplot(1, 3, 3, projection="polar")
 sc = axes[0].scatter(lon[1:], lat[1:], c=speed, s=8, cmap=cmocean.cm.speed)

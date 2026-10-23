@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the map, grid, section and stick helpers of the :mod:`xoa.plot` module
 """
@@ -10,8 +9,8 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.collections as mcollections
-import matplotlib.quiver as mquiver
 import matplotlib.pyplot as plt
+import matplotlib.quiver as mquiver
 import numpy as np
 import pytest
 import xarray as xr
@@ -250,9 +249,15 @@ class TestPlotGrid:
 
     def test_figsize_follows_the_aspect_ratio(self):
         def get_size(dlon, dlat):
-            lon = xr.DataArray(np.linspace(0, dlon, 5), dims="lon", attrs={"standard_name": "longitude"})
-            lat = xr.DataArray(np.linspace(0, dlat, 5), dims="lat", attrs={"standard_name": "latitude"})
-            return xplot.plot_grid(xr.Dataset(coords={"lon": lon, "lat": lat})).figure.get_size_inches()
+            lon = xr.DataArray(
+                np.linspace(0, dlon, 5), dims="lon", attrs={"standard_name": "longitude"}
+            )
+            lat = xr.DataArray(
+                np.linspace(0, dlat, 5), dims="lat", attrs={"standard_name": "latitude"}
+            )
+            return xplot.plot_grid(
+                xr.Dataset(coords={"lon": lon, "lat": lat})
+            ).figure.get_size_inches()
 
         assert get_size(20, 5)[1] < get_size(5, 20)[1]
         ax = xplot.plot_grid(get_temp(), map_kw={"figsize": (5, 5)})
@@ -733,7 +738,11 @@ class TestPlotTaylor:
 class TestAutoCmap:
     @pytest.mark.parametrize(
         "offset, option, symmetric",
-        [(-55.0, "plot.cmapdiv", True), (0.0, "plot.cmappos", False), (-70.0, "plot.cmapneg", False)],
+        [
+            (-55.0, "plot.cmapdiv", True),
+            (0.0, "plot.cmappos", False),
+            (-70.0, "plot.cmapneg", False),
+        ],
     )
     def test_cmap_follows_the_sign(self, offset, option, symmetric):
         temp = get_temp() + offset  # From 50 to 59 without offset
@@ -801,7 +810,13 @@ class TestPlotFields:
 class TestPanelLabeler:
     def test_labels(self):
         labeler = xplot.PanelLabeler("{A}.")
-        assert [labeler.get_label(i) for i in (0, 25, 26, 27, 52)] == ["A.", "Z.", "AA.", "AB.", "BA."]
+        assert [labeler.get_label(i) for i in (0, 25, 26, 27, 52)] == [
+            "A.",
+            "Z.",
+            "AA.",
+            "AB.",
+            "BA.",
+        ]
         assert xplot.PanelLabeler("{n}").get_label(2) == "3"
 
     def test_counter_goes_on(self):
@@ -823,7 +838,9 @@ class TestPanelLabeler:
 class TestMinimap:
     @staticmethod
     def get_ds():
-        return xr.Dataset(coords={"lon": ("st", [-7.0, -5.0, -5.0]), "lat": ("st", [44.0, 44.0, 46.0])})
+        return xr.Dataset(
+            coords={"lon": ("st", [-7.0, -5.0, -5.0]), "lat": ("st", [44.0, 44.0, 46.0])}
+        )
 
     @pytest.mark.parametrize("loc", ["upper right", "upper left", "lower right", "lower left"])
     def test_inset_is_inside_the_parent(self, loc):
@@ -839,7 +856,7 @@ class TestMinimap:
         np.testing.assert_allclose(box.width * 6, 0.25 * pbox.width * 6)
 
     def test_default_position_and_explicit_ax(self):
-        fig = plt.figure()
+        plt.figure()
         ax = xplot.plot_minimap(self.get_ds())
         assert ax.get_position(original=True).x0 == pytest.approx(0.9)
         ax2 = xplot.plot_minimap(self.get_ds(), ax=[0.1, 0.1, 0.2])
@@ -853,7 +870,9 @@ class TestMinimap:
         x, y = line.get_data()
         assert len(x) == 2 * (3 + 4) - 4 + 1  # Each edge point once, and the closing one
         assert (x[0], y[0]) == (x[-1], y[-1]) == (-8.0, 44.0)
-        assert set(zip(x, y)) == {(a, b) for a, b in zip(lon.ravel(), lat.ravel()) if a in (-8, -5) or b in (44, 46)}
+        assert set(zip(x, y)) == {
+            (a, b) for a, b in zip(lon.ravel(), lat.ravel()) if a in (-8, -5) or b in (44, 46)
+        }
         assert line.get_linewidth() == 1.5
 
     def test_invalid_loc(self):

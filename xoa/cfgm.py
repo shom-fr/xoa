@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Configuration management utilities based on :mod:`configobj`
 
 .. rubric:: Usage
@@ -20,21 +19,20 @@ See the :ref:`indepth.cfgm` section.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import importlib
 import inspect
+import logging
 import os
 import re
 import shutil
 import sys
 import traceback
-from argparse import SUPPRESS
+from argparse import SUPPRESS, ArgumentParser
 from argparse import Action as AP_Action
-from argparse import ArgumentParser
 from argparse import HelpFormatter as ArgHelpFormatter
 from collections import OrderedDict
 from contextlib import contextmanager
 from warnings import warn
-import logging
-import importlib
 
 try:
     import configobj.validate as validate
@@ -136,28 +134,26 @@ def _valwraplist_(validator):
         # Do list checks
         n = kwargs.pop("n", None)
         if n is not None and len(value) != int(n):
-            raise validate.VdtSizeError(
-                "Incorrect size: {}, {} values expected".format(len(value), n)
-            )
+            raise validate.VdtSizeError(f"Incorrect size: {len(value)}, {n} values expected")
         nmin = kwargs.pop("nmin", None)
         if nmin is not None and len(value) < int(nmin):
             raise validate.VdtSizeError(
-                "Incorrect size: {}, at least {} values expected".format(len(value), nmin)
+                f"Incorrect size: {len(value)}, at least {nmin} values expected"
             )
         nmax = kwargs.pop("nmax", None)
         if nmax is not None and len(value) > int(nmax):
             raise validate.VdtSizeError(
-                "Incorrect size: {}, at most {} values expected".format(len(value), nmax)
+                f"Incorrect size: {len(value)}, at most {nmax} values expected"
             )
         odd = validate.is_boolean(kwargs.pop("odd", False))
         if odd and not len(value) % 2:
             raise validate.VdtSizeError(
-                "Incorrect size: {}, odd number of values expected".format(len(value))
+                f"Incorrect size: {len(value)}, odd number of values expected"
             )
         even = validate.is_boolean(kwargs.pop("even", False))
         if even and len(value) % 2:
             raise validate.VdtSizeError(
-                "Incorrect size: {}, even number of values expected".format(len(value))
+                f"Incorrect size: {len(value)}, even number of values expected"
             )
 
         shape = kwargs.pop("shape", None)
@@ -169,14 +165,12 @@ def _valwraplist_(validator):
                     shape, vshape = list(map(int, shape)), numpy.shape(value)
                     if vshape != shape:
                         raise validate.VdtSizeError(
-                            "Incorrect shape: {}, {} shape expected".format(vshape, shape)
+                            f"Incorrect shape: {vshape}, {shape} shape expected"
                         )
                 except Exception:
                     raise validate.ValidateError(
                         "Cannot test value shape, this may be caused by "
-                        "an irregular array-like shape. Error was:\n{}".format(
-                            traceback.format_exc()
-                        )
+                        f"an irregular array-like shape. Error was:\n{traceback.format_exc()}"
                     )
 
         # Preserve tuple type
@@ -444,7 +438,7 @@ def is_daterange64(value, default=None):
         raise VdtDateTimeError("Need startdate, end date and step")
     import numpy as np
 
-    return np.arange(value[0], value[1], dtype="M8[{}]".format(value[2]))
+    return np.arange(value[0], value[1], dtype=f"M8[{value[2]}]")
 
 
 def is_boolstr(value, default=None):
@@ -581,7 +575,6 @@ VALIDATOR_SPECS = {
     "numerics": is_numerics,
     "figsize": is_figsize,
     "bbox": is_bbox,
-    "datetime": is_datetime,
     "file": is_path,
     "path": is_path,
     "directory": is_path,
@@ -652,7 +645,7 @@ for key in VALIDATOR_TYPES:
     if not spec["func"].__name__.startswith("list_validator_wrapper"):
         val = ":func:`{} <{}>`".format(key, spec["base_func"].__name__)
     else:
-        val = ":func:`{}`".format(key)
+        val = f":func:`{key}`"
     _for_doc.append(val)
 
 __doc__ = __doc__.format(" ".join(_for_doc))
@@ -716,7 +709,7 @@ def print_validation_functions(pattern="*"):
             print(f"{name}{sig}{doc}")
 
 
-class ConfigManager(object):
+class ConfigManager:
     """A configuration management class based on :class:`configobj`
 
     It supports content verification and default values thanks to
@@ -902,9 +895,9 @@ class ConfigManager(object):
         cfg.filename = cfgfile
         cfg.write()
         if verbose:
-            print("Created default config file: {}".format(cfgfile))
+            print(f"Created default config file: {cfgfile}")
             if backup:
-                print("Backuped old config file to: {}.bak".format(cfgfile))
+                print(f"Backuped old config file to: {cfgfile}.bak")
         return cfg
 
     def load(

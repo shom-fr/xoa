@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Find variables whatever their names
 ===================================
@@ -19,8 +18,8 @@ See also: :ref:`sphx_glr_tutorials_meta_plot_naming_specs.py`, :ref:`sphx_glr_tu
 # Initialisations
 # ---------------
 
-import xarray as xr
 import cmocean
+import xarray as xr
 
 import xoa
 from xoa import meta
@@ -51,7 +50,9 @@ for name, ds in datasets.items():
 # ``"u"`` or ``"lon"``, by scanning the names and the attributes of the arrays.
 
 for name, ds in datasets.items():
-    print(f"{name:7} u -> {ds.xoa.get('u').name:3} sal -> {getattr(ds.xoa.get('sal'), 'name', None)}")
+    print(
+        f"{name:7} u -> {ds.xoa.get('u').name:3} sal -> {getattr(ds.xoa.get('sal'), 'name', None)}"
+    )
 
 # %%
 # A function that works with any model

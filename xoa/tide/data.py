@@ -189,7 +189,7 @@ def get_constituent_names():
     return get_constituents().names
 
 
-class set_constituents(object):
+class set_constituents:
     """Set the current constituents, globally or within a context
 
     Parameters

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.accessors` module
 """
 
 import warnings
-import pytest
+
 import numpy as np
+import pytest
 import xarray as xr
 
 import xoa
@@ -21,9 +21,11 @@ class TestAccessorRegistration:
         accessors.register_meta_accessors(name='meta')
 
         # Create a simple dataset
-        ds = xr.Dataset({
-            'temperature': (['x', 'y'], np.random.rand(3, 4)),
-        })
+        ds = xr.Dataset(
+            {
+                'temperature': (['x', 'y'], np.random.rand(3, 4)),
+            }
+        )
 
         # Check that meta accessor is available
         assert hasattr(ds, 'meta')
@@ -43,9 +45,11 @@ class TestAccessorRegistration:
         """Test registering meta accessors with custom name"""
         accessors.register_meta_accessors(name='mymeta')
 
-        ds = xr.Dataset({
-            'temp': (['x'], np.array([1, 2, 3])),
-        })
+        ds = xr.Dataset(
+            {
+                'temp': (['x'], np.array([1, 2, 3])),
+            }
+        )
 
         # Check that custom name accessor is available
         assert hasattr(ds, 'mymeta')
@@ -72,23 +76,32 @@ class TestMetaAccessorMethods:
         accessors.register_meta_accessors(name='meta')
 
         # Create test dataset with CF-like names
-        self.ds = xr.Dataset({
-            'SST': (['time', 'lat', 'lon'], np.random.rand(2, 3, 4), {
-                'standard_name': 'sea_surface_temperature',
-                'long_name': 'Sea Surface Temperature',
-                'units': 'degC'
-            }),
-        }, coords={
-            'lon': (['lon'], np.linspace(-180, 180, 4), {
-                'standard_name': 'longitude',
-                'units': 'degrees_east'
-            }),
-            'lat': (['lat'], np.linspace(-90, 90, 3), {
-                'standard_name': 'latitude',
-                'units': 'degrees_north'
-            }),
-            'time': (['time'], np.array([0, 1])),
-        })
+        self.ds = xr.Dataset(
+            {
+                'SST': (
+                    ['time', 'lat', 'lon'],
+                    np.random.rand(2, 3, 4),
+                    {
+                        'standard_name': 'sea_surface_temperature',
+                        'long_name': 'Sea Surface Temperature',
+                        'units': 'degC',
+                    },
+                ),
+            },
+            coords={
+                'lon': (
+                    ['lon'],
+                    np.linspace(-180, 180, 4),
+                    {'standard_name': 'longitude', 'units': 'degrees_east'},
+                ),
+                'lat': (
+                    ['lat'],
+                    np.linspace(-90, 90, 3),
+                    {'standard_name': 'latitude', 'units': 'degrees_north'},
+                ),
+                'time': (['time'], np.array([0, 1])),
+            },
+        )
 
     def test_metaspecs_property(self):
         """Test that meta_specs property works"""
@@ -163,9 +176,11 @@ class TestXoaAccessorSubaccessors:
         # Register accessors
         xoa.register_accessors(xoa=True, meta=True)
 
-        self.ds = xr.Dataset({
-            'temp': (['x'], np.array([20, 21, 22])),
-        })
+        self.ds = xr.Dataset(
+            {
+                'temp': (['x'], np.array([20, 21, 22])),
+            }
+        )
 
     def test_xoa_meta_subaccessor(self):
         """Test that .xoa.meta subaccessor works"""
@@ -230,8 +245,10 @@ class TestRegisterAccessorsFunction:
 
             # Check warning was issued
             assert len(w) >= 1
-            assert any(issubclass(warn.category, (DeprecationWarning, xoa.XoaDeprecationWarning))
-                      for warn in w)
+            assert any(
+                issubclass(warn.category, (DeprecationWarning, xoa.XoaDeprecationWarning))
+                for warn in w
+            )
 
     def test_register_both_meta_and_xcf(self):
         """Test that both meta and xcf can be registered (for compatibility)"""
@@ -429,8 +446,9 @@ class TestTideAccessor:
 
 
 def test_accessor_get_geosel():
-    import xarray as xr
     import numpy as np
+    import xarray as xr
+
     import xoa  # noqa: F401
 
     lon = xr.DataArray(np.arange(0.0, 40.0, 10.0), dims="x", name="lon")

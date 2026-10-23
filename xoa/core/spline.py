@@ -348,9 +348,7 @@ def compute_frac_indices(
 
 
 @numba.njit(cache=NOT_CI, parallel=True)
-def bilinear_frac(
-    j_base, i_base, frac_a, frac_b, X, nx_src, out, skipna, na_thres, periodic=False
-):
+def bilinear_frac(j_base, i_base, frac_a, frac_b, X, nx_src, out, skipna, na_thres, periodic=False):
     """
     Bilinear interpolation over K columns using fractional cell indices.
 

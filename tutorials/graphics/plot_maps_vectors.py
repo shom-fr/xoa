@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Plot fields and currents on maps
 ================================
@@ -22,20 +21,20 @@ See also: :ref:`sphx_glr_tutorials_graphics_plot_taylor_diagram.py`.
 # Initialisations
 # ---------------
 
+import cmocean
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
-import cmocean
 
 import xoa
 from xoa import meta
 from xoa.plot import (
+    plot_double_minimap,
     plot_field,
     plot_fields,
-    plot_vectors,
-    plot_stick,
     plot_minimap,
-    plot_double_minimap,
+    plot_stick,
+    plot_vectors,
 )
 
 xr.set_options(display_style="text")

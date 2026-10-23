@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 High level interpolation routines.
 
@@ -32,27 +31,28 @@ import xarray as xr
 
 from . import coords as xcoords
 from . import grid as xgrid
-from . import misc
-from . import weights
+from . import misc, weights
 from .core import num
 from .core.interp import XYInterpolator as CoreXYInterpolator
 
 # Backward compat
 from .core.interp import (  # noqa
-    closest2d,
     cell2relloc,
+    closest2d,
+    grid2locs,
     grid2relloc,
     grid2rellocs,
-    grid2locs,
+)
+from .core.interp import (
     isoslice as core_isoslice,
 )
 from .core.regrid import (  # noqa
-    nearest1d,
-    linear1d,
-    cubic1d,
-    hermit1d,
-    extrap1d,
     cellave1d,
+    cubic1d,
+    extrap1d,
+    hermit1d,
+    linear1d,
+    nearest1d,
 )
 
 # warnings.warn("The 'xoa.interp' module is deprecated in favour of the 'xoa.core.interp' module")

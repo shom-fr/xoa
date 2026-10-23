@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Manage a configuration with validation and command line options
 ================================================================

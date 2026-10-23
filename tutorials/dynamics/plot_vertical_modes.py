@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Vertical modes of the Gulf Stream
 =================================
@@ -23,14 +22,14 @@ See also: :ref:`sphx_glr_tutorials_dynamics_plot_dimensionless_numbers.py`, :ref
 # Initialisations
 # ---------------
 
+import cmocean  # noqa
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
-import cmocean  # noqa
 
 import xoa
-import xoa.meta as xmeta
 import xoa.dyn as xdyn
+import xoa.meta as xmeta
 import xoa.thermdyn as xthermdyn
 from xoa.plot import plot_fields
 
@@ -159,8 +158,10 @@ fig, axes = plot_fields(
 rd1_wkb = (xdyn.get_rossby_radius(n2) * 1e-3).where(open_ocean)
 diff = ((rd1_wkb / rd1 - 1) * 100).rename("diff")
 diff.attrs = {"long_name": "WKB relative difference", "units": "%"}
-print(f"WKB / modes - 1: median = {float(diff.median()):.1f} %, "
-      f"5-95% = {float(diff.quantile(0.05)):.1f} to {float(diff.quantile(0.95)):.1f} %")
+print(
+    f"WKB / modes - 1: median = {float(diff.median()):.1f} %, "
+    f"5-95% = {float(diff.quantile(0.05)):.1f} to {float(diff.quantile(0.95)):.1f} %"
+)
 
 contours = [{"field": speed0, "levels": [0.8, 1.2], "colors": ["0.35", "k"], "linewidths": 0.8}]
 rd_kw = {"cmap": "cmo.matter", "levels": np.linspace(18, 34, 17), "extend": "both"}

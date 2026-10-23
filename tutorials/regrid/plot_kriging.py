@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Interpolate scattered data with kriging
 =======================================
@@ -22,11 +21,11 @@ See also: :ref:`sphx_glr_tutorials_filtering_plot_filtering.py` and
 
 import time
 
-import numpy as np
-import xarray as xr
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cmocean
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 
 from xoa.filter import generate_kernel, smooth
 from xoa.krig import Kriger, LocalKriger, VariogramModel, empirical_variogram

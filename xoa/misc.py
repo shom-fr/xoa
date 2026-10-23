@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Miscellaneous low level utilities
 """
@@ -20,7 +19,7 @@ Miscellaneous low level utilities
 import hashlib
 import types
 from collections import OrderedDict
-from enum import IntEnum, EnumMeta
+from enum import EnumMeta, IntEnum
 
 import numpy as np
 
@@ -173,7 +172,7 @@ class IntEnumChoices(IntEnum):
         return self.name
 
 
-class Choices(object):
+class Choices:
     """Choice management for a function or method parameter
 
     Parameters
@@ -259,7 +258,7 @@ class Choices(object):
         if choice not in self._choices:
             desc = self._description if self._description else 'choice'
             raise exceptions.XoaError(
-                f"Invalid choice for \"{desc}\": {choice}. " f"Please choose one of: {self}"
+                f"Invalid choice for \"{desc}\": {choice}. Please choose one of: {self}"
             )
         if self.aliases:
             for ref, values in self.aliases.items():
@@ -597,7 +596,7 @@ def dict_merge(
                 break
 
     # Init
-    from configobj import Section, ConfigObj
+    from configobj import ConfigObj, Section
 
     if cls is Section:
         for d in dd:
@@ -775,7 +774,7 @@ def gunique(seq):
             yield x
 
 
-class ArgList(object):
+class ArgList:
     """Utility to always manage arguments as list and return results as input
 
     Examples
@@ -815,7 +814,7 @@ class ArgList(object):
         return argso[0]
 
 
-class ArgTuple(object):
+class ArgTuple:
     """Utility to always manage arguments as tuple and return results as input
 
     Examples
@@ -924,7 +923,7 @@ def combine_fingerprints(*fingerprints):
     return hashlib.blake2b("|".join(fingerprints).encode(), digest_size=16).hexdigest()
 
 
-class SmallCache(object):
+class SmallCache:
     """A small cache that forgets the least recently used items
 
     Parameters

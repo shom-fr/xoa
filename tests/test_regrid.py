@@ -1,25 +1,23 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.regrid` module
 """
 
-import numpy as np
-import xarray as xr
-import pytest
-
-from xoa import regrid
-from test_core_regrid import get_regrid1d_data
 import os
 import tempfile
+
+import numpy as np
+import pytest
+import xarray as xr
+from test_core_regrid import get_regrid1d_data
+
 import xoa
+from xoa import interp, regrid
+from xoa.core.regrid import XYRegridder
 from xoa.interp import Interpolator
 from xoa.regrid import Regridder
-from xoa.core.regrid import XYRegridder
-from xoa import interp
 
 
 class TestRegrid1d:
-
     def test_depth_1d(self):
         """data:3d, coord_in:1d, coord_out:1d"""
         xxi, yyi, vari, xxo, yyo, eshapes = get_regrid1d_data()
@@ -63,8 +61,9 @@ class TestRegrid1d:
             coords=(time, lon, dep0),
         )
         depth_in = xr.DataArray(yyi, dims=("lon", "nz"))
-        depth_out = xr.DataArray(yyo, dims=("lon", "nk"),
-                                 attrs={'standard_name': 'ocean_layer_depth'})
+        depth_out = xr.DataArray(
+            yyo, dims=("lon", "nk"), attrs={'standard_name': 'ocean_layer_depth'}
+        )
         del da_in["nz"]
         da_in = da_in.assign_coords({"time": time, "lon": lon, "depth": depth_in})
         da_out = regrid.regrid1d(da_in, depth_out, method="linear")
@@ -86,8 +85,9 @@ class TestRegrid1d:
             coords=(time, lon, dep0),
         )
         depth_in = xr.DataArray(yyi, dims=("lon", "nz"))
-        depth_out = xr.DataArray(yyo, dims=("lon", "nk"),
-                                 attrs={'standard_name': 'ocean_layer_depth'})
+        depth_out = xr.DataArray(
+            yyo, dims=("lon", "nk"), attrs={'standard_name': 'ocean_layer_depth'}
+        )
         del da_in["nz"]
         da_in = da_in.assign_coords({"time": time, "lon": lon, "depth": depth_in})
 
@@ -110,8 +110,9 @@ class TestRegrid1d:
             coords=(time, lon, dep0),
         )
         depth_in = xr.DataArray(yyi, dims=("lon", "nz"))
-        depth_out = xr.DataArray(yyo, dims=("lon", "nk"),
-                                 attrs={'standard_name': 'ocean_layer_depth'})
+        depth_out = xr.DataArray(
+            yyo, dims=("lon", "nk"), attrs={'standard_name': 'ocean_layer_depth'}
+        )
         del da_in["nz"]
         da_in = da_in.assign_coords({"time": time, "lon": lon, "depth": depth_in})
 
@@ -126,12 +127,12 @@ class TestRegrid1d:
 
     def test_time(self):
         time_in = xr.DataArray(
-            np.arange("2000-01-01", "2000-01-03", dtype="M8[D]").astype("M8[ns]"),
-            dims="time")
+            np.arange("2000-01-01", "2000-01-03", dtype="M8[D]").astype("M8[ns]"), dims="time"
+        )
         data_in = xr.DataArray(np.arange(time_in.size), coords={"time": time_in})
         time_out = xr.DataArray(
-            np.arange("2000-01-01", "2000-01-03", dtype="M8[h]").astype("M8[ns]"),
-            dims="time")
+            np.arange("2000-01-01", "2000-01-03", dtype="M8[h]").astype("M8[ns]"), dims="time"
+        )
         data_out = regrid.regrid1d(data_in, time_out)
         assert data_out.dtype.char == "d"
         assert "M8" in data_out.time.dtype.str
@@ -157,10 +158,10 @@ class TestRegrid1d:
         np.testing.assert_allclose(vo.values[:, 0, 0], expected)
 
     def test_cellave(self):
-        zi = xr.DataArray([0., 1., 2., 3.], dims="z")
-        zo = xr.DataArray([0., 1.5, 3.], dims="z")
+        zi = xr.DataArray([0.0, 1.0, 2.0, 3.0], dims="z")
+        zo = xr.DataArray([0.0, 1.5, 3.0], dims="z")
         vi = xr.DataArray(
-            np.array([1., 2., 3.]).reshape(3, 1),
+            np.array([1.0, 2.0, 3.0]).reshape(3, 1),
             dims=('z', 'x'),
             coords={"z": zi[:-1]},
         )
@@ -185,12 +186,12 @@ class TestRegrid1d:
     def test_drop_na(self):
         zi = xr.DataArray(np.arange(5, dtype="d"), dims='z')
         zo = xr.DataArray(np.linspace(0, 4, 9), dims='z')
-        data = np.array([1., np.nan, np.nan, np.nan, 5.])
+        data = np.array([1.0, np.nan, np.nan, np.nan, 5.0])
         vi = xr.DataArray(data, dims='z', coords={"z": zi})
         vo = regrid.regrid1d(vi, zo, dim="z", drop_na=True)
         assert not np.isnan(vo).all()
-        assert float(vo[0]) == 1.
-        assert float(vo[-1]) == 5.
+        assert float(vo[0]) == 1.0
+        assert float(vo[-1]) == 5.0
 
 
 @pytest.mark.parametrize(

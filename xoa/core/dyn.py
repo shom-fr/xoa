@@ -295,6 +295,7 @@ def geos(ssh, dx, dy, corio):
     corio = np.broadcast_to(corio, shape)
     return _geos_(ssh, dx, dy, corio)
 
+
 #: Advection terms of the iterative cyclogeostrophic method
 CYCLOGEOS_TERMS = ("full", "penven")
 

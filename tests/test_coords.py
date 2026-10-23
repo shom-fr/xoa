@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.coords` module
 """
 
-import pytest
 import numpy as np
+import pytest
 import xarray as xr
 
 import xoa

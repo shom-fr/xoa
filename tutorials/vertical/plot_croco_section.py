@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Interpolate a meridional section of CROCO outputs to regular heights
 ====================================================================
@@ -21,15 +20,16 @@ See also: :ref:`sphx_glr_tutorials_grids_plot_grid_tools.py`, :ref:`sphx_glr_tut
 #
 # Import needed modules.
 
+import cmocean  # noqa
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
-import cmocean  # noqa
+
 import xoa
+import xoa.meta as xmeta
 from xoa.plot import add_colorbar, plot_section
 from xoa.regrid import regrid1d
 from xoa.thermdyn import mixed_layer_depth
-import xoa.meta as xmeta
 
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
@@ -124,6 +124,7 @@ mldz = -mixed_layer_depth(tempz, deltatemp=deltatemp)
 # Plot the full section with :func:`xoa.plot.plot_section`, that finds the depths and
 # labels the axes from the meta-data.
 
+
 def plot_both(axs, **extra):
     """Plot the original and the interpolated sections with a shared colorbar"""
     kw = dict(levels=np.arange(0, 23), x="lat", add_colorbar=False, **extra)
@@ -146,9 +147,7 @@ plot_both(axs)
 # %%
 # Plot a zoom near the surface and add the mixed layer depth isoline.
 
-fig, axs = plt.subplots(
-    ncols=2, sharex=True, sharey=True, figsize=(9, 3), constrained_layout=True
-)
+fig, axs = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(9, 3), constrained_layout=True)
 plot_both(axs)
 axs[0].plot(mld[lat_name], mld, color="k", linewidth=2, linestyle="--")
 axs[1].plot(mldz[lat_name], mldz, color="k", linewidth=2, linestyle="--")

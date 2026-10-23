@@ -1,19 +1,19 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.core.interp` module
 """
 
 import functools
+import os
+import tempfile
+
 import numpy as np
 import pytest
 
 from xoa.core import regrid
-import os
-import tempfile
 from xoa.core.grid import create_regular_grid, create_rotated_grid
-from xoa.core.regrid import XYRegridder
 from xoa.core.num import CsrMatrix
 from xoa.core.poly import spherical_area
+from xoa.core.regrid import XYRegridder
 
 
 def vfunc(t=0, z=0, y=0, x=0):
@@ -21,7 +21,7 @@ def vfunc(t=0, z=0, y=0, x=0):
     return 1.13 * x + 12.35 * y + 3.24 * z - 0.65 * t
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def get_regrid1d_data(
     yimin=-100.0,
     yimax=0.0,

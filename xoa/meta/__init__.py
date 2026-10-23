@@ -1,18 +1,15 @@
 """Meta-data and conventions management"""
 
-import os
 import fnmatch
+import os
 
 from platformdirs import user_config_dir
 
-from .. import exceptions
-from .. import misc
-from . import configs
-from . import general
+from .. import exceptions, misc
+from . import configs, general
 from .categories import MetaCoordSpecs, MetaVarSpecs  # noqa: F401
 from .general import MetaSpecs  # noqa: F401
 from .sglocator import SGLocator  # noqa: F401
-
 
 _THISDIR = os.path.dirname(__file__)
 
@@ -131,7 +128,7 @@ def search_similar(obj, da):
             return obj[name]
 
 
-class set_meta_specs(object):
+class set_meta_specs:
     """Set the current Meta specs
 
     Parameters
@@ -200,7 +197,6 @@ def get_meta_config_file(name):
     if name.endswith(".cfg"):
         name = name[:-4]
     if name not in configs.META_CONFIGS:
-
         raise exceptions.XoaMetaError(
             "fInvalid meta config name '{name}'.\n"
             + "Please use on of: "
@@ -610,7 +606,6 @@ def assign_meta_specs(ds, name=None, register=False, set_encoding=True):
 
     # Set as encoding
     if set_encoding:
-
         targets = [ds] + [ds[name] for name in misc.list_xr_names(ds, dims=False)]
         for target in targets:
             target.encoding.update(meta_specs=name)

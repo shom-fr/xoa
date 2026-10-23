@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Thermodynamics utilities.
 
 Provides functions to identify and retrieve temperature, salinity and
 density variables from datasets, and to compute the mixed layer depth.
 """
+
 import inspect
 
 import numpy as np
 import xarray as xr
 
+from . import coords as xcoords
 from . import exceptions
 from . import meta as xmeta
 from . import misc as xmisc
-from . import coords as xcoords
 from . import regrid as xregrid
 from .core import thermdyn as cthermdyn
-
 
 # def _get_array_(ds, func, variants, variant, errors, name):
 #     if not variant:
@@ -489,8 +488,7 @@ def convert_temp(
 MLD_METHODS = xmisc.Choices(
     {
         "deltatemp": (
-            "depth at which the temperature is ``deltatemp`` "
-            "lower than the surface temperature"
+            "depth at which the temperature is ``deltatemp`` lower than the surface temperature"
         ),
         "deltadens": (
             "depth at which the potential density is `deltadens` higher than the surface density"

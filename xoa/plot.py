@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Plotting utilities
 
@@ -23,22 +22,20 @@ and http://vacumm.github.io/vacumm/library/misc.core_plot.html
 
 import re
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import matplotlib.collections as mcollections
 import matplotlib.artist as martist
-import matplotlib.text as mtext
+import matplotlib.collections as mcollections
+import matplotlib.colors as mcolors
 import matplotlib.patheffects as mpatheffects
+import matplotlib.pyplot as plt
+import matplotlib.text as mtext
+import numpy as np
 import xarray as xr
 
-from . import exceptions
-from . import misc as xmisc
+from . import coords as xcoords
+from . import dyn, exceptions
 from . import geo as xgeo
 from . import meta as xmeta
-from . import coords as xcoords
-from . import dyn
-from .options import resolve_option as _opt
+from . import misc as xmisc
 from .core import grid as cgrid
 from .core import plot as cplot
 from .core import stats as cstats
@@ -50,9 +47,10 @@ from .core.plot import (  # noqa
     create_base_map,
     create_map,
     decorate_map,
-    setup_map_axes,
     import_cartopy,
+    setup_map_axes,
 )
+from .options import resolve_option as _opt
 
 _AX_SETUP_KEYS = cplot.AX_SETUP_KEYS
 
@@ -143,7 +141,6 @@ def plot_flow(
     """
     # Infer parameters
     if duration is None or step is None:
-
         # Default duration based on a fraction of the area crossing time
         if duration is None:
             xmin, xmax, ymin, ymax = xgeo.get_extent(u)
@@ -367,7 +364,6 @@ def plot_ts(
 
     # Density contours
     if dens is not False:
-
         import gsw
 
         (smin, tmin), (smax, tmax) = axes.viewLim.get_points()
@@ -439,7 +435,9 @@ def _get_inset_position_(parent, loc, size, pad=0.01):
     The size is relative to the width of the axes and the pad is relative to the smallest side.
     """
     if loc not in _MINIMAP_LOCS:
-        raise exceptions.XoaError(f"Invalid loc: {loc!r}. Choose one of: " + ", ".join(_MINIMAP_LOCS))
+        raise exceptions.XoaError(
+            f"Invalid loc: {loc!r}. Choose one of: " + ", ".join(_MINIMAP_LOCS)
+        )
     parent.apply_aspect()
     box = parent.get_position()
     fw, fh = parent.figure.get_size_inches()
@@ -584,7 +582,9 @@ def plot_minimap(
         else:
             ax = _get_inset_position_(parent, loc, size)
             fig = parent.figure if fig is None else fig
-            anchor = {"upper": "N", "lower": "S"}[loc.split()[0]] + {"left": "W", "right": "E"}[loc.split()[1]]
+            anchor = {"upper": "N", "lower": "S"}[loc.split()[0]] + {"left": "W", "right": "E"}[
+                loc.split()[1]
+            ]
     if fig is None:
         fig = plt.gcf()
     if isinstance(ax, (list, tuple)):
@@ -764,7 +764,9 @@ def _get_pretty_units_(units):
     pretty = _PRETTY_UNITS.get(units.lower())
     if pretty:
         return pretty
-    return re.sub(r"(?<=[A-Za-z])(-?\d+)(?=\s|$)", lambda m: m.group(1).translate(_SUPERSCRIPTS), units)
+    return re.sub(
+        r"(?<=[A-Za-z])(-?\d+)(?=\s|$)", lambda m: m.group(1).translate(_SUPERSCRIPTS), units
+    )
 
 
 def get_label(da, units=True, pretty=True):
@@ -1147,7 +1149,7 @@ def plot_fields(
     return fig, axes
 
 
-class PanelLabeler(object):
+class PanelLabeler:
     """Label the panels of figures with letters or numbers, like "a)"
 
     The counter goes on from one call to the next, so that the panels of
@@ -1217,7 +1219,9 @@ class PanelLabeler(object):
         texts = []
         for ax in np.ravel(axes):
             texts.append(
-                ax.text(*self.xy, self.get_label(self.index), transform=ax.transAxes, **self.text_kw)
+                ax.text(
+                    *self.xy, self.get_label(self.index), transform=ax.transAxes, **self.text_kw
+                )
             )
             self.index += 1
         return texts
@@ -1377,7 +1381,9 @@ def plot_grid(
     extent = xgeo.get_extent((lon.values, lat.values), margin=0.05)
     if ax is None and "figsize" not in (map_kw or {}):
         # Figure adapted to the aspect ratio of the map, to avoid white margins
-        aspect = (extent[3] - extent[2]) / ((extent[1] - extent[0]) * np.cos(np.radians(np.mean(extent[2:]))))
+        aspect = (extent[3] - extent[2]) / (
+            (extent[1] - extent[0]) * np.cos(np.radians(np.mean(extent[2:])))
+        )
         width = 7.0 if field is None else 8.0  # Room for the colorbar
         map_kw = {**(map_kw or {}), "figsize": (width, np.clip(7.0 * aspect, 3.0, 8.0))}
     map_kw = dict(map_kw or {})
@@ -1552,9 +1558,7 @@ def plot_section(
     return mappable
 
 
-def plot_stick(
-    u, v=None, ax=None, scale=None, color=None, key=True, key_pos=None, **kwargs
-):
+def plot_stick(u, v=None, ax=None, scale=None, color=None, key=True, key_pos=None, **kwargs):
     """Plot a current time series as sticks
 
     Each vector is drawn as a stick anchored at ``y=0``, oriented along the current
@@ -2010,7 +2014,7 @@ def _smooth2d_(A, sigma):
     return gaussian_filter(A, sigma, truncate=3)
 
 
-class _BaseFilter_(object):
+class _BaseFilter_:
     def prepare_image(self, src_image, dpi, pad):
         ny, nx, depth = src_image.shape
         padded_src = np.zeros([pad * 2 + ny, pad * 2 + nx, depth], dtype="d")
@@ -2202,7 +2206,15 @@ def add_agg_filter(objs, filter, zorder=None, ax=None, add=True):
 
 
 def add_shadow(
-    objs, width=None, xoffset=None, yoffset=None, alpha=None, color=None, zorder=None, ax=None, add=True
+    objs,
+    width=None,
+    xoffset=None,
+    yoffset=None,
+    alpha=None,
+    color=None,
+    zorder=None,
+    ax=None,
+    add=True,
 ):
     """Add a drop-shadow to objects
 
