@@ -104,6 +104,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix the ``-h`` and ``--short-help`` options of :meth:`xoa.cfgm.ConfigManager.arg_parse`, which lost the options section since python 3.10, and :meth:`~xoa.cfgm.ConfigManager.arg_long_help`, which failed. :mod:`xoa.cfgm` no longer uses the private ``argparse._HelpAction``.
 - Draw the outline of 2D grids with ``plot_coords="auto"`` in :func:`xoa.plot.plot_minimap` instead of all the points, and default ``coords_linewidth`` to 1.5.
 - Fix the Greenwich phases of :mod:`xoa.tide`: astronomical arguments 12 h off, M2/N2/2N2 nodal satellites, and the 90° shifts of the diurnal constituents. They now agree with utide at Brest within 0.5° for the main constituents.
 - Search the time dimension and the variables of :mod:`xoa.tide` with :mod:`xoa.coords` and :mod:`xoa.meta`: ``t_dim`` and ``time_dim`` default to None, :func:`~xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv` accept datasets, and ``valid_time`` is a known time name.
