@@ -259,6 +259,24 @@ def test_regrid1d_decreasing(method):
     np.testing.assert_allclose(regrid.regrid1d(vi, zo[::-1], method=method), ref[::-1])
 
 
+@pytest.mark.parametrize("method", ["linear", "cellave"])
+def test_regrid1d_positive(method):
+    zi = xr.DataArray(np.linspace(-90, -10, 9), dims="z", attrs={"positive": "up"})
+    vi = xr.DataArray(-zi.values / 10, dims="z", coords={"z": zi})
+    zo = xr.DataArray(np.linspace(-80, -20, 4), dims="z", attrs={"positive": "up"})
+    ref = regrid.regrid1d(vi, zo, method=method)
+    # Depths in input, positive down
+    depth = xr.DataArray(-zi.values, dims="z", attrs={"positive": "down"})
+    vid = vi.assign_coords(z=depth)
+    np.testing.assert_allclose(regrid.regrid1d(vid, zo, method=method), ref)
+    # Depths in output, positive down
+    zod = xr.DataArray(-zo.values, dims="z", attrs={"positive": "DOWN"})
+    np.testing.assert_allclose(regrid.regrid1d(vi, zod, method=method), ref)
+    # Not negated without the attributes
+    vid.z.attrs.clear()
+    assert np.isnan(regrid.regrid1d(vid, zo, method=method)).all()
+
+
 def test_regrid1d_cellave_drop_na():
     zi = xr.DataArray(np.arange(4.0), dims="z")
     vi = xr.DataArray(np.arange(4.0), dims="z", coords={"z": zi})

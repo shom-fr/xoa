@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- :func:`xoa.regrid.regrid1d` negates the input coordinate when it has a ``positive`` attribute opposite to the one of the output coordinate, like a depth regridded to ``z`` levels.
 - :func:`xoa.regrid.regrid1d` and the 1D kernels of :mod:`xoa.core.regrid` support decreasing coordinates, which may also change direction from a column to another. They used to give NaNs.
 - Add the ``na_thres`` argument to :func:`xoa.regrid.regrid1d` and :func:`xoa.core.regrid.cellave1d`: the minimal fraction of an output cell that must be covered by valid input cells with the ``cellave`` method.
 - :func:`xoa.regrid.regrid1d` and :func:`xoa.regrid.extrap1d` no longer move the working dimension last, which makes them faster and lighter, and process dask arrays by blocks with :func:`xoa.grid.map_along_dim`.

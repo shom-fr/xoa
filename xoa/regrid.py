@@ -86,6 +86,13 @@ class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     true = 2
 
 
+def _have_opposite_positive_attrs_(positive_in, positive_out):
+    """Tell if two coordinates have explicit and opposite positive attributes"""
+    if not positive_in or not positive_out:
+        return False
+    return xcoords.positive_attr[positive_in.lower()] != xcoords.positive_attr[positive_out.lower()]
+
+
 def _get_dims_(da, coord, dim):
     """Get the input and output dimensions of :func:`regrid1d`"""
     if not isinstance(dim, (tuple, list)):
@@ -129,7 +136,10 @@ def regrid1d(
 
     The input and output coordinates may vary along other dimensions,
     which useful for instance for vertical interpolation in coastal
-    ocean models.
+    ocean models. They may increase or decrease.
+    When they both have a ``positive`` attribute, like a depth that is positive down
+    and a ``z`` that is positive up, the input coordinate is negated
+    if they differ.
     The dimension is kept in place with :func:`xoa.grid.map_along_dim`, so the arrays
     are not transposed, and dask arrays are processed by blocks: only the working
     dimension must be a single chunk.
@@ -255,6 +265,7 @@ def regrid1d(
         coord_in_name = coord_in.name
 
     # Coordinates, or edges for the cell methods
+    coord_in_positive = coord_in.attrs.get("positive")
     method = regrid1d_methods[method]
     coord_out = coord
     out_size = coord.sizes[dim_out]
@@ -271,6 +282,10 @@ def regrid1d(
             coord = xgrid.get_edges(coord, dim_out)
         coord_in = coord_in.rename({coord_in.dims[idimin]: dim_in})
         coord = coord.rename({coord.dims[idimout]: dim_out})
+
+    # Opposite sign conventions, like a depth regridded to z levels
+    if _have_opposite_positive_attrs_(coord_in_positive, coord_out.attrs.get("positive")):
+        coord_in = -coord_in
 
     # Interpolation function name and arguments
     func_name = str(method) + "1d"
