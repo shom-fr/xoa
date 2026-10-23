@@ -156,7 +156,8 @@ def map_along_dim(func, da, dim, *coords, out_dim=None, out_size=None, dtype=Non
 
     The coordinates, like the input and output coordinates of an interpolation,
     may have any subset of the dimensions of the data array, plus other ones,
-    which are put first in the output.
+    which are put first in the output. Those that don't have the working
+    dimension get a size of 1 along it.
     Dask arrays are processed with :func:`dask.array.map_blocks`: only the working
     dimension must be a single chunk, and the other chunks are kept.
 
@@ -172,7 +173,8 @@ def map_along_dim(func, da, dim, *coords, out_dim=None, out_size=None, dtype=Non
     dim: str
         Working dimension
     coords: xarray.DataArray
-        Other arrays that have `dim` or `out_dim`
+        Other arrays, which may have `dim` or `out_dim`, or none of them like
+        the latitudes for a vertical dimension
     out_dim: str, None
         Output dimension, which defaults to `dim`
     out_size: int, None
@@ -224,8 +226,6 @@ def map_along_dim(func, da, dim, *coords, out_dim=None, out_size=None, dtype=Non
             if dim in coord.dims:
                 raise exceptions.XoaError(f"An array cannot have both '{dim}' and '{out_dim}'")
             coord = coord.rename({out_dim: dim})
-        if dim not in coord.dims:
-            raise exceptions.XoaError(f"Arrays must have the '{dim}' or '{out_dim}' dimension")
         renamed.append(coord)
     extra = []
     for coord in renamed:

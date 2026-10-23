@@ -391,10 +391,33 @@ def test_map_along_dim(vdims, zidims, zodims, odims, use_dask):
     np.testing.assert_allclose(out.values, ref.values)
 
 
+def test_map_along_dim_without_dim():
+    # An array without the working dimension gets a size of 1 along it
+    da = xr.DataArray(np.ones((4, 2, 3)), dims=("t", "z", "x"))
+    factor = xr.DataArray(np.arange(3.0), dims="x")
+    shapes = []
+
+    def func(data, factor, axis):
+        shapes.append(factor.shape)
+        return data * factor
+
+    out = grid.map_along_dim(func, da, "z", factor)
+    assert shapes == [(1, 1, 3)]
+    np.testing.assert_allclose(out, da * factor)
+    out = grid.map_along_dim(func, da.chunk(t=1), "z", factor)
+    np.testing.assert_allclose(out, da * factor)
+
+
 def test_map_along_dim_errors():
     da = xr.DataArray(np.ones((2, 3)), dims=("z", "x"))
     with pytest.raises(xoa.exceptions.XoaError):
-        grid.map_along_dim(lambda *a, axis: a[0], da, "z", xr.DataArray(np.ones(3), dims="x"))
+        grid.map_along_dim(
+            lambda *a, axis: a[0],
+            da,
+            "z",
+            xr.DataArray(np.ones((2, 2)), dims=("z", "depth")),
+            out_dim="depth",
+        )
 
 
 def test_get_lonlat_2d():
