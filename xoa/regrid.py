@@ -55,6 +55,8 @@ class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     hermitian = 3
     #: Cell-averaging or conservative regridding
     cellave = -1
+    #: Average of the input points that fall in each output cell
+    binning = -2
 
 
 class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
@@ -167,22 +169,23 @@ def regrid1d(
         by default.
     edges: dict, None
         Grid edge coordinates along the interpolation dimension,
-        for the conservative regridding.
+        for the ``cellave`` method, or output edges for the ``binning`` method.
         When not provided, edges are computed with :func:`xoa.grid.get_edges`.
         Keys are `"in"` and/or `"out"` and values are arrays with the same shape as
         coordinates except along the interpolation dimension on which 1 is added.
     conserv: bool
         Use conservative regridding when using ``cellave`` method.
     na_thres: float
-        Minimal fraction, from 0 to 1, of an output cell that must be covered
-        by valid input cells to get a value with the ``cellave`` method,
+        With the ``cellave`` method, minimal fraction, from 0 to 1, of an output cell
+        that must be covered by valid input cells, and with the ``binning`` method,
+        minimal fraction of valid values among the input points of an output cell,
         else the output is NaN. Zero means that any valid input is enough.
     extrap: str, int
         Extrapolation mode as one of the following:
         {extrap_modes.rst_with_links}
     drop_na: bool
         Drop input inner NaNs during interpolation. Note that outer NaNs are
-        always ignored. The ``cellave`` method doesn't support the parameter.
+        always ignored. The ``cellave`` and ``binning`` methods don't support the parameter.
     maxgap: int
         Max size for a gap to be interpolated when ``drop_na`` is True.
         Size is not checked when ``maxgap`` is zero.
@@ -269,18 +272,19 @@ def regrid1d(
     method = regrid1d_methods[method]
     coord_out = coord
     out_size = coord.sizes[dim_out]
-    if int(method) < 0:
+    if method == regrid1d_methods.cellave:  # input edges
         idimin = coord_in.get_axis_num(dim_in)
-        idimout = coord.get_axis_num(dim_out)
         if edges and "in" in edges:
             coord_in = edges["in"]
         else:
             coord_in = xgrid.get_edges(coord_in, dim_in)
+        coord_in = coord_in.rename({coord_in.dims[idimin]: dim_in})
+    if int(method) < 0:  # output edges
+        idimout = coord.get_axis_num(dim_out)
         if edges and "out" in edges:
             coord = edges["out"]
         else:
             coord = xgrid.get_edges(coord, dim_out)
-        coord_in = coord_in.rename({coord_in.dims[idimin]: dim_in})
         coord = coord.rename({coord.dims[idimout]: dim_out})
 
     # Opposite sign conventions, like a depth regridded to z levels
@@ -295,12 +299,18 @@ def regrid1d(
         func_kwargs.update(bias=bias, tension=tension)
     if method == regrid1d_methods.cellave:
         func_kwargs.update(conserv=conserv, na_thres=na_thres)
+    elif method == regrid1d_methods.binning:
+        if extrap != "no":
+            raise exceptions.XoaRegridError("The binning regrid method does not extrapolate")
+        func_kwargs = {"na_thres": na_thres}
     elif na_thres:
-        raise exceptions.XoaRegridError("na_thres is only supported by the cellave method")
+        raise exceptions.XoaRegridError(
+            "na_thres is only supported by the cellave and binning methods"
+        )
     if drop_na:
-        if method == regrid1d_methods.cellave:
+        if int(method) < 0:
             raise exceptions.XoaRegridError(
-                "The cellave regrid method does not support the drop_na parameter"
+                f"The {method.name} regrid method does not support the drop_na parameter"
             )
         func_kwargs.update(drop_na=drop_na, maxgap=maxgap)
 

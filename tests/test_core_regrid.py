@@ -253,6 +253,32 @@ def test_regrid1d_decreasing(method, extrap):
     np.testing.assert_allclose(func(vim, yim, yo, extrap=extrap), ref)
 
 
+def test_binning1d():
+    rng = np.random.default_rng(0)
+    yi = np.sort(rng.uniform(0, 10, (4, 30)), axis=1)
+    yi[1, -3:] = np.nan  # missing coordinates
+    vi = rng.random((4, 30))
+    vi[rng.random(vi.shape) < 0.3] = np.nan
+    yob = np.linspace(-3, 12, 11)  # the first bin is empty
+    out = regrid.binning1d(vi, yi, yob)
+    ref = np.full((4, 10), np.nan)
+    frac = np.zeros((4, 10))
+    for i in range(4):
+        for j in range(10):
+            sel = (yi[i] >= yob[j]) & (yi[i] < yob[j + 1])
+            if np.isfinite(vi[i, sel]).any():
+                ref[i, j] = np.nanmean(vi[i, sel])
+                frac[i, j] = np.isfinite(vi[i, sel]).mean()
+    np.testing.assert_allclose(out, ref)
+    assert np.isnan(out[:, 0]).all()  # empty bin
+    # Minimal fraction of valid values
+    out = regrid.binning1d(vi, yi, yob, na_thres=0.8)
+    np.testing.assert_allclose(out, np.where(frac >= 0.8, ref, np.nan))
+    # Decreasing coordinates
+    np.testing.assert_allclose(regrid.binning1d(vi[:, ::-1], yi[:, ::-1], yob), ref)
+    np.testing.assert_allclose(regrid.binning1d(vi, yi, yob[::-1]), ref[:, ::-1])
+
+
 def get_valid_mask(result, min_fraction=0.5):
     """Mask of the valid points, that must be numerous for a test to mean something"""
     valid = ~np.isnan(result)

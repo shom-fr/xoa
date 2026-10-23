@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Add the ``binning`` method to :func:`xoa.regrid.regrid1d` and :func:`xoa.core.regrid.binning1d`: the average of the input points that fall in each output cell, with a minimal fraction of valid values given by ``na_thres``.
 - :func:`xoa.regrid.regrid1d` negates the input coordinate when it has a ``positive`` attribute opposite to the one of the output coordinate, like a depth regridded to ``z`` levels.
 - :func:`xoa.regrid.regrid1d` and the 1D kernels of :mod:`xoa.core.regrid` support decreasing coordinates, which may also change direction from a column to another. They used to give NaNs.
 - Add the ``na_thres`` argument to :func:`xoa.regrid.regrid1d` and :func:`xoa.core.regrid.cellave1d`: the minimal fraction of an output cell that must be covered by valid input cells with the ``cellave`` method.

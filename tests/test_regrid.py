@@ -277,6 +277,25 @@ def test_regrid1d_positive(method):
     assert np.isnan(regrid.regrid1d(vid, zo, method=method)).all()
 
 
+@pytest.mark.parametrize("use_dask", [False, True])
+def test_regrid1d_binning(use_dask):
+    rng = np.random.default_rng(0)
+    depth = xr.DataArray(np.sort(rng.uniform(-100, 0, (40, 3)), axis=0), dims=("z", "x"))
+    vi = xr.DataArray(rng.random((40, 3)), dims=("z", "x"), coords={"depth": depth})
+    zo = xr.DataArray(np.linspace(-90, -10, 5), dims="depth", name="depth")
+    if use_dask:
+        vi = vi.chunk(x=1)
+    vo = regrid.regrid1d(vi, zo, method="binning", dim=("z", "depth"), coord_in_name="depth")
+    assert vo.dims == ("depth", "x")
+    edges = np.linspace(-100, 0, 6)
+    for ix in range(3):
+        for j in range(5):
+            sel = (depth[:, ix] >= edges[j]) & (depth[:, ix] < edges[j + 1])
+            np.testing.assert_allclose(vo[j, ix], vi[:, ix].values[sel.values].mean())
+    with pytest.raises(xoa.exceptions.XoaRegridError):
+        regrid.regrid1d(vi, zo, method="binning", dim=("z", "depth"), extrap="both")
+
+
 def test_regrid1d_cellave_drop_na():
     zi = xr.DataArray(np.arange(4.0), dims="z")
     vi = xr.DataArray(np.arange(4.0), dims="z", coords={"z": zi})

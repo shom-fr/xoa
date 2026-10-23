@@ -414,6 +414,32 @@ def _cellave1d_col_(vi, yib, yob, vo, extrap, conserv, na_thres):
             vo[iyo] /= wo
 
 
+@numba.njit(nogil=True, cache=NOT_CI)
+def _binning1d_col_(vi, yi, yob, vo, na_thres):
+    nyi = vi.size
+    k = 0
+    for jo in range(vo.size):
+        # Skip the input points before the output cell
+        while k < nyi and (np.isnan(yi[k]) or yi[k] < yob[jo]):
+            k += 1
+
+        # Average the valid input values within the output cell
+        total = 0.0
+        nvalid = 0
+        npoints = 0
+        while k < nyi and (np.isnan(yi[k]) or yi[k] < yob[jo + 1]):
+            if not np.isnan(yi[k]):
+                npoints += 1
+                if not np.isnan(vi[k]):
+                    total += vi[k]
+                    nvalid += 1
+            k += 1
+        if nvalid == 0 or nvalid < na_thres * npoints:
+            vo[jo] = np.nan
+        else:
+            vo[jo] = total / nvalid
+
+
 @numba.njit(parallel=True, cache=NOT_CI)
 def _get_decreasing_(y):
     """Tell if the columns of a (m, n, m) coordinate array decrease
@@ -470,8 +496,10 @@ def _regrid1d_kernel_(
             _cubic1d_col_(v, y, z, o, extrap, drop_na, maxgap)
         elif method == 3:
             _hermit1d_col_(v, y, z, o, extrap, bias, tension, drop_na, maxgap)
-        else:
+        elif method == -1:
             _cellave1d_col_(v, y, z, o, extrap, conserv, na_thres)
+        else:
+            _binning1d_col_(v, y, z, o, na_thres)
     return varo
 
 
@@ -564,6 +592,44 @@ def hermit1d(vari, yi, yo, axis=-1, extrap="no", bias=0.0, tension=0.0, drop_na=
 
 def cellave1d(vari, yib, yob, axis=-1, extrap="no", conserv=False, na_thres=0.0):
     return _regrid1d_(vari, yib, yob, axis, -1, extrap, conserv=conserv, na_thres=na_thres)
+
+
+def binning1d(vari, yi, yob, axis=-1, na_thres=0.0):
+    """Average of the input points that fall in each output cell, along an axis
+
+    The output cell ``j`` contains the input points whose coordinate is in
+    ``[yob[j], yob[j + 1])``, and its value is the mean of their valid values,
+    or NaN when there is none.
+
+    The arrays are broadcasted against each other except along `axis`, like with numpy,
+    so the coordinates may vary along the other axes, or not, without a copy.
+    See :func:`xoa.core.num.broadcast_along_axis`.
+    The coordinates may increase or decrease, and their direction may change
+    from a column to another.
+
+    Parameters
+    ----------
+    vari: array_like
+        Input data
+    yi: array_like
+        Input coordinates, monotonic along `axis`
+    yob: array_like
+        Output cell edges, monotonic along `axis`
+    axis: int
+        Working axis, which is kept in place, relative to the array of greatest
+        number of dimensions
+    na_thres: float
+        Minimal fraction, from 0 to 1, of valid values among the input points
+        of an output cell, else the output is NaN.
+        Zero means that any valid value is enough.
+
+    Return
+    ------
+    numpy.ndarray
+        Output data with the broadcasted shape of the arrays,
+        and the size of `yob` minus one along `axis`
+    """
+    return _regrid1d_(vari, yi, yob, axis, -2, na_thres=na_thres)
 
 
 for _func, _title, _coords, _params in [
