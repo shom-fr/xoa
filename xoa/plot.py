@@ -38,6 +38,7 @@ from . import geo as xgeo
 from . import meta as xmeta
 from . import coords as xcoords
 from . import dyn
+from .options import resolve_option as _opt
 from .core import grid as cgrid
 from .core import plot as cplot
 from .core import stats as cstats
@@ -63,11 +64,11 @@ def plot_flow(
     v,
     duration=None,
     step=None,
-    particles=2000,
+    particles=None,
     axes=None,
-    alpha=(0.2, 1),
-    linewidth=0.3,
-    color="k",
+    alpha=None,
+    linewidth=None,
+    color=None,
     autolim=None,
     **kwargs,
 ):
@@ -83,19 +84,20 @@ def plot_flow(
         Total integration time in seconds
     step: int, numpy.timedelta64
         Integration step in seconds
-    particles: int, xarray.Dataset, tuple
+    particles: None, int, xarray.Dataset, tuple
         Either a number of particles or a dataset of initial positions
-        with longitude and latitude coordinates
+        with longitude and latitude coordinates.
+        It defaults to the ``plot.flow_particles`` option.
     axes: matplotlib.axes.Axes
         The axes instance
-    alpha: float, tuple
+    alpha: None, float, tuple
         Alpha transparency. If a tuple, apply a linear alpha ramp to the track
-        from its start to its end.
-    linewidth: float, tuple
+        from its start to its end. It defaults to the ``plot.flow_alpha`` option.
+    linewidth: None, float, tuple
         Linewidth of the track. If a tuple, apply a linear linewidth ramp to the track
-        from its start to its end.
-    color:
-        Single color for the track.
+        from its start to its end. It defaults to the ``plot.flow_linewidth`` option.
+    color: None
+        Single color for the track, which defaults to the ``plot.flow_color`` option.
     autolim: None, bool
         Whether to auto-update the data limits.
         A value of None sets autolim to True if "axes" is not provided,
@@ -160,6 +162,10 @@ def plot_flow(
         step /= np.timedelta64(1, "s")
 
     # Compute the flow
+    particles = _opt(particles, "plot.flow_particles")
+    alpha = _opt(alpha, "plot.flow_alpha")
+    linewidth = _opt(linewidth, "plot.flow_linewidth")
+    color = _opt(color, "plot.flow_color")
     flow = dyn.flow2d(u, v, particles, duration, step)
     tx = flow.lon.values
     ty = flow.lat.values
@@ -449,23 +455,26 @@ def plot_minimap(
     obj,
     ax=None,
     parent=None,
-    loc="upper right",
-    size=0.2,
+    loc=None,
+    size=None,
     fig=None,
-    extent=1.0,
-    min_extent=2.0,
-    gridlines=True,
+    extent=None,
+    min_extent=None,
+    gridlines=None,
     ocean_color=None,
     land_color=None,
     land_scale="110m",
     plot_coords="auto",
-    coords_markersize=10,
-    coords_linewidth=1.5,
-    coords_color="tab:red",
-    coords_facecolor=0.2,
+    coords_markersize=None,
+    coords_linewidth=None,
+    coords_color=None,
+    coords_facecolor=None,
     **kwargs,
 ):
     """Plot a small map to show the geographic situation of coordinates
+
+    The default values of the parameters that are ``None`` come from the
+    ``plot.minimap_<name>`` options.
 
     Parameters
     ----------
@@ -481,20 +490,20 @@ def plot_minimap(
     parent: None, matplotlib.axes.Axes
         Axes in which the minimap is inset, which avoids to enlarge the figure
         and to hide its content: it is placed at `loc` when `ax` is not given.
-    loc: str
+    loc: None, str
         Corner of `parent`: ``"upper right"``, ``"upper left"``, ``"lower right"``
         or ``"lower left"``.
-    size: float
+    size: None, float
         Width of the inset relative to the one of `parent`.
     fig: figure
         Figure instance
-    extent: str, float
+    extent: None, str, float
         Either ``"global"`` for a global minimap, or the margin added to the coordinates
         bounding box expressed relative to the coordinates extent: a value of 1.0 means
         a margin equal to the extent.
     min_extent: None, float, (float, float)
         Minimal extent in degrees. See :func:`xoa.geo.get_extent`
-    gridlines: bool
+    gridlines: None, bool
         Add gridlines.
     ocean_color: None, color
         A matplotlib color for oceans.
@@ -503,13 +512,13 @@ def plot_minimap(
         A matplotlib color for lands.
         If `None`, it defaults to ``cartopy.feature.COLORS["land"]``.
     {plot_coords}
-    coords_markersize: float
+    coords_markersize: None, float
         Size of markers in ``"points"`` mode.
-    coords_linewidth: float
+    coords_linewidth: None, float
         Line width in ``"lines"``, `"box"`` and ``"filledbox"`` modes.
-    coord_color: color
+    coords_color: None, color
         Matplotlib color.
-    coords_facecolor: color
+    coords_facecolor: None, color
         Matplotlib face color in ``"filled"`` and ``"filledbox"`` modes.
         If a float, it is interpreted as an alpha transparency that is applied to `coord_color`
         to get the face color.
@@ -554,6 +563,15 @@ def plot_minimap(
     # Create map
     ccrs, cfeature = _import_cartopy_()
     pcar = ccrs.PlateCarree()
+    loc = _opt(loc, "plot.minimap_loc")
+    size = _opt(size, "plot.minimap_size")
+    extent = _opt(extent, "plot.minimap_extent")
+    min_extent = _opt(min_extent, "plot.minimap_min_extent")
+    gridlines = _opt(gridlines, "plot.minimap_gridlines")
+    coords_markersize = _opt(coords_markersize, "plot.minimap_coords_markersize")
+    coords_linewidth = _opt(coords_linewidth, "plot.minimap_coords_linewidth")
+    coords_color = _opt(coords_color, "plot.minimap_coords_color")
+    coords_facecolor = _opt(coords_facecolor, "plot.minimap_coords_facecolor")
     if isinstance(obj, tuple):
         lon, lat = obj
     else:
@@ -796,7 +814,7 @@ def get_label(da, units=True, pretty=True):
 def _get_cbar_kwargs_(da=None, cbar_kwargs=None):
     """Get the colorbar parameters with the shrink factor and the label as defaults"""
     kwargs = dict(cbar_kwargs or {})
-    kwargs.setdefault("shrink", cplot.CBAR_SHRINK)
+    kwargs.setdefault("shrink", _opt(None, "plot.colorbar_shrink"))
     if da is not None:
         kwargs.setdefault("label", get_label(da))
     return kwargs
@@ -885,7 +903,7 @@ def _get_auto_cmap_kwargs_(field, kwargs):
 def plot_field(
     field,
     ax=None,
-    method="pcolormesh",
+    method=None,
     transform=None,
     title=None,
     margin=0.0,
@@ -910,8 +928,9 @@ def plot_field(
         than the horizontal ones.
     ax: None, cartopy.mpl.geoaxes.GeoAxes
         Axes to plot on. A map is created if not provided.
-    method: {"pcolormesh", "contourf", "contour"}
-        Plot method of :class:`xarray.DataArray.plot`
+    method: None, {"pcolormesh", "contourf", "contour"}
+        Plot method of :class:`xarray.DataArray.plot`,
+        which defaults to the ``plot.field_method`` option
     transform: None, cartopy.crs.CRS
         Coordinate system of the field, which defaults to ``PlateCarree``
     title: None, str
@@ -973,7 +992,7 @@ def plot_field(
             kwargs.setdefault(key, value)
     if kwargs.get("add_colorbar", True):
         kwargs["cbar_kwargs"] = _get_cbar_kwargs_(field, kwargs.get("cbar_kwargs"))
-    mappable = getattr(field.plot, method)(
+    mappable = getattr(field.plot, _opt(method, "plot.field_method"))(
         x=lon.name, y=lat.name, ax=ax, transform=transform, add_labels=False, **kwargs
     )
 
@@ -1116,15 +1135,18 @@ class PanelLabeler(object):
 
     Parameters
     ----------
-    style: str
+    style: None, str
         Format of the labels, where ``{a}`` is a lower case letter,
         ``{A}`` an upper case letter and ``{n}`` a number starting from 1.
+        It defaults to the ``plot.panel_style`` option.
     start: int
         Index of the first label, starting from 0.
-    loc: {"upper left", "upper right", "lower left", "lower right"}
-        Corner of the axes where the labels are put.
-    pad: float
-        Distance to the corner in axes fraction.
+    loc: None, {"upper left", "upper right", "lower left", "lower right"}
+        Corner of the axes where the labels are put,
+        which defaults to the ``plot.panel_loc`` option.
+    pad: None, float
+        Distance to the corner in axes fraction,
+        which defaults to the ``plot.panel_pad`` option.
     text_kw:
         Extra parameters passed to :meth:`matplotlib.axes.Axes.text`, like ``fontsize``.
         By default, the labels are bold and have a white halo.
@@ -1138,7 +1160,10 @@ class PanelLabeler(object):
         labeler(axes[2:])  # Goes on with "(C)"
     """
 
-    def __init__(self, style="{a})", start=0, loc="upper left", pad=0.03, **text_kw):
+    def __init__(self, style=None, start=0, loc=None, pad=None, **text_kw):
+        style = _opt(style, "plot.panel_style")
+        loc = _opt(loc, "plot.panel_loc")
+        pad = _opt(pad, "plot.panel_pad")
         vloc, hloc = loc.split() if isinstance(loc, str) and len(loc.split()) == 2 else (None,) * 2
         if vloc not in ("upper", "lower") or hloc not in ("left", "right"):
             raise exceptions.XoaError(f"Invalid label location: {loc!r}")
@@ -1200,7 +1225,7 @@ def plot_grid(
     ax=None,
     kind="mesh",
     stride="auto",
-    min_spacing=12,
+    min_spacing=None,
     edges=None,
     centers=None,
     strips=None,
@@ -1246,8 +1271,9 @@ def plot_grid(
         and to the number of cells, so that there are at least ``min_spacing`` pixels
         between consecutive cells, measured on the map. When the grid is under-sampled, the drawn centers
         are the ones of the coarse cells delimited by the drawn edges.
-    min_spacing: float
-        Minimal spacing in pixels between cells in the ``"auto"`` stride mode.
+    min_spacing: None, float
+        Minimal spacing in pixels between cells in the ``"auto"`` stride mode,
+        which defaults to the ``plot.mesh_min_spacing`` option.
     edges: None, bool
         Draw the edges of the cells. It defaults to True for the ``"mesh"`` kind, and
         to False with the others. The first and last edges are always drawn.
@@ -1385,7 +1411,7 @@ def plot_section(
     da,
     x=None,
     ax=None,
-    method="pcolormesh",
+    method=None,
     title=None,
     add_colorbar=True,
     cbar_kwargs=None,
@@ -1411,8 +1437,9 @@ def plot_section(
         - a data array that is broadcastable to the horizontal dimension
 
     ax: None, matplotlib.axes.Axes
-    method: {"pcolormesh", "contourf", "contour"}
-        Plot method of :class:`matplotlib.axes.Axes`
+    method: None, {"pcolormesh", "contourf", "contour"}
+        Plot method of :class:`matplotlib.axes.Axes`,
+        which defaults to the ``plot.section_method`` option
     title: None, str
     add_colorbar: bool
     cbar_kwargs: None, dict
@@ -1492,7 +1519,7 @@ def plot_section(
         xaxis.values,
         depth.values,
         data.values,
-        method=method,
+        method=_opt(method, "plot.section_method"),
         invert_yaxis=positive == "down",
         **kwargs,
     )
@@ -1506,7 +1533,7 @@ def plot_section(
 
 
 def plot_stick(
-    u, v=None, ax=None, scale=None, color="steelblue", key=True, key_pos=(0.0, 1.03), **kwargs
+    u, v=None, ax=None, scale=None, color=None, key=True, key_pos=None, **kwargs
 ):
     """Plot a current time series as sticks
 
@@ -1525,11 +1552,13 @@ def plot_stick(
     scale: None, float
         Scale passed to :meth:`matplotlib.axes.Axes.quiver`: the smaller, the longer
         the sticks.
-    color: color
+    color: None, color
+        Color of the sticks, which defaults to the ``plot.stick_color`` option
     key: bool, str
         Add a reference stick that is labelled with its speed, as in :func:`plot_vectors`
-    key_pos: tuple(float)
-        Position of the reference stick in axes coordinates
+    key_pos: None, tuple(float)
+        Position of the reference stick in axes coordinates,
+        which defaults to the ``plot.key_pos`` option
     kwargs:
         Extra parameters are passed to :meth:`matplotlib.axes.Axes.quiver`
 
@@ -1591,10 +1620,10 @@ def plot_vectors(
     v,
     ax=None,
     stride="auto",
-    min_spacing=16,
+    min_spacing=None,
     color="k",
     key=True,
-    key_pos=(0.0, 1.03),
+    key_pos=None,
     transform=None,
     margin=0.0,
     map_kw=None,
@@ -1618,8 +1647,9 @@ def plot_vectors(
         Under-sampling of the arrows, either one value for both directions
         or a ``(y, x)`` tuple. With ``"auto"``, the stride is adapted to the size of the axes
         so that there are at least `min_spacing` pixels between consecutive arrows.
-    min_spacing: float
-        Minimal spacing in pixels between arrows in the ``"auto"`` stride mode.
+    min_spacing: None, float
+        Minimal spacing in pixels between arrows in the ``"auto"`` stride mode,
+        which defaults to the ``plot.vectors_min_spacing`` option.
     color: color, "speed"
         Color of the arrows, or ``"speed"`` to color them with the speed, in which case
         a colorbar is added unless ``add_colorbar=False`` is passed.
@@ -1627,8 +1657,9 @@ def plot_vectors(
         Add a reference arrow that is labelled with its speed, whose round value is given by
         :func:`xoa.core.plot.get_quiverkey_value`. A string is used as the
         label units, which default to the ones of `u`.
-    key_pos: tuple(float)
-        Position of the reference arrow in axes coordinates, above the left corner by default
+    key_pos: None, tuple(float)
+        Position of the reference arrow in axes coordinates,
+        which defaults to the ``plot.key_pos`` option
     transform: None, cartopy.crs.CRS
         Coordinate system of the field, which defaults to ``PlateCarree``
     margin: float
@@ -1669,6 +1700,7 @@ def plot_vectors(
     ax = _get_map_axes_(ax, extent, transform, map_kw)
     dims = lon.dims
     uu, vv = u.transpose(*dims).values, v.transpose(*dims).values
+    min_spacing = _opt(min_spacing, "plot.vectors_min_spacing")
     sy, sx = cplot.get_strides(stride, lon.values, lat.values, ax, transform, min_spacing)
 
     speed = np.hypot(uu, vv)
@@ -2150,7 +2182,7 @@ def add_agg_filter(objs, filter, zorder=None, ax=None, add=True):
 
 
 def add_shadow(
-    objs, width=3, xoffset=2, yoffset=-2, alpha=0.5, color='k', zorder=None, ax=None, add=True
+    objs, width=None, xoffset=None, yoffset=None, alpha=None, color=None, zorder=None, ax=None, add=True
 ):
     """Add a drop-shadow to objects
 
@@ -2158,20 +2190,27 @@ def add_shadow(
     ----------
     objs: :class:`matplotlib.artist.Artist`
         Plotted objects.
-    width: optional
-        Width of the gaussian filter in points.
-    xoffset: optional
-        Shadow offset along X in points.
-    yoffset: optional
-        Shadow offset along Y in points.
-    color: optional
-        Color of the shadow.
+    width: None, float
+        Width of the gaussian filter in points, which defaults to the ``plot.shadow_width`` option.
+    xoffset: None, float
+        Shadow offset along X in points, which defaults to the ``plot.shadow_xoffset`` option.
+    yoffset: None, float
+        Shadow offset along Y in points, which defaults to the ``plot.shadow_yoffset`` option.
+    alpha: None, float
+        Opacity of the shadow, which defaults to the ``plot.shadow_alpha`` option.
+    color: None
+        Color of the shadow, which defaults to the ``plot.shadow_color`` option.
     zorder: optional
         zorder (else guess from ``objs``).
     ax: optional, :class:`matplotlib.axes.Axes`
 
     Inspired from http://matplotlib.sourceforge.net/examples/pylab_examples/demo_agg_filter.html .
     """
+    width = _opt(width, "plot.shadow_width")
+    xoffset = _opt(xoffset, "plot.shadow_xoffset")
+    yoffset = _opt(yoffset, "plot.shadow_yoffset")
+    alpha = _opt(alpha, "plot.shadow_alpha")
+    color = _opt(color, "plot.shadow_color")
     if color is not None:
         color = mcolors.ColorConverter().to_rgb(color)
     try:
@@ -2181,23 +2220,28 @@ def add_shadow(
         exceptions.xoa_warn('Cannot plot shadows using agg filters')
 
 
-def add_glow(objs, width=3, zorder=None, color='w', ax=None, alpha=1.0, add=True):
+def add_glow(objs, width=None, zorder=None, color=None, ax=None, alpha=None, add=True):
     """Add a glow effect to text
 
     Parameters
     ----------
     objs: :class:`matplotlib.artist.Artist`
         Plotted objects.
-    width: optional
-        Width of the gaussian filter in points.
-    color: optional
-        Color of the shadow.
+    width: None, float
+        Width of the gaussian filter in points, which defaults to the ``plot.glow_width`` option.
+    color: None
+        Color of the glow, which defaults to the ``plot.glow_color`` option.
+    alpha: None, float
+        Opacity of the glow, which defaults to the ``plot.glow_alpha`` option.
     zorder: optional
         zorder (else guess from ``objs``).
     ax: optional, :class:`matplotlib.axes.Axes`
 
     Inspired from http://matplotlib.sourceforge.net/examples/pylab_examples/demo_agg_filter.html .
     """
+    width = _opt(width, "plot.glow_width")
+    color = _opt(color, "plot.glow_color")
+    alpha = _opt(alpha, "plot.glow_alpha")
     if color is not None:
         color = mcolors.ColorConverter().to_rgb(color)
     try:
@@ -2207,18 +2251,20 @@ def add_glow(objs, width=3, zorder=None, color='w', ax=None, alpha=1.0, add=True
         exceptions.xoa_warn('Cannot add glow effect using agg filters')
 
 
-def add_lightshading(objs, width=7, fraction=1.0, zorder=None, ax=None, add=True, **kwargs):
+def add_lightshading(objs, width=None, fraction=None, zorder=None, ax=None, add=True, **kwargs):
     """Add a light shading effect to objects
 
     Parameters
     ----------
     objs: :class:`matplotlib.artist.Artist`
         Plotted objects.
-    width: optional
-        Width of the gaussian filter in points.
-    fraction: optional
+    width: None, float
+        Width of the gaussian filter in points, which defaults to the
+        ``plot.lightshading_width`` option.
+    fraction: None, float
         Contrast of the shading, passed to :meth:`matplotlib.colors.LightSource.shade_rgb`.
         Values lower than one give black objects with recent versions of matplotlib.
+        It defaults to the ``plot.lightshading_fraction`` option.
     zorder: optional
         zorder (else guess from ``objs``).
     ax: optional, :class:`matplotlib.axes.Axes`
@@ -2227,6 +2273,8 @@ def add_lightshading(objs, width=7, fraction=1.0, zorder=None, ax=None, add=True
 
     Inspired from http://matplotlib.sourceforge.net/examples/pylab_examples/demo_agg_filter.html .
     """
+    width = _opt(width, "plot.lightshading_width")
+    fraction = _opt(fraction, "plot.lightshading_fraction")
     if zorder is None:
         zorder = True
     try:

@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Add ``plot`` options used as defaults by the plot functions, load options from a file with :func:`xoa.load_options` and :class:`xoa.set_options`, validate options. ``CBAR_SHRINK`` becomes ``plot.colorbar_shrink``. See :doc:`configure`.
 - Rewrite the :ref:`roadmap`: next diagnostics, and the shoot and armoor ecosystem.
 - Show a larger surge, concise dates and the predicted tide in the skew surge plot of :ref:`sphx_glr_tutorials_tides_plot_tide_station.py`.
 - Export :class:`~xoa.meta.MetaSpecs`, :class:`~xoa.meta.SGLocator`, :class:`~xoa.meta.MetaVarSpecs` and :class:`~xoa.meta.MetaCoordSpecs` from :mod:`xoa.meta`, and fix the API documentation: submodules of the :mod:`xoa.core`, :mod:`xoa.meta` and :mod:`xoa.tide` packages, objects re-exported by packages, missing modules and wrong references.

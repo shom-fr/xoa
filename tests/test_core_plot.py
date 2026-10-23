@@ -302,8 +302,7 @@ class TestAddColorbar:
         fig2, ax2 = plt.subplots()
         full = cplot.add_colorbar(self.get_mappable(ax2), ax2, shrink=1.0)
         ratio = cbar.ax.get_position().height / full.ax.get_position().height
-        np.testing.assert_allclose(ratio, cplot.CBAR_SHRINK)
-        assert cplot.CBAR_SHRINK == 0.7
+        np.testing.assert_allclose(ratio, 0.7)
 
     def test_axes_default_to_the_artist_axes(self):
         fig, ax = plt.subplots()
@@ -561,3 +560,66 @@ class TestMapDecorations:
         assert not any(effects(ax))
         with pytest.raises(xoa.exceptions.XoaError):
             cplot.add_compass(get_map(), effect="blur")
+
+
+class TestPlotOptions:
+    """The ``plot`` options are the default values of the plot functions"""
+
+    @pytest.fixture(autouse=True)
+    def reset(self):
+        xoa.reset_options()
+        yield
+        xoa.reset_options()
+
+    def test_map_options(self):
+        pytest.importorskip("cartopy")
+        with xoa.set_options("plot", map_figsize=(5, 4), map_gridlines=False):
+            fig, ax = cplot.create_map([-8, 0, 46, 50])
+            assert tuple(fig.get_size_inches()) == (5, 4)
+            assert not [a for a in ax.artists if hasattr(a, "xlocator")]
+        fig, ax = cplot.create_map([-8, 0, 46, 50])
+        assert tuple(fig.get_size_inches()) == (8, 8)
+        assert [a for a in ax.artists if hasattr(a, "xlocator")]
+        # Explicit values win over options
+        with xoa.set_options("plot", map_figsize=(5, 4)):
+            fig, _ = cplot.create_map([-8, 0, 46, 50], figsize=(3, 3))
+            assert tuple(fig.get_size_inches()) == (3, 3)
+
+    def test_scalebar_and_compass_options(self):
+        ax = get_map()
+        with xoa.set_options("plot", scalebar_units="nmi", compass_style="fancy"):
+            assert cplot.add_scalebar(ax)[-1].get_text().endswith("nmi")
+            fancy = cplot.add_compass(ax)
+        assert len(fancy) > len(cplot.add_compass(get_map()))
+        assert cplot.add_scalebar(ax)[-1].get_text().endswith("km")
+
+    def test_colorbar_and_sticks_options(self):
+        fig, ax = plt.subplots()
+        mappable = ax.pcolormesh(np.arange(12.0).reshape(3, 4))
+        full = cplot.add_colorbar(mappable, ax, shrink=1.0)
+        with xoa.set_options("plot", colorbar_shrink=0.5):
+            fig2, ax2 = plt.subplots()
+            cbar = cplot.add_colorbar(ax2.pcolormesh(np.arange(12.0).reshape(3, 4)), ax2)
+        ratio = cbar.ax.get_position().height / full.ax.get_position().height
+        np.testing.assert_allclose(ratio, 0.5)
+        with xoa.set_options("plot", stick_color="red"):
+            quiver = cplot.plot_sticks(plt.subplots()[1], [0, 1], [1, 2], [0, 1])
+        np.testing.assert_allclose(quiver.get_facecolor()[0][:3], (1, 0, 0))
+
+    def test_quiverkey_options(self):
+        assert cplot.get_quiverkey_value([1, 2, 3, 100], percentile=0) == 1
+        with xoa.set_options("plot", key_percentile=0):
+            assert cplot.get_quiverkey_value([1, 2, 3, 100]) == 1
+        ax = plt.subplots()[1]
+        quiver = ax.quiver([0], [0], [1], [1])
+        with xoa.set_options("plot", key_pos=(0.1, 0.9)):
+            qkey = cplot.add_quiverkey(ax, quiver, 1.0)
+        np.testing.assert_allclose((qkey.X, qkey.Y), (0.1, 0.9), atol=0.2)
+
+    def test_mesh_spacing_option(self):
+        ax = get_map()
+        lon, lat = np.meshgrid(np.linspace(-5, 5, 50), np.linspace(40, 50, 50))
+        pcar = cplot._import_cartopy_()[0].PlateCarree()
+        default = cplot.get_strides("auto", lon, lat, ax, pcar)
+        with xoa.set_options("plot", mesh_min_spacing=60):
+            assert min(cplot.get_strides("auto", lon, lat, ax, pcar)) > max(default)

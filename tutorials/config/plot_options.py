@@ -105,9 +105,19 @@ print(xoa.get_option("plot.cmapdiv"))
 # of a file, can also be loaded for the session with :func:`xoa.load_options`.
 
 cfgfile = pathlib.Path(tempfile.mkdtemp()) / "xoa.cfg"
-cfgfile.write_text("[plot]\ncmappos = cmo.speed\n")
-xoa.load_options(str(cfgfile))
+cfgfile.write_text("[plot]\ncmappos = cmo.speed\nscalebar_units = nmi\nmap_land = True\n")
+xoa.load_options(cfgfile)
 print(xoa.get_option("plot.cmappos"))
+xoa.reset_options()
+
+# %%
+# :class:`xoa.set_options` also takes a path, to use the file temporarily.
+# The ``plot`` options are the default values of the arguments of the plot functions
+# that are ``None``, like the units of the scale bar or the land of the maps.
+
+with xoa.set_options(cfgfile):
+    plot_fields(fields, scalebar=True, **{**kw, "map_kw": {}})
+print("After the block:", xoa.get_option("plot.scalebar_units"))
 
 # %%
 # The user configuration file and the other paths of xoa are printed by

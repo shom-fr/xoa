@@ -73,3 +73,66 @@ def test_options_are_available_from_the_package():
     with xoa.set_options("plot", cmapdiv="cmo.delta"):
         assert xoa.get_option("plot.cmapdiv") == "cmo.delta"
     assert xoa.get_option("plot.cmapdiv") != "cmo.delta"
+
+
+class TestOptionsFiles:
+    """Test loading options from files, and validation"""
+
+    @pytest.fixture(autouse=True)
+    def reset(self):
+        options.reset_options()
+        yield
+        options.reset_options()
+
+    @pytest.fixture
+    def cfgfile(self, tmp_path):
+        path = tmp_path / "xoa.cfg"
+        path.write_text("[plot]\nmap_figsize = 5, 4\nscalebar_units = m\n")
+        return path
+
+    @pytest.mark.parametrize("as_str", [True, False])
+    def test_load_options(self, cfgfile, as_str):
+        options.load_options(str(cfgfile) if as_str else cfgfile)
+        assert options.get_option("plot.map_figsize") == [5.0, 4.0]
+        assert options.get_option("plot.scalebar_units") == "m"
+        assert options.get_option("plot.scalebar_loc") == "lower left"
+
+    def test_load_options_missing_file(self, tmp_path):
+        with pytest.raises(OSError):
+            options.load_options(tmp_path / "missing.cfg")
+
+    @pytest.mark.parametrize("as_str", [True, False])
+    def test_set_options_file_context(self, cfgfile, as_str):
+        with options.set_options(str(cfgfile) if as_str else cfgfile):
+            assert options.get_option("plot.scalebar_units") == "m"
+        assert options.get_option("plot.scalebar_units") == "km"
+
+    def test_set_options_file_and_options(self, cfgfile):
+        with options.set_options(cfgfile, **{"plot.scalebar_units": "nmi"}):
+            assert options.get_option("plot.scalebar_units") == "nmi"
+            assert options.get_option("plot.map_figsize") == [5.0, 4.0]
+
+    def test_set_options_are_cumulative(self):
+        options.set_options("plot", cmapdiv="a")
+        options.set_options("plot", cmappos="b")
+        assert options.get_option("plot.cmapdiv") == "a"
+        assert options.get_option("plot.cmappos") == "b"
+
+    @pytest.mark.parametrize(
+        "opts",
+        [
+            {"plot.unknown": 1},
+            {"unknown.cmapdiv": 1},
+            {"plot.scalebar_units": "cm"},
+            {"plot.map_figsize": [1]},
+        ],
+    )
+    def test_invalid_options(self, opts):
+        before = options.get_option("plot.map_figsize")
+        with pytest.raises(exceptions.XoaConfigError):
+            options.set_options(**opts)
+        assert options.get_option("plot.map_figsize") == before
+
+    def test_resolve_option(self):
+        assert options.resolve_option(3, "plot.map_figsize") == 3
+        assert options.resolve_option(None, "plot.map_figsize") == (8.0, 8.0)
