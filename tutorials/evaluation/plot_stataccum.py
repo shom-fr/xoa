@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Accumulating statistics in time
 ===============================
@@ -25,12 +24,12 @@ See also: :ref:`sphx_glr_tutorials_graphics_plot_taylor_diagram.py`.
 import os
 import tempfile
 
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 
-from xoa.stats import StatAccum
 from xoa.grid import get_dx_dy, get_dz
+from xoa.stats import StatAccum
 
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 

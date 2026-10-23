@@ -1,21 +1,19 @@
-# -*- coding: utf8 -*-
 """
 Kriging adapted from vacumm's module
 https://github.com/VACUMM/vacumm/blob/master/lib/python/vacumm/misc/grid/kriging.py
 
 """
 
+import warnings
 from functools import partial
 from multiprocessing import Pool, cpu_count
-import warnings
 
 import numpy as np
 import xarray as xr
 
-from . import exceptions
-from . import misc
-from . import geo as xgeo
 from . import coords as xcoords
+from . import exceptions, misc
+from . import geo as xgeo
 from .core import krig as ckrig
 from .core.geo import SphericalKDTree
 
@@ -193,7 +191,7 @@ def get_variogram_model_func(mtype, n, s, r, nrelmax=0.2):
     return lambda h: ckrig.variogram(h, code, n, s, r)
 
 
-class VariogramModel(object):
+class VariogramModel:
     """Class used when fitting a variogram model to data to better control params
 
     Parameters
@@ -223,7 +221,7 @@ class VariogramModel(object):
         dist_units = self._dist_units
         sp = []
         for name in self.param_names:
-            sp.append("{}={}".format(name, self[name]))
+            sp.append(f"{name}={self[name]}")
         sp = ', '.join(sp)
         return f"<{clsname}('{mtype}', dist_units='{dist_units}', {sp})>"
 
@@ -328,7 +326,7 @@ class VariogramModel(object):
         pp = list(self.estimated_params.values())
         if None in pp:
             raise exceptions.XoaKrigingError(
-                "Not all parameters are estimated: {}".format(self.estimated_params)
+                f"Not all parameters are estimated: {self.estimated_params}"
             )
         return np.array(pp)
 
@@ -374,7 +372,7 @@ class VariogramModel(object):
             params = self.get_params()
             if None in list(params.values()):
                 raise exceptions.XoaKrigingError(
-                    "Not all parameters are estimated: {}".format(self.estimated_params)
+                    f"Not all parameters are estimated: {self.estimated_params}"
                 )
         return get_variogram_model_func(self.mtype, **params)
 
@@ -506,7 +504,7 @@ class kriging_types(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     simple = 0
 
 
-class BaseKriger(object):
+class BaseKriger:
     """Base class of the krigers
 
     It manages the kriging type, the variogram, the input points and the formatting
@@ -635,8 +633,9 @@ class BaseKriger(object):
                 name: xr.DataArray(
                     zo, dims=self._dims + (sname,), coords=coords, attrs=self._attrs
                 ),
-                name
-                + "_error": xr.DataArray(eo, dims=(sname,), coords=stacked_coords, attrs=attrs_err),
+                name + "_error": xr.DataArray(
+                    eo, dims=(sname,), coords=stacked_coords, attrs=attrs_err
+                ),
             }
         )
         return xcoords.geo_unstack(out, dso, sname)

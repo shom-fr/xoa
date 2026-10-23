@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.tide.harmonic` module
 """
@@ -6,10 +5,10 @@ Test the :mod:`xoa.tide.harmonic` module
 import numpy as np
 import pytest
 import xarray as xr
+from conftest import TIDE_NAMES, TIDE_NX, TIDE_NY, TIDE_TIME
 
 import xoa.tide as xtide
 from xoa.exceptions import XoaError
-from conftest import TIDE_NAMES, TIDE_NX, TIDE_NY, TIDE_TIME
 
 
 @pytest.mark.parametrize("greenwich", [False, True])
@@ -86,7 +85,9 @@ def test_analysis_1d_with_gaps(tide_ssh, tide_uv):
 
 def get_ssh_with_lonlat(tide_ssh):
     da, *_ = tide_ssh
-    return da.assign_coords(lon=("x", np.arange(TIDE_NX) * 1.0), lat=("y", np.arange(TIDE_NY) * 1.0))
+    return da.assign_coords(
+        lon=("x", np.arange(TIDE_NX) * 1.0), lat=("y", np.arange(TIDE_NY) * 1.0)
+    )
 
 
 def test_analysis_keeps_spatial_coords(tide_ssh):

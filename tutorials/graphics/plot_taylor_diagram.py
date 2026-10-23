@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Compare simulations with a reference using Taylor diagrams
 ==========================================================
@@ -20,12 +19,12 @@ See also: :ref:`sphx_glr_tutorials_evaluation_plot_stataccum.py`.
 # Initialisations
 # ---------------
 
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 
-from xoa.plot import plot_taylor, add_shadow
 from xoa.core import plot as cplot
+from xoa.plot import add_shadow, plot_taylor
 
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 

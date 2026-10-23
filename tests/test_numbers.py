@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.numbers` module
 """
@@ -84,7 +83,9 @@ class TestBurger:
         np.testing.assert_allclose(
             bu, xnum.get_burger(1e5, rd=np.sqrt(1e-5) * 1000.0 / f), rtol=1e-12
         )
-        np.testing.assert_allclose(xnum.get_burger(1e5, n2=n2.values[0], h=1000.0, lat=self.lat), bu)
+        np.testing.assert_allclose(
+            xnum.get_burger(1e5, n2=n2.values[0], h=1000.0, lat=self.lat), bu
+        )
 
     def test_errors(self):
         with pytest.raises(ValueError):

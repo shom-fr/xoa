@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 xarray and pandas xoa accessors
 
@@ -25,7 +24,7 @@ from . import exceptions
 from .misc import ERRORS
 
 
-class _BasicMetaAccessor_(object):
+class _BasicMetaAccessor_:
     """Base class for meta-aware xarray accessors"""
 
     def __init__(self, obj, meta_specs=None):
@@ -764,7 +763,7 @@ class _InterpRegridMixin_:
         )
 
 
-class XoaPlotAccessor(object):
+class XoaPlotAccessor:
     """Plotting methods of the main xoa accessors, that call the :mod:`xoa.plot` functions
 
     The accessed array or dataset is passed as the first argument.
@@ -846,7 +845,7 @@ class _GridMixin_:
 
         The tree is cached for successive calls, see :meth:`get_kdtree`.
         """
-        from .geo import get_neighbors, _pop_tree_kwargs_
+        from .geo import _pop_tree_kwargs_, get_neighbors
 
         tree = self.get_kdtree(**_pop_tree_kwargs_(kwargs))
         return get_neighbors(tree, target, k=k, radius=radius, units=units, output=output, **kwargs)
@@ -1065,6 +1064,7 @@ def register_cf_accessors(name='xcf'):
         Use :func:`register_meta_accessors` instead.
     """
     import warnings
+
     from . import XoaDeprecationWarning
 
     warnings.warn(

@@ -20,8 +20,8 @@ or numpy.ndarray type.
 # limitations under the License.
 import os
 
-import numpy as np
 import numba
+import numpy as np
 
 from ..exceptions import xoa_warn
 from .conserv import compute_conservative_weights

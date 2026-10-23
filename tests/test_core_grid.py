@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.core.grid` module
 """
@@ -120,7 +119,9 @@ def test_axis_operators(axis, dtype):
         ),
         (
             grid.pad(a, axis, 1, "linear_extrap"),
-            np.concatenate([2 * first - np.take(a, [1], axis), a, 2 * last - np.take(a, [-2], axis)], axis),
+            np.concatenate(
+                [2 * first - np.take(a, [1], axis), a, 2 * last - np.take(a, [-2], axis)], axis
+            ),
         ),
         (
             grid.edges(a, axis),
@@ -153,7 +154,9 @@ def test_pad_modes_shift_gradient(axis):
     width = [(0, 0)] * 3
     width[axis] = (2, 6)
     for mode, kw in [("wrap", {}), ("constant", {"constant_values": 7.0})]:
-        np.testing.assert_array_equal(grid.pad(a, axis, (2, 6), mode, **kw), np.pad(a, width, mode, **kw))
+        np.testing.assert_array_equal(
+            grid.pad(a, axis, (2, 6), mode, **kw), np.pad(a, width, mode, **kw)
+        )
     assert np.isnan(grid.pad(a, axis, 1, "constant")).sum() == 2 * a.size // n
 
     padded = np.pad(a, _width(axis, (1, 0)), "edge")
@@ -169,7 +172,9 @@ def test_pad_modes_shift_gradient(axis):
     ref = np.diff(a, axis=axis) / np.diff(x).reshape(shape)
     np.testing.assert_allclose(grid.gradient(a, x, axis), ref)
     shape[axis] = n
-    np.testing.assert_allclose(grid.gradient(a, np.broadcast_to(x.reshape(shape), a.shape), axis), ref)
+    np.testing.assert_allclose(
+        grid.gradient(a, np.broadcast_to(x.reshape(shape), a.shape), axis), ref
+    )
     with pytest.raises(ValueError):
         grid.gradient(a, x[:-1], axis)
 
@@ -202,11 +207,21 @@ def test_lon_across_dateline(dtype):
     )
     # Positive longitudes keep their range, and no wrapping occurs without a jump
     np.testing.assert_allclose(grid.centers(lon % 360, 1, lon=True), row([174, 182, 190]))
-    np.testing.assert_allclose(grid.pad(np.arange(3.0), 0, 2, "linear_extrap", lon=True), np.arange(-2, 5))
+    np.testing.assert_allclose(
+        grid.pad(np.arange(3.0), 0, 2, "linear_extrap", lon=True), np.arange(-2, 5)
+    )
 
 
 def test_is_periodic_lon():
-    for lons in [np.arange(-180.0, 180.0, 2.0), np.arange(0.0, 360.0, 3.0)[::-1], np.roll(np.arange(-180.0, 180.0, 2.0), 7)]:
+    for lons in [
+        np.arange(-180.0, 180.0, 2.0),
+        np.arange(0.0, 360.0, 3.0)[::-1],
+        np.roll(np.arange(-180.0, 180.0, 2.0), 7),
+    ]:
         assert grid.is_periodic_lon(np.tile(lons, (2, 1)))
-    for lons in [np.arange(-120.0, 121.0, 2.0), np.arange(0.0, 300.0, 2.0), np.arange(-180.0, 181.0, 2.0)[:5]]:
+    for lons in [
+        np.arange(-120.0, 121.0, 2.0),
+        np.arange(0.0, 300.0, 2.0),
+        np.arange(-180.0, 181.0, 2.0)[:5],
+    ]:
         assert not grid.is_periodic_lon(np.tile(lons, (2, 1)))

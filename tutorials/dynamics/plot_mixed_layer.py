@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Mixed layer, thermocline and isotherms
 ======================================
@@ -20,11 +19,11 @@ See also: :ref:`sphx_glr_tutorials_dynamics_plot_vertical_modes.py`.
 # Initialisations
 # ---------------
 
-import numpy as np
-import xarray as xr
+import cmocean
 import gsw
 import matplotlib.pyplot as plt
-import cmocean
+import numpy as np
+import xarray as xr
 
 import xoa
 from xoa import meta
@@ -123,7 +122,10 @@ t200 = isoslice(temp, depth, 200.0, "depth")
 t200.attrs.update(long_name="Temperature at 200 m", units="degC")
 
 fig, axes = plot_fields(
-    [(z18, {"cmap": cmocean.cm.deep, "vmin": 0, "vmax": 500}), (t200, {"cmap": cmocean.cm.thermal})],
+    [
+        (z18, {"cmap": cmocean.cm.deep, "vmin": 0, "vmax": 500}),
+        (t200, {"cmap": cmocean.cm.thermal}),
+    ],
     ncols=2,
     figsize=(9, 4),
     map_kw={"land": True},
@@ -143,7 +145,13 @@ fig, axes = plot_fields(
 sec = temp.sel(lon=-66.0, method="nearest")
 fig, ax = plt.subplots(figsize=(8, 4), constrained_layout=True)
 sec.plot.contourf(
-    x="lat", y="depth", yincrease=False, ylim=(1000, 0), levels=np.arange(4, 29, 2), cmap=cmocean.cm.thermal, ax=ax
+    x="lat",
+    y="depth",
+    yincrease=False,
+    ylim=(1000, 0),
+    levels=np.arange(4, 29, 2),
+    cmap=cmocean.cm.thermal,
+    ax=ax,
 )
 sec.plot.contour(
     x="lat", y="depth", yincrease=False, levels=[12, 18], colors="k", linewidths=1, ax=ax

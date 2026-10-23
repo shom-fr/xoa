@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Commandline interface for xoa
 """
@@ -57,5 +56,3 @@ def main_info(parser, args):
         options.show_paths()
     elif args.category == "options":
         options.show_options()
-
-

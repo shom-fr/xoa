@@ -20,13 +20,14 @@ mask erosion and point decimation.
 # limitations under the License.
 
 import inspect
+
 import numpy as np
 import xarray as xr
 
-from . import exceptions
-from . import misc as xmisc
 from . import coords as xcoords
+from . import exceptions
 from . import geo as xgeo
+from . import misc as xmisc
 from .core import filter as core_filter
 
 
@@ -350,7 +351,7 @@ def generate_kernel(
     if isinstance(kernel, tuple):
         if len(kernel) > data.ndim:
             raise exceptions.XoaError(
-                "Too many dimensions for your kernel: {} > {}".format(len(kernel), data.ndim)
+                f"Too many dimensions for your kernel: {len(kernel)} > {data.ndim}"
             )
         kernel = dict(item for item in zip(data.dims[-len(kernel) :], kernel))
 
@@ -366,9 +367,7 @@ def generate_kernel(
                 isotropic = data.dims
             elif not set(isotropic).issubset(data.dims):
                 raise exceptions.XoaError(
-                    "Invalid dimensions for isotropic keyword: {}".format(
-                        set(isotropic) - set(data.dims)
-                    )
+                    f"Invalid dimensions for isotropic keyword: {set(isotropic) - set(data.dims)}"
                 )
 
         # Split into consistant isotropic and orthogonal kernels
@@ -437,7 +436,7 @@ def generate_kernel(
     elif isinstance(kernel, np.ndarray):
         if kernel.ndim > data.ndim:
             raise exceptions.XoaError(
-                "Too many dimensions for your numpy kernel: {} > {}".format(kernel.dim, data.ndim)
+                f"Too many dimensions for your numpy kernel: {kernel.dim} > {data.ndim}"
             )
         dims = data.dims[-kernel.ndim :]
 
@@ -896,7 +895,7 @@ def decimate(
                 values = obj[target].values.reshape(-1, obj[target].shape[-1])
                 objc[target][:] = core_filter.decimate_by_average(
                     x, y, smooth_factor * radius / sphere_radius, keep.values, values
-                ).reshape((objc[target].shape[:-1] + (-1,)))
+                ).reshape(objc[target].shape[:-1] + (-1,))
 
     return objc
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Internal configuration files for the :mod:`xoa.meta` module.
 
@@ -12,9 +11,9 @@ The list of available cf config files is stored in :data:`META_CONFIGS`.
 
 .. autodata:: META_CONFIGS
 """
-import os
-import glob
 
+import glob
+import os
 
 _THIS_DIR = os.path.dirname(__file__)
 

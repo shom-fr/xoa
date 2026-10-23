@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.dyn` module
 """
@@ -24,17 +23,18 @@ def test_get_sea_level():
     assert result.name == "ssh"
 
     # Found by standard_name attribute
-    ds = xr.Dataset({"my_var": (("lat", "lon"), data,
-                                {"standard_name": "sea_surface_height"})})
+    ds = xr.Dataset({"my_var": (("lat", "lon"), data, {"standard_name": "sea_surface_height"})})
     result = dyn.get_sea_level(ds)
     assert result is not None
     assert result.name == "my_var"
 
     # Found with variant filter
-    ds = xr.Dataset({
-        "ssh": (("lat", "lon"), data),
-        "sla": (("lat", "lon"), data),
-    })
+    ds = xr.Dataset(
+        {
+            "ssh": (("lat", "lon"), data),
+            "sla": (("lat", "lon"), data),
+        }
+    )
     result = dyn.get_sea_level(ds, variant="sla")
     assert result is not None
     assert result.name == "sla"
@@ -75,19 +75,24 @@ def test_flow2d():
     """Test flow2d function"""
     lon = xr.DataArray(np.arange(4), dims='lon')
     lat = xr.DataArray(np.arange(3), dims='lat')
-    u = xr.DataArray(lat*lon/3, dims=('lat', 'lon'), coords={'lon': lon, 'lat': lat})
-    v = xr.DataArray((lat+lon)/2, dims=('lat', 'lon'), coords={'lon': lon, 'lat': lat})
+    u = xr.DataArray(lat * lon / 3, dims=('lat', 'lon'), coords={'lon': lon, 'lat': lat})
+    v = xr.DataArray((lat + lon) / 2, dims=('lat', 'lon'), coords={'lon': lon, 'lat': lat})
 
     ff = dyn.flow2d(
-        u, v, ([1., 2.], [1., 1.5]), np.timedelta64(3, "h"), np.timedelta64(2, "h"),
-        date="2000-01-01")
+        u,
+        v,
+        ([1.0, 2.0], [1.0, 1.5]),
+        np.timedelta64(3, "h"),
+        np.timedelta64(2, "h"),
+        date="2000-01-01",
+    )
     assert list(ff.coords) == ['lon', 'lat', 'time']
     assert ff.lon.dims == ('time', 'particles')
     assert ff.lon.shape == (3, 2)
     assert 'lat' in ff.coords
     np.testing.assert_allclose(
-        ff.lon.values.ravel(),
-        [1., 2., 1.0148674, 2.04497533, 1.02261437, 2.06865695])
+        ff.lon.values.ravel(), [1.0, 2.0, 1.0148674, 2.04497533, 1.02261437, 2.06865695]
+    )
     assert ff.time.values[0] == np.datetime64("2000-01-01")
 
     # Initial positions from a dataset use the longitudes and the latitudes
@@ -97,9 +102,7 @@ def test_flow2d():
             "lat": ("p", [1.0, 1.5], {"standard_name": "latitude"}),
         }
     )
-    ff2 = dyn.flow2d(
-        u, v, pos, np.timedelta64(3, "h"), np.timedelta64(2, "h"), date="2000-01-01"
-    )
+    ff2 = dyn.flow2d(u, v, pos, np.timedelta64(3, "h"), np.timedelta64(2, "h"), date="2000-01-01")
     np.testing.assert_allclose(ff2.lon, ff.lon)
     np.testing.assert_allclose(ff2.lat, ff.lat)
 
@@ -569,7 +572,9 @@ class TestVerticalModes:
         assert a.name == "amps" and a.attrs["long_name"].startswith("Amplitude")
         assert vm.decomp(field, nmodes=3).shape == (3,)
         # A mode is projected on itself
-        np.testing.assert_allclose(vm.decomp(1.5 * vm.modes.isel(mode=2)), np.eye(6)[2] * 1.5, atol=1e-10)
+        np.testing.assert_allclose(
+            vm.decomp(1.5 * vm.modes.isel(mode=2)), np.eye(6)[2] * 1.5, atol=1e-10
+        )
 
     def test_decomp_extra_dimensions(self):
         cube = self.get_cube()

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Colors and colormaps utilities
 """
@@ -43,7 +42,7 @@ def crop_cmap(cmapin, vmin, vmax, pivot=0):
     return cmocean.tools.crop(cmapin, vmin, vmax, pivot)
 
 
-class CmapAdapter(object):
+class CmapAdapter:
     """Adapt a given colormap to data
 
     Parameters

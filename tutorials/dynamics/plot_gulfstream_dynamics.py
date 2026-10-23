@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Vorticity, strain and eddies in Gulf Stream currents
 ====================================================
@@ -27,21 +26,21 @@ See also: :ref:`sphx_glr_tutorials_dynamics_plot_dimensionless_numbers.py`, :ref
 # Initialisations
 # ---------------
 
+import cartopy.crs as ccrs
+import cmocean  # noqa
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import cmocean  # noqa
 
 import xoa
-import xoa.meta as xmeta
 import xoa.dyn as xdyn
 import xoa.grid as xgrid
 import xoa.mask as xmask
+import xoa.meta as xmeta
 import xoa.poly as xpoly
 import xoa.stats as xstats
-from xoa.plot import plot_field, plot_fields, plot_vectors, add_shadow
+from xoa.plot import add_shadow, plot_field, plot_fields, plot_vectors
 
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})

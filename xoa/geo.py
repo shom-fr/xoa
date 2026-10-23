@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Geographic utilities
 """
@@ -20,12 +19,12 @@ Geographic utilities
 
 import functools
 import math
+
 import numpy as np
 import xarray as xr
 
-from . import exceptions
-from . import misc
 from . import coords as xcoords
+from . import exceptions, misc
 from .core import geo as _geo
 
 #: Earth radius in meters
@@ -244,7 +243,7 @@ def _adapative_pdist_(X, method="haversine", **kwargs):
     return scipy.spatial.distance.pdist(X, method=method, **kwargs)
 
 
-class ScipyDistContext(object):
+class ScipyDistContext:
     """Context to switch the :func:`scipy.spatial.distance.cdist` function to :func:`cdist`
 
     Parameters

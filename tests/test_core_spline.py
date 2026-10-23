@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.core.spline` kernels
 """
@@ -127,9 +126,9 @@ class TestComputeCubicWeights1D:
             for bias in [-0.5, 0.0, 0.5]:
                 for tension in [0.0, 0.5, 1.0]:
                     weights = compute_cubic_weights_1d(hh, bias, tension)
-                    assert np.sum(weights) == pytest.approx(
-                        1.0, abs=1e-12
-                    ), f"Weights don't sum to 1 at mu={mu}, bias={bias}, tension={tension}"
+                    assert np.sum(weights) == pytest.approx(1.0, abs=1e-12), (
+                        f"Weights don't sum to 1 at mu={mu}, bias={bias}, tension={tension}"
+                    )
 
     def test_consistency_with_interpolate_cubic(self):
         """Weights must reproduce the same result as interpolate_cubic point-evaluation."""
@@ -142,9 +141,9 @@ class TestComputeCubicWeights1D:
                     direct = interpolate_cubic(hh, p[0], p[1], p[2], p[3], bias, tension)
                     weights = compute_cubic_weights_1d(hh, bias, tension)
                     from_weights = np.dot(weights, p)
-                    assert from_weights == pytest.approx(
-                        direct, abs=1e-12
-                    ), f'Weight decomposition inconsistent at mu={mu}, bias={bias}, tension={tension}'
+                    assert from_weights == pytest.approx(direct, abs=1e-12), (
+                        f'Weight decomposition inconsistent at mu={mu}, bias={bias}, tension={tension}'
+                    )
 
     def test_weights_match_compute_tangent_unit_basis(self):
         """Weights must equal what compute_tangent on unit-basis vectors predicts.
@@ -182,9 +181,9 @@ class TestComputeCubicWeights1D:
             weights = compute_cubic_weights_1d(hh, bias=0.0, tension=0.0)
             result = np.dot(weights, p)
             expected = 2 * (1.0 + mu) + 3
-            assert result == pytest.approx(
-                expected, abs=1e-12
-            ), f'Linear polynomial not exact via weights at mu={mu}'
+            assert result == pytest.approx(expected, abs=1e-12), (
+                f'Linear polynomial not exact via weights at mu={mu}'
+            )
 
 
 class TestInterpolateCubic:
@@ -389,9 +388,9 @@ class TestInterpolateBicubic:
             x_pos = 1.0 + mu_x
             y_pos = 1.0 + mu_y
             expected = x_pos**2 + y_pos**2 + x_pos * y_pos + 2 * x_pos + 3 * y_pos + 1
-            assert result == pytest.approx(
-                expected, abs=1e-10
-            ), f'Bicubic not exact for quadratic at ({mu_x},{mu_y}): error={abs(result - expected)}'
+            assert result == pytest.approx(expected, abs=1e-10), (
+                f'Bicubic not exact for quadratic at ({mu_x},{mu_y}): error={abs(result - expected)}'
+            )
 
     def test_smooth_function(self):
         """Test bicubic on smooth function"""
@@ -460,9 +459,9 @@ class TestInterpolateBicubic:
                 y_w = compute_cubic_weights_1d(yhh, bias, tension)
                 via_weights = sum(y_w[r] * x_w[c] * pp[r, c] for r in range(4) for c in range(4))
 
-                assert via_weights == pytest.approx(
-                    ref, abs=1e-12
-                ), f'Mismatch at mu_x={mu_x}, mu_y={mu_y}, bias={bias}, tension={tension}'
+                assert via_weights == pytest.approx(ref, abs=1e-12), (
+                    f'Mismatch at mu_x={mu_x}, mu_y={mu_y}, bias={bias}, tension={tension}'
+                )
 
 
 class TestInterpolationConsistency:

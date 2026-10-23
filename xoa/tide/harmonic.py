@@ -19,14 +19,14 @@ Tidal harmonic analysis and prediction of scalars and currents
 import numpy as np
 import xarray as xr
 
-from .. import exceptions
 from .. import dyn as xdyn
+from .. import exceptions
 from ..core import tide as tide_core
 from .data import (
-    get_time_dim,
     auto_constituents,
     equilibrium_argument,
     get_frequencies,
+    get_time_dim,
     nodal_corrections,
 )
 
@@ -395,9 +395,7 @@ def harmonic_analysis(
     )
 
 
-def harmonic_analysis_uv(
-    da_u, da_v=None, names=None, t_dim=None, nodal=True, rayleigh_min=1.0
-):
+def harmonic_analysis_uv(da_u, da_v=None, names=None, t_dim=None, nodal=True, rayleigh_min=1.0):
     """One-shot harmonic analysis of tidal currents
 
     The time dimension is searched with :func:`xoa.coords.get_tdim` when ``t_dim`` is None.

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Inspect and manipulate horizontal and vertical grids
 ====================================================
@@ -21,9 +20,9 @@ See also: :ref:`sphx_glr_tutorials_regrid_plot_regrid_interp.py`, :ref:`sphx_glr
 # Initialisations
 # ---------------
 
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 
 import xoa
 from xoa import grid

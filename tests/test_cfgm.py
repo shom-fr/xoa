@@ -1,7 +1,7 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.cfgm` module
 """
+
 import pytest
 
 from xoa import cfgm

@@ -1,10 +1,10 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.sigma` module
 """
+
 import numpy as np
-import xarray as xr
 import pytest
+import xarray as xr
 
 import xoa
 from xoa import meta, sigma
@@ -31,9 +31,9 @@ def test_atmosphere_sigma_coordinate():
     assert "sig" in p.dims
     assert p.sizes["sig"] == nz
     # At sigma=0: p = ptop = 10
-    np.testing.assert_allclose(p.isel(sig=0), 10.)
+    np.testing.assert_allclose(p.isel(sig=0), 10.0)
     # At sigma=1: p = ps = 1000
-    np.testing.assert_allclose(p.isel(sig=-1), 1000.)
+    np.testing.assert_allclose(p.isel(sig=-1), 1000.0)
 
 
 class TestOceanSigma:
@@ -48,9 +48,9 @@ class TestOceanSigma:
         assert "sig" in depth.dims
         assert depth.sizes["sig"] == nz
         # At sigma=-1 with ssh=0: z = -bathy = -100
-        np.testing.assert_allclose(depth.isel(sig=0), -100.)
+        np.testing.assert_allclose(depth.isel(sig=0), -100.0)
         # At sigma=0 with ssh=0: z = 0
-        np.testing.assert_allclose(depth.isel(sig=-1), 0.)
+        np.testing.assert_allclose(depth.isel(sig=-1), 0.0)
 
     def test_ocean_s_coordinate(self):
         nt, nz, nx = 2, 3, 5
@@ -64,7 +64,7 @@ class TestOceanSigma:
         assert "sig" in depth.dims
         assert depth.sizes["sig"] == nz
         # At surface (sigma=0): z should be 0 (with ssh=0)
-        np.testing.assert_allclose(depth.isel(sig=-1), 0., atol=1e-10)
+        np.testing.assert_allclose(depth.isel(sig=-1), 0.0, atol=1e-10)
 
     def test_ocean_s_coordinate_g1(self):
         nt, nz, nx = 2, 3, 5
@@ -77,7 +77,7 @@ class TestOceanSigma:
         depth = sigma.ocean_s_coordinate_g1(sig, ssh, bathy, hc, thetas, thetab)
         assert "sig" in depth.dims
         assert depth.sizes["sig"] == nz
-        np.testing.assert_allclose(depth.isel(sig=-1), 0., atol=1e-10)
+        np.testing.assert_allclose(depth.isel(sig=-1), 0.0, atol=1e-10)
 
     def test_ocean_s_coordinate_g2(self):
         nt, nz, nx = 2, 3, 5
@@ -90,7 +90,7 @@ class TestOceanSigma:
         depth = sigma.ocean_s_coordinate_g2(sig, ssh, bathy, hc, thetas, thetab)
         assert "sig" in depth.dims
         assert depth.sizes["sig"] == nz
-        np.testing.assert_allclose(depth.isel(sig=-1), 0., atol=1e-10)
+        np.testing.assert_allclose(depth.isel(sig=-1), 0.0, atol=1e-10)
 
     def test_ocean_s_with_cs(self):
         """Test providing a pre-computed stretching curve instead of thetas/thetab"""
@@ -102,14 +102,12 @@ class TestOceanSigma:
         cs = sigma.get_cs(sig, 7.0, 2.0)
         depth = sigma.ocean_s_coordinate_g2(sig, ssh, bathy, hc, cs=cs)
         assert depth.sizes["sig"] == nz
-        np.testing.assert_allclose(depth.isel(sig=-1), 0., atol=1e-10)
+        np.testing.assert_allclose(depth.isel(sig=-1), 0.0, atol=1e-10)
 
 
 def test_decode_formula_terms():
     """Test parsing of formula_terms attribute"""
-    terms = sigma.decode_formula_terms(
-        "s: sc_r C: Cs_r eta: zeta depth: h depth_c: hc"
-    )
+    terms = sigma.decode_formula_terms("s: sc_r C: Cs_r eta: zeta depth: h depth_c: hc")
     assert terms == {
         "s": "sc_r",
         "C": "Cs_r",

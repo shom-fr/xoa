@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Switch from black and flake8 to ruff for linting and formatting, with a pre-commit configuration.
 - Add ``plot`` options used as defaults by the plot functions, load options from a file with :func:`xoa.load_options` and :class:`xoa.set_options`, validate options. ``CBAR_SHRINK`` becomes ``plot.colorbar_shrink``. See :doc:`configure`.
 - Rewrite the :ref:`roadmap`: next diagnostics, and the shoot and armoor ecosystem.
 - Show a larger surge, concise dates and the predicted tide in the skew surge plot of :ref:`sphx_glr_tutorials_tides_plot_tide_station.py`.

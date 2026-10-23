@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Terrain following parametric vertical coordinates
 
@@ -26,10 +25,8 @@ import re
 import numpy as np
 import xarray as xr
 
-from . import exceptions
-from . import misc
-from . import meta
 from . import coords as xcoords
+from . import exceptions, meta, misc
 from .core import sigma as core_sigma
 
 # %% Constants
@@ -643,7 +640,7 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
         # Check standard_name and get loc
         if "standard_name" not in sig.attrs:
             raise exceptions.XoaSigmaError(
-                "No standard_name attribute found in sigma/s " "variable name: " + sig.name
+                "No standard_name attribute found in sigma/s variable name: " + sig.name
             )
         standard_name = meta_specs.sglocator.parse_attr("standard_name", sig.standard_name)[0]
         # The loc is also parsed from the name, like "rho" from "s_rho" with croco specs
@@ -654,7 +651,7 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
         # Get formula terms
         if "formula_terms" not in sig.attrs:
             raise exceptions.XoaSigmaError(
-                f"Sigma/s type variable {sig.name} " "has no formula_term attribute"
+                f"Sigma/s type variable {sig.name} has no formula_term attribute"
             )
         formula_terms = decode_formula_terms(sig.formula_terms)
 
@@ -748,7 +745,7 @@ def decode_sigma(ds, rename=False, hlocs=None, ref="datum", errors="raise"):
         if errors == "raise":
             raise e
         if errors == "warn":
-            exceptions.xoa_warn("Error while decoding sigma coords: {}. Skipping...".format(e))
+            exceptions.xoa_warn(f"Error while decoding sigma coords: {e}. Skipping...")
         return ds
 
     # Loop on locations

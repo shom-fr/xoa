@@ -212,7 +212,9 @@ def vertical_modes(
     n2 = np.asarray(n2, dtype="d")
     z = np.asarray(z, dtype="d")
     if n2.ndim == 0 or z.ndim == 0 or n2.shape[-1] != z.shape[-1]:
-        raise ValueError("n2 and z must have the same last dimension, which is the vertical one: shape mismatch")
+        raise ValueError(
+            "n2 and z must have the same last dimension, which is the vertical one: shape mismatch"
+        )
     return _vertical_modes_(
         n2,
         z,

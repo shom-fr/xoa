@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Analyse the tide of a gridded field
 ===================================
@@ -21,9 +20,9 @@ See also: :ref:`sphx_glr_tutorials_tides_plot_tide_station.py`.
 # Initialisations
 # ---------------
 
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 
 from xoa import plot as xplot
 from xoa import tide as xtide
@@ -54,7 +53,9 @@ hours = xr.DataArray(np.arange(t.size) * 1.0, dims="time", coords={"time": t})
 omega = dict(zip(names, xtide.get_frequencies(names) * 3600))  # rad per hour
 
 ssh = sum(
-    base_amp[n] * (0.5 + 0.5 * s) * (1 + 0.1 * (y - 48))
+    base_amp[n]
+    * (0.5 + 0.5 * s)
+    * (1 + 0.1 * (y - 48))
     * np.cos(omega[n] * hours - base_pha[n] - 0.3 * s)
     for n in names
 )
@@ -62,12 +63,11 @@ ssh += 0.05 * np.random.default_rng(0).standard_normal(ssh.shape)
 ssh = ssh.transpose("time", "y", "x").rename("ssh").assign_attrs(units="m")
 
 umax = (0.8 * (1 - s) + 0.1) * (1 + 0.2 * (y - 48))
-u = sum(
-    0.5 * base_amp[n] * umax * np.cos(omega[n] * hours - base_pha[n]) for n in names
-).transpose("time", "y", "x")
+u = sum(0.5 * base_amp[n] * umax * np.cos(omega[n] * hours - base_pha[n]) for n in names).transpose(
+    "time", "y", "x"
+)
 v = sum(
-    0.5 * base_amp[n] * umax * (y - 47) / 2 * np.sin(omega[n] * hours - base_pha[n])
-    for n in names
+    0.5 * base_amp[n] * umax * (y - 47) / 2 * np.sin(omega[n] * hours - base_pha[n]) for n in names
 ).transpose("time", "y", "x")
 print(ssh.dims, ssh.shape)
 
@@ -117,9 +117,7 @@ plt.tight_layout()
 coef_uv = xtide.tidal_ellipses(xtide.harmonic_analysis_uv(u, v, names=names))
 m2 = coef_uv.sel(constituent="M2")
 
-tplot.plot_tidal_ellipses(
-    coef_uv, "M2", ref=0.5, background=m2.semi_major, step=2, map_kw=MAP_KW
-)
+tplot.plot_tidal_ellipses(coef_uv, "M2", ref=0.5, background=m2.semi_major, step=2, map_kw=MAP_KW)
 plt.tight_layout()
 
 # %%

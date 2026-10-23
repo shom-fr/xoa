@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Rossby number on the sigma levels of a CROCO simulation
 =======================================================
@@ -26,18 +25,18 @@ See also: :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`, :ref:`sphx_g
 # Initialisations
 # ---------------
 
+import cmocean  # noqa
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
-import cmocean  # noqa
 
 import xoa
-import xoa.meta as xmeta
-import xoa.numbers as xnum
 import xoa.coords as xcoords
 import xoa.mask as xmask
+import xoa.meta as xmeta
+import xoa.numbers as xnum
 import xoa.stats as xstats
-from xoa.plot import plot_fields, plot_section, add_colorbar
+from xoa.plot import add_colorbar, plot_fields, plot_section
 from xoa.regrid import regrid1d
 
 xr.set_options(display_style="text")
@@ -190,7 +189,9 @@ kw.update(
 )
 estimates.pop("Reference")
 fig, axes = plot_fields(
-    {name: (da - rossby_ref).where(valid) for name, da in estimates.items()}, figsize=(6.5, 3.3), **kw
+    {name: (da - rossby_ref).where(valid) for name, da in estimates.items()},
+    figsize=(6.5, 3.3),
+    **kw,
 )
 print(f"Standard deviation of the reference: {float(rossby_ref.where(valid).std()):.3f}")
 for name, da in estimates.items():

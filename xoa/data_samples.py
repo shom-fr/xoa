@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Available data files that are used by :mod:`xoa` examples.
 
 .. autodata:: DATA_SAMPLES
 
 """
+
 import os
 
 _THIS_DIR = os.path.dirname(__file__)
 
 
 import os
+
 import pooch
 
 pooch.get_logger().setLevel("DEBUG")

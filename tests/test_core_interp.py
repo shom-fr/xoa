@@ -1,20 +1,20 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.core.interp` module
 """
 
 import functools
+import os
+import tempfile
+
 import numpy as np
 import pytest
 
 from xoa.core import geo, interp
-from xoa.exceptions import XoaDeprecationWarning
-import os
-import tempfile
+from xoa.core.grid import create_rotated_grid
 from xoa.core.interp import XYInterpolator, interp_transect
 from xoa.core.regrid import XYRegridder
 from xoa.core.time import compute_time_frac_indices
-from xoa.core.grid import create_rotated_grid
+from xoa.exceptions import XoaDeprecationWarning
 
 
 def vfunc(t=0, z=0, y=0, x=0):
@@ -60,7 +60,7 @@ def test_interp_closest2d_deprecated():
         assert interp.closest2d(xxi, yyi, 2.1, 1.2) == (2, 1)
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def get_grid2locs_coords(nex=4, nexz=2, nxi=7, nyi=6, nzi=5, nti=4, no=10):
     np.random.seed(0)
 
@@ -965,9 +965,9 @@ class TestSkipnaRenormalization:
         j, i = plat.astype(int), plon.astype(int)
         valid = ~np.isnan(field)
         corners_ok = valid[j, i] & valid[j, i + 1] & valid[j + 1, i] & valid[j + 1, i + 1]
-        out = XYInterpolator(
-            {"lon": lon, "lat": lat}, plon, plat, method=method
-        ).interp(field, skipna=True, na_thres=0)
+        out = XYInterpolator({"lon": lon, "lat": lat}, plon, plat, method=method).interp(
+            field, skipna=True, na_thres=0
+        )
         assert corners_ok.any() and (~corners_ok).any()
         np.testing.assert_array_equal(~np.isnan(out), corners_ok)
 

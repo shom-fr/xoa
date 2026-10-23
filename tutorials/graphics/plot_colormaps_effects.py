@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Colormaps adapted to the data and graphical effects
 ===================================================
@@ -19,11 +18,11 @@ See also: :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`,
 # Initialisations
 # ---------------
 
-import numpy as np
-import xarray as xr
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cmocean  # noqa
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 
 import xoa
 import xoa.meta as xmeta

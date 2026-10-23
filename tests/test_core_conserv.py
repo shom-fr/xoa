@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.core.conserv` kernels
 """
@@ -6,8 +5,8 @@ Test the :mod:`xoa.core.conserv` kernels
 import numpy as np
 import pytest
 
-from xoa.core.grid import create_regular_grid
 from xoa.core.conserv import compute_conservative_weights
+from xoa.core.grid import create_regular_grid
 from xoa.core.regrid import XYRegridder
 
 

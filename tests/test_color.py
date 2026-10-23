@@ -1,7 +1,7 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.color` module
 """
+
 import matplotlib.colors as mcolors
 import pytest
 

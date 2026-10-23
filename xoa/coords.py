@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Utilities for working with coordinates and dimensions.
 
@@ -27,9 +26,7 @@ from collections.abc import Mapping
 import numpy as np
 import xarray as xr
 
-from . import exceptions
-from . import misc
-from . import meta
+from . import exceptions, meta, misc
 
 
 def ensure_ns_datetime(da):
@@ -250,9 +247,9 @@ def _get_z_depth_(da, name, errors, **kwargs):
             found = _search_z_depth_(decoded, name, **kwargs)
             if found is not None:
                 return found
-        msg = "Can't infer {} coordinate from dataset".format(name)
+        msg = f"Can't infer {name} coordinate from dataset"
     else:
-        msg = "No {} coordinate found".format(name)
+        msg = f"No {name} coordinate found"
     if errors == "raise":
         raise exceptions.XoaCoordsError(msg)
     if errors == "warn":

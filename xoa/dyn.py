@@ -23,21 +23,18 @@ coordinate (see also :class:`VerticalModes` for the vertical modes): :func:`get_
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import textwrap
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-from . import exceptions
 from . import coords as xcoords
+from . import exceptions, geo, interp
 from . import grid as xgrid
 from . import meta as xmeta
 from . import misc as xmisc
 from . import stats as xstats
-from . import interp
-from . import geo
 from .core import dyn as cdyn
 from .core import modes as cmodes
 

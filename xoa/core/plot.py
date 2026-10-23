@@ -29,8 +29,7 @@ import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
 import numpy as np
 
-from .. import exceptions
-from .. import misc
+from .. import exceptions, misc
 from ..options import resolve_option as _opt
 from .geo import EARTH_RADIUS, haversine
 from .grid import centers2edges
@@ -285,6 +284,7 @@ AX_SETUP_KEYS = (
 
 
 # %% Colorbars
+
 
 def add_colorbar(mappable, ax=None, **kwargs):
     """Add a colorbar that is shrunk by default
@@ -606,7 +606,10 @@ def add_quiverkey(ax, quiver, value, units="", pos=None, **kwargs):
             qkey._init()
             xverts = np.asarray(qkey.verts[0])[:, 0]
             trans = qkey.vector.get_transform()
-            width = trans.transform([[xverts.max(), 0]])[0, 0] - trans.transform([[xverts.min(), 0]])[0, 0]
+            width = (
+                trans.transform([[xverts.max(), 0]])[0, 0]
+                - trans.transform([[xverts.min(), 0]])[0, 0]
+            )
             qkey.X = pos[0] + width / ax.bbox.width
         except (AttributeError, IndexError, ZeroDivisionError):  # pragma: no cover
             pass
@@ -614,7 +617,9 @@ def add_quiverkey(ax, quiver, value, units="", pos=None, **kwargs):
     # Make the key count in the tight bounding box of the figure, which is not the case by default
     def get_window_extent(renderer=None):
         xy = qkey.get_transform().transform([(pos[0], pos[1])])
-        return mtransforms.Bbox.union([qkey.text.get_window_extent(renderer), mtransforms.Bbox([xy[0], xy[0]])])
+        return mtransforms.Bbox.union(
+            [qkey.text.get_window_extent(renderer), mtransforms.Bbox([xy[0], xy[0]])]
+        )
 
     qkey.get_window_extent = get_window_extent
     qkey.set_clip_on(False)
@@ -1726,7 +1731,9 @@ class Rose:
         bottom = np.zeros(nsector)
         bars = []
         for ibin in range(nbin):
-            text = f"{edges[ibin]:g}–{edges[ibin + 1]:g}" if ibin < nbin - 1 else f"≥ {edges[ibin]:g}"
+            text = (
+                f"{edges[ibin]:g}–{edges[ibin + 1]:g}" if ibin < nbin - 1 else f"≥ {edges[ibin]:g}"
+            )
             bars.append(
                 self.ax.bar(
                     theta,

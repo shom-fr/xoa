@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Backward compatibility layer for the cf module
 
@@ -9,6 +8,7 @@ and aliasing to old cf names.
 .. deprecated::
     The cf module is deprecated. Please use :mod:`xoa.meta` instead.
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,6 +23,7 @@ and aliasing to old cf names.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import warnings
-from .core.num import get_iminmax, unravel_index, ravel_index  # noqa
+
+from .core.num import get_iminmax, ravel_index, unravel_index  # noqa
 
 warnings.warn("The 'xoa.num' module is deprecated in favour of the 'xoa.core.num' module")

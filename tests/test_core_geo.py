@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.core.geo` module
 """
@@ -75,9 +74,9 @@ class TestBearing:
         angles = geo.bearing(lon0, lat0, lon1, lat1)
         assert angles.shape == (4,)
         np.testing.assert_allclose(angles[0], 90.0, atol=1e-10)  # North
-        np.testing.assert_allclose(angles[1], 0.0, atol=1e-10)   # East
-        np.testing.assert_allclose(angles[2], -90.0, atol=1e-10) # South
-        np.testing.assert_allclose(angles[3], 180.0, atol=1e-10) # West
+        np.testing.assert_allclose(angles[1], 0.0, atol=1e-10)  # East
+        np.testing.assert_allclose(angles[2], -90.0, atol=1e-10)  # South
+        np.testing.assert_allclose(angles[3], 180.0, atol=1e-10)  # West
 
     def test_bearing_same_point(self):
         """Test bearing for same point (undefined but should not error)"""
@@ -166,7 +165,9 @@ class TestClosestPointFastOnLargeGrids:
     def test_all_the_subsampled_nodes_are_nan(self):
         lon, lat = self.get_grid(200)
         mask = np.ones(lon.shape, bool)
-        mask[::10, ::10] = False  # the subsampled nodes (step 10) are the only valid ones... inverted
+        mask[::10, ::10] = (
+            False  # the subsampled nodes (step 10) are the only valid ones... inverted
+        )
         lon = np.where(mask, lon, np.nan)
         lat = np.where(mask, lat, np.nan)
         x, y = lon[51, 52], lat[51, 52]

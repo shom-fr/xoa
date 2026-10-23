@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Unit tests for xoa.core.signal."""
 
 import numpy as np

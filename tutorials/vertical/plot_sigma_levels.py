@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Sigma levels over a slope: choose your stretching
 =================================================
@@ -21,9 +20,9 @@ See also: :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`,
 # Initialisations
 # ---------------
 
+import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 
 from xoa.sigma import get_cs, ocean_s_coordinate_g2, ocean_sigma_coordinate
 

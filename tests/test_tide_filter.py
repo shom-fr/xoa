@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.tide.filter` module
 """
@@ -11,7 +10,6 @@ import xoa.tide as xtide
 
 
 class TestTidalFilter:
-
     def test_demerliac(self):
         times = np.arange("2000-01-01", "2000-01-10", dtype="M8[h]").astype("M8[ns]")
         nt = len(times)

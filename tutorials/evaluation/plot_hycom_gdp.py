@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Compare Hycom3d with a GDP drifter
 ==================================
@@ -19,18 +18,19 @@ See also: :ref:`sphx_glr_tutorials_evaluation_plot_mercator_argo.py`, :ref:`sphx
 # Initialisations
 # ---------------
 
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
+
 import xoa
-from xoa.grid import dz2depth, shift
-from xoa.regrid import grid2loc, regrid1d
-import xoa.meta as xmeta
 import xoa.geo as xgeo
-from xoa.plot import plot_flow, plot_double_minimap
+import xoa.meta as xmeta
 from xoa.core.plot import add_quiverkey, get_quiverkey_value
+from xoa.grid import dz2depth, shift
+from xoa.plot import plot_double_minimap, plot_flow
+from xoa.regrid import grid2loc, regrid1d
 
 xr.set_options(display_style="text")
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
@@ -193,8 +193,11 @@ vh15 = regrid1d(hycom["v"], d15).squeeze(drop=True).mean(dim="time")
 
 pmerc = ccrs.Mercator()
 pcarr = ccrs.PlateCarree()
-fig, ax = plt.subplots(figsize=(6.5, 6.5), subplot_kw={"facecolor": "teal", "projection": pmerc},
-                       constrained_layout=True)
+fig, ax = plt.subplots(
+    figsize=(6.5, 6.5),
+    subplot_kw={"facecolor": "teal", "projection": pmerc},
+    constrained_layout=True,
+)
 
 ax.gridlines(draw_labels=True, dms=True)
 ax.set_extent(xgeo.get_extent(uh15))

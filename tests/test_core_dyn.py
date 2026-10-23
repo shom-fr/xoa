@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.core.dyn` module
 """
@@ -243,9 +242,7 @@ class TestCyclogeos:
         """The default correction has the two terms u dudx and v dvdy, starting from zero"""
         eta, *_, res, f = _eddy(amp)
         ug, vg = dyn.geos(eta, res, res, f)
-        uc, vc = dyn.cyclogeos(
-            ug, vg, res, res, f, terms="penven", relax=1.0, tol=1e-10, niter=500
-        )
+        uc, vc = dyn.cyclogeos(ug, vg, res, res, f, terms="penven", relax=1.0, tol=1e-10, niter=500)
         u = np.zeros_like(ug)
         v = np.zeros_like(vg)
         for _ in range(200):
