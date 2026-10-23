@@ -109,6 +109,7 @@ Deprecations
 
 Bug fixes
 ---------
+- The ``conserv`` argument of :func:`xoa.regrid.regrid1d` was ignored by the ``cellave`` method. The conservative regridding also gives NaN instead of 0 where there is no valid input.
 - The ``bias`` and ``tension`` arguments of :func:`xoa.regrid.regrid1d` were ignored by the ``hermit`` method, and ``drop_na`` was not rejected by the ``cellave`` method.
 - :func:`xoa.regrid.extrap1d` failed with dask arrays of more than one dimension.
 - The ``cellave`` method of :func:`xoa.regrid.regrid1d` gave random results when the output coordinates have a dimension that the data does not have.

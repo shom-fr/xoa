@@ -406,12 +406,11 @@ def _cellave1d_col_(vi, yib, yob, vo, extrap, conserv):
             if yib1 >= yob[iyo + 1]:
                 break
 
-        # Normalize
-        if not conserv:
-            if wo != 0:
-                vo[iyo] /= wo
-            else:
-                vo[iyo] = np.nan
+        # Normalize, or nan where there is no valid input
+        if wo == 0:
+            vo[iyo] = np.nan
+        elif not conserv:
+            vo[iyo] /= wo
 
 
 @numba.njit(parallel=True, cache=NOT_CI)

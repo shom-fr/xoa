@@ -272,6 +272,8 @@ def regrid1d(
     func_kwargs = {"extrap": extrap}
     if method == regrid1d_methods.hermit:
         func_kwargs.update(bias=bias, tension=tension)
+    if method == regrid1d_methods.cellave:
+        func_kwargs.update(conserv=conserv)
     if drop_na:
         if method == regrid1d_methods.cellave:
             raise exceptions.XoaRegridError(

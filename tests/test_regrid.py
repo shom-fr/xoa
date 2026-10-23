@@ -203,6 +203,23 @@ def test_regrid1d_hermit_bias_tension():
     assert not np.allclose(vo, vob)
 
 
+def test_regrid1d_cellave_conserv():
+    zie = np.linspace(-100.0, 0.0, 21)
+    zoe = np.linspace(-120.0, 10.0, 8)  # the end cells are partly covered
+    zi = xr.DataArray(0.5 * (zie[1:] + zie[:-1]), dims="z")
+    vi = xr.DataArray(np.cos(zi.values / 30), dims="z", coords={"z": zi})
+    zo = xr.DataArray(0.5 * (zoe[1:] + zoe[:-1]), dims="z")
+    edges = {"in": xr.DataArray(zie, dims="z_edges"), "out": xr.DataArray(zoe, dims="z_edges")}
+    vo = regrid.regrid1d(vi, zo, method="cellave", edges=edges, conserv=True)
+    # The integral is conserved, the end cells being partly covered
+    np.testing.assert_allclose(float((vo * np.diff(zoe)).sum()), float((vi * np.diff(zie)).sum()))
+    vom = regrid.regrid1d(vi, zo, method="cellave", edges=edges)
+    assert not np.allclose(vo, vom)
+    # No valid input: nan
+    vo = regrid.regrid1d(vi.where(zi > -50), zo, method="cellave", edges=edges, conserv=True)
+    assert np.isnan(vo[0]) and not np.isnan(vo[-1])
+
+
 def test_regrid1d_cellave_drop_na():
     zi = xr.DataArray(np.arange(4.0), dims="z")
     vi = xr.DataArray(np.arange(4.0), dims="z", coords={"z": zi})
