@@ -14,6 +14,7 @@ import importlib
 import inspect
 import os
 import sys
+import types
 from matplotlib import MatplotlibDeprecationWarning
 import warnings
 from sphinx_gallery.sorting import ExplicitOrder
@@ -261,10 +262,19 @@ def _skip_class_aliases(app, what, name, obj, skip, options):
         return True
 
 
+def _skip_builtin_methods(app, what, name, obj, skip, options):
+    """Do not document methods inherited from builtin types, like ``int.from_bytes``"""
+    if what in ("class", "exception", "method") and isinstance(
+        obj, (types.BuiltinMethodType, types.MethodDescriptorType)
+    ):
+        return True
+
+
 def setup(app):
     app.add_css_file('custom.css')
     app.connect("source-read", _close_figures)
     app.connect("autodoc-skip-member", _skip_class_aliases)
+    app.connect("autodoc-skip-member", _skip_builtin_methods)
 
     app.add_object_type(
         'confopt',
