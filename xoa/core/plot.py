@@ -31,6 +31,7 @@ import numpy as np
 
 from .. import exceptions
 from .. import misc
+from ..options import resolve_option as _opt
 from .geo import EARTH_RADIUS, haversine
 from .grid import centers2edges
 from .stats import rose_hist
@@ -115,16 +116,18 @@ def get_projection(projection=None, extent=None):
         ) from exc
 
 
-def add_land(ax, scale="110m", color=None, **kwargs):
+def add_land(ax, scale=None, color=None, **kwargs):
     """Add the land to a cartopy axes
 
     Parameters
     ----------
     ax: cartopy.mpl.geoaxes.GeoAxes
-    scale: str
-        Natural Earth scale like ``"110m"``, ``"50m"`` or ``"10m"``
+    scale: None, str
+        Natural Earth scale like ``"110m"``, ``"50m"`` or ``"10m"``,
+        which defaults to the ``plot.map_land_scale`` option
     color: None, color
-        Face color which defaults to ``cartopy.feature.COLORS["land"]``
+        Face color which defaults to the ``plot.map_land_color`` option,
+        or else to ``cartopy.feature.COLORS["land"]``
     kwargs:
         Extra parameters are passed to :meth:`cartopy.mpl.geoaxes.GeoAxes.add_feature`
 
@@ -133,6 +136,8 @@ def add_land(ax, scale="110m", color=None, **kwargs):
     cartopy.mpl.feature_artist.FeatureArtist
     """
     ccrs, cfeature = _import_cartopy_()
+    scale = _opt(scale, "plot.map_land_scale")
+    color = _opt(color, "plot.map_land_color")
     if color is None:
         color = cfeature.COLORS["land"]
     kwargs.setdefault("facecolor", color)
@@ -143,16 +148,19 @@ def decorate_map(
     ax,
     extent=None,
     transform=None,
-    gridlines=True,
-    gridlines_labels_on=("bottom", "left"),
-    land=False,
-    land_scale="110m",
-    coastlines=False,
-    bbox=True,
-    fancy=False,
+    gridlines=None,
+    gridlines_labels_on=None,
+    land=None,
+    land_scale=None,
+    coastlines=None,
+    bbox=None,
+    fancy=None,
     **kwargs,
 ):
     """Decorate a cartopy axes
+
+    The default values of the parameters that are ``None`` come from the ``plot.map_<name>``
+    options, like ``plot.map_gridlines``.
 
     Parameters
     ----------
@@ -162,18 +170,18 @@ def decorate_map(
         :func:`xoa.geo.get_extent`
     transform: None, cartopy.crs.CRS
         Coordinate system of the extent, which defaults to ``PlateCarree``
-    gridlines: bool
+    gridlines: None, bool
         Add labelled gridlines
-    gridlines_labels_on: list(str)
+    gridlines_labels_on: None, list(str)
         Sides on which labels are drawn
-    land: bool
+    land: None, bool
         Add the land with :func:`add_land`
-    land_scale: str
-    coastlines: bool
+    land_scale: None, str
+    coastlines: None, bool
         Add the coastlines
-    bbox: bool
+    bbox: None, bool
         Keep the frame of the axes visible
-    fancy: bool, dict
+    fancy: None, bool, dict
         Add a black and white frame with :func:`add_fancy_map_frame`.
         A dict gives its parameters.
     kwargs:
@@ -185,6 +193,12 @@ def decorate_map(
     cartopy.mpl.geoaxes.GeoAxes
     """
     ccrs, _ = _import_cartopy_()
+    gridlines = _opt(gridlines, "plot.map_gridlines")
+    gridlines_labels_on = _opt(gridlines_labels_on, "plot.map_gridlines_labels_on")
+    land = _opt(land, "plot.map_land")
+    coastlines = _opt(coastlines, "plot.map_coastlines")
+    bbox = _opt(bbox, "plot.map_bbox")
+    fancy = _opt(fancy, "plot.map_fancy")
     if transform is None:
         transform = ccrs.PlateCarree()
     if extent is not None:
@@ -198,15 +212,16 @@ def decorate_map(
     if gridlines:
         kwgl = {
             "draw_labels": list(gridlines_labels_on),
-            "linewidth": 0.3,
-            "linestyle": "--",
-            "color": "gray",
+            "linewidth": _opt(None, "plot.map_gridlines_linewidth"),
+            "linestyle": _opt(None, "plot.map_gridlines_linestyle"),
+            "color": _opt(None, "plot.map_gridlines_color"),
             "rotate_labels": False,
         }
         kwgl.update(misc.dict_filter(kwargs, "gridlines_"))
         gl = ax.gridlines(**kwgl)
-        gl.xlabel_style = {"size": 7}
-        gl.ylabel_style = {"size": 7}
+        labelsize = _opt(None, "plot.map_gridlines_labelsize")
+        gl.xlabel_style = {"size": labelsize}
+        gl.ylabel_style = {"size": labelsize}
     if fancy:
         add_fancy_map_frame(ax, **(fancy if isinstance(fancy, dict) else {}))
     return ax
@@ -214,7 +229,7 @@ def decorate_map(
 
 def create_map(
     extent,
-    figsize=(8, 8),
+    figsize=None,
     projection=None,
     transform=None,
     title=None,
@@ -227,8 +242,8 @@ def create_map(
     extent: list
         Extent ``[xmin, xmax, ymin, ymax]`` in degrees, as returned by
         :func:`xoa.geo.get_extent`
-    figsize: tuple
-        Figure size in inches
+    figsize: None, tuple
+        Figure size in inches, which defaults to the ``plot.map_figsize`` option
     projection: None, str, cartopy.crs.CRS
         Projection of the map, or its name as accepted by :func:`get_projection`,
         which defaults to ``Mercator``
@@ -244,7 +259,7 @@ def create_map(
     cartopy.mpl.geoaxes.GeoAxes
     """
     projection = get_projection(projection, extent)
-    fig = plt.figure(figsize=figsize)
+    fig = plt.figure(figsize=_opt(figsize, "plot.map_figsize"))
     ax = fig.add_subplot(111, projection=projection)
     decorate_map(ax, extent, transform, **kwargs)
     if title:
@@ -271,10 +286,6 @@ AX_SETUP_KEYS = (
 
 # %% Colorbars
 
-#: Default shrink factor of colorbars
-CBAR_SHRINK = 0.7
-
-
 def add_colorbar(mappable, ax=None, **kwargs):
     """Add a colorbar that is shrunk by default
 
@@ -287,7 +298,7 @@ def add_colorbar(mappable, ax=None, **kwargs):
         several. It defaults to the axes of the artist.
     kwargs:
         Extra parameters are passed to :meth:`matplotlib.figure.Figure.colorbar`,
-        like ``label``. The ``shrink`` parameter defaults to :data:`CBAR_SHRINK`.
+        like ``label``. The ``shrink`` parameter defaults to the ``plot.colorbar_shrink`` option.
 
     Return
     ------
@@ -296,7 +307,7 @@ def add_colorbar(mappable, ax=None, **kwargs):
     if ax is None:
         ax = mappable.axes
     axes = np.ravel(ax)
-    kwargs.setdefault("shrink", CBAR_SHRINK)
+    kwargs.setdefault("shrink", _opt(None, "plot.colorbar_shrink"))
     return axes[0].figure.colorbar(mappable, ax=ax if np.ndim(ax) else axes[0], **kwargs)
 
 
@@ -307,7 +318,7 @@ def add_colorbar(mappable, ax=None, **kwargs):
 _MAX_SPACING_LINES = 64
 
 
-def get_strides(stride, lon, lat, ax=None, transform=None, min_spacing=12):
+def get_strides(stride, lon, lat, ax=None, transform=None, min_spacing=None):
     """Get the under-sampling strides along y and x
 
     Parameters
@@ -323,8 +334,9 @@ def get_strides(stride, lon, lat, ax=None, transform=None, min_spacing=12):
         Axes that is needed in ``"auto"`` mode
     transform: None, cartopy.crs.CRS
         Coordinate system of ``lon`` and ``lat``, when the axes have a projection
-    min_spacing: float
-        Minimal spacing in pixels for the ``"auto"`` mode
+    min_spacing: None, float
+        Minimal spacing in pixels for the ``"auto"`` mode,
+        which defaults to the ``plot.mesh_min_spacing`` option
 
     Return
     ------
@@ -337,6 +349,7 @@ def get_strides(stride, lon, lat, ax=None, transform=None, min_spacing=12):
         if ax is None:
             raise exceptions.XoaError("The axes are needed to compute an automatic stride")
         ax.apply_aspect()
+        min_spacing = _opt(min_spacing, "plot.mesh_min_spacing")
         lon = np.asarray(lon, dtype=np.float64)
         lat = np.asarray(lat, dtype=np.float64)
         stride = []
@@ -429,7 +442,7 @@ def plot_mesh(
     lon,
     lat,
     stride="auto",
-    min_spacing=12,
+    min_spacing=None,
     edges=True,
     centers=True,
     transform=None,
@@ -445,8 +458,9 @@ def plot_mesh(
         Longitudes and latitudes of the centers in degrees
     stride: str, int, tuple(int)
         Under-sampling strides. See :func:`get_strides`.
-    min_spacing: float
-        Minimal spacing in pixels for the ``"auto"`` stride
+    min_spacing: None, float
+        Minimal spacing in pixels for the ``"auto"`` stride,
+        which defaults to the ``plot.mesh_min_spacing`` option
     edges, centers: bool
         Draw the edges and the centers
     transform: None, cartopy.crs.CRS
@@ -527,7 +541,7 @@ def plot_depth_section(ax, x, z, data, method="pcolormesh", invert_yaxis=False, 
     return mappable
 
 
-def get_quiverkey_value(speed, percentile=80):
+def get_quiverkey_value(speed, percentile=None):
     """Get a round reference value for a quiver key
 
     It is the closest one, in a logarithmic sense, to a high percentile of the speeds
@@ -538,8 +552,9 @@ def get_quiverkey_value(speed, percentile=80):
     ----------
     speed: array_like
         Speeds, with possibly missing values
-    percentile: float
-        Percentile of the positive speeds that is rounded
+    percentile: None, float
+        Percentile of the positive speeds that is rounded,
+        which defaults to the ``plot.key_percentile`` option
 
     Return
     ------
@@ -550,12 +565,12 @@ def get_quiverkey_value(speed, percentile=80):
     speed = speed[np.isfinite(speed) & (speed > 0)]
     if not speed.size:
         return 1.0
-    ref = np.percentile(speed, percentile)
+    ref = np.percentile(speed, _opt(percentile, "plot.key_percentile"))
     mag = 10 ** np.floor(np.log10(ref))
     return float(min((1, 2, 5, 10), key=lambda m: abs(np.log(m * mag / ref))) * mag)
 
 
-def add_quiverkey(ax, quiver, value, units="", pos=(0.0, 1.03), **kwargs):
+def add_quiverkey(ax, quiver, value, units="", pos=None, **kwargs):
     """Add a reference arrow, labelled with its value, above the left corner of the axes
 
     Parameters
@@ -566,9 +581,9 @@ def add_quiverkey(ax, quiver, value, units="", pos=(0.0, 1.03), **kwargs):
         Reference value, see :func:`get_quiverkey_value`
     units: str
         Units that are appended to the label
-    pos: tuple(float)
+    pos: None, tuple(float)
         Position of the start of the arrow in axes coordinates,
-        which is above the left corner by default
+        which defaults to the ``plot.key_pos`` option
     kwargs:
         Extra parameters are passed to :meth:`matplotlib.axes.Axes.quiverkey`
 
@@ -576,6 +591,7 @@ def add_quiverkey(ax, quiver, value, units="", pos=(0.0, 1.03), **kwargs):
     ------
     matplotlib.quiver.QuiverKey
     """
+    pos = _opt(pos, "plot.key_pos")
     kwargs.setdefault("labelpos", "E")
     kwargs.setdefault("coordinates", "axes")
     kwargs.setdefault("color", "k")
@@ -716,18 +732,21 @@ def get_scalebar_length(max_length):
 def add_scalebar(
     ax,
     length=None,
-    units="km",
-    loc="lower left",
-    pad=0.04,
-    segments=2,
-    height=0.012,
-    color="k",
+    units=None,
+    loc=None,
+    pad=None,
+    segments=None,
+    height=None,
+    color=None,
     effect=None,
     effect_kw=None,
-    zorder=10,
+    zorder=None,
     **kwargs,
 ):
     """Add a scale bar to a map
+
+    The default values of the parameters that are ``None`` come from the
+    ``plot.scalebar_<name>`` options.
 
     The length of the bar is the ground distance along the horizontal direction of the axes
     at the position of the bar, so it accounts for the distortion of the projection.
@@ -739,16 +758,16 @@ def add_scalebar(
     length: None, float
         Length of the bar in ``units``. It defaults to a round value, see
         :func:`get_scalebar_length`, that is at most a fifth of the width of the axes.
-    units: {"m", "km", "nmi"}
-    loc: {"lower left", "lower right", "upper left", "upper right"}
+    units: None, {"m", "km", "nmi"}
+    loc: None, {"lower left", "lower right", "upper left", "upper right"}
         Corner of the axes where the bar is placed
-    pad: float
+    pad: None, float
         Distance to the corner in axes coordinates
-    segments: int
+    segments: None, int
         Number of alternating black and white segments
-    height: float
+    height: None, float
         Height of the bar in axes coordinates
-    color: color
+    color: None, color
         Color of the dark segments, the labels and the frame
     effect: None, bool, str, list(str)
         Add a ``"shadow"``, a ``"glow"`` or both, which are drawn below the artists
@@ -757,7 +776,7 @@ def add_scalebar(
         Parameters of the effects: the blur ``width`` in points, the ``alpha``,
         the ``color`` and, for the shadow, the ``offset`` in points. Give a dict per effect
         to set them separately, like ``{"glow": {"color": "y"}}``.
-    zorder: float
+    zorder: None, float
     kwargs:
         Extra parameters are passed to :class:`matplotlib.text.Text`, like ``fontsize``.
 
@@ -766,6 +785,13 @@ def add_scalebar(
     list
         The artists: the segments and the label
     """
+    units = _opt(units, "plot.scalebar_units")
+    loc = _opt(loc, "plot.scalebar_loc")
+    pad = _opt(pad, "plot.scalebar_pad")
+    segments = _opt(segments, "plot.scalebar_segments")
+    height = _opt(height, "plot.scalebar_height")
+    color = _opt(color, "plot.scalebar_color")
+    zorder = _opt(zorder, "plot.scalebar_zorder")
     if units not in SCALEBAR_UNITS:
         raise exceptions.XoaError(
             f"Invalid units '{units}'. Choose among: {', '.join(SCALEBAR_UNITS)}"
@@ -835,17 +861,20 @@ def _compass_polygons_(style):
 
 def add_compass(
     ax,
-    loc="upper right",
-    size=40,
-    style="simple",
+    loc=None,
+    size=None,
+    style=None,
     pad=None,
-    color="k",
+    color=None,
     effect=None,
     effect_kw=None,
-    zorder=10,
+    zorder=None,
     **kwargs,
 ):
     """Add a compass to a map
+
+    The default values of the parameters that are ``None`` come from the
+    ``plot.compass_<name>`` options.
 
     The north points to the direction of the meridian at the position of the compass,
     which differs from the vertical in some projections.
@@ -854,16 +883,16 @@ def add_compass(
     Parameters
     ----------
     ax: cartopy.mpl.geoaxes.GeoAxes
-    loc: {"lower left", "lower right", "upper left", "upper right"}
+    loc: None, {"lower left", "lower right", "upper left", "upper right"}
         Corner of the axes where the compass is placed
-    size: float
+    size: None, float
         Height of the compass in points
-    style: {"simple", "fancy"}
+    style: None, {"simple", "fancy"}
         A single arrow, or a rose with four split points and a ring
     pad: None, float
         Distance of the center to the corner in axes coordinates. By default, it leaves
         room for the arrow and the "N" inside the axes.
-    color: color
+    color: None, color
         Color of the dark parts and of the "N"
     effect: None, bool, str, list(str)
         Add a ``"shadow"``, a ``"glow"`` or both, which are drawn below the artists
@@ -872,7 +901,7 @@ def add_compass(
         Parameters of the effects: the blur ``width`` in points, the ``alpha``,
         the ``color`` and, for the shadow, the ``offset`` in points. Give a dict per effect
         to set them separately, like ``{"glow": {"color": "y"}}``.
-    zorder: float
+    zorder: None, float
     kwargs:
         Extra parameters are passed to :class:`matplotlib.text.Text`, like ``fontsize``.
 
@@ -881,6 +910,11 @@ def add_compass(
     list
         The artists: the polygons, the ring of the fancy style and the "N"
     """
+    loc = _opt(loc, "plot.compass_loc")
+    size = _opt(size, "plot.compass_size")
+    style = _opt(style, "plot.compass_style")
+    color = _opt(color, "plot.compass_color")
+    zorder = _opt(zorder, "plot.compass_zorder")
     polygons = _compass_polygons_(style)
     if pad is None:
         ax.apply_aspect()
@@ -1024,15 +1058,15 @@ def _get_frame_ticks_(ax, side, ticks):
 
 def add_fancy_map_frame(
     ax,
-    width=5.0,
+    width=None,
     sides=("bottom", "left", "top", "right"),
-    colors=("k", "w"),
+    colors=None,
     xticks=None,
     yticks=None,
     inside=False,
-    linewidth=0.6,
-    edgecolor="k",
-    zorder=5,
+    linewidth=None,
+    edgecolor=None,
+    zorder=None,
 ):
     """Add a black and white alternating frame to a map, like GMT does
 
@@ -1042,24 +1076,26 @@ def add_fancy_map_frame(
     It requires a projection whose meridians and parallels are parallel
     to the edges of the map, like ``PlateCarree`` or ``Mercator``.
     Existing tick labels are moved away by the width of the frame.
+    The default values of the parameters that are ``None`` come from the
+    ``plot.fancy_<name>`` options.
 
     Parameters
     ----------
     ax: cartopy.mpl.geoaxes.GeoAxes
-    width: float
+    width: None, float
         Width of the frame in points
     sides: list(str)
         Sides to decorate among "bottom", "left", "top" and "right"
-    colors: tuple
+    colors: None, tuple
         Colors of the first and second alternating segments
     xticks, yticks: None, array_like, matplotlib.ticker.Locator
         Longitudes and latitudes where the frame is cut.
         They default to the locators of the gridlines of the axes.
     inside: bool
         Draw the frame inside the map, rather than outside
-    linewidth, edgecolor:
+    linewidth, edgecolor: None
         Properties of the thin lines that outline the frame
-    zorder: float
+    zorder: None, float
 
     Return
     ------
@@ -1077,6 +1113,11 @@ def add_fancy_map_frame(
     --------
     decorate_map
     """
+    width = _opt(width, "plot.fancy_width")
+    colors = _opt(colors, "plot.fancy_colors")
+    linewidth = _opt(linewidth, "plot.fancy_linewidth")
+    edgecolor = _opt(edgecolor, "plot.fancy_edgecolor")
+    zorder = _opt(zorder, "plot.fancy_zorder")
     sides = (sides,) if isinstance(sides, str) else tuple(sides)
     for side in sides:
         if side not in _FRAME_SIDES:
@@ -1167,7 +1208,7 @@ def add_fancy_map_frame(
     return artists
 
 
-def plot_sticks(ax, x, u, v, scale=None, color="steelblue", **kwargs):
+def plot_sticks(ax, x, u, v, scale=None, color=None, **kwargs):
     """Plot vectors as sticks anchored at ``y=0``
 
     Parameters
@@ -1180,7 +1221,8 @@ def plot_sticks(ax, x, u, v, scale=None, color="steelblue", **kwargs):
     scale: None, float
         Scale passed to :meth:`matplotlib.axes.Axes.quiver`: the smaller, the longer
         the sticks.
-    color: color
+    color: None, color
+        Color of the sticks, which defaults to the ``plot.stick_color`` option
     kwargs:
         Extra parameters are passed to :meth:`matplotlib.axes.Axes.quiver`
 
@@ -1189,6 +1231,7 @@ def plot_sticks(ax, x, u, v, scale=None, color="steelblue", **kwargs):
     matplotlib.quiver.Quiver
     """
     u = np.asarray(u)
+    color = _opt(color, "plot.stick_color")
     kwargs.setdefault("headaxislength", 0)
     kwargs.setdefault("headlength", 0)
     kwargs.setdefault("headwidth", 1)

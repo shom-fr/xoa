@@ -269,7 +269,7 @@ of parameters, like ``map_kw=dict(fancy=dict(width=8))`` with the plot functions
 Colorbars
 =========
 
-All the colorbars of the module are shrunk (``shrink=0.7``, ``xoa.core.plot.CBAR_SHRINK``)
+All the colorbars of the module are shrunk (``shrink=0.7``, option ``plot.colorbar_shrink``)
 and labelled with :func:`~xoa.plot.get_label`, so that they do not dwarf the maps.
 
 - The functions that make a colorbar accept ``cbar_kwargs`` (:func:`~xoa.plot.plot_field`,
