@@ -55,8 +55,6 @@ class regrid1d_methods(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     hermitian = 3
     #: Cell-averaging or conservative regridding
     cellave = -1
-    #: Cell-averaging or conservative regridding
-    cellerr = -2
 
 
 class extrap_modes(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
@@ -169,7 +167,7 @@ def regrid1d(
         {extrap_modes.rst_with_links}
     drop_na: bool
         Drop input inner NaNs during interpolation. Note that outer NaNs are
-        always ignored. ``cellave`` and ``cellerr`` methods don't support the parameter.
+        always ignored. The ``cellave`` method doesn't support the parameter.
     maxgap: int
         Max size for a gap to be interpolated when ``drop_na`` is True.
         Size is not checked when ``maxgap`` is zero.
@@ -270,18 +268,14 @@ def regrid1d(
 
     # Interpolation function name and arguments
     func_name = str(method) + "1d"
-    if method == regrid1d_methods.cellerr and not (coord_in.ndim == coord.ndim == 1):
-        raise exceptions.XoaRegridError(
-            "cellerr regrid method works only with 1D input and output coordinates"
-        )
     extrap = str(extrap_modes[extrap])
     func_kwargs = {"extrap": extrap}
     if method == "hermit":
         func_kwargs.update(bias=bias, tension=tension)
     if drop_na:
-        if method == "cellave" or method == "cellerr":
+        if method == "cellave":
             raise exceptions.XoaRegridError(
-                "cellerr and cellave regrid method still not support the drop_na paramater"
+                "The cellave regrid method does not support the drop_na parameter"
             )
         func_kwargs.update(drop_na=drop_na, maxgap=maxgap)
 
