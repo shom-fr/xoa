@@ -234,6 +234,19 @@ def test_regrid1d_cellave_extrap(mode, bottom, top):
     assert not np.isnan(vo[5])
 
 
+def test_regrid1d_cellave_na_thres():
+    zi = xr.DataArray(np.linspace(-95.0, -5.0, 10), dims="z")
+    vi = xr.DataArray(np.ones(10), dims="z", coords={"z": zi})
+    # Output edges: -105, -75, -45, -15, 15, so the first cell is covered at 5/6
+    # by the input cells (-100 to 0) and the last one at 1/2
+    zo = xr.DataArray(np.linspace(-90.0, 0.0, 4), dims="z")
+    assert not np.isnan(regrid.regrid1d(vi, zo, method="cellave")).any()
+    vo = regrid.regrid1d(vi, zo, method="cellave", na_thres=0.6)
+    assert np.isnan(vo[-1]) and not np.isnan(vo[:-1]).any()
+    with pytest.raises(xoa.exceptions.XoaRegridError):
+        regrid.regrid1d(vi, zo, method="linear", na_thres=0.5)
+
+
 def test_regrid1d_cellave_drop_na():
     zi = xr.DataArray(np.arange(4.0), dims="z")
     vi = xr.DataArray(np.arange(4.0), dims="z", coords={"z": zi})

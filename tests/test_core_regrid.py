@@ -210,6 +210,22 @@ def test_cellave1d():
     assert not np.isnan(varoe[0]).any()
 
 
+@pytest.mark.parametrize("conserv", [False, True])
+def test_cellave1d_na_thres(conserv):
+    # Input cells of size 1 from 0 to 10, the third one missing
+    yib = np.arange(11.0)
+    vari = np.ones(10)
+    vari[2] = np.nan
+    # Output cells of size 2: [0, 2] full, [2, 4] half covered, [9, 11] half covered
+    yob = np.array([0.0, 2.0, 4.0, 9.0, 11.0])
+    varo = regrid.cellave1d(vari, yib, yob, conserv=conserv)
+    assert not np.isnan(varo).any()
+    varo = regrid.cellave1d(vari, yib, yob, conserv=conserv, na_thres=0.6)
+    np.testing.assert_array_equal(np.isnan(varo), [False, True, False, True])
+    varo = regrid.cellave1d(vari, yib, yob, conserv=conserv, na_thres=0.5)
+    assert not np.isnan(varo).any()
+
+
 def get_valid_mask(result, min_fraction=0.5):
     """Mask of the valid points, that must be numerous for a test to mean something"""
     valid = ~np.isnan(result)

@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Add the ``na_thres`` argument to :func:`xoa.regrid.regrid1d` and :func:`xoa.core.regrid.cellave1d`: the minimal fraction of an output cell that must be covered by valid input cells with the ``cellave`` method.
 - :func:`xoa.regrid.regrid1d` and :func:`xoa.regrid.extrap1d` no longer move the working dimension last, which makes them faster and lighter, and process dask arrays by blocks with :func:`xoa.grid.map_along_dim`.
 - Add :func:`xoa.grid.map_along_dim` to apply a function along a dimension that is kept in place, with coordinates of any subset of the dimensions and dask arrays processed with :func:`dask.array.map_blocks`, and :func:`xoa.core.num.view_along_axis` and :func:`xoa.core.num.broadcast_along_axis` to view arrays as ``(nouter, n, ninner)`` in numba kernels.
 - Switch from black and flake8 to ruff for linting and formatting, with a pre-commit configuration.

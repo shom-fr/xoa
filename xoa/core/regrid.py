@@ -364,7 +364,7 @@ def _hermit1d_col_(vi, yi, yo, vo, extrap, bias, tension, drop_na, maxgap):
 
 
 @numba.njit(nogil=True, cache=NOT_CI)
-def _cellave1d_col_(vi, yib, yob, vo, extrap, conserv):
+def _cellave1d_col_(vi, yib, yob, vo, extrap, conserv, na_thres):
     nyi = vi.size
     nyo = vo.size
 
@@ -406,15 +406,18 @@ def _cellave1d_col_(vi, yib, yob, vo, extrap, conserv):
             if yib1 >= yob[iyo + 1]:
                 break
 
-        # Normalize, or nan where there is no valid input
-        if wo == 0:
+        # Normalize, or nan where the valid input covers too little of the output cell
+        coverage = wo if conserv else wo / (yob[iyo + 1] - yob[iyo])
+        if wo == 0 or coverage < na_thres:
             vo[iyo] = np.nan
         elif not conserv:
             vo[iyo] /= wo
 
 
 @numba.njit(parallel=True, cache=NOT_CI)
-def _regrid1d_kernel_(vi, yi, yo, method, extrap, bias, tension, drop_na, maxgap, conserv):
+def _regrid1d_kernel_(
+    vi, yi, yo, method, extrap, bias, tension, drop_na, maxgap, conserv, na_thres
+):
     """Loop on the columns of (m, n, m) arrays, the outer and inner m being 1 or the size
 
     Options are numbers rather than strings, whose reference counting
@@ -442,7 +445,7 @@ def _regrid1d_kernel_(vi, yi, yo, method, extrap, bias, tension, drop_na, maxgap
         elif method == 3:
             _hermit1d_col_(v, y, z, o, extrap, bias, tension, drop_na, maxgap)
         else:
-            _cellave1d_col_(v, y, z, o, extrap, conserv)
+            _cellave1d_col_(v, y, z, o, extrap, conserv, na_thres)
     return varo
 
 
@@ -458,6 +461,7 @@ def _regrid1d_(
     drop_na=False,
     maxgap=0,
     conserv=False,
+    na_thres=0.0,
 ):
     """Broadcast the arrays along an axis, call the kernel and reshape the output"""
     (vari, yi, yo), outer, inner = broadcast_along_axis(
@@ -474,6 +478,7 @@ def _regrid1d_(
         bool(drop_na),
         int(maxgap),
         bool(conserv),
+        float(na_thres),
     )
     return varo.reshape(outer + varo.shape[1:2] + inner)
 
@@ -528,8 +533,8 @@ def hermit1d(vari, yi, yo, axis=-1, extrap="no", bias=0.0, tension=0.0, drop_na=
     return _regrid1d_(vari, yi, yo, axis, 3, extrap, bias, tension, drop_na, maxgap)
 
 
-def cellave1d(vari, yib, yob, axis=-1, extrap="no", conserv=False):
-    return _regrid1d_(vari, yib, yob, axis, -1, extrap, conserv=conserv)
+def cellave1d(vari, yib, yob, axis=-1, extrap="no", conserv=False, na_thres=0.0):
+    return _regrid1d_(vari, yib, yob, axis, -1, extrap, conserv=conserv, na_thres=na_thres)
 
 
 for _func, _title, _coords, _params in [
@@ -556,7 +561,11 @@ for _func, _title, _coords, _params in [
         Output cell edges, increasing along `axis`""",
         """
     conserv: bool
-        Conservative regridding: the integral is preserved instead of the average""",
+        Conservative regridding: the integral is preserved instead of the average
+    na_thres: float
+        Minimal fraction, from 0 to 1, of an output cell that must be covered
+        by valid input cells, else the output is NaN.
+        Zero means that any valid input is enough.""",
     ),
 ]:
     _func.__doc__ = (

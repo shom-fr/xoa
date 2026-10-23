@@ -123,6 +123,7 @@ def regrid1d(
     drop_na=False,
     maxgap=0,
     dask='parallelized',
+    na_thres=0.0,
 ):
     """Regrid along a single dimension
 
@@ -162,6 +163,10 @@ def regrid1d(
         coordinates except along the interpolation dimension on which 1 is added.
     conserv: bool
         Use conservative regridding when using ``cellave`` method.
+    na_thres: float
+        Minimal fraction, from 0 to 1, of an output cell that must be covered
+        by valid input cells to get a value with the ``cellave`` method,
+        else the output is NaN. Zero means that any valid input is enough.
     extrap: str, int
         Extrapolation mode as one of the following:
         {extrap_modes.rst_with_links}
@@ -216,6 +221,7 @@ def regrid1d(
             coord_in_name=coord_in_name,
             edges=edges,
             conserv=conserv,
+            na_thres=na_thres,
             extrap=extrap,
             bias=bias,
             tension=tension,
@@ -273,7 +279,9 @@ def regrid1d(
     if method == regrid1d_methods.hermit:
         func_kwargs.update(bias=bias, tension=tension)
     if method == regrid1d_methods.cellave:
-        func_kwargs.update(conserv=conserv)
+        func_kwargs.update(conserv=conserv, na_thres=na_thres)
+    elif na_thres:
+        raise exceptions.XoaRegridError("na_thres is only supported by the cellave method")
     if drop_na:
         if method == regrid1d_methods.cellave:
             raise exceptions.XoaRegridError(
