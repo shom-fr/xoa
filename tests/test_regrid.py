@@ -247,6 +247,18 @@ def test_regrid1d_cellave_na_thres():
         regrid.regrid1d(vi, zo, method="linear", na_thres=0.5)
 
 
+@pytest.mark.parametrize("method", ["linear", "cellave"])
+def test_regrid1d_decreasing(method):
+    zi = xr.DataArray(np.linspace(-90, -10, 9), dims="z")
+    vi = xr.DataArray(-zi.values / 10, dims="z", coords={"z": zi})
+    zo = xr.DataArray(np.linspace(-80, -20, 4), dims="z")
+    ref = regrid.regrid1d(vi, zo, method=method)
+    np.testing.assert_allclose(ref, [8, 6, 4, 2])
+    vid = vi.isel(z=slice(None, None, -1))
+    np.testing.assert_allclose(regrid.regrid1d(vid, zo, method=method), ref)
+    np.testing.assert_allclose(regrid.regrid1d(vi, zo[::-1], method=method), ref[::-1])
+
+
 def test_regrid1d_cellave_drop_na():
     zi = xr.DataArray(np.arange(4.0), dims="z")
     vi = xr.DataArray(np.arange(4.0), dims="z", coords={"z": zi})

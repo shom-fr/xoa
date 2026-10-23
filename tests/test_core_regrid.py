@@ -226,6 +226,33 @@ def test_cellave1d_na_thres(conserv):
     assert not np.isnan(varo).any()
 
 
+@pytest.mark.parametrize("method", ["nearest", "linear", "cubic", "hermit", "cellave"])
+@pytest.mark.parametrize("extrap", ["no", "bottom", "top", "both"])
+def test_regrid1d_decreasing(method, extrap):
+    rng = np.random.default_rng(0)
+    cell = method == "cellave"
+    nyi, nyo = (12, 9) if not cell else (13, 10)  # edges for cellave
+    yi = np.sort(rng.uniform(-100, 0, (5, nyi)), axis=1)
+    yo = np.sort(rng.uniform(-120, 10, (5, nyo)), axis=1)
+    vi = rng.random((5, nyi - cell))
+    vi[1, 3] = np.nan
+    yi[2, -2:] = np.nan  # missing coordinates at the end
+    func = getattr(regrid, method + "1d")
+    ref = func(vi, yi, yo, extrap=extrap)
+    assert not np.isnan(ref).all()
+    # Decreasing input coordinates: same result
+    np.testing.assert_allclose(func(vi[:, ::-1], yi[:, ::-1], yo, extrap=extrap), ref)
+    # Decreasing output coordinates: reversed result
+    np.testing.assert_allclose(func(vi, yi, yo[:, ::-1], extrap=extrap), ref[:, ::-1])
+    np.testing.assert_allclose(
+        func(vi[:, ::-1], yi[:, ::-1], yo[:, ::-1], extrap=extrap), ref[:, ::-1]
+    )
+    # Directions that change from a column to another
+    vim, yim = vi.copy(), yi.copy()
+    vim[::2], yim[::2] = vi[::2, ::-1], yi[::2, ::-1]
+    np.testing.assert_allclose(func(vim, yim, yo, extrap=extrap), ref)
+
+
 def get_valid_mask(result, min_fraction=0.5):
     """Mask of the valid points, that must be numerous for a test to mean something"""
     valid = ~np.isnan(result)

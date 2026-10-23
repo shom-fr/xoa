@@ -415,6 +415,22 @@ def _cellave1d_col_(vi, yib, yob, vo, extrap, conserv, na_thres):
 
 
 @numba.njit(parallel=True, cache=NOT_CI)
+def _get_decreasing_(y):
+    """Tell if the columns of a (m, n, m) coordinate array decrease
+
+    Only the first and last valid values of each column are read,
+    and each column is checked once, even when it is shared by several data columns.
+    """
+    mo, _, mi = y.shape
+    decreasing = np.zeros(mo * mi, dtype=np.bool_)
+    for ic in numba.prange(mo * mi):
+        col = y[ic // mi, :, ic % mi]
+        imin, imax = get_iminmax(col)
+        decreasing[ic] = imin >= 0 and col[imax] < col[imin]
+    return decreasing
+
+
+@numba.njit(parallel=True, cache=NOT_CI)
 def _regrid1d_kernel_(
     vi, yi, yo, method, extrap, bias, tension, drop_na, maxgap, conserv, na_thres
 ):
@@ -422,6 +438,8 @@ def _regrid1d_kernel_(
 
     Options are numbers rather than strings, whose reference counting
     would slow down the parallel loop.
+    The columns whose input or output coordinates decrease are processed as reversed
+    views, so that the column functions only work with increasing coordinates.
     """
     no = max(vi.shape[0], yi.shape[0], yo.shape[0])
     ni = max(vi.shape[2], yi.shape[2], yo.shape[2])
@@ -429,6 +447,8 @@ def _regrid1d_kernel_(
         varo = np.zeros((no, yo.shape[1] - 1, ni), dtype=vi.dtype)
     else:
         varo = np.full((no, yo.shape[1], ni), np.nan, dtype=vi.dtype)
+    yi_decreasing = _get_decreasing_(yi)
+    yo_decreasing = _get_decreasing_(yo)
     for ic in numba.prange(no * ni):
         io = ic // ni
         p = ic % ni
@@ -436,6 +456,12 @@ def _regrid1d_kernel_(
         y = yi[io % yi.shape[0], :, p % yi.shape[2]]
         z = yo[io % yo.shape[0], :, p % yo.shape[2]]
         o = varo[io, :, p]
+        if yi_decreasing[(io % yi.shape[0]) * yi.shape[2] + p % yi.shape[2]]:
+            v = v[::-1]
+            y = y[::-1]
+        if yo_decreasing[(io % yo.shape[0]) * yo.shape[2] + p % yo.shape[2]]:
+            z = z[::-1]
+            o = o[::-1]
         if method == 0:
             _nearest1d_col_(v, y, z, o, extrap, drop_na, maxgap)
         elif method == 1:
@@ -487,6 +513,9 @@ _DOC_1D_ = """
     The arrays are broadcasted against each other except along `axis`, like with numpy,
     so the coordinates may vary along the other axes, or not, without a copy.
     See :func:`xoa.core.num.broadcast_along_axis`.
+    The coordinates may increase or decrease, and their direction may change
+    from a column to another, the extrapolations to the bottom and top referring
+    to the smallest and largest values.
 
     Parameters
     ----------
@@ -506,9 +535,9 @@ _DOC_1D_ = """
         and the size of `yo` along `axis`
 """
 _DOC_INTERP_COORDS_ = """yi: array_like
-        Input coordinates, increasing along `axis`
+        Input coordinates, monotonic along `axis`
     yo: array_like
-        Output coordinates, increasing along `axis`"""
+        Output coordinates, monotonic along `axis`"""
 _DOC_DROP_NA_ = """
     drop_na: bool
         Interpolate across the inner NaNs of the input data
@@ -556,9 +585,9 @@ for _func, _title, _coords, _params in [
         cellave1d,
         "Cell averaging or conservative regridding",
         """yib: array_like
-        Input cell edges, increasing along `axis`, with one more element than `vari`
+        Input cell edges, monotonic along `axis`, with one more element than `vari`
     yob: array_like
-        Output cell edges, increasing along `axis`""",
+        Output cell edges, monotonic along `axis`""",
         """
     conserv: bool
         Conservative regridding: the integral is preserved instead of the average
