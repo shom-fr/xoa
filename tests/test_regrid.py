@@ -220,6 +220,20 @@ def test_regrid1d_cellave_conserv():
     assert np.isnan(vo[0]) and not np.isnan(vo[-1])
 
 
+@pytest.mark.parametrize(
+    "mode,bottom,top",
+    [("no", False, False), ("bottom", True, False), ("top", False, True), ("both", True, True)],
+)
+def test_regrid1d_cellave_extrap(mode, bottom, top):
+    zi = xr.DataArray(np.linspace(-90.0, -10.0, 9), dims="z")
+    vi = xr.DataArray(np.arange(9.0), dims="z", coords={"z": zi})
+    zo = xr.DataArray(np.linspace(-150.0, 50.0, 11), dims="z")
+    vo = regrid.regrid1d(vi, zo, method="cellave", extrap=mode)
+    assert np.isnan(vo[0]) != bottom
+    assert np.isnan(vo[-1]) != top
+    assert not np.isnan(vo[5])
+
+
 def test_regrid1d_cellave_drop_na():
     zi = xr.DataArray(np.arange(4.0), dims="z")
     vi = xr.DataArray(np.arange(4.0), dims="z", coords={"z": zi})

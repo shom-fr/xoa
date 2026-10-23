@@ -382,9 +382,9 @@ def _cellave1d_col_(vi, yib, yob, vo, extrap, conserv):
             yib1 = yib[iyi + 1]
 
             # Extrapolation
-            if extrap == 2 and iyi == 0 and yib0 > yob[iyo]:
+            if (extrap == -1 or extrap == 2) and iyi == 0 and yib0 > yob[iyo]:
                 yib0 = yob[iyo]
-            if extrap == 2 and iyi == nyi - 1 and yib1 < yob[iyo + 1]:
+            if (extrap == 1 or extrap == 2) and iyi == nyi - 1 and yib1 < yob[iyo + 1]:
                 yib1 = yob[iyo + 1]
 
             # No intersection
