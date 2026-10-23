@@ -73,7 +73,7 @@ def get_polygon_mask(obj, polygon, threshold=0.5):
     --------
     xoa.core.mask.polygon_mask
     """
-    lon, lat = xgrid._get_lonlat_yx_(obj)
+    lon, lat = xgrid.get_lonlat_2d(obj)
     lonv, latv = lon.values, lat.values
     kwargs = {}
     if threshold is not None:

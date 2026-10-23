@@ -1353,7 +1353,7 @@ def plot_grid(
         centers = kind == "mesh"
 
     # Axes
-    lon, lat = xgrid._get_lonlat_yx_(obj)
+    lon, lat = xgrid.get_lonlat_2d(obj)
     extent = xgeo.get_extent((lon.values, lat.values), margin=0.05)
     if ax is None and "figsize" not in (map_kw or {}):
         # Figure adapted to the aspect ratio of the map, to avoid white margins
@@ -1695,7 +1695,7 @@ def plot_vectors(
     ccrs, _ = _import_cartopy_()
     if transform is None:
         transform = ccrs.PlateCarree()
-    lon, lat = xgrid._get_lonlat_yx_(u)
+    lon, lat = xgrid.get_lonlat_2d(u)
     extent = xgeo.get_extent((lon.values, lat.values), margin=margin)
     ax = _get_map_axes_(ax, extent, transform, map_kw)
     dims = lon.dims

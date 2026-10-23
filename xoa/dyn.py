@@ -489,7 +489,7 @@ def get_div(u, v, dx=None, dy=None, z=None, normalize=False):
         cdyn.div, 1, u, v, dx, dy, z, ["div"], ["Horizontal divergence"], ["s-1"]
     )
     if normalize:
-        corio = get_coriolis(xgrid._get_lonlat_yx_(u)[1])
+        corio = get_coriolis(xgrid.get_lonlat_2d(u)[1])
         div = _normalize_(div, u, corio, "div", "Divergence / f")
     return div
 
@@ -524,7 +524,7 @@ def get_strain(u, v, dx=None, dy=None, z=None, normalize=False):
         ["s-1", "s-1"],
     )
     if normalize:
-        corio = abs(get_coriolis(xgrid._get_lonlat_yx_(u)[1]))
+        corio = abs(get_coriolis(xgrid.get_lonlat_2d(u)[1]))
         strains = tuple(
             _normalize_(da, u, corio, da.name, da.long_name + " / |f|") for da in strains
         )
@@ -620,7 +620,7 @@ def get_geos(ssh, dx=None, dy=None):
     dx, dy = _get_dx_dy_(ssh, dx, dy)
     dx = xr.DataArray(dx) if np.ndim(dx) == 0 else dx
     dy = xr.DataArray(dy) if np.ndim(dy) == 0 else dy
-    lon, lat = xgrid._get_lonlat_yx_(ssh)
+    lon, lat = xgrid.get_lonlat_2d(ssh)
     corio = get_coriolis(lat)
     core_dims = [ydim, xdim]
     ug, vg = xr.apply_ufunc(
@@ -727,7 +727,7 @@ def get_cyclogeos(
     if np.ndim(dy) == 0:
         dy = xr.DataArray(dy)
     ug, vg = get_geos(ssh, dx=dx, dy=dy)
-    corio = get_coriolis(xgrid._get_lonlat_yx_(ssh)[1])
+    corio = get_coriolis(xgrid.get_lonlat_2d(ssh)[1])
     core_dims = [ydim, xdim]
     uc, vc = xr.apply_ufunc(
         cdyn.cyclogeos,

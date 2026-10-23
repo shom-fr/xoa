@@ -62,7 +62,7 @@ def get_rossby(u, v, dx=None, dy=None, z=None):
     xoa.dyn.get_coriolis
     """
     relvort = get_relvort(u, v, dx=dx, dy=dy, z=z)
-    corio = get_coriolis(xgrid._get_lonlat_yx_(u)[1])
+    corio = get_coriolis(xgrid.get_lonlat_2d(u)[1])
     rossby = relvort / corio
     return _name_(rossby.transpose(*u.dims), u, "rossby", "Rossby number", "1")
 

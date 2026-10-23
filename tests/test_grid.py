@@ -308,6 +308,27 @@ def _lonlat_ds():
     return xr.Dataset(coords={"lon": lon, "lat": lat})
 
 
+def test_get_lonlat_2d():
+    ds = _lonlat_ds()
+    lon, lat = grid.get_lonlat_2d(ds)
+    assert lon.dims == lat.dims == ("lat", "lon")
+    assert lon.shape == lat.shape == (4, 5)
+    np.testing.assert_allclose(lon[0], ds.lon)
+    np.testing.assert_allclose(lat[:, 0], ds.lat)
+    # From a data array with 2D coordinates and transposed dimensions
+    lon2d, lat2d = xr.broadcast(ds.lon, ds.lat)
+    da = xr.DataArray(
+        np.zeros(lon2d.shape), dims=lon2d.dims, coords={"lon": lon2d, "lat": lat2d}
+    ).transpose("lon", "lat")
+    lon2, lat2 = grid.get_lonlat_2d(da)
+    assert lon2.dims == ("lat", "lon")
+    np.testing.assert_allclose(lon2, lon)
+    np.testing.assert_allclose(lat2, lat)
+    # Not 2D
+    with pytest.raises(xoa.exceptions.XoaError):
+        grid.get_lonlat_2d(xr.DataArray([0.0, 1.0], dims="lon", coords={"lon": [0.0, 1.0], "lat": 0.0}))
+
+
 def test_get_resolution():
     ds = _lonlat_ds()
     dx, dy = grid.get_resolution(ds)
