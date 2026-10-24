@@ -408,6 +408,23 @@ def test_map_along_dim_without_dim():
     np.testing.assert_allclose(out, da * factor)
 
 
+def test_map_along_dim_coord_named_as_dim():
+    # An output coordinate along "level" that is also named like the working dimension
+    da = xr.DataArray(np.ones((4, 2)), dims=("depth", "member"))
+    depth = xr.DataArray(
+        np.arange(3.0),
+        dims="level",
+        name="depth",
+        coords={"level": np.arange(3), "depth": ("level", np.arange(3.0))},
+    )
+
+    def func(data, depth, axis):
+        return np.repeat(data[:3], 1, axis=axis)
+
+    out = grid.map_along_dim(func, da, "depth", depth, out_dim="level")
+    assert out.dims == ("level", "member")
+
+
 def test_map_along_dim_errors():
     da = xr.DataArray(np.ones((2, 3)), dims=("z", "x"))
     with pytest.raises(xoa.exceptions.XoaError):

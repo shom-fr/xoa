@@ -225,7 +225,7 @@ def map_along_dim(func, da, dim, *coords, out_dim=None, out_size=None, dtype=Non
         if out_dim != dim and out_dim in coord.dims:
             if dim in coord.dims:
                 raise exceptions.XoaError(f"An array cannot have both '{dim}' and '{out_dim}'")
-            coord = coord.rename({out_dim: dim})
+            coord = coord.reset_coords(drop=True).rename({out_dim: dim})
         renamed.append(coord)
     extra = []
     for coord in renamed:
