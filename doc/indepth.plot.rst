@@ -78,7 +78,8 @@ Two layers
       - ``"Long name [units]"`` from the meta-data
     * - (re-exported)
       - :func:`~xoa.core.plot.create_map`, :func:`~xoa.core.plot.decorate_map`,
-        :func:`~xoa.core.plot.add_land`
+        :func:`~xoa.core.plot.add_land`,
+        :func:`~xoa.core.plot.add_layer`
       - Decorated cartopy maps
 
 The high level functions find the data and the labels, then delegate the drawing to the
@@ -217,6 +218,41 @@ searched in the dataset given by ``ds``:
         overlay_contours=[dict(field="bathy", levels=[200, 1000], colors="0.4", linestyles="--")],
         ds=ds,
     )
+
+Background layers
+=================
+
+:func:`~xoa.plot.add_layer` adds a layer of a web map service (WMS or WMTS) under the data,
+and ``layer=True`` or ``layer="name"`` does it in :func:`~xoa.plot.decorate_map`.
+The layers are defined in the ``layers`` section of the xoa config file,
+one subsection per layer, and the ``plot.layer`` option sets the default one.
+The National Geographic map of Esri, ``natgeo``, is available out of the box.
+
+To add your own layer, which is a WMS here, edit your ``xoa.cfg`` file
+(see :func:`xoa.show_paths`) or load another one with :func:`xoa.load_options`:
+
+.. code-block:: ini
+
+    [plot]
+    layer = mylayer
+
+    [layers]
+        [[mylayer]]
+        kind = wms  # or wmts, for which url is the capabilities document
+        url = https://my.server/wms?
+        layer = name_of_the_layer
+        attribution = "My credits"
+
+The same layer can be defined from a dict with
+``xoa.set_options("layers", mylayer={"kind": "wms", "url": ..., "layer": ...})``.
+The ``plot.layer_*`` options set the opacity, the drawing order and the light grey
+attribution drawn in the lower right corner.
+
+.. warning::
+    Quote the values that contain commas, like an attribution, or they are read as lists.
+    A service that is not reachable raises a warning and the land is drawn instead,
+    unless ``fallback=False``.
+    Check the terms of use of a service before publishing a figure.
 
 Scale bar and compass
 =====================

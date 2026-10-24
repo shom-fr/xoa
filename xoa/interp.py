@@ -208,6 +208,11 @@ def grid2loc(da, loc, compat="warn"):
 # %% 2D
 
 
+def _isoslice_along_axis_(var, values, isoval, axis, reverse):
+    """Call the isoslice kernel and keep the axis with a size of 1, for map_along_dim"""
+    return np.expand_dims(core_isoslice(var, values, isoval, reverse, axis=axis), axis)
+
+
 def isoslice(da, values, isoval, dim, reverse=False, dask='parallelized', **kwargs):
     """Extract a slice of ``da`` where ``values`` equals ``isoval``
 
@@ -229,9 +234,9 @@ def isoslice(da, values, isoval, dim, reverse=False, dask='parallelized', **kwar
         If True, search from the end of the ``dim`` axis instead
         of from the beginning.
     dask: str
-        See :func:`xarray.apply_ufunc`.
+        Unused, kept for compatibility.
     kwargs: dict
-        Extra keyword arguments passed to :func:`xarray.apply_ufunc`.
+        Unused, kept for compatibility.
 
     Return
     ------
@@ -248,24 +253,32 @@ def isoslice(da, values, isoval, dim, reverse=False, dask='parallelized', **kwar
     See Also
     --------
     xoa.core.interp.isoslice
-    xarray.apply_ufunc
+    xoa.grid.map_along_dim
     """
 
     assert dim in da.dims
     assert dim in values.dims
+    if not isinstance(isoval, xr.DataArray):
+        isoval = xr.DataArray(isoval)
 
-    da_out = xr.apply_ufunc(
-        core_isoslice,
-        da,
-        values,
-        isoval,
-        reverse,
-        join="override",
-        input_core_dims=[[dim], [dim], [], []],
-        exclude_dims={dim},
-        dask=dask,
-        **kwargs,
-    )
+    # Along the dimension, which is kept in place, then removed
+    da_out = xgrid.map_along_dim(
+        _isoslice_along_axis_, da, dim, values, isoval, out_size=1, reverse=reverse
+    ).squeeze(dim, drop=True)
+
+    # Dimensions and coordinates, those of da first, like with broadcasting
+    dims = [d for d in da.dims if d != dim]
+    for arr in (values, isoval):
+        dims.extend(d for d in arr.dims if d != dim and d not in dims)
+    da_out = da_out.transpose(*dims)
+    for arr in (values, isoval):
+        da_out = da_out.assign_coords(
+            {
+                name: coord
+                for name, coord in arr.coords.items()
+                if dim not in coord.dims and name not in da_out.coords
+            }
+        )
     da_out.attrs.update(da.attrs)
     da_out.encoding.update(da.encoding)
     return da_out

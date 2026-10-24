@@ -60,6 +60,14 @@ map_land_color = string(default=None) # face color of the land, cartopy default 
 map_coastlines = boolean(default=False) # add the coastlines
 map_bbox = boolean(default=True) # keep the frame of the axes visible
 map_fancy = boolean(default=False) # add a fancy black and white frame
+map_layer = boolean(default=False) # add the background layer
+
+layer = string(default="natgeo") # name of the default background layer, see the layers section
+layer_alpha = float(default=1.0) # opacity of the layer
+layer_zorder = float(default=0) # drawing order
+layer_attribution = boolean(default=True) # draw the attribution of the layer
+layer_attribution_size = float(default=5) # font size of the attribution
+layer_attribution_color = string(default="0.4") # color of the attribution
 
 scalebar_units = option("m", "km", "nmi", default="km") # units of the length
 scalebar_loc = string(default="lower left") # corner of the axes
@@ -110,6 +118,23 @@ lightshading_fraction = float(default=1.0) # light shading fraction
 panel_style = string(default="{a})") # label format
 panel_loc = string(default="upper left") # label location
 panel_pad = float(default=0.03) # distance to the axes corner
+
+[layers] # background layers of maps, one subsection per layer
+    [[__many__]]
+    kind = option("wms", "wmts", default="wmts") # type of web map service
+    url = string() # url of the service, or of its capabilities document for wmts
+    layer = string() # name of the layer in the service
+    attribution = string(default=None) # credit drawn on the map, quoted if it has commas
+"""
+
+#: Default layers, which can be overridden or completed in the user config
+CONFIG_DEFAULTS = """
+[layers]
+    [[natgeo]]
+    kind = wmts
+    url = https://services.arcgisonline.com/arcgis/rest/services/NatGeo_World_Map/MapServer/WMTS/1.0.0/WMTSCapabilities.xml
+    layer = NatGeo_World_Map
+    attribution = "Esri, National Geographic"
 """
 
 _PACKAGES = [
@@ -210,12 +235,15 @@ def load_options(cfgfile=None):
     if "options" not in _XOA_CACHE:
         default_user_config_file = get_default_user_config_file()
         options = configobj.ConfigObj(
-            (default_user_config_file if os.path.exists(default_user_config_file) else None),
+            CONFIG_DEFAULTS.split("\n"),
             configspec=_get_specs_(),
-            file_error=False,
             raise_errors=True,
             list_values=True,
         )
+        if os.path.exists(default_user_config_file):
+            options.merge(
+                configobj.ConfigObj(default_user_config_file, raise_errors=True, list_values=True)
+            )
     else:
         options = copy.deepcopy(_XOA_CACHE["options"])
     if cfgfile:
@@ -228,7 +256,24 @@ def load_options(cfgfile=None):
     _XOA_CACHE["options"] = options
 
 
-def _get_options_():
+def get_options():
+    """Get all the current options
+
+    Return
+    ------
+    configobj.ConfigObj
+        The validated options, with a section per option section.
+        It is the live object that :func:`get_option` reads, so do not modify it:
+        use :func:`set_options` or :func:`load_options` instead.
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        from xoa import get_options
+        list(get_options()["layers"])
+    """
     from . import _XOA_CACHE
 
     if "options" not in _XOA_CACHE:
@@ -248,7 +293,7 @@ def get_option(section, option=None):
         print(get_option('plot', 'cmapdiv'))
         print(get_option('plot.cmapdiv'))
     """
-    options = _get_options_()
+    options = get_options()
     if option is None:
         m = _RE_OPTION_MATCH(section)
         if m:
@@ -331,7 +376,7 @@ class set_options:
 
         # Ingest options
         self.xoa_cache = _XOA_CACHE
-        self.old_options = _get_options_()
+        self.old_options = get_options()
         try:
             if cfgfile:
                 load_options(cfgfile)
@@ -408,7 +453,7 @@ def show_options(specs=False):
     if specs:
         print(CONFIG_SPECS.strip("\n"))
     else:
-        print("\n".join(_get_options_().write()).strip("\n").replace("#", " #"))
+        print("\n".join(get_options().write()).strip("\n").replace("#", " #"))
 
 
 def _parse_requirements_(reqfile):

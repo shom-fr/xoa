@@ -194,6 +194,116 @@ class TestRegrid1d:
         assert float(vo[-1]) == 5.0
 
 
+def test_regrid1d_hermit_bias_tension():
+    zi = xr.DataArray(np.linspace(0, 10, 11), dims="z")
+    vi = xr.DataArray(np.sin(zi.values), dims="z", coords={"z": zi})
+    zo = xr.DataArray(np.linspace(0.5, 9.5, 10), dims="z")
+    vo = regrid.regrid1d(vi, zo, method="hermit")
+    vob = regrid.regrid1d(vi, zo, method="hermit", bias=0.5, tension=0.5)
+    assert not np.allclose(vo, vob)
+
+
+def test_regrid1d_cellave_conserv():
+    zie = np.linspace(-100.0, 0.0, 21)
+    zoe = np.linspace(-120.0, 10.0, 8)  # the end cells are partly covered
+    zi = xr.DataArray(0.5 * (zie[1:] + zie[:-1]), dims="z")
+    vi = xr.DataArray(np.cos(zi.values / 30), dims="z", coords={"z": zi})
+    zo = xr.DataArray(0.5 * (zoe[1:] + zoe[:-1]), dims="z")
+    edges = {"in": xr.DataArray(zie, dims="z_edges"), "out": xr.DataArray(zoe, dims="z_edges")}
+    vo = regrid.regrid1d(vi, zo, method="cellave", edges=edges, conserv=True)
+    # The integral is conserved, the end cells being partly covered
+    np.testing.assert_allclose(float((vo * np.diff(zoe)).sum()), float((vi * np.diff(zie)).sum()))
+    vom = regrid.regrid1d(vi, zo, method="cellave", edges=edges)
+    assert not np.allclose(vo, vom)
+    # No valid input: nan
+    vo = regrid.regrid1d(vi.where(zi > -50), zo, method="cellave", edges=edges, conserv=True)
+    assert np.isnan(vo[0]) and not np.isnan(vo[-1])
+
+
+@pytest.mark.parametrize(
+    "mode,bottom,top",
+    [("no", False, False), ("bottom", True, False), ("top", False, True), ("both", True, True)],
+)
+def test_regrid1d_cellave_extrap(mode, bottom, top):
+    zi = xr.DataArray(np.linspace(-90.0, -10.0, 9), dims="z")
+    vi = xr.DataArray(np.arange(9.0), dims="z", coords={"z": zi})
+    zo = xr.DataArray(np.linspace(-150.0, 50.0, 11), dims="z")
+    vo = regrid.regrid1d(vi, zo, method="cellave", extrap=mode)
+    assert np.isnan(vo[0]) != bottom
+    assert np.isnan(vo[-1]) != top
+    assert not np.isnan(vo[5])
+
+
+def test_regrid1d_cellave_na_thres():
+    zi = xr.DataArray(np.linspace(-95.0, -5.0, 10), dims="z")
+    vi = xr.DataArray(np.ones(10), dims="z", coords={"z": zi})
+    # Output edges: -105, -75, -45, -15, 15, so the first cell is covered at 5/6
+    # by the input cells (-100 to 0) and the last one at 1/2
+    zo = xr.DataArray(np.linspace(-90.0, 0.0, 4), dims="z")
+    assert not np.isnan(regrid.regrid1d(vi, zo, method="cellave")).any()
+    vo = regrid.regrid1d(vi, zo, method="cellave", na_thres=0.6)
+    assert np.isnan(vo[-1]) and not np.isnan(vo[:-1]).any()
+    with pytest.raises(xoa.exceptions.XoaRegridError):
+        regrid.regrid1d(vi, zo, method="linear", na_thres=0.5)
+
+
+@pytest.mark.parametrize("method", ["linear", "cellave"])
+def test_regrid1d_decreasing(method):
+    zi = xr.DataArray(np.linspace(-90, -10, 9), dims="z")
+    vi = xr.DataArray(-zi.values / 10, dims="z", coords={"z": zi})
+    zo = xr.DataArray(np.linspace(-80, -20, 4), dims="z")
+    ref = regrid.regrid1d(vi, zo, method=method)
+    np.testing.assert_allclose(ref, [8, 6, 4, 2])
+    vid = vi.isel(z=slice(None, None, -1))
+    np.testing.assert_allclose(regrid.regrid1d(vid, zo, method=method), ref)
+    np.testing.assert_allclose(regrid.regrid1d(vi, zo[::-1], method=method), ref[::-1])
+
+
+@pytest.mark.parametrize("method", ["linear", "cellave"])
+def test_regrid1d_positive(method):
+    zi = xr.DataArray(np.linspace(-90, -10, 9), dims="z", attrs={"positive": "up"})
+    vi = xr.DataArray(-zi.values / 10, dims="z", coords={"z": zi})
+    zo = xr.DataArray(np.linspace(-80, -20, 4), dims="z", attrs={"positive": "up"})
+    ref = regrid.regrid1d(vi, zo, method=method)
+    # Depths in input, positive down
+    depth = xr.DataArray(-zi.values, dims="z", attrs={"positive": "down"})
+    vid = vi.assign_coords(z=depth)
+    np.testing.assert_allclose(regrid.regrid1d(vid, zo, method=method), ref)
+    # Depths in output, positive down
+    zod = xr.DataArray(-zo.values, dims="z", attrs={"positive": "DOWN"})
+    np.testing.assert_allclose(regrid.regrid1d(vi, zod, method=method), ref)
+    # Not negated without the attributes
+    vid.z.attrs.clear()
+    assert np.isnan(regrid.regrid1d(vid, zo, method=method)).all()
+
+
+@pytest.mark.parametrize("use_dask", [False, True])
+def test_regrid1d_binning(use_dask):
+    rng = np.random.default_rng(0)
+    depth = xr.DataArray(np.sort(rng.uniform(-100, 0, (40, 3)), axis=0), dims=("z", "x"))
+    vi = xr.DataArray(rng.random((40, 3)), dims=("z", "x"), coords={"depth": depth})
+    zo = xr.DataArray(np.linspace(-90, -10, 5), dims="depth", name="depth")
+    if use_dask:
+        vi = vi.chunk(x=1)
+    vo = regrid.regrid1d(vi, zo, method="binning", dim=("z", "depth"), coord_in_name="depth")
+    assert vo.dims == ("depth", "x")
+    edges = np.linspace(-100, 0, 6)
+    for ix in range(3):
+        for j in range(5):
+            sel = (depth[:, ix] >= edges[j]) & (depth[:, ix] < edges[j + 1])
+            np.testing.assert_allclose(vo[j, ix], vi[:, ix].values[sel.values].mean())
+    with pytest.raises(xoa.exceptions.XoaRegridError):
+        regrid.regrid1d(vi, zo, method="binning", dim=("z", "depth"), extrap="both")
+
+
+def test_regrid1d_cellave_drop_na():
+    zi = xr.DataArray(np.arange(4.0), dims="z")
+    vi = xr.DataArray(np.arange(4.0), dims="z", coords={"z": zi})
+    zo = xr.DataArray(np.linspace(0, 3, 7), dims="z")
+    with pytest.raises(xoa.exceptions.XoaRegridError):
+        regrid.regrid1d(vi, zo, method="cellave", drop_na=True)
+
+
 @pytest.mark.parametrize(
     "mode,expected",
     [

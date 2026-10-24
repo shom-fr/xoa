@@ -18,6 +18,8 @@ xarray-based ocean analysis library
 
 import os
 
+import cmocean  # noqa: F401 to register the cmo colormaps
+
 from .accessors import register_accessors, register_xoa_accessors
 from .data_samples import (  # noqa: F401
     get_data_sample,
@@ -36,6 +38,7 @@ from .meta.configs import META_CONFIGS  # noqa: F401
 from .options import (  # noqa: F401
     get_default_user_config_file,
     get_option,
+    get_options,
     load_options,
     reset_options,
     set_option,
@@ -62,6 +65,7 @@ __all__ = [
     "get_default_user_config_file",
     "load_options",
     "get_option",
+    "get_options",
     "set_option",
     "set_options",
     "reset_options",

@@ -20,6 +20,7 @@ They are used by the high level plotting functions of the :mod:`xoa.plot` module
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+import warnings
 
 import matplotlib.collections as mcollections
 import matplotlib.patches as mpatches
@@ -30,6 +31,7 @@ import matplotlib.transforms as mtransforms
 import numpy as np
 
 from .. import exceptions, misc
+from ..options import get_options
 from ..options import resolve_option as _opt
 from .geo import EARTH_RADIUS, haversine
 from .grid import centers2edges
@@ -156,6 +158,102 @@ def add_land(ax, scale=None, color=None, **kwargs):
     return ax.add_feature(cfeature.LAND.with_scale(scale), **kwargs)
 
 
+def get_layer(name=None):
+    """Get the definition of a background layer from the ``layers`` options
+
+    Parameters
+    ----------
+    name: None, str
+        Layer name, which defaults to the ``plot.layer`` option
+
+    Return
+    ------
+    dict
+        With the ``kind``, ``url``, ``layer`` and ``attribution`` keys
+
+    Raises
+    ------
+    XoaConfigError
+        When the layer is not defined
+    """
+    name = _opt(name, "plot.layer")
+    layers = get_options()["layers"]
+    if name not in layers:
+        raise exceptions.XoaConfigError(
+            f"Invalid layer name: {name}. Choose one of: {', '.join(layers.sections)}"
+        )
+    return dict(layers[name])
+
+
+def add_layer(ax, name=None, alpha=None, zorder=None, attribution=None, fallback=True, **kwargs):
+    """Add a background layer from a web map service to a cartopy axes
+
+    The layers are defined in the ``layers`` section of the xoa config,
+    like in the following example::
+
+        [layers]
+            [[mylayer]]
+            kind = wms
+            url = https://my.server/wms?
+            layer = my_layer_name
+            attribution = My credits
+
+    Parameters
+    ----------
+    ax: cartopy.mpl.geoaxes.GeoAxes
+    name: None, str
+        Layer name, which defaults to the ``plot.layer`` option
+    alpha: None, float
+        Opacity, which defaults to the ``plot.layer_alpha`` option
+    zorder: None, float
+        Drawing order, which defaults to the ``plot.layer_zorder`` option
+    attribution: None, bool
+        Draw the attribution of the layer, if any,
+        which defaults to the ``plot.layer_attribution`` option
+    fallback: bool
+        Add the land with :func:`add_land` and warn when the service fails
+        instead of raising the error
+    kwargs:
+        Extra parameters are passed to :meth:`cartopy.mpl.geoaxes.GeoAxes.add_wms`
+        or :meth:`cartopy.mpl.geoaxes.GeoAxes.add_wmts`
+
+    Return
+    ------
+    matplotlib.artist.Artist
+
+    See also
+    --------
+    get_layer
+    """
+    layer = get_layer(name)
+    alpha = _opt(alpha, "plot.layer_alpha")
+    zorder = _opt(zorder, "plot.layer_zorder")
+    add = ax.add_wmts if layer["kind"] == "wmts" else ax.add_wms
+    try:
+        artist = add(layer["url"], layer["layer"], alpha=alpha, zorder=zorder, **kwargs)
+    except Exception as exc:
+        if not fallback:
+            raise
+        warnings.warn(
+            f"The layer {name or _opt(None, 'plot.layer')} is not available "
+            f"({type(exc).__name__}): the land is drawn instead"
+        )
+        return add_land(ax, zorder=zorder)
+    if layer["attribution"] and _opt(attribution, "plot.layer_attribution"):
+        ax.text(
+            0.995,
+            0.005,
+            layer["attribution"],
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=_opt(None, "plot.layer_attribution_size"),
+            color=_opt(None, "plot.layer_attribution_color"),
+            zorder=10,
+        )
+    return artist
+
+
 def decorate_map(
     ax,
     extent=None,
@@ -165,6 +263,7 @@ def decorate_map(
     land=None,
     land_scale=None,
     coastlines=None,
+    layer=None,
     bbox=None,
     fancy=None,
     **kwargs,
@@ -191,6 +290,8 @@ def decorate_map(
     land_scale: None, str
     coastlines: None, bool
         Add the coastlines
+    layer: None, bool, str
+        Add a background layer with :func:`add_layer`, whose name may be given
     bbox: None, bool
         Keep the frame of the axes visible
     fancy: None, bool, dict
@@ -209,6 +310,7 @@ def decorate_map(
     gridlines_labels_on = _opt(gridlines_labels_on, "plot.map_gridlines_labels_on")
     land = _opt(land, "plot.map_land")
     coastlines = _opt(coastlines, "plot.map_coastlines")
+    layer = _opt(layer, "plot.map_layer")
     bbox = _opt(bbox, "plot.map_bbox")
     fancy = _opt(fancy, "plot.map_fancy")
     if transform is None:
@@ -221,6 +323,8 @@ def decorate_map(
         add_land(ax, scale=land_scale)
     if coastlines:
         ax.coastlines()
+    if layer:
+        add_layer(ax, layer if isinstance(layer, str) else None)
     if gridlines:
         kwgl = {
             "draw_labels": list(gridlines_labels_on),
@@ -291,6 +395,7 @@ AX_SETUP_KEYS = (
     "land",
     "land_scale",
     "coastlines",
+    "layer",
     "bbox",
     "fancy",
 )

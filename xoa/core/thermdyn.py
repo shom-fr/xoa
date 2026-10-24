@@ -78,18 +78,29 @@ def convert_temp(temp, sal, z, lat, lon, kind, to, sal_kind):
     return from_ct(to_ct(temp, kind, sa, p), to, sa, p)
 
 
-def n2_at_levels(temp, sal, z, lat, lon, temp_kind, sal_kind):
-    """Squared Brunt-Vaisala frequency at the levels of arrays whose last axis is the vertical"""
+def n2_at_levels(temp, sal, z, lat, lon, temp_kind, sal_kind, axis=-1):
+    """Squared Brunt-Vaisala frequency at the levels of arrays whose vertical axis is `axis`
+
+    The latitudes and longitudes either have no vertical axis, or one of size 1.
+    """
     import gsw
 
-    lat = np.asarray(lat, dtype="d")[..., None]
-    lon = np.asarray(lon, dtype="d")[..., None]
+    temp = np.asarray(temp, dtype="d")
+    axis = axis % temp.ndim
+    lat = np.asarray(lat, dtype="d")
+    lon = np.asarray(lon, dtype="d")
+    if lat.ndim < temp.ndim:
+        lat = np.expand_dims(lat, axis if lat.ndim else 0)
+    if lon.ndim < temp.ndim:
+        lon = np.expand_dims(lon, axis if lon.ndim else 0)
     p = gsw.p_from_z(z, lat)
     sa = to_sa(sal, sal_kind, p, lon, lat)
     ct = to_ct(temp, temp_kind, sa, p)
-    mid, _ = gsw.Nsquared(sa, ct, p, lat, axis=-1)
-    out = np.empty(np.shape(temp), dtype="d")
-    out[..., 1:-1] = 0.5 * (mid[..., :-1] + mid[..., 1:])
-    out[..., 0] = mid[..., 0]
-    out[..., -1] = mid[..., -1]
+    mid, _ = gsw.Nsquared(sa, ct, p, lat, axis=axis)
+    out = np.empty(np.broadcast(temp, sa, ct, p).shape, dtype="d")
+    mid = np.moveaxis(mid, axis, 0)  # views only, to index along the vertical axis
+    outv = np.moveaxis(out, axis, 0)
+    outv[1:-1] = 0.5 * (mid[:-1] + mid[1:])
+    outv[0] = mid[0]
+    outv[-1] = mid[-1]
     return out

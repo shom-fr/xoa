@@ -6,6 +6,12 @@ Unreleased
 
 New features
 ------------
+- Add the ``binning`` method to :func:`xoa.regrid.regrid1d` and :func:`xoa.core.regrid.binning1d`: the average of the input points that fall in each output cell, with a minimal fraction of valid values given by ``na_thres``.
+- :func:`xoa.regrid.regrid1d` negates the input coordinate when it has a ``positive`` attribute opposite to the one of the output coordinate, like a depth regridded to ``z`` levels.
+- :func:`xoa.regrid.regrid1d` and the 1D kernels of :mod:`xoa.core.regrid` support decreasing coordinates, which may also change direction from a column to another. They used to give NaNs.
+- Add the ``na_thres`` argument to :func:`xoa.regrid.regrid1d` and :func:`xoa.core.regrid.cellave1d`: the minimal fraction of an output cell that must be covered by valid input cells with the ``cellave`` method.
+- :func:`xoa.regrid.regrid1d` and :func:`xoa.regrid.extrap1d` no longer move the working dimension last, which makes them faster and lighter, and process dask arrays by blocks with :func:`xoa.grid.map_along_dim`. :func:`xoa.thermdyn.get_n2` also keeps the vertical dimension in place, and :func:`xoa.grid.map_along_dim` accepts arrays without the working dimension, like latitudes. :func:`xoa.interp.isoslice` keeps it in place too, with a parallel kernel that does not broadcast the arrays: for depths without the time dimension, it is 5 times faster and needs much less memory.
+- Add :func:`xoa.grid.map_along_dim` to apply a function along a dimension that is kept in place, with coordinates of any subset of the dimensions and dask arrays processed with :func:`dask.array.map_blocks`, and :func:`xoa.core.num.view_along_axis` and :func:`xoa.core.num.broadcast_along_axis` to view arrays as ``(nouter, n, ninner)`` in numba kernels.
 - Switch from black and flake8 to ruff for linting and formatting, with a pre-commit configuration.
 - Make public the helpers that were used outside their module: :func:`xoa.core.plot.import_cartopy`, :func:`xoa.plot.get_map_axes`, :func:`xoa.core.interp.get_source_matrix`, :func:`xoa.geo.pop_tree_kwargs` and :func:`xoa.dyn.format_uv_docstring`. Add :func:`xoa.core.geo.normalize_longitudes`, :func:`xoa.core.poly.as_polygons` and :func:`xoa.coords.set_name_attrs`.
 - Add :func:`xoa.grid.get_lonlat_2d` to get 2D longitudes and latitudes with (y, x) dimensions.
@@ -16,7 +22,8 @@ New features
 - Add :class:`xoa.tide.set_constituents` to use your own tidal constituents files, globally or within a context, with :func:`~xoa.tide.get_constituents`, :func:`~xoa.tide.get_constituent_names` and :func:`~xoa.tide.reset_constituents`. The constituents are read when needed, and ``CONSTITUENT_DB`` and ``CONSTITUENT_NAMES`` are removed. See :ref:`appendix.tide`.
 - Link the xoa functions, classes and accessor methods in the tutorials, and list the ``get_neighbors``, ``get_geosel`` and ``geosel`` accessor methods.
 - Add geographic selection in a box, circle or polygon, or nearest to a point, on rectangular and curvilinear grids and clouds of points: :func:`xoa.geo.get_geosel`, :class:`xoa.geo.GeoSelector`, :class:`xoa.geo.GeoSelection`, :func:`xoa.geo.with_geosel`, with ``fit`` and ``pad`` options and the :func:`xoa.geo.geosel` function and accessor method, based on :class:`xoa.core.geo.GeoSelector`. See :ref:`sphx_glr_tutorials_grids_plot_geosel.py`.
-- Add the :ref:`sphx_glr_tutorials_graphics_plot_map_decorations.py` tutorial: GEBCO background, fancy frame, scale bar, compass and minimap.
+- Add :func:`xoa.plot.add_layer` and :func:`~xoa.plot.get_layer` to add background layers of WMS and WMTS services, which are defined in the new ``layers`` section of the config, with the ``plot.layer*`` options and the ``layer`` argument of :func:`~xoa.plot.decorate_map`. The default layer is the National Geographic map of Esri. Add :func:`xoa.get_options`.
+- Add the :ref:`sphx_glr_tutorials_graphics_plot_map_decorations.py` tutorial: fancy frame, scale bar, compass and minimap.
 - Rename :func:`xoa.plot.create_base_map` and :func:`~xoa.plot.setup_map_axes` to :func:`~xoa.plot.create_map` and :func:`~xoa.plot.decorate_map`. The old names remain as aliases.
 - Add :func:`xoa.plot.add_fancy_map_frame` and the ``fancy`` option of :func:`xoa.plot.decorate_map`, for a GMT-like black and white frame.
 - Ignore the missing time steps of 1D series in :func:`xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv`.
@@ -91,6 +98,9 @@ New features
 
 Breaking changes
 ----------------
+- :func:`xoa.core.interp.isoslice` is no longer a generalized ufunc: it takes an ``axis`` argument, which is the last one by default, and returns the result.
+- The ``cellerr`` method of :func:`xoa.regrid.regrid1d` is removed: it has not been working since the Fortran routines were replaced by numba ones.
+- The 1D kernels of :mod:`xoa.core.regrid` (:func:`~xoa.core.regrid.nearest1d`, :func:`~xoa.core.regrid.linear1d`, :func:`~xoa.core.regrid.cubic1d`, :func:`~xoa.core.regrid.hermit1d` and :func:`~xoa.core.regrid.cellave1d`) no longer take an ``eshapes`` argument: they take arrays that are broadcasted like with numpy except along an ``axis``, which is kept in place. :func:`~xoa.core.regrid.extrap1d` also takes an ``axis``. The ``dask`` argument of :func:`xoa.regrid.regrid1d` and :func:`xoa.regrid.extrap1d` is no longer used.
 - :func:`xoa.sigma.decode_sigma` and the ``ocean_*`` functions of :mod:`xoa.sigma` now return a ``z`` array, which is positive up, instead of a ``depth`` array that was negative. :func:`xoa.grid.dz2depth` and :func:`xoa.grid.decode_dz2depth` return a ``z`` array when ``positive="up"``, and :func:`xoa.grid.decode_dz2depth` no longer overwrites a dimension coordinate that has the same name. Use :func:`xoa.coords.get_depth` to get a depth.
 - :func:`xoa.coords.get_vertical` now uses the meta specs of its argument and looks for a depth, a ``z`` and then an altitude. The ``z`` name is no longer an alternative name of the ``level`` coordinate, and the ``z`` entry of the ``hycom`` configuration is now a ``depth`` entry.
 - :func:`xoa.grid.get_edges` now extrapolates the outer edges linearly by default (``mode="linear_extrap"``) instead of replicating the end values. Pass ``mode="edge"`` to recover the previous behaviour. This also changes the edges inferred by the ``cellave`` method of :func:`xoa.regrid.regrid1d`.
@@ -105,6 +115,12 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix :func:`xoa.grid.map_along_dim` when an output coordinate has a coordinate named like the working dimension, and import ``cmocean`` in :mod:`xoa` to register the ``cmo.*`` colormaps.
+- The ``bottom`` and ``top`` extrapolation modes of the ``cellave`` method of :func:`xoa.regrid.regrid1d` were ignored.
+- The ``conserv`` argument of :func:`xoa.regrid.regrid1d` was ignored by the ``cellave`` method. The conservative regridding also gives NaN instead of 0 where there is no valid input.
+- The ``bias`` and ``tension`` arguments of :func:`xoa.regrid.regrid1d` were ignored by the ``hermit`` method, and ``drop_na`` was not rejected by the ``cellave`` method.
+- :func:`xoa.regrid.extrap1d` failed with dask arrays of more than one dimension.
+- The ``cellave`` method of :func:`xoa.regrid.regrid1d` gave random results when the output coordinates have a dimension that the data does not have.
 - Fix the ``-h`` and ``--short-help`` options of :meth:`xoa.cfgm.ConfigManager.arg_parse`, which lost the options section since python 3.10, and :meth:`~xoa.cfgm.ConfigManager.arg_long_help`, which failed. :mod:`xoa.cfgm` no longer uses the private ``argparse._HelpAction``.
 - Draw the outline of 2D grids with ``plot_coords="auto"`` in :func:`xoa.plot.plot_minimap` instead of all the points, and default ``coords_linewidth`` to 1.5.
 - Fix the Greenwich phases of :mod:`xoa.tide`: astronomical arguments 12 h off, M2/N2/2N2 nodal satellites, and the 90° shifts of the diurnal constituents. They now agree with utide at Brest within 0.5° for the main constituents.
@@ -179,6 +195,7 @@ Bug fixes
 
 Documentation
 -------------
+- Add the :ref:`indepth.performance` guide: the working dimension kept in place, dask chunks, threads or processes, and the speed or memory trade-off. Document the coordinates, the missing values and the ``binning`` method of :func:`xoa.regrid.regrid1d`.
 - Rename "Using the modules" section to "In-depth guides".
 - Added in the in-depth guide to metadata mentions of :mod:`xoa.coords`, :mod:`xoa.dyn` and :mod:`xoa.thermdyn` helper function to access coordinates and physical variables like lon or temp.
 - Added in-depth guides about sigma-like coordinates, grids and regridding, and filtering.
@@ -442,4 +459,3 @@ Bug fixes
 
 Documentation
 -------------
-

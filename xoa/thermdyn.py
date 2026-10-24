@@ -13,6 +13,7 @@ import xarray as xr
 
 from . import coords as xcoords
 from . import exceptions
+from . import grid as xgrid
 from . import meta as xmeta
 from . import misc as xmisc
 from . import regrid as xregrid
@@ -677,22 +678,21 @@ def get_n2(temp, sal, z=None, lat=None, lon=None, temp_kind=None, sal_kind=None)
     sal_kind = _get_sal_kind_(sal, sal_kind)
     temp_c = _as_celsius_(temp)
     z, lat, lon = _get_zlatlon_(temp, z, lat, lon)
-    n2 = xr.apply_ufunc(
+    # The vertical dimension is kept in place
+    lat, lon = (c if isinstance(c, xr.DataArray) else xr.DataArray(c) for c in (lat, lon))
+    n2 = xgrid.map_along_dim(
         cthermdyn.n2_at_levels,
         temp_c,
+        zdim,
         sal,
         z,
         lat,
         lon,
-        input_core_dims=[[zdim], [zdim], [zdim], [], []],
-        output_core_dims=[[zdim]],
-        kwargs={"temp_kind": temp_kind, "sal_kind": sal_kind},
-        join="override",
-        dask="parallelized",
-        output_dtypes=[float],
-        dask_gufunc_kwargs={"allow_rechunk": True},
+        temp_kind=temp_kind,
+        sal_kind=sal_kind,
+        dtype="d",
     )
-    n2 = n2.transpose(*[d for d in temp.dims if d in n2.dims], ...)
+    n2 = n2.assign_coords({name: c for name, c in temp.coords.items() if zdim in c.dims})
     n2 = xcoords.copy_coord_attrs(n2, temp)
     n2.name = "n2"
     n2.attrs = {"long_name": "Squared Brunt-Vaisala frequency", "units": "s-2"}

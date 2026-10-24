@@ -233,7 +233,10 @@ These include:
 - **nearest**: Nearest neighbor interpolation
 - **cubic**: Cubic interpolation
 - **hermit/hermitian**: Hermitian interpolation
-- **cellave**: Cell-averaging or conservative regridding
+- **cellave**: Cell-averaging or conservative regridding, from the edges of the input
+  and output cells, which are computed with :func:`~xoa.grid.get_edges` unless given
+  with ``edges``
+- **binning**: Average of the input points that fall in each output cell
 
 Example usage
 ^^^^^^^^^^^^^
@@ -251,6 +254,45 @@ Example usage
 
     # Regrid with linear interpolation
     data_new = regrid.regrid1d(data_old, x_new, method='linear')
+
+    # Average of the input points in the output cells
+    regrid.regrid1d(data_old, x_new[::4], method='binning')
+
+Coordinates
+^^^^^^^^^^^
+
+The input and output coordinates may vary along the other dimensions, like
+the depths of sigma levels, and may have only some of the dimensions of the data,
+like levels that are the same everywhere. They may increase or decrease, and their
+direction may change from a column to another: "bottom" and "top" then refer to
+the smallest and largest values.
+
+When both coordinates have a ``positive`` attribute and they differ, like a depth that
+is positive down and a ``z`` that is positive up, the input coordinate is negated:
+
+.. ipython:: python
+
+    depth = xr.DataArray([10.0, 50.0, 100.0], dims="z", attrs={"positive": "down"})
+    temp = xr.DataArray([15.0, 12.0, 10.0], dims="z", coords={"depth": depth})
+    z = xr.DataArray([-80.0, -30.0], dims="z", attrs={"positive": "up"}, name="z")
+    regrid.regrid1d(temp, z, dim="z", coord_in_name="depth")
+
+Missing values
+^^^^^^^^^^^^^^
+
+The interpolations ignore the missing values at the ends of the columns, and
+interpolate across the inner ones with ``drop_na=True``, up to ``maxgap`` consecutive
+values. With the ``cellave`` and ``binning`` methods, ``na_thres`` is the minimal valid
+fraction of an output cell to get a value: the covered fraction for ``cellave``, and
+the fraction of valid input points for ``binning``.
+
+Performance
+^^^^^^^^^^^
+
+The working dimension is kept in place: the arrays are not transposed nor copied, the
+columns are processed in parallel by numba, and dask arrays are processed block by
+block, with a single chunk along the working dimension only.
+See :ref:`indepth.performance`.
 
 Extrapolation modes
 ^^^^^^^^^^^^^^^^^^^
@@ -430,20 +472,20 @@ and sigma coordinates using CROCO model output:
     import xoa.meta
     import xoa.regrid
     import numpy as np
-    
+
     # Load CROCO sample data
     ds = xoa.open_data_sample("MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.meridional.nc")
-    
+
     # Set internal croco decoding rules and decode s-coordinate and dataset names
     xoa.meta.set_meta_specs('croco')
     ds_decoded = ds.xoa.decode_sigma().xoa.decode()
-    
+
     # The sigma coordinate has been converted to z heights
     # You can now regrid to regular z levels if needed
-    
+
     # Define regular z levels
     regular_z = xr.DataArray(np.linspace(-100, 0, 20), dims='z', attrs={'units': 'm', 'positive': 'up'})
-    
+
     # Regrid temperature to regular z levels
     temp_regular = xoa.regrid.regrid1d(ds_decoded.ptemp, regular_z, extrap="top")
     print(temp_regular[0, :, 0, 0])

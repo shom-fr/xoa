@@ -15,4 +15,5 @@ In-depth guides
     indepth.regrid
     indepth.plot
     indepth.filtering
+    indepth.performance
     indepth.stataccum

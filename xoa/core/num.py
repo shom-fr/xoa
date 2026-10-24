@@ -112,6 +112,103 @@ def as_float_array(arr):
     return arr
 
 
+def view_along_axis(arr, axis):
+    """View an array as a 3D array ``(nouter, n, ninner)`` around an axis
+
+    ``nouter`` is the product of the sizes of the axes before `axis`,
+    ``n`` the size along `axis` and ``ninner`` the product of the sizes of the axes
+    after it. This is a view of C-contiguous arrays, and a copy otherwise.
+    It lets numba kernels work along an axis without moving it.
+
+    Parameters
+    ----------
+    arr: numpy.ndarray
+    axis: int
+
+    Return
+    ------
+    numpy.ndarray
+        3D array
+
+    See also
+    --------
+    broadcast_along_axis
+    """
+    arr = np.asarray(arr)
+    axis = axis % arr.ndim
+    shape = arr.shape
+    return np.ascontiguousarray(arr).reshape(
+        int(np.prod(shape[:axis])), shape[axis], int(np.prod(shape[axis + 1 :]))
+    )
+
+
+def broadcast_along_axis(*arrays, axis=-1):
+    """Broadcast arrays against each other, except along an axis, and view them in 3D
+
+    The arrays follow the numpy broadcasting rules, except along `axis` where their
+    sizes may differ, like the input data, input coordinates and output coordinates
+    of an interpolation. Each array is then viewed with :func:`view_along_axis`
+    as ``(mouter, n, minner)``, where ``mouter`` and ``minner`` are either 1 or the
+    broadcasted sizes ``nouter`` and ``ninner``. Numba kernels can then loop on
+    ``nouter * ninner`` columns and index the arrays with modulos.
+
+    The arrays are not copied when they are C-contiguous and when the axes
+    before `axis` are either all broadcasted or not at all, and the same
+    for the axes after `axis`. They are broadcasted with a copy otherwise.
+
+    Parameters
+    ----------
+    arrays: numpy.ndarray
+        Arrays with fewer dimensions are prepended with axes of size 1, like with numpy.
+    axis: int
+        Working axis, relative to the array of greatest number of dimensions
+
+    Return
+    ------
+    list of numpy.ndarray
+        3D arrays
+    tuple
+        Broadcasted shape of the axes before `axis`
+    tuple
+        Broadcasted shape of the axes after `axis`
+
+    Example
+    -------
+    .. ipython:: python
+
+        @suppress
+        import numpy as np
+        @suppress
+        from xoa.core.num import broadcast_along_axis
+        data = np.ones((3, 10, 4, 5))  # (t, z, y, x)
+        depth = np.ones((10, 4, 5))  # (z, y, x)
+        levels = np.ones((20, 1, 1))  # (zo, 1, 1)
+        views, outer, inner = broadcast_along_axis(data, depth, levels, axis=1)
+        [view.shape for view in views], outer, inner
+
+    See also
+    --------
+    view_along_axis
+    """
+    arrays = [np.asarray(arr) for arr in arrays]
+    ndim = max(arr.ndim for arr in arrays)
+    axis = axis % ndim
+    arrays = [arr.reshape((1,) * (ndim - arr.ndim) + arr.shape) for arr in arrays]
+    outer = np.broadcast_shapes(*(arr.shape[:axis] for arr in arrays))
+    inner = np.broadcast_shapes(*(arr.shape[axis + 1 :] for arr in arrays))
+    views = []
+    for arr in arrays:
+        shape = arr.shape
+        if shape[:axis] != outer and np.prod(shape[:axis]) != 1:
+            shape = outer + shape[axis:]
+        if shape[axis + 1 :] != inner and np.prod(shape[axis + 1 :]) != 1:
+            shape = shape[: axis + 1] + inner
+        if shape != arr.shape:  # partly broadcasted
+            arr = np.broadcast_to(arr, shape)
+        views.append(view_along_axis(arr, axis))
+    return views, outer, inner
+
+
 EMPTY_OFFSETS = np.empty(0, dtype=np.int64)
 
 

@@ -630,3 +630,83 @@ class TestPlotOptions:
         default = cplot.get_strides("auto", lon, lat, ax, pcar)
         with xoa.set_options("plot", mesh_min_spacing=60):
             assert min(cplot.get_strides("auto", lon, lat, ax, pcar)) > max(default)
+
+
+class TestLayers:
+    """Background layers of web map services, defined in the options"""
+
+    @pytest.fixture
+    def ax(self):
+        pytest.importorskip("cartopy")
+        ccrs, _ = cplot.import_cartopy()
+        return plt.figure().add_subplot(111, projection=ccrs.PlateCarree())
+
+    def test_default_layer(self):
+        layer = cplot.get_layer()
+        assert layer["kind"] == "wmts"
+        assert layer["layer"] == "NatGeo_World_Map"
+        assert layer["attribution"]
+
+    def test_layers_from_options(self):
+        layers = {"mine": {"kind": "wms", "url": "http://x/wms?", "layer": "L"}}
+        with xoa.set_options("layers", **layers):
+            layer = cplot.get_layer("mine")
+            assert layer == {**layers["mine"], "attribution": None}
+            with xoa.set_options("plot", layer="mine"):
+                assert cplot.get_layer() == layer
+            assert "natgeo" in xoa.get_option("layers", "natgeo").parent
+        with pytest.raises(xoa.XoaConfigError, match="Invalid layer name: mine"):
+            cplot.get_layer("mine")
+
+    def test_unknown_layer(self):
+        with pytest.raises(xoa.XoaConfigError, match="natgeo"):
+            cplot.get_layer("unknown")
+
+    def test_add_layer_kinds(self, ax, monkeypatch):
+        calls = []
+        monkeypatch.setattr(
+            type(ax), "add_wmts", lambda self, *a, **kw: calls.append(("wmts", a, kw))
+        )
+        monkeypatch.setattr(
+            type(ax), "add_wms", lambda self, *a, **kw: calls.append(("wms", a, kw))
+        )
+        cplot.add_layer(ax)
+        layers = {"mine": {"kind": "wms", "url": "http://x/wms?", "layer": "L"}}
+        with xoa.set_options("layers", **layers):
+            cplot.add_layer(ax, "mine", alpha=0.5, zorder=2)
+        assert [c[0] for c in calls] == ["wmts", "wms"]
+        assert calls[0][1][1] == "NatGeo_World_Map"
+        assert calls[0][2] == {"alpha": 1.0, "zorder": 0}
+        assert calls[1][1] == ("http://x/wms?", "L")
+        assert calls[1][2] == {"alpha": 0.5, "zorder": 2}
+
+    def test_attribution(self, ax, monkeypatch):
+        monkeypatch.setattr(type(ax), "add_wmts", lambda self, *a, **kw: None)
+        cplot.add_layer(ax)
+        (text,) = ax.texts
+        assert text.get_text() == "Esri, National Geographic"
+        assert text.get_fontsize() == xoa.get_option("plot.layer_attribution_size")
+        cplot.add_layer(ax, attribution=False)
+        assert len(ax.texts) == 1
+
+    def test_failure(self, ax, monkeypatch):
+        def fail(self, *args, **kwargs):
+            raise OSError("no network")
+
+        monkeypatch.setattr(type(ax), "add_wmts", fail)
+        n0 = len(ax.get_children())
+        with pytest.warns(UserWarning, match="natgeo is not available"):
+            cplot.add_layer(ax, "natgeo")
+        assert len(ax.get_children()) == n0 + 1  # the land
+        with pytest.raises(OSError):
+            cplot.add_layer(ax, fallback=False)
+
+    def test_decorate_map(self, ax, monkeypatch):
+        names = []
+        monkeypatch.setattr(cplot, "add_layer", lambda ax, name=None, **kw: names.append(name))
+        cplot.decorate_map(ax, gridlines=False)
+        cplot.decorate_map(ax, gridlines=False, layer=True)
+        cplot.decorate_map(ax, gridlines=False, layer="natgeo")
+        with xoa.set_options("plot", map_layer=True):
+            cplot.decorate_map(ax, gridlines=False)
+        assert names == [None, "natgeo", None]

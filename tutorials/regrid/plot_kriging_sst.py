@@ -303,16 +303,14 @@ add_colorbar(m2, axes[2], label="°C", shrink=0.8)
 # for instance along a ship track. Let's look at the error with respect to the truth and
 # to the global kriging, and at the cost, as functions of ``nneigh``.
 
-nneighs = np.array([4, 8, 16, 32, 64, 128])
+nneighs = np.array([4, 8, 16, 32, 64])
 errs, gaps, costs = [], [], []
 for nneigh in nneighs:
     lk = LocalKriger(resid, "ordinary", vario, nneigh=int(nneigh), dist_units="km")
-    best_t = np.inf
     lk.interp(target.isel(lon=slice(2), lat=slice(2)))  # warm-up
-    for _ in range(5):
-        start = time.perf_counter()
-        out_nn = lk.interp(target, name="sst")
-        best_t = min(best_t, time.perf_counter() - start)
+    start = time.perf_counter()
+    out_nn = lk.interp(target, name="sst")
+    best_t = time.perf_counter() - start
     res = (out_nn.sst + plane(lon, lat)).where(~land)
     errs.append(float(np.sqrt(((res - truth) ** 2).mean())))
     gaps.append(float(np.sqrt(((res - est) ** 2).mean())))
@@ -358,7 +356,7 @@ for ax in axes:
 #
 # The observations are here random points, and the cost includes the setup of the kriger.
 
-counts = [250, 500, 1000, 2000]
+counts = [100, 200, 400, 800]
 timings = {"Kriger": [], "ClusteredKriger": [], "LocalKriger": []}
 builders = {
     "Kriger": lambda o: Kriger(o, "ordinary", vario, dist_units="km"),
