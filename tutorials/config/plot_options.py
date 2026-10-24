@@ -121,6 +121,25 @@ with xoa.set_options(cfgfile):
 print("After the block:", xoa.get_option("plot.scalebar_units"))
 
 # %%
+# Background layers
+# -----------------
+#
+# The layers of web map services of :func:`xoa.plot.add_layer` are defined in the ``layers``
+# section, with a subsection per layer. The National Geographic one is available by default,
+# and the ``plot.layer`` option sets the default layer. Here is how to add your own,
+# from a file or a dict.
+
+cfgfile.write_text(
+    '[plot]\nlayer = mine\n[layers]\n  [[mine]]\n  kind = wms\n  url = https://my.server/wms?\n'
+    '  layer = my_layer\n  attribution = "My credits"\n'
+)
+with xoa.set_options(cfgfile):
+    print(xoa.get_option("plot.layer"), xoa.get_option("layers", "mine"))
+with xoa.set_options("layers", other={"url": "https://my.server/wmts", "layer": "my_layer"}):
+    print(xoa.get_option("layers", "other"))
+print(list(xoa.get_option("layers", "natgeo")))
+
+# %%
 # The user configuration file and the other paths of xoa are printed by
 # :func:`xoa.show_paths`, which is also the ``xoa info paths`` command.
 

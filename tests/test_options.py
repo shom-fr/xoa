@@ -62,6 +62,12 @@ class TestOptionsManagement:
         assert value is False
 
 
+def test_get_options():
+    opts = options.get_options()
+    assert opts["plot"]["cmapdiv"] == options.get_option("plot.cmapdiv")
+    assert "natgeo" in opts["layers"].sections
+
+
 def test_options_are_available_from_the_package():
     import xoa
 
@@ -134,3 +140,45 @@ class TestOptionsFiles:
     def test_resolve_option(self):
         assert options.resolve_option(3, "plot.map_figsize") == 3
         assert options.resolve_option(None, "plot.map_figsize") == (8.0, 8.0)
+
+
+class TestLayersOptions:
+    """Test the layers section"""
+
+    @pytest.fixture(autouse=True)
+    def reset(self):
+        options.reset_options()
+        yield
+        options.reset_options()
+
+    def test_default_layers(self):
+        natgeo = options.get_option("layers", "natgeo")
+        assert natgeo["kind"] == "wmts"
+        assert natgeo["url"].startswith("https://")
+
+    def test_load_layer_from_file(self, tmp_path):
+        path = tmp_path / "xoa.cfg"
+        path.write_text(
+            "[layers]\n  [[mine]]\n  kind = wms\n  url = http://x/wms?\n  layer = L\n"
+            '  attribution = "A, B"\n'
+        )
+        options.load_options(path)
+        assert options.get_option("layers", "mine")["attribution"] == "A, B"
+        assert options.get_option("layers", "mine")["kind"] == "wms"
+        assert "natgeo" in options.get_option("layers", "natgeo").parent
+
+    def test_override_default_layer(self):
+        with options.set_options("layers", natgeo={"layer": "other"}):
+            assert options.get_option("layers", "natgeo")["layer"] == "other"
+            assert options.get_option("layers", "natgeo")["kind"] == "wmts"
+        assert options.get_option("layers", "natgeo")["layer"] == "NatGeo_World_Map"
+
+    @pytest.mark.parametrize(
+        "layer",
+        [{"kind": "wms"}, {"url": "u", "layer": "L", "kind": "ftp"}],
+        ids=["missing", "kind"],
+    )
+    def test_invalid_layer(self, layer):
+        with pytest.raises(exceptions.XoaConfigError):
+            options.load_options({"layers": {"bad": layer}})
+        assert "bad" not in options.get_option("layers", "natgeo").parent

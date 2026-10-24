@@ -22,7 +22,8 @@ New features
 - Add :class:`xoa.tide.set_constituents` to use your own tidal constituents files, globally or within a context, with :func:`~xoa.tide.get_constituents`, :func:`~xoa.tide.get_constituent_names` and :func:`~xoa.tide.reset_constituents`. The constituents are read when needed, and ``CONSTITUENT_DB`` and ``CONSTITUENT_NAMES`` are removed. See :ref:`appendix.tide`.
 - Link the xoa functions, classes and accessor methods in the tutorials, and list the ``get_neighbors``, ``get_geosel`` and ``geosel`` accessor methods.
 - Add geographic selection in a box, circle or polygon, or nearest to a point, on rectangular and curvilinear grids and clouds of points: :func:`xoa.geo.get_geosel`, :class:`xoa.geo.GeoSelector`, :class:`xoa.geo.GeoSelection`, :func:`xoa.geo.with_geosel`, with ``fit`` and ``pad`` options and the :func:`xoa.geo.geosel` function and accessor method, based on :class:`xoa.core.geo.GeoSelector`. See :ref:`sphx_glr_tutorials_grids_plot_geosel.py`.
-- Add the :ref:`sphx_glr_tutorials_graphics_plot_map_decorations.py` tutorial: GEBCO background, fancy frame, scale bar, compass and minimap.
+- Add :func:`xoa.plot.add_layer` and :func:`~xoa.plot.get_layer` to add background layers of WMS and WMTS services, which are defined in the new ``layers`` section of the config, with the ``plot.layer*`` options and the ``layer`` argument of :func:`~xoa.plot.decorate_map`. The default layer is the National Geographic map of Esri. Add :func:`xoa.get_options`.
+- Add the :ref:`sphx_glr_tutorials_graphics_plot_map_decorations.py` tutorial: fancy frame, scale bar, compass and minimap.
 - Rename :func:`xoa.plot.create_base_map` and :func:`~xoa.plot.setup_map_axes` to :func:`~xoa.plot.create_map` and :func:`~xoa.plot.decorate_map`. The old names remain as aliases.
 - Add :func:`xoa.plot.add_fancy_map_frame` and the ``fancy`` option of :func:`xoa.plot.decorate_map`, for a GMT-like black and white frame.
 - Ignore the missing time steps of 1D series in :func:`xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv`.
@@ -114,6 +115,7 @@ Deprecations
 
 Bug fixes
 ---------
+- Fix :func:`xoa.grid.map_along_dim` when an output coordinate has a coordinate named like the working dimension, and import ``cmocean`` in :mod:`xoa` to register the ``cmo.*`` colormaps.
 - The ``bottom`` and ``top`` extrapolation modes of the ``cellave`` method of :func:`xoa.regrid.regrid1d` were ignored.
 - The ``conserv`` argument of :func:`xoa.regrid.regrid1d` was ignored by the ``cellave`` method. The conservative regridding also gives NaN instead of 0 where there is no valid input.
 - The ``bias`` and ``tension`` arguments of :func:`xoa.regrid.regrid1d` were ignored by the ``hermit`` method, and ``drop_na`` was not rejected by the ``cellave`` method.

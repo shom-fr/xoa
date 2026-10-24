@@ -66,7 +66,8 @@ def genrst(app):
     fdecl = open(file_declarations, 'w')
 
     for sec in cfgspecs.sections:
-        for optname, optspecs in cfgspecs[sec].items():
+        for optname in cfgspecs[sec].scalars:
+            optspecs = cfgspecs[sec][optname]
 
             opttype, fun_args, fun_kwargs, optdef = validator._parse_check(optspecs)
             optdesc = cfgspecs[sec].inline_comments[optname].strip("# ")

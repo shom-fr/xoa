@@ -43,10 +43,12 @@ from .core.plot import (  # noqa
     add_compass,
     add_fancy_map_frame,
     add_land,
+    add_layer,
     add_scalebar,
     create_base_map,
     create_map,
     decorate_map,
+    get_layer,
     import_cartopy,
     setup_map_axes,
 )
