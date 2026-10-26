@@ -23,10 +23,12 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "platformdirs",
+    "cartopy",
     "cmocean",
     "configobj",
     "dask",
     "gsw",
+    "matplotlib",
     "netCDF4",
     "numba",
     "pooch",
@@ -35,13 +37,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-plot = ["cartopy"]
+dev = [
+  "pre-commit",
+  "pytest",
+  "ruff",
+  "shapely",
+]
 docs = [
-  "cartopy",
-  "cmocean",
   "ipython",
   "jupyter_client",
-  "matplotlib",
   "owslib",
   "sphinx<9",
   "sphinx_autosummary_accessors",

@@ -6,7 +6,12 @@ Unreleased
 
 New features
 ------------
+- Add the ``dev`` extra with the tools for development (``pytest``, ``pre-commit``, ``ruff`` and ``shapely``).
 - Add the :ref:`contributing` guide, with the release procedure.
+
+Breaking changes
+----------------
+- ``cartopy``, ``matplotlib`` and ``dask`` are standard dependencies: the ``plot`` extra is removed.
 
 2026.10.0
 =========
