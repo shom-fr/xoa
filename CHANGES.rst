@@ -8,6 +8,7 @@ New features
 ------------
 - Add the ``dev`` extra with the tools for development (``pytest``, ``pre-commit``, ``ruff`` and ``shapely``).
 - Add the :ref:`contributing` guide, with the release procedure.
+- Test Python 3.10 to 3.13 in the CI, which installs xoa with pip and the ``dev`` extra.
 
 Breaking changes
 ----------------
