@@ -4,6 +4,9 @@ What's new
 Unreleased
 ==========
 
+2026.10.0
+=========
+
 New features
 ------------
 - Add uncertainty ellipses at the tip of the arrows of :func:`xoa.plot.plot_vectors` with ``ustd``, ``vstd`` and ``uvcorr``, based on :func:`xoa.core.plot.plot_vector_ellipses` and the numba kernel :func:`xoa.core.plot.cov2ellipse`.
@@ -20,13 +23,10 @@ New features
 - Add :func:`xoa.grid.get_lonlat_2d` to get 2D longitudes and latitudes with (y, x) dimensions.
 - Add ``plot`` options used as defaults by the plot functions, load options from a file with :func:`xoa.load_options` and :class:`xoa.set_options`, validate options. ``CBAR_SHRINK`` becomes ``plot.colorbar_shrink``. See :doc:`configure`.
 - Rewrite the :ref:`roadmap`: next diagnostics, and the shoot and armoor ecosystem.
-- Show a larger surge, concise dates and the predicted tide in the skew surge plot of :ref:`sphx_glr_tutorials_tides_plot_tide_station.py`.
 - Export :class:`~xoa.meta.MetaSpecs`, :class:`~xoa.meta.SGLocator`, :class:`~xoa.meta.MetaVarSpecs` and :class:`~xoa.meta.MetaCoordSpecs` from :mod:`xoa.meta`, and fix the API documentation: submodules of the :mod:`xoa.core`, :mod:`xoa.meta` and :mod:`xoa.tide` packages, objects re-exported by packages, missing modules and wrong references.
 - Add :class:`xoa.tide.set_constituents` to use your own tidal constituents files, globally or within a context, with :func:`~xoa.tide.get_constituents`, :func:`~xoa.tide.get_constituent_names` and :func:`~xoa.tide.reset_constituents`. The constituents are read when needed, and ``CONSTITUENT_DB`` and ``CONSTITUENT_NAMES`` are removed. See :ref:`appendix.tide`.
-- Link the xoa functions, classes and accessor methods in the tutorials, and list the ``get_neighbors``, ``get_geosel`` and ``geosel`` accessor methods.
 - Add geographic selection in a box, circle or polygon, or nearest to a point, on rectangular and curvilinear grids and clouds of points: :func:`xoa.geo.get_geosel`, :class:`xoa.geo.GeoSelector`, :class:`xoa.geo.GeoSelection`, :func:`xoa.geo.with_geosel`, with ``fit`` and ``pad`` options and the :func:`xoa.geo.geosel` function and accessor method, based on :class:`xoa.core.geo.GeoSelector`. See :ref:`sphx_glr_tutorials_grids_plot_geosel.py`.
 - Add :func:`xoa.plot.add_layer` and :func:`~xoa.plot.get_layer` to add background layers of WMS and WMTS services, which are defined in the new ``layers`` section of the config, with the ``plot.layer*`` options and the ``layer`` argument of :func:`~xoa.plot.decorate_map`. The default layer is the National Geographic map of Esri. Add :func:`xoa.get_options`.
-- Add the :ref:`sphx_glr_tutorials_graphics_plot_map_decorations.py` tutorial: fancy frame, scale bar, compass and minimap.
 - Rename :func:`xoa.plot.create_base_map` and :func:`~xoa.plot.setup_map_axes` to :func:`~xoa.plot.create_map` and :func:`~xoa.plot.decorate_map`. The old names remain as aliases.
 - Add :func:`xoa.plot.add_fancy_map_frame` and the ``fancy`` option of :func:`xoa.plot.decorate_map`, for a GMT-like black and white frame.
 - Ignore the missing time steps of 1D series in :func:`xoa.tide.harmonic_analysis` and :func:`~xoa.tide.harmonic_analysis_uv`.
@@ -41,19 +41,16 @@ New features
 - Add :func:`xoa.grid.vmean` and :func:`xoa.grid.vintegrate` for thickness weighted vertical means and integrals.
 - Add the ``projection`` argument to :func:`xoa.plot.plot_grid`, orthographic by default.
 - Add :class:`xoa.plot.PanelLabeler`, :func:`xoa.plot.add_panel_labels` and the ``panel_labels`` argument of :func:`xoa.plot.plot_fields` to label panels like "a)".
-- Add a tour of xoa to the :ref:`quickstart`, and the tutorials :ref:`sphx_glr_tutorials_dynamics_plot_flow_advection.py`, :ref:`sphx_glr_tutorials_vertical_plot_layer_thicknesses.py`, :ref:`sphx_glr_tutorials_grids_plot_distances.py`, :ref:`sphx_glr_tutorials_vertical_plot_sigma_levels.py`, :ref:`sphx_glr_tutorials_graphics_plot_colormaps_effects.py` and :ref:`sphx_glr_tutorials_config_plot_options.py`, and improve the figures of the others: consistent fonts and units, shared colorbars, compact layouts.
 - Add the ``parent``, ``loc`` and ``size`` arguments to :func:`xoa.plot.plot_minimap` and :func:`~xoa.plot.plot_double_minimap` to inset the minimaps in an axes.
 - Add ``cmap="auto"`` to :func:`xoa.plot.plot_field` to choose the colormap from the sign of the data and the ``plot`` options, and the ``pretty`` argument of :func:`xoa.plot.get_label` that writes the units in a nicer way (``°C``, ``m s⁻¹``).
 - The options functions, like :func:`xoa.get_option` and :func:`xoa.set_options`, are now available from the ``xoa`` package, as documented.
-- Add the "Configuration" tutorial :ref:`sphx_glr_tutorials_config_plot_cfgm.py` and the naming tutorial :ref:`sphx_glr_tutorials_meta_plot_naming_specs.py`, moved out of :ref:`sphx_glr_tutorials_meta_plot_naming.py`, and shorten the :ref:`indepth.cfgm` guide.
 - Add :func:`xoa.core.plot.get_quiverkey_value` and :func:`~xoa.core.plot.add_quiverkey`: reference arrows now have a round value (1, 2 or 5 times a power of ten) and are placed above the left corner of the axes, also with :func:`xoa.plot.plot_stick`. The :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py` tutorial is reworked and its minimaps no longer enlarge the figures.
 - Add :func:`xoa.dyn.get_rossby_radius`, a quick WKB estimate of the first Rossby radius of deformation. See :ref:`sphx_glr_tutorials_dynamics_plot_vertical_modes.py`.
-- Add the :ref:`sphx_glr_tutorials_vertical_plot_croco_uv_depths.py` tutorial on the depths at the u and v points of a CROCO grid.
 - Add :class:`xoa.krig.LocalKriger`, which krigs with the nearest points only using the new :class:`~xoa.core.geo.SphericalKDTree` and the numba kernels of :mod:`xoa.core.krig`. See :ref:`sphx_glr_tutorials_regrid_plot_kriging.py` and :ref:`sphx_glr_tutorials_regrid_plot_kriging_sst.py`.
 - Add :func:`xoa.coords.geo_unstack` to restore the grid of an object stacked with :func:`~xoa.coords.geo_stack`, and its ``singleton`` argument. The stacked dimensions are now in a fixed order, latitude first.
 - Add :class:`xoa.krig.ClusteredKriger`, which now holds the clusterization (``npmax`` and ``nproc``) that moved out of :class:`xoa.krig.Kriger`.
 - Add :class:`xoa.geo.GeoKDTree` and :func:`xoa.geo.get_neighbors` to find the nearest points or those within a distance, also as ``xoa`` accessor methods with a cached tree, based on the new :class:`xoa.core.geo.SphericalKDTree`. See :ref:`sphx_glr_tutorials_grids_plot_neighbors.py`.
-- Add the :ref:`indepth.dyn` guide and the :mod:`xoa.dyn` diagnostics :func:`~xoa.dyn.get_relvort`, :func:`~xoa.dyn.get_div`, :func:`~xoa.dyn.get_strain`, :func:`~xoa.dyn.get_okuboweiss`, :func:`~xoa.dyn.get_coriolis` and :func:`~xoa.dyn.get_geos`, also available as ``xoa`` accessor methods, with numba kernels in the new :mod:`xoa.core.dyn` module. Grid resolution comes from :func:`xoa.grid.get_dx_dy`.
+- Add the :mod:`xoa.dyn` diagnostics :func:`~xoa.dyn.get_relvort`, :func:`~xoa.dyn.get_div`, :func:`~xoa.dyn.get_strain`, :func:`~xoa.dyn.get_okuboweiss`, :func:`~xoa.dyn.get_coriolis` and :func:`~xoa.dyn.get_geos`, also available as ``xoa`` accessor methods, with numba kernels in the new :mod:`xoa.core.dyn` module. Grid resolution comes from :func:`xoa.grid.get_dx_dy`.
 - Add :func:`xoa.dyn.get_cyclogeos`, an iterative cyclogeostrophic solver after Penven et al. (2014), with full (smoothed) advection terms or the two classic ones with ``terms="penven"``.
 - The :mod:`xoa.dyn` diagnostics accept a variable vertical coordinate ``z`` to compute horizontal derivatives at constant depth. See the :ref:`sphx_glr_tutorials_dynamics_plot_croco_rossby.py` tutorial.
 - Add :class:`xoa.dyn.VerticalModes` to compute vertical modes, speeds and deformation radii, and to decompose and recompose profiles, based on the new :mod:`xoa.core.modes` module. See :ref:`sphx_glr_tutorials_dynamics_plot_vertical_modes.py`.
@@ -61,9 +58,7 @@ New features
 - Add :func:`xoa.thermdyn.get_n2` for the squared Brunt-Vaisala frequency, and :func:`xoa.coords.as_z` to get a vertical coordinate as z, positive up.
 - Add the :mod:`xoa.numbers` module with :func:`~xoa.numbers.get_rossby`, :func:`~xoa.numbers.get_burger`, :func:`~xoa.numbers.get_froude` and :func:`~xoa.numbers.get_ekman`. ``xoa.dyn.get_rossby`` moved to it, without backward compatibility. See :ref:`sphx_glr_tutorials_dynamics_plot_dimensionless_numbers.py`.
 - Add :class:`xoa.stats.StatAccum` to accumulate temporal and spatial statistics, with automatic vertical and horizontal weights, dump and restart, based on numba moments in :mod:`xoa.core.stats`. See :ref:`indepth.stataccum`.
-- Split the grids tutorials into grids, vertical, regridding and filtering, and split the filtering one into :ref:`sphx_glr_tutorials_filtering_plot_filter_space.py`, :ref:`sphx_glr_tutorials_filtering_plot_filter_time.py` and :ref:`sphx_glr_tutorials_filtering_plot_decimate.py`, with more on kernels, tidal filters and decimation.
 - Add :func:`xoa.grid.dz2z`, :func:`xoa.grid.z2dz`, :func:`xoa.grid.get_dz`, :func:`xoa.grid.get_dz_terms` and :func:`xoa.grid.decode_dz2z`, and the ``positive`` and ``errors`` arguments of :func:`xoa.coords.get_positive_attr`. :func:`xoa.coords.get_z` now relies on :func:`~xoa.grid.decode_dz2z`. Fix :func:`xoa.grid.decode_dz2depth` with a bathymetry or a sea surface height and ``positive="down"``.
-- Group the tutorials in categories: graphics, grids, dynamics and evaluation, and add the :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`, :ref:`sphx_glr_tutorials_filtering_plot_filtering.py` and :ref:`sphx_glr_tutorials_regrid_plot_kriging.py` tutorials, and the new :ref:`sphx_glr_tutorials_meta_plot_naming.py` and :ref:`sphx_glr_tutorials_dynamics_plot_mixed_layer.py` ones. Figures are narrower to fit the doc pages, and the :ref:`indepth.meta` guide is shorter and clearer.
 - Add the :ref:`references` page.
 - Add :func:`xoa.mask.get_polygon_mask`, also an ``xoa`` accessor method, to flag grid cells inside polygons with a coverage threshold, based on the new :mod:`xoa.core.mask` and :mod:`xoa.core.poly` numba functions.
 - Add :func:`xoa.plot.plot_fields` to plot several fields on maps of a single figure, with a shared colorbar if needed.
@@ -71,11 +66,10 @@ New features
 - Add :func:`xoa.mask.get_common_mask`, :func:`xoa.stats.rms` and :func:`xoa.poly.get_contour_polygons`, with the new :mod:`xoa.stats` and :mod:`xoa.poly` modules.
 - Add the :meth:`~xoa.dyn.VerticalModes.energy_share` and :meth:`~xoa.dyn.VerticalModes.truncation_error` methods to :class:`xoa.dyn.VerticalModes`.
 - Add :func:`xoa.plot.plot_vectors` and :func:`xoa.core.plot.plot_vectors` to draw currents as under-sampled arrows.
-- Add the :ref:`sphx_glr_tutorials_dynamics_plot_gulfstream_dynamics.py` tutorial, based on a new GLORYS data sample.
 - The ``mercator`` naming specifications are also used for GLORYS.
 - Add the ``ref="surface"`` argument to :func:`xoa.sigma.decode_sigma`, the ``decode_sigma`` accessor and the ocean sigma functions, to get heights relative to the free surface instead of the fixed datum. The core functions of :mod:`xoa.core.sigma` take a new ``datum`` argument, and :func:`xoa.coords.to_z` and :func:`xoa.coords.to_depth` keep the ``xoa_vertical_ref`` attribute.
 - Add :func:`xoa.coords.copy_coord_attrs` to restore coordinate attributes after :func:`xarray.apply_ufunc`.
-- Add the :ref:`indepth.vertical` guide and the ``z`` coordinate (positive up) as distinct from ``depth`` (positive down): ``z`` meta spec, :func:`xoa.coords.get_z`, :func:`~xoa.coords.is_z`, :func:`~xoa.coords.to_z`, :func:`~xoa.coords.to_depth`, :func:`~xoa.coords.reverse_dim` and the ``xoa.get_z`` accessor method. :func:`~xoa.coords.get_depth` and :func:`~xoa.coords.get_z` fall back on each other and flip the sign when needed.
+- Add the ``z`` coordinate (positive up) as distinct from ``depth`` (positive down): ``z`` meta spec, :func:`xoa.coords.get_z`, :func:`~xoa.coords.is_z`, :func:`~xoa.coords.to_z`, :func:`~xoa.coords.to_depth`, :func:`~xoa.coords.reverse_dim` and the ``xoa.get_z`` accessor method. :func:`~xoa.coords.get_depth` and :func:`~xoa.coords.get_z` fall back on each other and flip the sign when needed.
 - Add :func:`xoa.core.plot.get_projection` to get a map projection from an instance, a cartopy lower case name or the ``"merc"``, ``"pc"`` and ``"ortho"`` aliases. The default of :func:`xoa.plot.plot_grid` is ``"ortho"``, centered on the grid.
 - The main ``xoa`` accessor is now registered when :mod:`xoa` is imported.
 - Add the :class:`xoa.core.interp.XYInterpolator` and :class:`xoa.core.regrid.XYRegridder` numba classes for horizontal bilinear, bicubic and conservative interpolation and regridding, with their kernels in the new :mod:`xoa.core.spline` and :mod:`xoa.core.conserv` modules.
@@ -87,7 +81,6 @@ New features
 - The weights of :class:`xoa.interp.Interpolator` and :class:`xoa.regrid.Regridder` are computed only once for the same grids, points and parameters: they are shared between the objects, and thus between the calls of the ``xoa`` accessors on the variables of a dataset. The :func:`xoa.interp.clear_weights_cache` and :func:`xoa.regrid.clear_weights_cache` functions free them.
 - The weights files of :class:`xoa.interp.Interpolator` and :class:`xoa.regrid.Regridder` are now netcdf files with one group per grid and method, named after a fingerprint of the grids, so that a single file serves all your grids, the weights are found automatically and cannot be loaded for other grids. A group is added to the file when it is not found. Files in the previous format are still read, with a warning, but the grids cannot be checked. See the new :mod:`xoa.weights` module.
 - The fingerprint of a grid is available with :func:`xoa.grid.get_fingerprint`, and from the ``src_fingerprint``, ``dst_fingerprint``, ``fingerprint`` and ``weights_group`` attributes of :class:`xoa.regrid.Regridder` and :class:`xoa.interp.Interpolator`. The :func:`xoa.weights.find_groups` and :func:`xoa.weights.describe_groups` functions find and describe the weights of a grid in a weights file.
-- Add the in-depth guides :ref:`indepth.horizontal` and :ref:`indepth.plot`.
 - Add the :func:`xoa.misc.get_array_fingerprint` and :func:`xoa.misc.combine_fingerprints` functions and the :class:`xoa.misc.SmallCache` class.
 - Add the :func:`xoa.plot.add_colorbar` and :func:`xoa.core.plot.add_colorbar` functions that add shrunk colorbars, labelled from the data array, which are used by all the colorbars of :mod:`xoa.plot`.
 - Add the :mod:`xoa.core.plot` module with the low level plotting routines that work on numpy arrays and axes, like :func:`xoa.core.plot.plot_mesh`, :func:`xoa.core.plot.plot_depth_section` and :func:`xoa.core.plot.plot_sticks`, which are used by the high level functions of :mod:`xoa.plot`.
@@ -162,6 +155,13 @@ Bug fixes
 - Fix a data race in :func:`xoa.core.interp.closest2d` (parallel scan writing to shared accumulators) that made :func:`xoa.interp.grid2loc` silently return wrong results, or crash, on genuinely curvilinear (non-separable) grids.
 - Remove ``fastmath=True`` from :func:`xoa.core.interp.closest2d`, :func:`xoa.core.interp.cell2relloc` and :func:`xoa.core.interp.grid2relloc`: it could break the NaN-skip comparisons these functions rely on to ignore invalid/land-masked grid points, silently returning a wrong result.
 
+Documentation
+-------------
+- Add a gallery of tutorials grouped in categories (graphics, grids, vertical, regridding, filtering, dynamics, tides, meta, config and evaluation), with consistent and compact figures and links to the xoa objects. See :ref:`tutorials`.
+- Add the :ref:`indepth.dyn`, :ref:`indepth.vertical`, :ref:`indepth.tide`, :ref:`indepth.horizontal`, :ref:`indepth.plot`, :ref:`indepth.stataccum` and :ref:`indepth.performance` guides, and the tide appendix. The :ref:`indepth.meta` and :ref:`indepth.cfgm` guides are shorter.
+- Add a tour of xoa to the :ref:`quickstart`.
+- List the ``get_neighbors``, ``get_geosel`` and ``geosel`` accessor methods.
+
 
 2026.7.0
 ========
@@ -200,7 +200,6 @@ Bug fixes
 
 Documentation
 -------------
-- Add the :ref:`indepth.performance` guide: the working dimension kept in place, dask chunks, threads or processes, and the speed or memory trade-off. Document the coordinates, the missing values and the ``binning`` method of :func:`xoa.regrid.regrid1d`.
 - Rename "Using the modules" section to "In-depth guides".
 - Added in the in-depth guide to metadata mentions of :mod:`xoa.coords`, :mod:`xoa.dyn` and :mod:`xoa.thermdyn` helper function to access coordinates and physical variables like lon or temp.
 - Added in-depth guides about sigma-like coordinates, grids and regridding, and filtering.
