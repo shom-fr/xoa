@@ -111,7 +111,7 @@ def apply_along_dim(
                 dao.attrs = da.attrs
             daos[dao.name] = dao
         if isinstance(dso, xr.Dataset):
-            dso = dso.update(daos)
+            dso.update(daos)  # in place, it returns None since xarray 2025.09.1
             dso.attrs = ds.attrs
             dso.encoding = ds.encoding
         else:

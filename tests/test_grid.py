@@ -717,3 +717,22 @@ def test_apply_along_dim_name_kwargs():
 
     grid.apply_along_dim(da, "x", func, name_kwargs={"y": {"a": 1}}, b=0)
     assert calls == [{"b": 0}, {"b": 0, "a": 1}, {"b": 0}]
+
+
+def test_apply_along_dim_dataset():
+    ds = xr.Dataset(
+        {
+            "temp": (("x", "y"), np.arange(12.0).reshape(4, 3), {"units": "degC"}),
+            "mask": ("y", np.ones(3)),
+        },
+        coords={"x": np.arange(4.0), "y": np.arange(3.0)},
+        attrs={"title": "test"},
+    )
+    out = grid.apply_along_dim(ds, "x", grid.get_centers)
+    assert isinstance(out, xr.Dataset)
+    assert out.sizes == {"x": 3, "y": 3}
+    np.testing.assert_allclose(out.x, [0.5, 1.5, 2.5])
+    np.testing.assert_allclose(out.temp, 0.5 * (ds.temp[1:].values + ds.temp[:-1].values))
+    assert out.temp.attrs == {"units": "degC"}
+    assert out.attrs == {"title": "test"}
+    xr.testing.assert_identical(out.mask, ds.mask)  # without the dimension
