@@ -201,6 +201,9 @@ or an arc (``"deg"``), which is the only choice for a cloud of points.
     - As for neighbors, a nearest point beyond ``max_dist`` has an index of -1 when there are
       several targets, and raises an error with a single target.
 
+The shapes are drawn with :func:`xoa.plot.plot_box`, :func:`xoa.plot.plot_circle` and
+:func:`xoa.plot.plot_polygon`, which take the same arguments.
+
 See the :ref:`sphx_glr_tutorials_grids_plot_geosel.py` tutorial.
 
 
@@ -217,7 +220,9 @@ a single call. Tiles are datasets, arrays, netcdf files or glob patterns, and ma
 
     ds = merge_tiles("tiles/*.nc", overlap="mean")
 
-    tm = TileMerger(tiles=["west.nc", "east.nc"])  # or dx, dy, lon0, lat0, nx, ny
+    tm = TileMerger(lon_range=(-180, 180))  # or dx, dy, lon0, lat0, nx, ny
+    tm.add("west.nc")
+    tm.add("east.nc")
     print(tm)  # grid, tiles and estimated memory
     tm.plot()  # grid, tiles, overlaps and gaps
     ds = tm.merge()

@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Add :func:`xoa.plot.plot_box`, :func:`xoa.plot.plot_circle` and :func:`xoa.plot.plot_polygon` to draw the shapes of :func:`xoa.geo.get_geosel`, based on the functions of :mod:`xoa.core.plot`.
 - Add :class:`xoa.tiles.TileMerger` and :func:`xoa.tiles.merge_tiles` to merge overlapping tiles of a regular lon/lat grid, with longitude wrapping and ``lon_range``, a memory estimate and warning, and a plot of the tiles on the grid, based on the new :mod:`xoa.core.tiles` numba kernels. See :ref:`sphx_glr_tutorials_grids_plot_tiles.py`.
 - Add the ``binning`` method to :func:`xoa.regrid.regrid1d` and :func:`xoa.core.regrid.binning1d`: the average of the input points that fall in each output cell, with a minimal fraction of valid values given by ``na_thres``.
 - :func:`xoa.regrid.regrid1d` negates the input coordinate when it has a ``positive`` attribute opposite to the one of the output coordinate, like a depth regridded to ``z`` levels.

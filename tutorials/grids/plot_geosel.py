@@ -29,6 +29,7 @@ import xarray as xr
 import xoa  # noqa: F401
 from xoa.core.grid import create_rotated_grid
 from xoa.geo import GeoSelector, geosel, get_geosel, with_geosel
+from xoa.plot import plot_box, plot_circle, plot_polygon
 
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 pc = ccrs.PlateCarree()
@@ -146,18 +147,30 @@ obs = xr.Dataset(
     {"temp": ("obs", rng.normal(14, 2, 400))},
     coords={"lon": ("obs", rng.uniform(-7, -2, 400)), "lat": ("obs", rng.uniform(45, 49.5, 400))},
 )
-box = geosel(obs, lon=(-6, -4.5), lat=(46, 47.5))
-circle = geosel(obs, circle=(-3.5, 48, 70), units="km")
-polygon = geosel(obs, polygon=[[-6, 46], [-4, 45.5], [-3.5, 47.5], [-5, 48.5]])
-padded = geosel(obs, circle=(-3.5, 48, 70), units="km", pad=30, pad_units="km")
+box_kw = dict(lon=(-6, -4.5), lat=(46, 47.5))
+circle_kw = dict(circle=(-3.5, 48, 70), units="km")
+polygon_kw = dict(polygon=[[-6, 46], [-4, 45.5], [-3.5, 47.5], [-5, 48.5]])
+box = geosel(obs, **box_kw)
+circle = geosel(obs, **circle_kw)
+polygon = geosel(obs, **polygon_kw)
+padded = geosel(obs, **circle_kw, pad=30, pad_units="km")
 print(box.sizes["obs"], circle.sizes["obs"], padded.sizes["obs"])
+
+# %%
+# The shapes are drawn with :func:`~xoa.plot.plot_box`, :func:`~xoa.plot.plot_circle` and
+# :func:`~xoa.plot.plot_polygon`, that take the same arguments as the selection. The circle is
+# a great circle one, and the margin of a circle is a larger radius.
 
 fig, axes = new_map(3, width=3.4)
 for ax, sub, title in zip(axes, [box, circle, polygon], ["Box", "Circle", "Polygon"]):
     ax.plot(obs.lon, obs.lat, ".", color="0.7", ms=3, transform=pc)
     ax.plot(sub.lon, sub.lat, ".", color="C3", ms=4, transform=pc)
     ax.set_title(title)
+plot_box(**box_kw, ax=axes[0])
+plot_circle(circle_kw["circle"], units="km", ax=axes[1])
+plot_polygon(polygon_kw["polygon"], ax=axes[2])
 axes[1].plot(padded.lon, padded.lat, ".", color="C1", ms=3, transform=pc, zorder=0.5)
+plot_circle((-3.5, 48, 100), units="km", ax=axes[1], edgecolor="C1", linestyle="--")
 axes[1].set_title("Circle, and with 30 km margin")
 
 # %%
