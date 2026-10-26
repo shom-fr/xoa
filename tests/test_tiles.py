@@ -134,3 +134,60 @@ def test_plot_single_color_many_tiles(full):
     assert (colors[:-1] != colors[1:]).all()
     ax = tm.plot(color="C0")
     assert "Tiles" in [t.get_text() for t in ax.get_legend().get_texts()]
+
+
+def lon_tile(lon, name):
+    lon = np.asarray(lon, "d")
+    return xr.Dataset(
+        {"u": (("lat", "lon"), np.tile(lon, (3, 1)))},
+        coords={"lon": lon, "lat": np.arange(3.0)},
+        attrs={"name": name},
+    )
+
+
+@pytest.mark.parametrize(
+    "tiles, lon_range, lon_min, lon_max",
+    [
+        # 0/360 seam, convention of the first tile
+        ([np.arange(340.0, 360), np.arange(0.0, 20)], None, 0, 359),
+        ([np.arange(340.0, 360), np.arange(0.0, 20)], (-180, 180), -20, 19),
+        # Mixed conventions of the same place
+        ([np.arange(-20.0, 0), np.arange(0.0, 20), np.arange(340.0, 360)], None, -20, 19),
+        # Dateline, with a doubt on the convention
+        ([np.arange(160.0, 180), np.arange(-180.0, -160)], None, -180, 179),
+        ([np.arange(160.0, 180), np.arange(-180.0, -160)], (0, 360), 160, 199),
+        # A tile that crosses the dateline
+        ([np.r_[170:180, -180:-170]], None, -180, 179),
+    ],
+)
+def test_lon_wrapping(tiles, lon_range, lon_min, lon_max):
+    n = sum(len(lon) for lon in tiles)
+    out = merge_tiles([lon_tile(lon, str(i)) for i, lon in enumerate(tiles)], lon_range=lon_range)
+    lon = out.lon.values
+    assert lon.min() == lon_min and lon.max() == lon_max
+    assert (np.diff(lon) > 0).all()
+    # Compact grid, fully filled, with the values at the right longitudes
+    assert out.lon.size <= n and out.u.notnull().all()
+    np.testing.assert_allclose((out.u.isel(lat=0).values - lon) % 360, 0, atol=1e-9)
+
+
+def test_lon_range():
+    assert TileMerger(tiles=lon_tile(np.arange(0.0, 90), "a")).lon_range == (-180.0, 180.0)
+    assert TileMerger(tiles=lon_tile(np.arange(170.0, 190), "a")).lon_range == (0.0, 360.0)
+    assert TileMerger(lon_range=(-10, 350)).lon_range == (-10.0, 350.0)
+    with pytest.raises(exceptions.XoaError, match="360"):
+        TileMerger(lon_range=(0, 180))
+
+
+def test_lon0_wrapping():
+    tiles = [lon_tile(np.arange(350.0, 360), "a"), lon_tile(np.arange(0.0, 10), "b")]
+    tm = TileMerger(lon0=-10.0, dx=1.0, tiles=tiles)
+    assert tm.grid["lon0"] == -10.0 and tm.grid["nx"] == 20
+
+
+def test_plot_across_dateline():
+    tm = TileMerger(
+        tiles=[lon_tile(np.arange(170.0, 180), "a"), lon_tile(np.arange(-180.0, -170), "b")]
+    )
+    ax = tm.plot()
+    assert ax.projection.proj4_params["lon_0"] == pytest.approx(180.0, abs=1)

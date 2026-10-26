@@ -226,6 +226,11 @@ a single call. Tiles are datasets, arrays, netcdf files or glob patterns, and ma
   A tile that is not on the grid, within ``tol`` times the step, raises an error.
 - Coordinates may be 1D or 2D when rectilinear, as in :func:`~xoa.grid.to_rect`, and the merged
   ones are 1D and increasing.
+- Longitudes are processed modulo 360: tiles may use different conventions, cross the dateline
+  or the Greenwich meridian. The grid is built on the 360 degrees window with the smallest
+  extent, or starting at ``lon0``, and the merged longitudes are put in ``lon_range``, which
+  is inferred from the first tile: ``(0, 360)`` if it has longitudes above 180, and
+  ``(-180, 180)`` otherwise. The columns are sorted again when the window crosses the range.
 - Cells not covered by a tile are filled with nans, and nans of a tile never erase
   the values of another one.
 - ``overlap`` is ``"last"``, ``"first"``, ``"mean"`` or ``"raise"``.

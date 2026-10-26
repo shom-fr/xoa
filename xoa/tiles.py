@@ -72,39 +72,24 @@ class _Tile_:
         if lon.ndim != 1 or lat.ndim != 1:
             raise exceptions.XoaError(f"Tile {self.name!r} must have 1D longitudes and latitudes")
         self.xdim, self.ydim = lon.dims[0], lat.dims[0]
-        for dim, coord in ((self.xdim, lon), (self.ydim, lat)):
-            diff = np.diff(coord.values)
+        raw = lon.values.astype("d")
+        self.lon_min, self.lon_max = np.nanmin(raw), np.nanmax(raw)
+        # Longitudes are continuous across the dateline and the 0/360 seam
+        values = {"lon": np.unwrap(raw, period=360), "lat": lat.values.astype("d")}
+        self.axes = {}
+        for axis, dim, coord in (("lon", self.xdim, lon), ("lat", self.ydim, lat)):
+            diff = np.diff(values[axis])
             if (diff < 0).all() and diff.size:
                 obj = obj.isel({dim: slice(None, None, -1)})
+                values[axis] = values[axis][::-1]
             elif not (diff > 0).all():
                 raise exceptions.XoaError(
                     f"The coordinate {coord.name!r} of the tile {self.name!r} is not monotonic"
                 )
+            self.axes[axis] = values[axis]
         self.ds = obj
         self.lon = xcoords.get_lon(obj)
         self.lat = xcoords.get_lat(obj)
-
-
-def _fit_axis_(axes, step, origin, size, tol, name):
-    """Get the regular axis `(step, origin, size)` that fits increasing 1D axes"""
-    if step is None:
-        steps = [(ax[-1] - ax[0]) / (ax.size - 1) for ax in axes if ax.size > 1]
-        if not steps:
-            raise exceptions.XoaError(f"Cannot infer the {name} step: provide it")
-        step = np.median(steps)
-        # Least squares fit on all the points to avoid a drift
-        if origin is None:
-            origin = min(ax[0] for ax in axes)
-        pos = np.concatenate([np.round((ax - origin) / step) for ax in axes])
-        step = np.polyfit(pos, np.concatenate(axes), 1)[0]
-    if origin is None:
-        origin = min(ax[0] for ax in axes)
-    ends = [ctiles.get_grid_indices(np.array([ax[0], ax[-1]], "d"), origin, step) for ax in axes]
-    if any(ind[0] < 0 for ind, _ in ends):
-        raise exceptions.XoaError(f"Some tiles start before the {name} origin {origin}")
-    if size is None:
-        size = max(ind[1] for ind, _ in ends) + 1
-    return step, origin, size
 
 
 class TileMerger:
@@ -119,6 +104,11 @@ class TileMerger:
     The tiles must have the same variables and the same dimensions apart from
     longitude and latitude, whose coordinates may be 1D or 2D if the grid is rectilinear.
     Coordinates are sorted in increasing order.
+
+    Longitudes are processed modulo 360 degrees, so tiles may use different conventions
+    or cross the dateline or the Greenwich meridian. The grid is built on the window
+    of 360 degrees with the smallest extent, or starting at `lon0`, and the merged dataset
+    is put in `lon_range`.
 
     Parameters
     ----------
@@ -144,6 +134,10 @@ class TileMerger:
     max_memory: None, int
         Estimated memory in bytes, see :attr:`nbytes`, above which :meth:`merge` issues
         a warning. It defaults to half of the physical memory.
+    lon_range: None, tuple
+        Range of the longitudes of the merged dataset, like ``(-180, 180)`` or ``(0, 360)``,
+        whose size must be 360. It is inferred from the first tile: ``(0, 360)`` if its
+        longitudes exceed 180, and ``(-180, 180)`` otherwise.
     tiles: None, list
         Initial tiles, see :meth:`add`
 
@@ -157,13 +151,18 @@ class TileMerger:
 
     def __init__(
         self, dx=None, dy=None, lon0=None, lat0=None, nx=None, ny=None, overlap="last", tol=0.1,
-        max_memory=None, tiles=None,
+        max_memory=None, lon_range=None, tiles=None,
     ):  # fmt: skip
         if overlap not in ctiles.OVERLAPS:
             raise exceptions.XoaError(f"Invalid overlap {overlap!r}: {list(ctiles.OVERLAPS)}")
         self.overlap = overlap
         self.tol = tol
         self.max_memory = max_memory or _get_default_max_memory_()
+        if lon_range is not None:
+            lon_range = tuple(float(lon) for lon in lon_range)
+            if len(lon_range) != 2 or abs(lon_range[1] - lon_range[0] - 360) > 1e-6:
+                raise exceptions.XoaError("lon_range must have a size of 360 degrees")
+        self._lon_range = lon_range
         self._spec = {"dx": dx, "dy": dy, "lon0": lon0, "lat0": lat0, "nx": nx, "ny": ny}
         self._tiles = []
         self._grid = None
@@ -204,6 +203,28 @@ class TileMerger:
         return len(self._tiles)
 
     @property
+    def lon_range(self):
+        """Range of the longitudes of the merged dataset"""
+        if self._lon_range is not None:
+            return self._lon_range
+        if self._tiles and self._tiles[0].lon_max > 180:
+            return (0.0, 360.0)
+        return (-180.0, 180.0)
+
+    def _wrap_tiles_(self):
+        """Shift the longitudes of the tiles into the window of the grid"""
+        spec = self._spec
+        axes = [tile.axes["lon"] for tile in self._tiles]
+        if spec["lon0"] is not None:
+            start = spec["lon0"] - (0.5 * spec["dx"] if spec["dx"] else 1e-3)
+        else:
+            start = ctiles.get_lon_window_start(axes, self.lon_range[0])
+        for tile in self._tiles:
+            tile.lonv = ctiles.wrap_lon(tile.axes["lon"][0], start) + (
+                tile.axes["lon"] - tile.axes["lon"][0]
+            )
+
+    @property
     def grid(self):
         """Specifications of the grid, as a dict with ``dx``, ``dy``, ``lon0``, ``lat0``,
         ``nx`` and ``ny``"""
@@ -212,11 +233,13 @@ class TileMerger:
                 raise exceptions.XoaError("Add tiles to infer the grid")
             spec = self._spec
             grid = {}
+            if self._tiles:
+                self._wrap_tiles_()
             for xy, axis in (("x", "lon"), ("y", "lat")):
-                axes = [getattr(tile, axis).values.astype("d") for tile in self._tiles]
+                axes = [tile.lonv if axis == "lon" else tile.axes[axis] for tile in self._tiles]
                 step, origin, size = spec["d" + xy], spec[axis + "0"], spec["n" + xy]
                 if axes:
-                    step, origin, size = _fit_axis_(axes, step, origin, size, self.tol, axis)
+                    step, origin, size = ctiles.fit_regular_axis(axes, step, origin, size, axis)
                 grid.update({"d" + xy: step, axis + "0": origin, "n" + xy: size})
             self._grid = {key: grid[key] for key in self._spec}
             self._index_tiles_()
@@ -228,7 +251,7 @@ class TileMerger:
         for tile in self._tiles:
             tile.index = {}
             for axis, xy in (("lon", "x"), ("lat", "y")):
-                coord = getattr(tile, axis).values.astype("d")
+                coord = tile.lonv if axis == "lon" else tile.axes[axis]
                 ind, err = ctiles.get_grid_indices(coord, grid[axis + "0"], grid["d" + xy])
                 if err > self.tol or (np.diff(ind) != 1).any() or ind[0] < 0:
                     raise exceptions.XoaError(
@@ -278,7 +301,7 @@ class TileMerger:
 
     @property
     def lon(self):
-        """Longitudes of the grid"""
+        """Longitudes of the grid, continuous and so possibly out of :attr:`lon_range`"""
         grid = self.grid
         return grid["lon0"] + grid["dx"] * np.arange(grid["nx"])
 
@@ -376,6 +399,14 @@ class TileMerger:
             if mode == 2:
                 ctiles.finalize_mean(data3d, count)
             out[name] = xr.DataArray(data, dims=dims + [ydim, xdim], attrs=var.attrs)
+        # Put the longitudes in the range, which may reorder the columns
+        lon, lo = self.lon, self.lon_range[0]
+        norm = np.where((lon < lo) | (lon >= lo + 360), lo + (lon - lo) % 360, lon)
+        if (norm != lon).any():
+            order = np.argsort(norm, kind="stable")
+            out = out.isel({xdim: order}).assign_coords(
+                {first.lon.name: (xdim, norm[order], first.lon.attrs)}
+            )
         return out
 
     def get_coverage(self):
@@ -467,6 +498,9 @@ class TileMerger:
                 f"({grid['dx']:.4g}°×{grid['dy']:.4g}°)"
             )
             kwargs.setdefault("title", title)
+            if "projection" not in kwargs:  # centered, for grids that cross the dateline
+                ccrs, _ = cplot.import_cartopy()
+                kwargs["projection"] = ccrs.Mercator(central_longitude=0.5 * (x0 + x1))
             _, ax = cplot.create_map([x0 - dx, x1 + dx, y0 - dy, y1 + dy], **kwargs)
         kw = {}
         to_display = ax.transData
