@@ -204,6 +204,38 @@ or an arc (``"deg"``), which is the only choice for a cloud of points.
 See the :ref:`sphx_glr_tutorials_grids_plot_geosel.py` tutorial.
 
 
+Merging tiles with :mod:`xoa.tiles`
+-----------------------------------
+
+The :class:`xoa.tiles.TileMerger` class merges tiles that are subsets of a larger rectangular
+longitude/latitude grid with constant steps, and :func:`xoa.tiles.merge_tiles` does it in
+a single call. Tiles are datasets, arrays, netcdf files or glob patterns, and may overlap.
+
+.. code-block:: python
+
+    from xoa.tiles import TileMerger, merge_tiles
+
+    ds = merge_tiles("tiles/*.nc", overlap="mean")
+
+    tm = TileMerger(tiles=["west.nc", "east.nc"])  # or dx, dy, lon0, lat0, nx, ny
+    print(tm)  # grid, tiles and estimated memory
+    tm.plot()  # grid, tiles, overlaps and gaps
+    ds = tm.merge()
+
+- The grid steps, origin and size are inferred from the coordinates of the tiles when not given.
+  A tile that is not on the grid, within ``tol`` times the step, raises an error.
+- Coordinates may be 1D or 2D when rectilinear, as in :func:`~xoa.grid.to_rect`, and the merged
+  ones are 1D and increasing.
+- Cells not covered by a tile are filled with nans, and nans of a tile never erase
+  the values of another one.
+- ``overlap`` is ``"last"``, ``"first"``, ``"mean"`` or ``"raise"``.
+- Variables are transposed with longitude and latitude last, and integers are converted to floats.
+- The merge is eager: the :attr:`~xoa.tiles.TileMerger.nbytes` estimate is shown by the
+  representation and the plot, and a warning is issued when it exceeds ``max_memory``.
+
+See the :ref:`sphx_glr_tutorials_grids_plot_tiles.py` tutorial.
+
+
 .. _indepth.grids.regrid:
 
 Regridding with :mod:`xoa.regrid`

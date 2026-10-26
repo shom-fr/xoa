@@ -34,6 +34,7 @@ Package API
     xoa.regrid
     xoa.stats
     xoa.thermdyn
+    xoa.tiles
     xoa.weights
     xoa.sigma
 
