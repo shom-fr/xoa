@@ -179,6 +179,7 @@ TUTORIALS_ORDER = [
     "plot_distances",
     "plot_neighbors",
     "plot_geosel",
+    "plot_tiles",
     "plot_sigma_levels",
     "plot_layer_thicknesses",
     "plot_croco_uv_depths",
