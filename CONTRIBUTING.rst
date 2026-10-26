@@ -32,7 +32,11 @@ The version comes from the git tag (``setuptools-scm``) and follows ``YYYY.M.pat
        git tag -a vYYYY.M.patch -m "Version YYYY.M.patch"
        git push origin vYYYY.M.patch
 
-#. Create a GitHub release from the tag: it runs the workflow that publishes to PyPI.
+#. Create a GitHub release from the tag, with the notes of ``CHANGES.rst``: it runs the
+   workflow that publishes to PyPI::
+
+       python bin/release_notes.py YYYY.M.patch | gh release create vYYYY.M.patch --notes-file -
+
 #. Check Read the Docs and merge the pull request of the
    `conda-forge feedstock <https://github.com/conda-forge/xoa-feedstock>`_.
 #. Merge ``main`` back into ``develop``.
