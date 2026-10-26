@@ -266,6 +266,84 @@ class TestPlotVectors:
         assert quiver.get_array().size == 9
 
 
+class TestVectorEllipses:
+    @staticmethod
+    def get_quiver(ax, **kwargs):
+        x, y = np.meshgrid(np.arange(1.0, 5.0), np.arange(1.0, 4.0))
+        kwargs = {"scale": 10, "scale_units": "width", **kwargs}
+        return ax.quiver(x, y, np.ones_like(x), 0.5 * np.ones_like(x), **kwargs)
+
+    def test_cov2ellipse(self):
+        ustd, vstd, uvcorr = np.array([1.0, 2.0, 1.0]), np.array([0.5, 1.0, 1.0]), [0, 0.5, -1]
+        major, minor, angle = cplot.cov2ellipse(ustd, vstd, uvcorr)
+        for i in range(3):
+            cov = np.array(
+                [
+                    [ustd[i] ** 2, ustd[i] * vstd[i] * uvcorr[i]],
+                    [ustd[i] * vstd[i] * uvcorr[i], vstd[i] ** 2],
+                ]
+            )
+            evals, evecs = np.linalg.eigh(cov)
+            np.testing.assert_allclose([minor[i] ** 2, major[i] ** 2], evals, atol=1e-12)
+            np.testing.assert_allclose(
+                abs(np.cos(angle[i]) * evecs[0, 1] + np.sin(angle[i]) * evecs[1, 1]), 1
+            )
+
+    def test_cov2ellipse_missing_and_shape(self):
+        major, minor, angle = cplot.cov2ellipse(np.full((2, 3), np.nan), 1.0, 0.0)
+        assert major.shape == minor.shape == angle.shape == (2, 3)
+        assert np.isnan(major).all()
+
+    @pytest.mark.parametrize("pivot,frac", [("tail", 1.0), ("mid", 0.5), ("tip", 0.0)])
+    def test_tips(self, pivot, frac):
+        ax = get_axes(xlim=(0, 10), ylim=(0, 10))
+        quiver = self.get_quiver(ax, pivot=pivot)
+        ellipses = cplot.plot_vector_ellipses(ax, quiver, 0.3, 0.1)
+        ax.figure.canvas.draw()
+        tips = ax.transData.inverted().transform(ellipses.get_tips())
+        # One tenth of the axes width per unit of velocity
+        np.testing.assert_allclose(tips[0], [1 + frac, 1 + 0.5 * frac])
+
+    def test_size_follows_the_figure(self):
+        ax = get_axes(xlim=(0, 10), ylim=(0, 10))
+        quiver = self.get_quiver(ax)
+        ellipses = cplot.plot_vector_ellipses(ax, quiver, 0.5, 0.25, nsigma=2)
+        ax.figure.canvas.draw()
+        # Full axes: 2 sigma on each side, 500 pixels for 10 units
+        np.testing.assert_allclose(ellipses.get_widths(), 2 * 2 * 0.5 * 50)
+        np.testing.assert_allclose(ellipses.get_heights(), 2 * 2 * 0.25 * 50)
+        ax.figure.set_size_inches(10, 10)
+        ax.figure.canvas.draw()
+        np.testing.assert_allclose(ellipses.get_widths(), 2 * 2 * 0.5 * 100)
+
+    def test_rotation_and_missing_values(self):
+        ax = get_axes()
+        quiver = self.get_quiver(ax)
+        ustd = np.ones(quiver.U.size)
+        ustd[0] = np.nan
+        ellipses = cplot.plot_vector_ellipses(ax, quiver, ustd, 0.5, rotation=np.pi / 2)
+        angles = ellipses.get_angles()
+        np.testing.assert_allclose(angles[1], 90.0)
+        assert np.isnan(ellipses.get_widths()[0])
+
+    def test_legend_and_no_autoscale(self):
+        ax = get_axes()
+        quiver = self.get_quiver(ax)
+        lim = ax.dataLim.extents.copy()
+        cplot.plot_vector_ellipses(ax, quiver, 0.3, label="2 sigma")
+        np.testing.assert_allclose(ax.dataLim.extents, lim)
+        assert "2 sigma" in [t.get_text() for t in ax.legend().get_texts()]
+
+    def test_errors(self):
+        ax = get_axes()
+        with pytest.raises(xoa.XoaError, match="angles"):
+            cplot.plot_vector_ellipses(ax, self.get_quiver(ax, angles="xy"), 1.0)
+        with pytest.raises(xoa.XoaError, match="scale"):
+            cplot.plot_vector_ellipses(ax, self.get_quiver(ax, scale_units="xy"), 1.0)
+        with pytest.raises(xoa.XoaError, match="size"):
+            cplot.plot_vector_ellipses(ax, self.get_quiver(ax), np.ones(5))
+
+
 class TestCenterResolution:
     def test_regular_grid_on_the_equator(self):
         lon, lat = np.meshgrid(np.arange(5.0), np.arange(4.0) * 0)

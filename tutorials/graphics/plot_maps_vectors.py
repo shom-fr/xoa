@@ -9,7 +9,7 @@ In this tutorial, we show how to:
 * add a scale bar and a compass, optionally with a shadow or a glow,
 * compare several fields in a single figure,
 * overlay under-sampled arrows of the currents, optionally colored by the speed,
-  with a reference arrow whose value is rounded,
+  with a reference arrow whose value is rounded, and uncertainty ellipses at their tip,
 * plot a current time series as sticks,
 * show the location of the domain with a minimap, placed so that the figure stays compact.
 
@@ -132,6 +132,29 @@ plot_vectors(ds.u, ds.v, ax=ax, color="w")
 # The arrows can be colored by the speed, and the stride can be forced.
 
 plot_vectors(ds.u, ds.v, color="speed", stride=3, map_kw=MAP_KW, title="Stride 3")
+
+# %%
+# Uncertainty ellipses
+# --------------------
+#
+# With standard deviations of the components, and optionally their correlation,
+# an ellipse is drawn at the tip of each arrow. Its radius is ``nsigma`` standard
+# deviations, which includes 95% of a gaussian distribution by default. They are drawn
+# with the color of the arrows, with a transparent face.
+# Here the uncertainty is synthetic, and the correlation tilts the ellipses.
+
+std = 0.03 + 0.15 * speed
+plot_vectors(
+    ds.u,
+    ds.v,
+    color="tab:blue",
+    ustd=std,
+    vstd=0.5 * std,
+    uvcorr=0.6 + 0 * std,
+    stride=3,
+    map_kw=MAP_KW,
+    ellipse_kwargs={"label": "95 %"},
+).axes.legend(loc="lower right")
 
 # %%
 # Current time series

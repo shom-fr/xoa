@@ -6,6 +6,7 @@ Unreleased
 
 New features
 ------------
+- Add uncertainty ellipses at the tip of the arrows of :func:`xoa.plot.plot_vectors` with ``ustd``, ``vstd`` and ``uvcorr``, based on :func:`xoa.core.plot.plot_vector_ellipses` and the numba kernel :func:`xoa.core.plot.cov2ellipse`.
 - Add :func:`xoa.plot.plot_box`, :func:`xoa.plot.plot_circle` and :func:`xoa.plot.plot_polygon` to draw the shapes of :func:`xoa.geo.get_geosel`, based on the functions of :mod:`xoa.core.plot`.
 - Add :class:`xoa.tiles.TileMerger` and :func:`xoa.tiles.merge_tiles` to merge overlapping tiles of a regular lon/lat grid, with longitude wrapping and ``lon_range``, a memory estimate and warning, and a plot of the tiles on the grid, based on the new :mod:`xoa.core.tiles` numba kernels. See :ref:`sphx_glr_tutorials_grids_plot_tiles.py`.
 - Add the ``binning`` method to :func:`xoa.regrid.regrid1d` and :func:`xoa.core.regrid.binning1d`: the average of the input points that fall in each output cell, with a minimal fraction of valid values given by ``na_thres``.
@@ -100,6 +101,7 @@ New features
 
 Breaking changes
 ----------------
+- The shadows are more transparent: the default ``alpha`` goes from 0.3 to 0.15 for the map decorations and the ``plot.shadow_alpha`` option from 0.5 to 0.3.
 - :func:`xoa.core.interp.isoslice` is no longer a generalized ufunc: it takes an ``axis`` argument, which is the last one by default, and returns the result.
 - The ``cellerr`` method of :func:`xoa.regrid.regrid1d` is removed: it has not been working since the Fortran routines were replaced by numba ones.
 - The 1D kernels of :mod:`xoa.core.regrid` (:func:`~xoa.core.regrid.nearest1d`, :func:`~xoa.core.regrid.linear1d`, :func:`~xoa.core.regrid.cubic1d`, :func:`~xoa.core.regrid.hermit1d` and :func:`~xoa.core.regrid.cellave1d`) no longer take an ``eshapes`` argument: they take arrays that are broadcasted like with numpy except along an ``axis``, which is kept in place. :func:`~xoa.core.regrid.extrap1d` also takes an ``axis``. The ``dask`` argument of :func:`xoa.regrid.regrid1d` and :func:`xoa.regrid.extrap1d` is no longer used.
