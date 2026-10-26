@@ -101,7 +101,7 @@ New features
 
 Breaking changes
 ----------------
-- The shadow of the map decorations is more transparent: the default ``alpha`` goes from 0.3 to 0.15.
+- The shadows are more transparent: the default ``alpha`` goes from 0.3 to 0.15 for the map decorations and the ``plot.shadow_alpha`` option from 0.5 to 0.3.
 - :func:`xoa.core.interp.isoslice` is no longer a generalized ufunc: it takes an ``axis`` argument, which is the last one by default, and returns the result.
 - The ``cellerr`` method of :func:`xoa.regrid.regrid1d` is removed: it has not been working since the Fortran routines were replaced by numba ones.
 - The 1D kernels of :mod:`xoa.core.regrid` (:func:`~xoa.core.regrid.nearest1d`, :func:`~xoa.core.regrid.linear1d`, :func:`~xoa.core.regrid.cubic1d`, :func:`~xoa.core.regrid.hermit1d` and :func:`~xoa.core.regrid.cellave1d`) no longer take an ``eshapes`` argument: they take arrays that are broadcasted like with numpy except along an ``axis``, which is kept in place. :func:`~xoa.core.regrid.extrap1d` also takes an ``axis``. The ``dask`` argument of :func:`xoa.regrid.regrid1d` and :func:`xoa.regrid.extrap1d` is no longer used.

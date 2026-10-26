@@ -107,7 +107,7 @@ minimap_coords_facecolor = float(default=0.2) # opacity of the coordinates area
 shadow_width = float(default=3) # shadow blur width in points
 shadow_xoffset = float(default=2) # shadow horizontal offset in points
 shadow_yoffset = float(default=-2) # shadow vertical offset in points
-shadow_alpha = float(default=0.5) # shadow opacity
+shadow_alpha = float(default=0.3) # shadow opacity
 shadow_color = string(default="k") # shadow color
 glow_width = float(default=3) # glow width in points
 glow_alpha = float(default=1.0) # glow opacity
