@@ -9,10 +9,20 @@ MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.meridional.nc 0193833138ea9e92b8e55
 MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.surf.nc 61d2c863f143c9c6298180be38b9d23ab6c80ee3c8721f3899c0c48c2944446d
 MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.zonal.nc 0193833138ea9e92b8e55d9751784222af72481405936b8770c77cca006a2efd
 
+# A CROCO simulation of the eastern Mediterranean at 1/60 degree, on sigma levels and at regular depths
+MODELS/CROCO/MED/pelops_3d.nc 9040eaa0939e3e4aad2d2e90e2824f8c8c4c5e9f9e11dcb52e78aec55225df77
+MODELS/CROCO/MED/pelops_3d_interp.nc e4c929afade817a8dc317e688dc68a4a4c72b5142a5eed09265ff9c93df3497b
+
 # Three variables of an HyCOM run
 MODELS/HYCOM/hycom.gdp.h.nc 0c205cf6b8207e6b73a1cc97cdd4dbe63269d92e9230a7fb098a3fed87587c68
 MODELS/HYCOM/hycom.gdp.u.nc e5338a4ade98fd5ed5b7c48cabb03535b3c61a5b385d74473a8f75185deb70da
 MODELS/HYCOM/hycom.gdp.v.nc a7464d29342761cf74c6f91909c5a3555c94c33a2644779dce5ddd2eb2f82303
 
+# A daily GLORYS12 reanalysis of the Gulf Stream, with currents and sea surface height at 1/6 degree
+MODELS/CMEMS-GLORYS/glorys_gulfstream_3d.nc 8c07898627c6a1423a4fdb447ce382a0d69fbff76212a6bb97a72135646f62c1
+
 # A single drifter of the GDP program
 OBS/DRIFTERS/gdp-6203641.csv 1c6f44491cfc20c39e73051fc1ac3e3b61d4d5c12f6937253aa67dbf98ef1e7b
+
+# Hourly wave parameters of the Pierres Noires buoy, from 2013 to 2024
+OBS/WAVES/wave_buoy_6200069_2013-2024.nc 50e148dabfa897f66c960305ef38b53f5ce727a29635c9e28ad77a7acba97ab8

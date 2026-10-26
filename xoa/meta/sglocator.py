@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Naming convention tools for reading and formatting variables
 
@@ -24,9 +23,7 @@ See the :ref:`indepth.meta` section.
 
 import re
 
-
-from .. import exceptions
-from .. import misc
+from .. import exceptions, misc
 
 
 def _compile_sg_match_(re_match, formats, root_patterns, location_pattern):
@@ -42,7 +39,7 @@ def _compile_sg_match_(re_match, formats, root_patterns, location_pattern):
             ).fullmatch
 
 
-class SGLocator(object):
+class SGLocator:
     """Staggered grid location parsing and formatting utility
 
     Parameters

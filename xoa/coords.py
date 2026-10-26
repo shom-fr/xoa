@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Utilities for working with coordinates and dimensions.
 
@@ -7,6 +6,7 @@ coordinates (longitude, latitude, depth, time, etc.) and dimensions
 from :mod:`xarray` data arrays and datasets, based on the
 :mod:`xoa.meta` metadata specifications.
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,9 +26,7 @@ from collections.abc import Mapping
 import numpy as np
 import xarray as xr
 
-from . import exceptions
-from . import misc
-from . import meta
+from . import exceptions, meta, misc
 
 
 def ensure_ns_datetime(da):
@@ -63,6 +61,62 @@ def ensure_ns_datetime(da):
 
 
 @misc.ERRORS.format_function_docstring
+def copy_coord_attrs(da, ref):
+    """Copy the attributes of the coordinates of a reference to those of an array
+
+    This is useful after :func:`xarray.apply_ufunc`, which drops the attributes of the
+    coordinates, like the ``standard_name`` that is needed to find
+    the longitudes and latitudes.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+        Object whose coordinates are updated in place
+    ref: xarray.DataArray, xarray.Dataset
+        Object whose coordinate attributes are copied, for the coordinates they share
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+        The same object as `da`
+    """
+    for name, coord in ref.coords.items():
+        if name in da.coords:
+            da.coords[name].attrs.update(coord.attrs)
+    return da
+
+
+def set_name_attrs(da, ref, name, long_name, units):
+    """Name a computed array and set its attributes, while its coordinates keep theirs
+
+    The attributes of `da` are replaced by its long name and units,
+    and those of its coordinates are copied from `ref`
+    with :func:`copy_coord_attrs`.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Computed array, which is updated in place
+    ref: xarray.DataArray, xarray.Dataset
+        Object whose coordinate attributes are copied, like an input of the computation
+    name: str
+        Name of the array
+    long_name: str
+        Long name of the array
+    units: str
+        Units of the array
+
+    Return
+    ------
+    xarray.DataArray
+        The same array as `da`
+    """
+    da = copy_coord_attrs(da, ref)
+    da.name = name
+    da.attrs = {"long_name": long_name, "units": units}
+    return da
+
+
 def get_lon(da, errors="raise", **kwargs):
     """Get the longitude coordinate
 
@@ -177,12 +231,73 @@ def is_lat(da, loc="any"):
     return meta.get_meta_specs(da).coords.match(da, "lat", loc=loc)
 
 
-@misc.ERRORS.format_function_docstring
-def get_depth(da, errors="raise", **kwargs):
-    """Get or compute the depth coordinate
+_POSITIVE = {"z": "up", "depth": "down"}
 
-    If a depth variable cannot be found, it tries to compute either
-    from sigma-like coordinates or from layer thicknesses.
+
+def _search_z_depth_(da, name, **kwargs):
+    """Search for `name` ("z" or "depth"), else for the other one
+
+    The result is converted when its ``positive`` attribute, or its name when it has none,
+    is not the one of `name`.
+    """
+    metaspecs = meta.get_meta_specs(da)
+    for found_name in (name, "depth" if name == "z" else "z"):
+        found = metaspecs.search(da, found_name, errors="ignore", **kwargs)
+        if found is not None:
+            positive = found.attrs.get("positive")
+            if positive not in ("up", "down"):
+                positive = _POSITIVE[found_name]
+            if positive == _POSITIVE[name]:
+                return found
+            return to_z(found) if name == "z" else to_depth(found)
+
+
+def _get_z_depth_(da, name, errors, **kwargs):
+    """Common part of :func:`get_z` and :func:`get_depth`"""
+    errors = misc.ERRORS[errors]
+    ztype = meta.get_meta_specs(da)["vertical"]["type"]
+
+    # From variable, converted if needed
+    found = _search_z_depth_(da, name, **kwargs)
+    if found is not None:
+        return found
+
+    # Decode the dataset
+    if ztype != "z" and hasattr(da, "data_vars"):
+        decoders = []
+        if ztype in ("sigma", None):
+            from .sigma import decode_sigma
+
+            decoders.append(decode_sigma)
+        if ztype in ("dz", "layer", None):
+            from .grid import decode_dz2z
+
+            decoders.append(decode_dz2z)
+        for decoder in decoders:
+            decoded = decoder(da, errors="ignore" if ztype is None else errors)
+            found = _search_z_depth_(decoded, name, **kwargs)
+            if found is not None:
+                return found
+        msg = f"Can't infer {name} coordinate from dataset"
+    else:
+        msg = f"No {name} coordinate found"
+    if errors == "raise":
+        raise exceptions.XoaCoordsError(msg)
+    if errors == "warn":
+        exceptions.xoa_warn(msg)
+
+
+@misc.ERRORS.format_function_docstring
+def get_z(da, errors="raise", **kwargs):
+    """Get or compute the z coordinate, which is positive up
+
+    The z coordinate is negative in the ocean and increases from the bottom
+    to the surface, as opposed to the depth, which is positive in the ocean.
+    If a z variable cannot be found, it uses the depth, if any, with
+    :func:`to_z`, or tries to compute it either from sigma-like coordinates
+    or from layer thicknesses.
+    What is found is converted when its ``positive`` attribute, or its name when it has none,
+    is not ``"up"``.
 
     Parameters
     ----------
@@ -197,50 +312,77 @@ def get_depth(da, errors="raise", **kwargs):
 
     See also
     --------
+    get_depth
+    get_vertical
+    to_z
+    to_depth
+    xoa.meta.MetaSpecs.search
+    xoa.sigma.decode_sigma
+    xoa.grid.decode_dz2z
+    """
+    return _get_z_depth_(da, "z", errors, **kwargs)
+
+
+def is_z(da, loc="any"):
+    """Tell if a data array is identified as z, i.e. positive up
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+    loc: str
+        Staggered grid location
+
+    Return
+    ------
+    bool
+
+    See also
+    --------
+    is_depth
+    is_altitude
+    is_level
+    xoa.meta.MetaCoordSpecs.match
+    """
+    return meta.get_meta_specs(da).coords.match(da, "z", loc=loc)
+
+
+@misc.ERRORS.format_function_docstring
+def get_depth(da, errors="raise", **kwargs):
+    """Get or compute the depth coordinate, which is positive down
+
+    If a depth variable cannot be found, it uses the z coordinate, if any,
+    with :func:`to_depth`, or tries to compute it either
+    from sigma-like coordinates or from layer thicknesses.
+    What is found is converted when its ``positive`` attribute, or its name when it has none,
+    is not ``"down"``.
+
+    Parameters
+    ----------
+    da: xarray.DataArray, xarray.Dataset
+    {errors}
+    kwargs:
+        Extra parameters are passed to :meth:`xoa.meta.MetaSpecs.search`
+
+    Return
+    ------
+    xarray.DataArray or None
+
+    See also
+    --------
+    get_z
     get_lon
     get_lat
     get_time
     get_altitude
     get_level
     get_vertical
+    to_depth
+    to_z
     xoa.meta.MetaSpecs.search
-    xoa.sigma.decode_meta_sigma
-    xoa.grid.decode_meta_dz2depth
+    xoa.sigma.decode_sigma
+    xoa.grid.decode_dz2z
     """
-    metaspecs = meta.get_meta_specs(da)
-    errors = misc.ERRORS[errors]
-    ztype = metaspecs["vertical"]["type"]
-
-    # From variable
-    depth = metaspecs.search(da, 'depth', errors="ignore", **kwargs)
-    if depth is not None:
-        return depth
-    if ztype == "z" or not hasattr(da, "data_vars"):  # explicitly
-        msg = "No depth coordinate found"
-        if errors == "raise":
-            raise exceptions.XoaCoordsError(msg)
-        exceptions.xoa_warn(msg)
-        return
-
-    # Decode the dataset
-    if ztype == "sigma" or ztype is None:
-        err = "ignore" if ztype is None else errors
-        from .sigma import decode_meta_sigma
-
-        da = decode_meta_sigma(da, errors=err)
-        if "depth" in da:
-            return da.depth
-    if ztype == "dz2depth" or ztype is None:
-        err = "ignore" if ztype is None else errors
-        from .grid import decode_meta_dz2depth
-
-        da = decode_meta_dz2depth(da, errors=err)
-        if "depth" in da:
-            return da.depth
-    msg = "Can't infer depth coordinate from dataset"
-    if errors == "raise":
-        raise exceptions.XoaCoordsError(msg)
-    exceptions.xoa_warn(msg)
+    return _get_z_depth_(da, "depth", errors, **kwargs)
 
 
 def is_depth(da, loc="any"):
@@ -377,9 +519,10 @@ def is_level(da, loc="any"):
 
 @misc.ERRORS.format_function_docstring
 def get_vertical(da, errors="raise", **kwargs):
-    """Get either depth or altitude
+    """Get either z, depth or altitude
 
-    Tries to find a depth coordinate first, then falls back to altitude.
+    Tries to find a depth coordinate first, then a z and finally an altitude.
+    No conversion is performed: use :func:`get_z` or :func:`get_depth` for that.
 
     Parameters
     ----------
@@ -396,25 +539,158 @@ def get_vertical(da, errors="raise", **kwargs):
     --------
     get_lon
     get_lat
+    get_z
     get_depth
     get_altitude
     get_level
     get_time
     xoa.meta.MetaSpecs.search
     """
-    metaspecs = meta.get_meta_specs()
-    height = metaspecs.search(da, 'depth', errors="ignore", **kwargs)
-    if height is None:
-        height = metaspecs.search(da, 'altitude', errors="ignore", **kwargs)
+    metaspecs = meta.get_meta_specs(da)
+    for meta_name in ("depth", "z", "altitude"):
+        height = metaspecs.search(da, meta_name, errors="ignore", **kwargs)
+        if height is not None:
+            break
     if height is None:
         errors = misc.ERRORS[errors]
         msg = "No vertical coordinate found"
         if errors == "raise":
-            raise meta.XoaCoordsError(msg)
+            raise exceptions.XoaCoordsError(msg)
         elif errors == "warn":
             exceptions.xoa_warn(msg)
     else:
         return height
+
+
+def reverse_dim(da, dim=None):
+    """Reverse a data array along a dimension
+
+    This is a view for numpy arrays and a lazy operation for dask arrays.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+    dim: None, str
+        Dimension name, which defaults to the first one.
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    to_z
+    to_depth
+    """
+    dim = dim or da.dims[0]
+    return da.isel({dim: slice(None, None, -1)})
+
+
+def _flip_vertical_(da, name, positive, reverse):
+    """Common part of :func:`to_z` and :func:`to_depth`"""
+    out = 0 - da  # avoids negative zeros
+    if da.name in out.coords:  # stale copy of itself
+        out = out.drop_vars(da.name)
+    out.attrs = {k: v for k, v in da.attrs.items() if k in ("units", "xoa_vertical_ref")}
+    out.attrs["positive"] = positive
+    out = out.rename(name)
+    return reverse_dim(out, None if reverse is True else reverse) if reverse else out
+
+
+def to_z(da, name="z", reverse=False):
+    """Convert a depth (positive down) to z (positive up) by changing its sign
+
+    Only the ``units`` and ``xoa_vertical_ref`` attributes are kept,
+    and the ``positive`` attribute is set to ``"up"``. The array is lazily negated if it is a dask array.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Depths, i.e. positive in the ocean.
+    name: str
+        Name of the output array.
+    reverse: bool, str
+        Also reverse the array along its first dimension, or along the given
+        dimension, to switch from an order going from the surface to the bottom
+        to the opposite.
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    to_depth
+    reverse_dim
+    get_z
+
+    Example
+    -------
+    .. code-block:: python
+
+        >>> depth = xr.DataArray([0., 10, 50], dims="k", attrs={"units": "m"})
+        >>> to_z(depth, reverse=True).values
+        array([-50., -10.,   0.])
+    """
+    return _flip_vertical_(da, name, "up", reverse)
+
+
+def as_z(da, name="z"):
+    """Get a vertical coordinate as z, which is positive up, whatever its convention
+
+    The convention is given by the ``positive`` attribute, and is guessed from the values
+    when there is none: negative or null values are heights, and positive ones are depths.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Heights or depths
+    name: str
+        Name of the output array, when it is converted
+
+    Return
+    ------
+    xarray.DataArray
+        The same array if it already is z, else the converted one, see :func:`to_z`.
+
+    See also
+    --------
+    to_z
+    get_z
+    """
+    positive = da.attrs.get("positive")
+    if positive not in ("up", "down"):
+        positive = "up" if not bool((da > 0).any()) else "down"
+    return da if positive == "up" else to_z(da, name=name)
+
+
+def to_depth(da, name="depth", reverse=False):
+    """Convert a z (positive up) to depth (positive down) by changing its sign
+
+    This is the mirror of :func:`to_z`.
+
+    Parameters
+    ----------
+    da: xarray.DataArray
+        Heights, i.e. negative in the ocean.
+    name: str
+        Name of the output array.
+    reverse: bool, str
+        Also reverse the array along its first dimension, or along the given
+        dimension, to switch from an order going from the bottom to the surface
+        to the opposite.
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    to_z
+    reverse_dim
+    get_depth
+    """
+    return _flip_vertical_(da, name, "down", reverse)
 
 
 @misc.ERRORS.format_function_docstring
@@ -1005,7 +1281,8 @@ class positive_attr(misc.IntEnumChoices, metaclass=misc.DefaultEnumMeta):
     down = -1
 
 
-def get_positive_attr(da, zdim=None):
+@misc.ERRORS.format_function_docstring
+def get_positive_attr(da, zdim=None, positive=None, errors="ignore"):
     """Get the positive attribute of a dataset or data array
 
     Searches for the ``positive`` attribute in the vertical coordinate
@@ -1017,6 +1294,10 @@ def get_positive_attr(da, zdim=None):
     zdim: None, str
         The index coordinate name that is supposed to have this attribute,
         which is usually the vertical dimension.
+    positive: None, str, int
+        Explicit value, which is returned as a name if it is not the "infer" one.
+        See :class:`positive_attr`.
+    {errors}
 
     Return
     ------
@@ -1027,12 +1308,18 @@ def get_positive_attr(da, zdim=None):
     .. code-block:: python
 
         >>> depth = xr.DataArray([-100., -50., 0.], dims="z",
-        ...     attrs={"positive": "up"})
+        ...     attrs={{"positive": "up"}})
         >>> da = xr.DataArray([1, 2, 3], dims="z",
-        ...     coords={"depth": depth})
+        ...     coords={{"depth": depth}})
         >>> get_positive_attr(da)
         'up'
     """
+    # Explicit
+    positive = positive_attr[positive].name
+    if positive != "infer":
+        return positive
+    errors = misc.ERRORS[errors]
+
     # Targets
     if zdim is None:
         zdim = get_meta_dims(da, "z", errors="ignore")
@@ -1052,8 +1339,14 @@ def get_positive_attr(da, zdim=None):
             return positive_attr[positive].name
 
     # Fall back to current MetaSpecs
-    metaspecs = meta.get_meta_specs(da)
-    return metaspecs["vertical"]["positive"]
+    positive = meta.get_meta_specs(da)["vertical"]["positive"]
+    if positive is None:
+        msg = "Can't infer the positive attribute from the data"
+        if errors == "raise":
+            raise exceptions.XoaCoordsError(msg)
+        if errors == "warn":
+            exceptions.xoa_warn(msg)
+    return positive
 
 
 def get_binding_data_vars(ds, coord, as_names=False):
@@ -1081,7 +1374,13 @@ def get_binding_data_vars(ds, coord, as_names=False):
 
 
 def geo_stack(
-    obj, stack_dim="npts", rename=False, drop=False, reset_index=False, create_index=False
+    obj,
+    stack_dim="npts",
+    rename=False,
+    drop=False,
+    reset_index=False,
+    create_index=False,
+    singleton=False,
 ):
     """Stack the dimensions of longitude and latitude coordinates
 
@@ -1103,6 +1402,9 @@ def geo_stack(
         Remove MultiIndexes that contains lon and lat dimensions before any operations
     create_index: bool
         Create a MultiIndex when calling :meth:`~xarray.DataArray.stack`
+    singleton: bool
+        When longitude and latitude are scalars, expand them along `stack_dim`
+        instead of returning the object as is.
 
     Return
     ------
@@ -1113,14 +1415,25 @@ def geo_stack(
 
     See also
     --------
+    geo_unstack
     xarray.DataArray.stack
     """
     lon = get_lon(obj)
     lat = get_lat(obj)
 
     # Singleton
-    singleton = lon.ndim == 0 and lat.ndim == 0
-    dims = list(set(lon.dims).union(lat.dims))
+    is_singleton = lon.ndim == 0 and lat.ndim == 0
+    if is_singleton and singleton:
+        obj = obj.assign_coords(
+            {
+                lon.name: (stack_dim, np.atleast_1d(lon.values), lon.attrs),
+                lat.name: (stack_dim, np.atleast_1d(lat.values), lat.attrs),
+            }
+        )
+        lon, lat = get_lon(obj), get_lat(obj)
+        is_singleton = False
+    singleton = is_singleton
+    dims = list(dict.fromkeys(lat.dims + lon.dims))
 
     # Rename to lon and lat?
     if rename:
@@ -1167,3 +1480,161 @@ def geo_stack(
     # Keep trace
     obj.encoding["geo_stack"] = (stack_dim, lon.name, lat.name)
     return obj
+
+
+def geo_unstack(obj, ref, stack_dim="npts"):
+    """Restore the geographic dimensions of `ref` from an object stacked with :func:`geo_stack`
+
+    The stacked dimension is reshaped to the dimensions of the longitude and latitude
+    coordinates of `ref`, in the order used by :func:`geo_stack`, and the coordinates of
+    `ref` that are along them are restored with their values and attributes.
+    Unlike :meth:`xarray.DataArray.unstack`, the order of the coordinates is preserved.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with a stacked dimension, for instance computed from ``geo_stack(ref)``
+    ref: xarray.DataArray, xarray.Dataset
+        Object with valid longitude and latitude coordinates that was given to
+        :func:`geo_stack`.
+    stack_dim: str
+        Name of the stacked dimension
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+        The geographic dimensions are the last ones, with latitude before longitude.
+        Scalar coordinates are restored if `ref` has a single position.
+
+    See also
+    --------
+    geo_stack
+    """
+    lon = get_lon(ref)
+    lat = get_lat(ref)
+
+    # Singleton
+    if lon.ndim == 0 and lat.ndim == 0:
+        obj = obj.squeeze(stack_dim, drop=True)
+        return obj.assign_coords({lon.name: lon.variable, lat.name: lat.variable})
+
+    # Already stacked
+    if lon.ndim == 1 and lat.ndim == 1 and lon.dims == lat.dims:
+        return obj
+
+    # Reshape
+    gdims = tuple(dict.fromkeys(lat.dims + lon.dims))
+    shape = tuple(ref.sizes[dim] for dim in gdims)
+
+    def reshape(var):
+        if stack_dim not in var.dims:
+            return var.variable
+        i = var.dims.index(stack_dim)
+        j = i + 1
+        data = var.values.reshape(var.shape[:i] + shape + var.shape[j:])
+        return xr.Variable(var.dims[:i] + gdims + var.dims[j:], data, var.attrs)
+
+    coords = {name: reshape(coord) for name, coord in obj.coords.items() if name not in gdims}
+    coords.update({dim: ref.coords[dim].variable for dim in gdims if dim in ref.coords})
+    if isinstance(obj, xr.DataArray):
+        return xr.DataArray(reshape(obj), coords=coords, name=obj.name).transpose(..., *gdims)
+    data_vars = {name: reshape(var) for name, var in obj.data_vars.items()}
+    return xr.Dataset(data_vars, coords, attrs=obj.attrs).transpose(..., *gdims)
+
+
+def geo_merge(lon, lat, stack_dim="pts"):
+    """Merge lon/lat coordinates into data arrays with coherent dimensions
+
+    Four cases are handled:
+
+    - **DataArray, same dims**: already a point cloud or an aligned nD array.
+      Dimension and variable names are preserved.
+    - **DataArray, different dims**: rectangular (``lon(x)`` + ``lat(y)``) or
+      partially shared grid. Both arrays are broadcast to the union of
+      dimensions with latitude-only dimensions first (y before x).
+    - **Numpy, same shape**: point cloud or nD grid, with auto-generated dimension
+      names (``stack_dim``, ``stack_dim_y``/``stack_dim_x``, ...).
+    - **Numpy 1D, different sizes**: rectangular grid converted with
+      :func:`numpy.meshgrid` to shape ``(ny, nx)``.
+
+    Parameters
+    ----------
+    lon, lat: array_like, xarray.DataArray
+        Longitude and latitude arrays, any shape.
+        Names of data arrays are preserved, and others are named ``"lon"``
+        and ``"lat"``.
+    stack_dim: str
+        Base name used when auto-generating dimension names.
+
+    Return
+    ------
+    xarray.DataArray
+        Longitudes with coherent dimensions.
+    xarray.DataArray
+        Latitudes with the same dimensions.
+
+    See also
+    --------
+    geo_stack
+    """
+    lon_is_da = isinstance(lon, xr.DataArray)
+    lat_is_da = isinstance(lat, xr.DataArray)
+    lon_name = (lon.name if lon_is_da and lon.name else None) or "lon"
+    lat_name = (lat.name if lat_is_da and lat.name else None) or "lat"
+
+    if lon_is_da or lat_is_da:
+        if not lon_is_da:
+            lon = xr.DataArray(
+                np.asarray(lon, dtype=np.float64), dims=[f"{stack_dim}_x"], name=lon_name
+            )
+        if not lat_is_da:
+            lat = xr.DataArray(
+                np.asarray(lat, dtype=np.float64), dims=[f"{stack_dim}_y"], name=lat_name
+            )
+        if lon.dims == lat.dims:
+            return (
+                lon.astype(np.float64, copy=False).rename(lon_name),
+                lat.astype(np.float64, copy=False).rename(lat_name),
+            )
+
+        # Different dims: broadcast with lat-only dims first
+        lat_only = [d for d in lat.dims if d not in lon.dims]
+        lon_only = [d for d in lon.dims if d not in lat.dims]
+        shared = [d for d in lat.dims if d in lon.dims]
+        dims = tuple(lat_only + shared + lon_only)
+        lon_bc, lat_bc = xr.broadcast(lon, lat)
+        return (
+            lon_bc.transpose(*dims).astype(np.float64, copy=False).rename(lon_name),
+            lat_bc.transpose(*dims).astype(np.float64, copy=False).rename(lat_name),
+        )
+
+    lon_np = np.asarray(lon, dtype=np.float64)
+    lat_np = np.asarray(lat, dtype=np.float64)
+
+    if lon_np.shape == lat_np.shape:
+        lon_np = lon_np.reshape(1) if lon_np.ndim == 0 else lon_np
+        lat_np = lat_np.reshape(1) if lat_np.ndim == 0 else lat_np
+        if lon_np.ndim == 1:
+            dims = (stack_dim,)
+        elif lon_np.ndim == 2:
+            dims = (f"{stack_dim}_y", f"{stack_dim}_x")
+        else:
+            dims = tuple(f"{stack_dim}_{i}" for i in range(lon_np.ndim))
+        return (
+            xr.DataArray(lon_np, dims=dims, name=lon_name),
+            xr.DataArray(lat_np, dims=dims, name=lat_name),
+        )
+
+    if lon_np.ndim == 1 and lat_np.ndim == 1:
+        lon_np, lat_np = np.meshgrid(lon_np, lat_np)  # (ny, nx)
+        dims = (f"{stack_dim}_y", f"{stack_dim}_x")
+        return (
+            xr.DataArray(lon_np, dims=dims, name=lon_name),
+            xr.DataArray(lat_np, dims=dims, name=lat_name),
+        )
+
+    raise exceptions.XoaError(
+        f"lon shape {np.shape(lon)} and lat shape {np.shape(lat)} are incompatible: "
+        "only 1D arrays of different sizes are accepted as a rectangular grid; "
+        "otherwise both arrays must have the same shape."
+    )

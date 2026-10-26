@@ -1,43 +1,40 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Compare Mercator to ARGO
 ========================
 
-In this notebook, we show:
+In this tutorial, we show how to:
 
-* how to easily rename variables and coordinates in an ARGO and a Mercator datasets,
-* how to plot a T-S diagram,
-* how to stack geographical coordinates,
-* how to compute a geographical distance between two datasets with coordinates,
-* how to interpolate a vertical profile with different methods.
+* easily rename variables and coordinates in an ARGO and a Mercator datasets,
+* plot a T-S diagram,
+* stack geographical coordinates,
+* compute a geographical distance between two datasets with coordinates,
+* interpolate a vertical profile with different methods.
+
+The concepts are explained in the :ref:`indepth.meta` guide.
+See also: :ref:`sphx_glr_tutorials_evaluation_plot_hycom_gdp.py`.
 """
-
 
 # %%
 # Initialisations
 # ---------------
-import xarray as xr
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import gsw
-import cmocean
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import xarray as xr
 
 import xoa
-import xoa.grid as xgrid
-import xoa.regrid as xregrid
-import xoa.meta as xmeta
 import xoa.coords as xcoords
 import xoa.geo as xgeo
+import xoa.grid as xgrid
+import xoa.meta as xmeta
 import xoa.plot as xplot
+import xoa.regrid as xregrid
 
 mpl.rc("axes", grid=True)
 xr.set_options(display_style="text")
-
-# %%
-# Register the :ref:`xoa <accessors>` accessors :
-xoa.register_accessors()
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 # %%
 # Register the Mercator and ARGO naming specifications
@@ -78,19 +75,19 @@ ds_argo = xoa.open_data_sample("OBS/ARGO/argo-7900573.nc")
 ds_argo = ds_argo.xoa.decode()[["temp", "sal", "pres"]]
 
 # %%
-# We compute depths with the :mod:`gsw` package and assign them
-# as coordinates of the ARGO dataset.
+# We compute heights, that are negative, with the :mod:`gsw` package and assign them
+# as coordinates of the ARGO dataset, with their ``positive`` attribute.
 alat = ds_argo.lat.broadcast_like(ds_argo.pres)
 adepth = gsw.z_from_p(ds_argo.pres, alat)
 adepth = adepth.where(adepth.notnull(), adepth.min())
-adepth.attrs.update({"long_name": "Depth", "units": "m"})
+adepth.attrs.update({"long_name": "Depth", "units": "m", "positive": "up"})
 ds_argo = ds_argo.assign_coords(depth=adepth)
 ds_argo = ds_argo.isel(level=slice(None, None, -1))
 ds_argo = ds_argo.set_index(N_PROF="time").rename(N_PROF="time")
 
 # %%
 # Quick plot of the salinity that highligths the mediterranean water.
-fig, axs = plt.subplots(ncols=2, figsize=(14, 6))
+fig, axs = plt.subplots(ncols=2, figsize=(9, 4), constrained_layout=True)
 ds_argo.sal.plot.contourf("time", "depth", cmap="cmo.haline", levels=20, ax=axs[0])
 ds_argo.sal.plot.contour("time", "depth", levels=[35.65], linewidths=1, colors="k", ax=axs[0])
 xplot.plot_ts(
@@ -120,6 +117,7 @@ ds_argo_prof = ds_argo.isel(time=-1).squeeze(drop=True)
 ds_merc = xoa.open_data_sample("MODELS/CMEMS-IBI/ibi-argo-7900573.nc").xoa.decode()
 ds_merc = ds_merc.isel(depth=slice(None, None, -1))
 ds_merc = ds_merc.assign_coords(depth=-ds_merc.depth)
+ds_merc.depth.attrs.update(units="m", positive="up")
 print(ds_merc)
 
 # %%
@@ -158,7 +156,7 @@ pcar = ccrs.PlateCarree()
 fig, ax = plt.subplots(subplot_kw={"projection": pmerc}, figsize=(8, 8))
 ax.set_extent(xgeo.get_extent(ds_merc, margin=1, square=True))
 ax.gridlines(draw_labels=True)
-ax.add_wms("https://ows.emodnet-bathymetry.eu/wms", "emodnet:mean_atlas_land", alpha=0.5)
+xplot.add_layer(ax, alpha=0.5)
 kws = dict(c="C3", s=15, marker="s", transform=pcar)
 ax.scatter(ds_merc_ens_rect.lon, ds_merc_ens_rect.lat, label="Rejected", alpha=0.15, **kws)
 ax.scatter(ds_merc_ens.lon, ds_merc_ens.lat, label='Mercator', **kws)
@@ -180,7 +178,7 @@ ds_merc_prof = ds_merc.interp(time=ds_argo_prof.time, lon=ds_argo_prof.lon, lat=
 
 # %%
 # We plot now the model, its simulated uncertainty and the observations.
-plt.figure(figsize=(4, 7))
+plt.figure(figsize=(5, 7), constrained_layout=True)
 plt.fill_betweenx(
     ds_merc_prof.sal.depth,
     ds_merc_prof.sal - 1.96 * ds_merc_ens_std.sal,
@@ -194,9 +192,7 @@ ds_argo_prof.sal.plot(y="depth", label="ARGO", color="C0")
 plt.title("Uncertain profile")
 plt.legend()
 xplot.plot_double_minimap(
-    ds_argo_prof,
-    regional_ax="left",
-    global_ax=(0.88, 0.88, 0.11),
+    ds_argo_prof, parent=plt.gca(), loc="lower right", size=0.22, regional_ax="left"
 )
 
 # %%
@@ -224,7 +220,7 @@ merc_prof_edges = xgrid.get_edges(ds_merc_prof.depth, "depth")
 
 # %%
 # Let's plot them.
-fig, axes = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(10, 5))
+fig, axes = plt.subplots(ncols=2, sharex=True, sharey=True, figsize=(9, 4.5))
 sal_merc_prof_o.plot(y="depth", color="C1", label="Mercator", ax=axes[0])
 ds_argo_prof.sal.plot(y="depth", label="ARGO", color="C0", ax=axes[0])
 axes[0].set_title("On ARGO depths")

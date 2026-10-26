@@ -21,8 +21,9 @@ xoa - xarray-based ocean analysis library
 .. image:: https://anaconda.org/conda-forge/xoa/badges/platforms.svg
     :alt: noarch
     :target: https://anaconda.org/conda-forge/xoa
-.. image:: https://img.shields.io/badge/code%20style-black-black
-    :alt: Black code style
+.. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json
+    :alt: Ruff
+    :target: https://github.com/astral-sh/ruff
 .. image:: https://anaconda.org/conda-forge/xoa/badges/license.svg
     :alt: Apache 2.0
     :target: https://anaconda.org/conda-forge/xoa

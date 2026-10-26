@@ -18,7 +18,7 @@ dependencies:
   - owslib
   - pip
   - python>=3.10
-  - xarray>=0.17
+  - xarray>=2024.6
   - pip:
       - configobj
       - pooch

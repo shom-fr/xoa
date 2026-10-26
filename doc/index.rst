@@ -15,7 +15,7 @@
    :maxdepth: 1
    :hidden:
 
-   examples/index
+   tutorials/index
    indepth
    cli
 
@@ -28,6 +28,7 @@
    accessors
    changes
    roadmap
+   references
    appendix
    Github repository <https://github.com/shom-fr/xoa>
 

@@ -3,6 +3,11 @@
 Accessors API
 =============
 
+The main ``xoa`` accessor is registered when :mod:`xoa` is imported.
+The ``meta`` and ``decode_sigma`` accessors are available as subaccessors of it,
+like ``da.xoa.meta`` and ``ds.xoa.decode_sigma`` (the latter for datasets only),
+and can also be registered at the top level with :func:`xoa.register_accessors`,
+like ``ds.meta`` and ``ds.decode_sigma()``.
 
 .. currentmodule:: xarray
 
@@ -45,7 +50,18 @@ Methods
     DataArray.xoa.infer_coords
     DataArray.xoa.get
     DataArray.xoa.get_coord
+    DataArray.xoa.get_z
     DataArray.xoa.get_depth
+    DataArray.xoa.interp
+    DataArray.xoa.regrid
+    DataArray.xoa.get_geos
+    DataArray.xoa.get_cyclogeos
+    DataArray.xoa.harmonic_analysis
+    DataArray.xoa.tidal_filter
+    DataArray.xoa.get_polygon_mask
+    DataArray.xoa.get_neighbors
+    DataArray.xoa.get_geosel
+    DataArray.xoa.geosel
 
 
 Dataset
@@ -82,7 +98,20 @@ Methods
     Dataset.xoa.infer_coords
     Dataset.xoa.get
     Dataset.xoa.get_coord
+    Dataset.xoa.get_z
     Dataset.xoa.get_depth
+    Dataset.xoa.interp
+    Dataset.xoa.regrid
+    Dataset.xoa.get_relvort
+    Dataset.xoa.get_rossby
+    Dataset.xoa.get_div
+    Dataset.xoa.get_strain
+    Dataset.xoa.get_okuboweiss
+    Dataset.xoa.harmonic_predict
+    Dataset.xoa.get_polygon_mask
+    Dataset.xoa.get_neighbors
+    Dataset.xoa.get_geosel
+    Dataset.xoa.geosel
     Dataset.decode_sigma.decode
     Dataset.decode_sigma.get_sigma_terms
 
@@ -96,3 +125,14 @@ Callables
     :template: autosummary/accessor_callable.rst
 
     Dataset.decode_sigma
+
+
+Plotting
+~~~~~~~~
+
+The ``plot`` attribute of the ``xoa`` accessors, like ``da.xoa.plot.field()``,
+has the following methods.
+
+.. autoclass:: xoa.accessors.XoaPlotAccessor
+    :members:
+    :no-index:

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 xarray-based ocean analysis library
 """
@@ -17,25 +16,38 @@ xarray-based ocean analysis library
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import os
 
+import cmocean  # noqa: F401 to register the cmo colormaps
 
+from .accessors import register_accessors, register_xoa_accessors
+from .data_samples import (  # noqa: F401
+    get_data_sample,
+    open_data_sample,
+    show_data_samples,
+)
 from .exceptions import (  # noqa: F401
+    XoaConfigError,
+    XoaDeprecationWarning,
     XoaError,
     XoaWarning,
-    XoaDeprecationWarning,
-    XoaConfigError,
     xoa_warn,
 )
 from .meta import get_meta_config_file  # noqa: F401
 from .meta.configs import META_CONFIGS  # noqa: F401
-from .data_samples import (  # noqa: F401
-    get_data_sample,
-    show_data_samples,
-    open_data_sample,
+from .options import (  # noqa: F401
+    get_default_user_config_file,
+    get_option,
+    get_options,
+    load_options,
+    reset_options,
+    set_option,
+    set_options,
+    show_info,
+    show_options,
+    show_paths,
+    show_versions,
 )
-from .accessors import register_accessors
 
 try:
     from ._version import version as __version__
@@ -53,13 +65,20 @@ __all__ = [
     "get_default_user_config_file",
     "load_options",
     "get_option",
+    "get_options",
+    "set_option",
     "set_options",
+    "reset_options",
+    "show_options",
     "show_versions",
     "show_paths",
     "show_info",
     "register_accessors",
 ]
 
+
+# The main accessor is always available
+register_xoa_accessors()
 
 # Directory of sample files
 _SAMPLE_DIR = os.path.join(os.path.dirname(__file__), "_samples")

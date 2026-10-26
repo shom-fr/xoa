@@ -11,8 +11,8 @@ owslib
 pandas
 pip
 scipy
-xarray>=0.17
-sphinx
+xarray>=2024.6
+sphinx<9
 sphinx-autosummary-accessors
 sphinx-book-theme
 sphinx-argparse

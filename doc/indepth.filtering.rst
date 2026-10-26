@@ -8,15 +8,19 @@ Introduction
 
 The :mod:`xoa.filter` module provides comprehensive filtering and data processing
 utilities for oceanographic and atmospheric data. It includes spatial filtering
-with convolution kernels, specialized temporal filters for tidal signals, mask
+with convolution kernels, mask
 erosion operations, and data decimation tools.
 
 Key features:
 
 - **Spatial filtering**: N-dimensional convolution with NaN handling
-- **Temporal filtering**: Tidal filters (Demerliac, Godin) for time series
+- **Temporal filtering**: Tidal filters, see :ref:`indepth.tide`
 - **Mask operations**: Iterative mask erosion and coast filling
 - **Data decimation**: Intelligent undersampling based on spatial proximity
+
+See the tutorials :ref:`sphx_glr_tutorials_filtering_plot_filter_space.py`,
+:ref:`sphx_glr_tutorials_filtering_plot_filter_time.py` and
+:ref:`sphx_glr_tutorials_filtering_plot_decimate.py` for walkthroughs with figures.
 
 .. _indepth.filtering.spatial:
 
@@ -142,8 +146,9 @@ For isotropic (radially symmetric) kernels, use :func:`~xoa.filter.generate_isot
 Shapiro kernel
 ^^^^^^^^^^^^^^
 
-The Shapiro kernel is a specialized filter kernel commonly used in numerical
-models for smoothing:
+The Shapiro kernel is a cross with weights of 1 on the neighbors and 2 at the center,
+used to erode masks. It reduces the grid-scale noise by a factor of 3 only: for a complete
+removal, use the orthogonal kernel ``{'x': [1, 2, 1], 'y': [1, 2, 1]}``.
 
 .. ipython:: python
 
@@ -160,68 +165,8 @@ models for smoothing:
 Temporal filtering for tidal signals
 =====================================
 
-Oceanographic time series often contain tidal signals that need to be filtered out.
-The :mod:`xoa.filter` module provides specialized tidal filters.
-
-Demerliac filter
-----------------
-
-The Demerliac filter is a widely-used tidal filter designed to remove tidal
-components while preserving lower-frequency signals:
-
-.. ipython:: python
-
-    # Create hourly time series with tidal signal
-    import pandas as pd
-    time = pd.date_range('2020-01-01', periods=30*24, freq='h')
-
-    # Simulate signal: trend + tidal component + noise
-    t_hours = np.arange(len(time))
-    signal = (
-        0.5 * t_hours / 24 +  # trend
-        0.3 * np.sin(2 * np.pi * t_hours / 12.42) +  # M2 tide
-        0.1 * np.random.normal(size=len(time))  # noise
-    )
-
-    sea_level = xr.DataArray(
-        signal,
-        coords={'time': time},
-        dims='time',
-        name='sea_level'
-    )
-
-    # Apply Demerliac filter
-    filtered = xoa.filter.demerliac(sea_level, na_thres=0.2)
-
-The Demerliac filter uses pre-defined weights optimized for hourly data.
-It automatically handles sub-hourly data by interpolating the weights.
-
-Other tidal filters
--------------------
-
-The :func:`~xoa.filter.tidal_filter` function provides access to multiple
-tidal filter types:
-
-.. ipython:: python
-
-    # Godin filter (alternative tidal filter)
-    godin_filtered = xoa.filter.tidal_filter(sea_level, 'godin')
-
-    # Simple moving average (24-hour)
-    mean_filtered = xoa.filter.tidal_filter(sea_level, 'mean')
-
-Available filter types:
-
-- **demerliac**: Demerliac tidal filter (default for :func:`~xoa.filter.demerliac`)
-- **godin**: Godin tidal filter
-- **mean**: Simple 24-hour moving average
-
-Important notes for tidal filtering:
-
-- Data must have a valid time coordinate
-- Time step should be hourly or sub-hourly (sub-hourly is interpolated)
-- Time step should be relatively constant (checked with ``dt_tol`` parameter)
-- The ``na_thres`` parameter controls tolerance for missing data in the time series
+The tidal filters (Demerliac, Godin, mean) are now in :mod:`xoa.tide`:
+see :ref:`indepth.tide.filters`.
 
 
 .. _indepth.filtering.mask:
@@ -445,6 +390,8 @@ Computational considerations
 
 - Convolution is computationally intensive for large kernels
 - Consider using FFT-based methods for very large kernels (not yet in xoa)
+- Kernel sizes are in grid points, so their footprint varies with the grid resolution,
+  for instance with the latitude on a regular longitude and latitude grid
 - For repeated filtering, pre-generate kernels:
 
 .. code-block:: python

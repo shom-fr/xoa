@@ -43,9 +43,12 @@ def atmosphere_sigma_coordinate(sigma, ps, ptop, p):
 
 
 @numba.guvectorize(
-    ['void(float64[:], float64, float64, float64[:])'], '(k),(),()->(k)', nopython=True, cache=True
+    ['void(float64[:], float64, float64, float64, float64[:])'],
+    '(k),(),(),()->(k)',
+    nopython=True,
+    cache=True,
 )
-def ocean_sigma_coordinate(sigma, eta, depth, z):
+def ocean_sigma_coordinate(sigma, eta, depth, datum, z):
     """Convert from sigma to depth in an ocean model
 
     Parameters
@@ -56,20 +59,24 @@ def ocean_sigma_coordinate(sigma, eta, depth, z):
         Sea surface height
     depth : scalar
         Bottom depth
+    datum : scalar
+        1 for heights relative to the fixed datum, 0 for the free surface
     z : array(k)
         Output depth array (modified in-place)
     """
     for k in range(sigma.shape[0]):
         z[k] = eta + sigma[k] * (eta + depth)
+        # Refer to the free surface: remove the sea surface height
+        z[k] -= (1.0 - datum) * eta
 
 
 @numba.guvectorize(
-    ['void(float64[:], float64, float64, float64, float64[:], float64[:])'],
-    '(k),(),(),(),( k)->(k)',
+    ['void(float64[:], float64, float64, float64, float64[:], float64, float64[:])'],
+    '(k),(),(),(),(k),()->(k)',
     nopython=True,
     cache=True,
 )
-def ocean_s_coordinate(s, eta, depth, depth_c, C, z):
+def ocean_s_coordinate(s, eta, depth, depth_c, C, datum, z):
     """Convert from s-coordinate to depth in an ocean model
 
     Parameters
@@ -84,6 +91,8 @@ def ocean_s_coordinate(s, eta, depth, depth_c, C, z):
         Critical depth
     C : array(k)
         Stretching curve
+    datum : scalar
+        1 for heights relative to the fixed datum, 0 for the free surface
     z : array(k)
         Output depth array (modified in-place)
     """
@@ -92,15 +101,16 @@ def ocean_s_coordinate(s, eta, depth, depth_c, C, z):
 
     for k in range(s.shape[0]):
         z[k] = eta * (1.0 + s[k]) + depth_c * s[k] + depth_minus_depth_c * C[k]
+        z[k] -= (1.0 - datum) * eta
 
 
 @numba.guvectorize(
-    ['void(float64[:], float64, float64, float64, float64[:], float64[:])'],
-    '(k),(),(),(),( k)->(k)',
+    ['void(float64[:], float64, float64, float64, float64[:], float64, float64[:])'],
+    '(k),(),(),(),(k),()->(k)',
     nopython=True,
     cache=True,
 )
-def ocean_s_coordinate_g1(s, eta, depth, depth_c, C, z):
+def ocean_s_coordinate_g1(s, eta, depth, depth_c, C, datum, z):
     """Convert from s-coordinate (generic form 1) to depth in an ocean model
 
     Parameters
@@ -115,6 +125,8 @@ def ocean_s_coordinate_g1(s, eta, depth, depth_c, C, z):
         Critical depth
     C : array(k)
         Stretching curve
+    datum : scalar
+        1 for heights relative to the fixed datum, 0 for the free surface
     z : array(k)
         Output depth array (modified in-place)
     """
@@ -125,15 +137,16 @@ def ocean_s_coordinate_g1(s, eta, depth, depth_c, C, z):
     for k in range(s.shape[0]):
         S = depth_c * s[k] + depth_minus_depth_c * C[k]
         z[k] = S + eta * (1.0 + S * inv_depth)
+        z[k] -= (1.0 - datum) * eta
 
 
 @numba.guvectorize(
-    ['void(float64[:], float64, float64, float64, float64[:], float64[:])'],
-    '(k),(),(),(),( k)->(k)',
+    ['void(float64[:], float64, float64, float64, float64[:], float64, float64[:])'],
+    '(k),(),(),(),(k),()->(k)',
     nopython=True,
     cache=True,
 )
-def ocean_s_coordinate_g2(s, eta, depth, depth_c, C, z):
+def ocean_s_coordinate_g2(s, eta, depth, depth_c, C, datum, z):
     """Convert from s-coordinate (generic form 2) to depth in an ocean model
 
     Parameters
@@ -148,6 +161,8 @@ def ocean_s_coordinate_g2(s, eta, depth, depth_c, C, z):
         Critical depth
     C : array(k)
         Stretching curve
+    datum : scalar
+        1 for heights relative to the fixed datum, 0 for the free surface
     z : array(k)
         Output depth array (modified in-place)
     """
@@ -159,3 +174,4 @@ def ocean_s_coordinate_g2(s, eta, depth, depth_c, C, z):
     for k in range(s.shape[0]):
         S = (depth_c * s[k] + depth * C[k]) * inv_depth_plus_depth_c
         z[k] = S * depth_plus_eta + eta
+        z[k] -= (1.0 - datum) * eta

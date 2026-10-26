@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Xoa exceptions
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -69,6 +69,12 @@ class XoaRegridError(XoaError):
 
 class XoaSigmaError(XoaError):
     """Sigma coordinates error"""
+
+    pass
+
+
+class XoaStatsError(XoaError):
+    """Statistics error"""
 
     pass
 

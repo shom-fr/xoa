@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Terrain following parametric vertical coordinates
 
@@ -6,6 +5,7 @@ This follows the CF conventions for
 `Parametric Vertical Coordinates <http://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#parametric-v-coord>`_.
 
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,10 +25,8 @@ import re
 import numpy as np
 import xarray as xr
 
-from . import exceptions
-from . import misc
-from . import meta
 from . import coords as xcoords
+from . import exceptions, meta, misc
 from .core import sigma as core_sigma
 
 # %% Constants
@@ -64,7 +62,23 @@ _ocean_s_g2_ = core_sigma.ocean_s_coordinate_g2
 # %% Wrapper
 
 
-def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask):
+def _check_ref_(ref):
+    if ref not in ("datum", "surface"):
+        raise exceptions.XoaSigmaError(f'Invalid ref: {ref}. Must be "datum" or "surface"')
+    return float(ref == "datum")
+
+
+def _format_z_(z, sig, ref):
+    """Format the height and tag its vertical reference"""
+    z = meta.get_meta_specs(sig).format_data_var(z, "z", format_coords=False, rename_dims=False)
+    if ref == "surface":
+        z.attrs.pop("standard_name", None)  # altitude is relative to the geoid
+        z.attrs["long_name"] = "Height relative to the free surface"
+        z.attrs["xoa_vertical_ref"] = "surface"
+    return z
+
+
+def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask, ref):
     # Stretching curve
     if cs is None:
         if None in (thetas, thetab):
@@ -76,6 +90,7 @@ def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask
         raise exceptions.XoaSigmaError("Incompatible dimensions between bathy and hc")
 
     # Call core routine
+    datum = _check_ref_(ref)
     zdim = sig.dims[0]
     depth = xr.apply_ufunc(
         func,
@@ -84,17 +99,15 @@ def _apply_ocean_s_(func, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask
         bathy,
         hc,
         cs,
-        input_core_dims=[[zdim], [], [], [], [zdim]],
+        datum,
+        input_core_dims=[[zdim], [], [], [], [zdim], []],
         output_core_dims=[[zdim]],
         exclude_dims={zdim},
         dask=dask,
         dask_gufunc_kwargs={"output_sizes": {zdim: sig.shape[0]}},
     )
 
-    # Format
-    return meta.get_meta_specs(sig).format_data_var(
-        depth, "depth", format_coords=False, rename_dims=False
-    )
+    return _format_z_(depth, sig, ref)
 
 
 # %% High level routines
@@ -158,8 +171,8 @@ def atmosphere_sigma_coordinate(sig, ps, ptop, dask="parallelized", cache=None):
     )
 
 
-def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
-    """Convert from sigma [-1, 0] to negative depths in an ocean model
+def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None, ref="datum"):
+    """Convert from sigma [-1, 0] to z heights (positive up) in an ocean model
 
     .. note:: This function is dask-aware since it delegates the core computation to
         :func:`xarray.apply_ufunc`.
@@ -186,11 +199,15 @@ def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
         Sea surface height (:math:`\\eta` | ``eta``)
     bathy: xarray.DataArray
         Positive sea floor depth (:math:`h` | ``depth``)
+    ref: {"datum", "surface"}
+        Reference of the heights: the fixed datum of the formula, where the sea surface
+        height is zero so that the free surface is at ``ssh``, or the free surface,
+        where the heights are zero (``ssh`` is subtracted).
 
     Returns
     -------
     xarray.DataArray
-        Negative depth below surface in m (:math:`z`)
+        Height in m, negative in the ocean and positive up (:math:`z`)
     """
     if cache is not None:
         exceptions.xoa_warn("The `cache` parameter is currently not used.")
@@ -206,17 +223,15 @@ def ocean_sigma_coordinate(sig, ssh, bathy, dask="parallelized", cache=None):
         sig,
         ssh,
         bathy,
-        input_core_dims=[[zdim], [], []],
+        _check_ref_(ref),
+        input_core_dims=[[zdim], [], [], []],
         output_core_dims=[[zdim]],
         exclude_dims={zdim},
         dask=dask,
         dask_gufunc_kwargs={"output_sizes": {zdim: sig.shape[0]}},
     )
 
-    # Format
-    return meta.get_meta_specs(sig).format_data_var(
-        depth, "depth", format_coords=False, rename_dims=False
-    )
+    return _format_z_(depth, sig, ref)
 
 
 def get_cs(sig, thetas, thetab, cs_type=None):
@@ -278,8 +293,9 @@ def ocean_s_coordinate(
     cs_type=None,
     cache=None,
     dask="parallelized",
+    ref="datum",
 ):
-    """Convert from s [-1, 0] to depths in an ocean model
+    """Convert from s [-1, 0] to z heights (positive up) in an ocean model
 
     .. note:: This function is dask-aware since it delegates the core computation to
         :func:`xarray.apply_ufunc`.
@@ -321,18 +337,22 @@ def ocean_s_coordinate(
         computed by :func:`get_cs` (:math:`C` | ``C``)
     cs_type: str, None
         Stretching type (see :func:`get_cs`)
+    ref: {"datum", "surface"}
+        Reference of the heights: the fixed datum of the formula, where the sea surface
+        height is zero so that the free surface is at ``ssh``, or the free surface,
+        where the heights are zero (``ssh`` is subtracted).
     cache: dict
         Deprecated, currently unused.
 
     Returns
     -------
     xarray.DataArray
-        Negative depth below surface in m (:math:`z`)
+        Height relative to the surface in m, negative in the ocean and positive up (:math:`z`)
     """
     if cache is not None:
         exceptions.xoa_warn("The `cache` parameter is currently not used.")
 
-    return _apply_ocean_s_(_ocean_s_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask)
+    return _apply_ocean_s_(_ocean_s_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask, ref)
 
 
 def ocean_s_coordinate_g1(
@@ -346,8 +366,9 @@ def ocean_s_coordinate_g1(
     cs_type=None,
     cache=None,
     dask="parallelized",
+    ref="datum",
 ):
-    """Convert from s [-1, 0] generic form 1 to depths in an ocean model
+    """Convert from s [-1, 0] generic form 1 to z heights (positive up) in an ocean model
 
     .. note:: This function is dask-aware since it delegates the core computation to
         :func:`xarray.apply_ufunc`.
@@ -393,18 +414,24 @@ def ocean_s_coordinate_g1(
         computed by :func:`get_cs` (:math:`C` | ``C``)
     cs_type: str, None
         Stretching type (see :func:`get_cs`)
+    ref: {"datum", "surface"}
+        Reference of the heights: the fixed datum of the formula, where the sea surface
+        height is zero so that the free surface is at ``ssh``, or the free surface,
+        where the heights are zero (``ssh`` is subtracted).
     cache: dict
         Deprecated, currently unused.
 
     Returns
     -------
     xarray.DataArray
-        Negative depth below surface in m (:math:`z`)
+        Height relative to the surface in m, negative in the ocean and positive up (:math:`z`)
     """
     if cache is not None:
         exceptions.xoa_warn("The `cache` parameter is currently not used.")
 
-    return _apply_ocean_s_(_ocean_s_g1_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask)
+    return _apply_ocean_s_(
+        _ocean_s_g1_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask, ref
+    )
 
 
 def ocean_s_coordinate_g2(
@@ -418,8 +445,9 @@ def ocean_s_coordinate_g2(
     cs_type=None,
     cache=None,
     dask="parallelized",
+    ref="datum",
 ):
-    """Convert from s [-1, 0] generic form 2 to depths in an ocean model
+    """Convert from s [-1, 0] generic form 2 to z heights (positive up) in an ocean model
 
     .. note:: This function is dask-aware since it delegates the core computation to
         :func:`xarray.apply_ufunc`.
@@ -463,18 +491,24 @@ def ocean_s_coordinate_g2(
         computed by :func:`get_cs` (:math:`C` | ``C``)
     cs_type: str, None
         Stretching type (see :func:`get_cs`)
+    ref: {"datum", "surface"}
+        Reference of the heights: the fixed datum of the formula, where the sea surface
+        height is zero so that the free surface is at ``ssh``, or the free surface,
+        where the heights are zero (``ssh`` is subtracted).
     cache: dict
         Deprecated, currently unused.
 
     Returns
     -------
     xarray.DataArray
-        Negative depth below surface in m (:math:`z`)
+        Height relative to the surface in m, negative in the ocean and positive up (:math:`z`)
     """
     if cache is not None:
         exceptions.xoa_warn("The `cache` parameter is currently not used.")
 
-    return _apply_ocean_s_(_ocean_s_g2_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask)
+    return _apply_ocean_s_(
+        _ocean_s_g2_, sig, ssh, bathy, hc, thetas, thetab, cs, cs_type, dask, ref
+    )
 
 
 #: Supported sigma coordinates
@@ -606,16 +640,18 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
         # Check standard_name and get loc
         if "standard_name" not in sig.attrs:
             raise exceptions.XoaSigmaError(
-                "No standard_name attribute found in sigma/s " "variable name: " + sig.name
+                "No standard_name attribute found in sigma/s variable name: " + sig.name
             )
-        standard_name, loc = meta_specs.sglocator.parse_attr("standard_name", sig.standard_name)
+        standard_name = meta_specs.sglocator.parse_attr("standard_name", sig.standard_name)[0]
+        # The loc is also parsed from the name, like "rho" from "s_rho" with croco specs
+        loc = meta_specs.sglocator.get_loc_from_da(sig)
         # skip this one
         if standard_name not in SIGMA_COORDINATE_FUNCTIONS:
             continue
         # Get formula terms
         if "formula_terms" not in sig.attrs:
             raise exceptions.XoaSigmaError(
-                f"Sigma/s type variable {sig.name} " "has no formula_term attribute"
+                f"Sigma/s type variable {sig.name} has no formula_term attribute"
             )
         formula_terms = decode_formula_terms(sig.formula_terms)
 
@@ -660,7 +696,7 @@ def get_sigma_terms(ds, vloc=None, hlocs=None, rename=False):
 
 
 @misc.ERRORS.format_function_docstring
-def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
+def decode_sigma(ds, rename=False, hlocs=None, ref="datum", errors="raise"):
     """Compute heights from sigma-like variable in a dataset using CF conventions
 
     This makes use of the :class:`~xoa.meta.MetaSpecs` instance that is retrieved
@@ -683,6 +719,10 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
     hlocs: None, list of str
         Horizontal staggered grid locations to search for "bathy" and "ssh".
         By default, no location is assumed.
+    ref: {{"datum", "surface"}}
+        Reference of the heights: the fixed datum of the formulas, at which the
+        sea surface height is zero, or the free surface, at which the heights are zero.
+        See :func:`ocean_sigma_coordinate`.
     {errors}
 
     Return
@@ -691,8 +731,10 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
     """
     # Init
     ds = ds.copy()
+    ds0 = ds.copy()
     meta_specs = meta.get_meta_specs(ds)
     errors = misc.ERRORS[errors]
+    _check_ref_(ref)
 
     # Decode formula terms
     try:
@@ -703,11 +745,12 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
         if errors == "raise":
             raise e
         if errors == "warn":
-            exceptions.xoa_warn("Error while decoding sigma coords: {}. Skipping...".format(e))
+            exceptions.xoa_warn(f"Error while decoding sigma coords: {e}. Skipping...")
         return ds
 
     # Loop on locations
     sigma_type = None
+    done = {}
     hsingle = not isinstance(hlocs, (list, tuple))
     if hsingle:
         hlocs = [hlocs]
@@ -728,11 +771,29 @@ def decode_sigma(ds, rename=False, hlocs=None, errors="raise"):
             func = SIGMA_COORDINATE_FUNCTIONS[sigma_type]
             # cache = {}
             # kwargs['cache'] = cache
+            if sigma_type.startswith("ocean"):
+                kwargs["ref"] = ref
             height = func(**kwargs)
 
             # Format
-            loc = (hloc or "") + (vloc or "")
+            # The rho vertical level is implicit at a given horizontal location, like "u"
+            loc = hloc if hloc and vloc == "rho" else (hloc or "") + (vloc or "")
             height = meta_specs.sglocator.format_dataarray(height, loc)
+
+            # Never write twice to the same height, as when the meta specs have no location
+            # in their names (the croco specs must be used for CROCO)
+            if height.name in done:
+                e = exceptions.XoaSigmaError(
+                    f"Height {height.name!r} would be written twice, at the {done[height.name]!r} "
+                    f"and {loc!r} locations. Please use meta specs whose names have a location, "
+                    "like croco."
+                )
+                if errors == "raise":
+                    raise e
+                if errors == "warn":
+                    exceptions.xoa_warn(f"Error while decoding sigma coords: {e}. Skipping...")
+                return ds0
+            done[height.name] = loc
 
             # Transpose if appropriate and set as coordinate
             transposed = False

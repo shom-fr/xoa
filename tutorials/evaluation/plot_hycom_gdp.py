@@ -1,40 +1,39 @@
 #!/usr/bin/env python
-# coding: utf-8
 """
 Compare Hycom3d with a GDP drifter
 ==================================
 
-In this notebook, we show :
+In this tutorial, we show how to:
 
-* how to decode dataset so that it is easy to access generic coordinates and variables,
-* how to compute depths from layer thicknesses,
-* how to interpolate currents from U and V positions to T position on an arakawa C grid,
-* how to perform a 4D interpolation with a variable depth coordinate to random positions,
-* how to make an horizontal slice of a 4D variable with a variable depth coordinate.
+* decode dataset so that it is easy to access generic coordinates and variables,
+* compute depths from layer thicknesses,
+* interpolate currents from U and V positions to T position on an arakawa C grid,
+* perform a 4D interpolation with a variable depth coordinate to random positions,
+* make an horizontal slice of a 4D variable with a variable depth coordinate.
 
+The concepts are explained in the :ref:`indepth.meta` guide.
+See also: :ref:`sphx_glr_tutorials_evaluation_plot_mercator_argo.py`, :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py`.
 """
 # %%
 # Initialisations
 # ---------------
 
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
+
 import xoa
-from xoa.grid import dz2depth, shift
-from xoa.regrid import grid2loc, regrid1d
-import xoa.meta as xmeta
 import xoa.geo as xgeo
-from xoa.plot import plot_flow, plot_double_minimap
+import xoa.meta as xmeta
+from xoa.core.plot import add_quiverkey, get_quiverkey_value
+from xoa.grid import dz2depth, shift
+from xoa.plot import plot_double_minimap, plot_flow
+from xoa.regrid import grid2loc, regrid1d
 
 xr.set_options(display_style="text")
-
-# %%
-# Register the :ref:`xoa <accessors>` accessors:
-
-xoa.register_accessors()
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 10, "axes.titleweight": "bold"})
 
 # %%
 # Set the internal Hycom naming specifications as the current ones
@@ -143,7 +142,11 @@ drifter = drifter.where(~drifter.lon.isnull() & ~drifter.lat.isnull(), drop=True
 # %%
 # We add a constant depth of 15 m.
 
-drifter.coords["depth"] = drifter.lon * 0 + 15
+drifter.coords["depth"] = (
+    "time",
+    np.full(drifter.sizes["time"], 15.0),
+    {"standard_name": "ocean_depth", "units": "m", "positive": "down"},
+)
 
 # %%
 # Here is what we obtain.
@@ -165,7 +168,7 @@ drifter["v"] = (
 )
 
 # %%
-# We make a 4D linear interpolation the Hycom velocity to the drifter positions with :func:`xoa.regrid.grid2loc`.
+# We make a 4D linear interpolation the Hycom velocity to the drifter positions with :func:`xoa.interp.grid2loc`.
 
 uloc = grid2loc(hycom["u"], drifter)
 vloc = grid2loc(hycom["v"], drifter)
@@ -185,11 +188,17 @@ vh15 = regrid1d(hycom["v"], d15).squeeze(drop=True).mean(dim="time")
 #
 # The geographic extent is easily computed with the :func:`xoa.geo.get_extent` function.
 # The background currents are plotted with the :func:`xoa.plot.plot_flow` function.
+# A reference arrow with a round value is added with :func:`xoa.core.plot.get_quiverkey_value`
+# and :func:`xoa.core.plot.add_quiverkey`, and a minimap with :func:`xoa.plot.plot_double_minimap`.
 
 pmerc = ccrs.Mercator()
 pcarr = ccrs.PlateCarree()
-fig, ax = plt.subplots(figsize=(8, 7), subplot_kw={"facecolor": "teal", "projection": pmerc})
-plt.subplots_adjust(right=0.85)
+fig, ax = plt.subplots(
+    figsize=(6.5, 6.5),
+    subplot_kw={"facecolor": "teal", "projection": pmerc},
+    constrained_layout=True,
+)
+
 ax.gridlines(draw_labels=True, dms=True)
 ax.set_extent(xgeo.get_extent(uh15))
 kwqv = dict(scale_units="dots", scale=0.1 / 20, units="dots", transform=pcarr)
@@ -215,9 +224,10 @@ ax.quiver(
     width=2,
     **kwqv,
 )
-plt.quiverkey(qv, 0.1, 1.06, 0.1, r"0.1 $m\,s^{-1}$", color="k", alpha=1, labelpos="E")
+qvalue = get_quiverkey_value(np.hypot(uloc, vloc))
+add_quiverkey(ax, qv, qvalue, r"$m\,s^{-1}$", pos=(0.0, 1.07))
 plt.legend()
-plot_double_minimap(drifter)
+plot_double_minimap(drifter, parent=ax, loc="lower left", size=0.15, regional_ax="right")
 
 # %%
 # The discrepancies between the lagrangian and mean eulerian currents highlight

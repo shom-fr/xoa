@@ -2,7 +2,7 @@
 Filtering utilities.
 
 Provides spatial and temporal filters including convolution-based smoothing,
-tidal filters (Demerliac, Godin), mask erosion and point decimation.
+mask erosion and point decimation.
 """
 
 # Copyright 2020-2026 Shom
@@ -20,191 +20,15 @@ tidal filters (Demerliac, Godin), mask erosion and point decimation.
 # limitations under the License.
 
 import inspect
+
 import numpy as np
 import xarray as xr
-import numba
 
-from . import exceptions
-from . import misc as xmisc
 from . import coords as xcoords
+from . import exceptions
 from . import geo as xgeo
-from .core import geo as core_geo
-
-HOURLY_TIDAL_FILTERS_WEIGHTS = {
-    "demerliac": [
-        1,
-        3,
-        8,
-        15,
-        21,
-        32,
-        45,
-        55,
-        72,
-        91,
-        105,
-        128,
-        153,
-        171,
-        200,
-        231,
-        253,
-        288,
-        325,
-        351,
-        392,
-        435,
-        465,
-        512,
-        558,
-        586,
-        624,
-        658,
-        678,
-        704,
-        726,
-        738,
-        752,
-        762,
-        766,
-        768,
-        766,
-        762,
-        752,
-        738,
-        726,
-        704,
-        678,
-        658,
-        624,
-        586,
-        558,
-        512,
-        465,
-        435,
-        392,
-        351,
-        325,
-        288,
-        253,
-        231,
-        200,
-        171,
-        153,
-        128,
-        105,
-        91,
-        72,
-        55,
-        45,
-        32,
-        21,
-        15,
-        8,
-        3,
-        1,
-    ],
-    "godin": [
-        1,
-        3,
-        6,
-        10,
-        15,
-        21,
-        28,
-        36,
-        45,
-        55,
-        66,
-        78,
-        91,
-        105,
-        120,
-        136,
-        153,
-        171,
-        190,
-        210,
-        231,
-        253,
-        276,
-        300,
-        323,
-        344,
-        363,
-        380,
-        395,
-        408,
-        419,
-        428,
-        435,
-        440,
-        443,
-        444,
-        443,
-        440,
-        435,
-        428,
-        419,
-        408,
-        395,
-        380,
-        363,
-        344,
-        323,
-        300,
-        276,
-        253,
-        231,
-        210,
-        190,
-        171,
-        153,
-        136,
-        120,
-        105,
-        91,
-        78,
-        66,
-        55,
-        45,
-        36,
-        28,
-        21,
-        15,
-        10,
-        6,
-        3,
-        1,
-    ],
-    "mean": [
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-    ],
-}
+from . import misc as xmisc
+from .core import filter as core_filter
 
 
 def get_window_func(window, **kwargs):
@@ -527,7 +351,7 @@ def generate_kernel(
     if isinstance(kernel, tuple):
         if len(kernel) > data.ndim:
             raise exceptions.XoaError(
-                "Too many dimensions for your kernel: {} > {}".format(len(kernel), data.ndim)
+                f"Too many dimensions for your kernel: {len(kernel)} > {data.ndim}"
             )
         kernel = dict(item for item in zip(data.dims[-len(kernel) :], kernel))
 
@@ -543,9 +367,7 @@ def generate_kernel(
                 isotropic = data.dims
             elif not set(isotropic).issubset(data.dims):
                 raise exceptions.XoaError(
-                    "Invalid dimensions for isotropic keyword: {}".format(
-                        set(isotropic) - set(data.dims)
-                    )
+                    f"Invalid dimensions for isotropic keyword: {set(isotropic) - set(data.dims)}"
                 )
 
         # Split into consistant isotropic and orthogonal kernels
@@ -614,7 +436,7 @@ def generate_kernel(
     elif isinstance(kernel, np.ndarray):
         if kernel.ndim > data.ndim:
             raise exceptions.XoaError(
-                "Too many dimensions for your numpy kernel: {} > {}".format(kernel.dim, data.ndim)
+                f"Too many dimensions for your numpy kernel: {kernel.dim} > {data.ndim}"
             )
         dims = data.dims[-kernel.ndim :]
 
@@ -945,155 +767,25 @@ def erode_coast(data, until=1, kernel=None, xdim=None, ydim=None):
 
 
 def demerliac(da, na_thres=0, dt_tol=0.01):
-    """Apply a Demerliac filter on a data array
+    """Deprecated, use :func:`xoa.tide.demerliac`"""
+    from .tide import filter as tide_filter
 
-    This is a shortcut to ``tidal_filter(da, "demerliac", ...)``.
-
-    Parameters
-    ----------
-    da: xarray.DataArray
-    dt_tol: float
-        Relative tolerance for the time step variability
-    na_thres: float
-        A float between 0 and 1 that defines the allowed level a NaN contamination.
-        See :func:`convolve`.
-
-    Return
-    ------
-    xarray.DataArray
-    """
-    return tidal_filter(da, "demerliac", na_thres=na_thres, dt_tol=dt_tol)
+    exceptions.xoa_warn(
+        "xoa.filter.demerliac is deprecated, use xoa.tide.demerliac",
+        exceptions.XoaDeprecationWarning,
+    )
+    return tide_filter.demerliac(da, na_thres=na_thres, dt_tol=dt_tol)
 
 
 def tidal_filter(da, filter_name, na_thres=0, dt_tol=0.01):
-    """Apply a tidal filter on a data array
+    """Deprecated, use :func:`xoa.tide.tidal_filter`"""
+    from .tide import filter as tide_filter
 
-    The data array must have a valid time dimension.
-    When the time step is less than an hour, the filter weights are interpolated
-    since they are designed for hourly time series.
-    An error is raised when the time step is too variable or above one hour.
-
-    Parameters
-    ----------
-    da: xarray.DataArray
-        Data array with a time dimension.
-    filter_name: str
-        Type of tidal filter: ``"demerliac"``, ``"godin"`` or ``"mean"``.
-    dt_tol: float
-        Relative tolerance for the time step variability.
-    na_thres: float
-        A float between 0 and 1 that defines the allowed level of NaN contamination.
-        See :func:`convolve`.
-
-    Return
-    ------
-    xarray.DataArray
-        Filtered data array with the tidal signal removed.
-
-    See also
-    --------
-    demerliac
-    convolve
-    """
-    # Ensure nanosecond precision for datetime coordinates
-    da = xcoords.ensure_ns_datetime(da)
-
-    # Get time dimension
-    tdim = xcoords.get_tdim(da, errors="ignore")
-    if tdim is None:
-        exceptions.xoa_warn("Cannot apply the Demerliac filter since no time dimension found")
-        return da.copy()
-
-    # Weights
-    if filter_name not in HOURLY_TIDAL_FILTERS_WEIGHTS:
-        raise exceptions.XoaError(
-            f"Invalid filter name '{filter_name}'. Please use one of: "
-            + ', '.join(HOURLY_TIDAL_FILTERS_WEIGHTS)
-        )
-    weights = np.array(HOURLY_TIDAL_FILTERS_WEIGHTS[filter_name], "d")
-    if tdim not in da.indexes:
-        exceptions.xoa_warn("Not time coordinate found so we assume hourly data")
-    else:
-        dt = np.diff(da[tdim].values) / np.timedelta64(3600, "s")
-        ddt = float(np.ptp(dt))
-        mdt = float(dt.mean())
-        if ddt > dt_tol * mdt:
-            raise exceptions.XoaError(
-                "The variability of your time steps is above the allowed level "
-                f" to apply a {filter_name} filter"
-            )
-        if mdt > 1 + dt_tol:
-            raise exceptions.XoaError(
-                f"You should not apply a {filter_name} filter to data that are less "
-                f"than hourly sampled. Current mean time step: {mdt:1.2f} s"
-            )
-        elif mdt < 1 - dt_tol:
-            nw = len(weights)
-            from scipy.interpolate import interp1d
-
-            weights = interp1d(weights, np.linspace(0, 1, nw), "cubic")(np.linspace(0, 1, nw / dt))
-
-    # Apply
-    return convolve(da, {tdim: weights}, normalize=True, na_thres=na_thres)
-
-
-@numba.njit(cache=True)
-def _get_decimate_arg_(lons, lats, radius):
-    """Get which point to keep to make sure they are enough distant of one another
-
-    A loop is made on all points: a point that is at a distance less that `radius`
-    from a point that was previously marked as True is marked as False.
-
-    Parameters
-    ----------
-    lons: numpy.ndarray
-        1D array of longitudes
-    lats: numpy.ndarray
-        1D array of latitudes
-    radius: float
-        Radius relative to the sphere radius
-
-    Returns
-    -------
-    numpy.array
-        1D array of boolean with True set for the points to keep
-
-    See also
-    --------
-    xoa.core.geo.haversine
-    decimate
-    """
-    npts = lons.size
-    keep = np.ones(npts, dtype="?")
-    for i in range(1, npts):
-        for j in range(i):
-            if keep[j]:
-                dist = core_geo.haversine(lons[i], lats[i], lons[j], lats[j])
-                if dist < radius:
-                    keep[i] = False
-                    break
-    return keep
-
-
-@numba.njit(cache=True)
-def _decimate_by_average_(lons, lats, radius, keep, data):
-    """Average data at kept points within a radius"""
-    npts = lons.size
-    nkept = keep.sum()
-    cdata = np.zeros(data.shape[:-1] + (nkept,), data.dtype)
-    ccount = np.zeros(nkept, data.dtype)
-    k = 0
-    for i in numba.prange(npts):
-        if keep[i]:
-            for j in range(npts):
-                dist = core_geo.haversine(lons[i], lats[i], lons[j], lats[j])
-                if dist <= radius:
-                    cdata[..., k] += data[..., j]
-                    ccount[k] += 1.0
-            k += 1
-    for i in numba.prange(nkept):
-        cdata[..., i] = cdata[..., i] / ccount[i]
-    return cdata
+    exceptions.xoa_warn(
+        "xoa.filter.tidal_filter is deprecated, use xoa.tide.tidal_filter",
+        exceptions.XoaDeprecationWarning,
+    )
+    return tide_filter.tidal_filter(da, filter_name, na_thres=na_thres, dt_tol=dt_tol)
 
 
 class decimation_methods(xmisc.IntEnumChoices, metaclass=xmisc.DefaultEnumMeta):
@@ -1189,7 +881,7 @@ def decimate(
     y = xcoords.get_lat(obj).values
 
     # Decimation arg
-    keep = xr.DataArray(_get_decimate_arg_(x, y, radius / sphere_radius), dims=lon.dims)
+    keep = xr.DataArray(core_filter.get_decimate_arg(x, y, radius / sphere_radius), dims=lon.dims)
 
     # Compress
     objc = obj.where(keep, drop=True)
@@ -1201,11 +893,20 @@ def decimate(
         for target in targets:
             if lon.dims[0] in obj[target].dims:
                 values = obj[target].values.reshape(-1, obj[target].shape[-1])
-                objc[target][:] = _decimate_by_average_(
+                objc[target][:] = core_filter.decimate_by_average(
                     x, y, smooth_factor * radius / sphere_radius, keep.values, values
-                ).reshape((objc[target].shape[:-1] + (-1,)))
+                ).reshape(objc[target].shape[:-1] + (-1,))
 
     return objc
 
 
 decimate.__doc__ = decimate.__doc__.format(**locals())
+
+
+def __getattr__(name):
+    # Backward compatibility: the tidal filter weights moved to xoa.tide
+    if name == "HOURLY_TIDAL_FILTERS_WEIGHTS":
+        from .tide.filter import HOURLY_TIDAL_FILTERS_WEIGHTS
+
+        return HOURLY_TIDAL_FILTERS_WEIGHTS
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

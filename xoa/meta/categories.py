@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Naming convention tools for reading and formatting variables
 
@@ -22,13 +21,10 @@ See the :ref:`indepth.meta` section.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from .. import exceptions
-from .. import misc
+from .. import exceptions, misc
 
 
 class _MetaBase_:
-
     @staticmethod
     def _list_xr_names_(obj, data_vars=True, coords=True, dims=True):
         """List the data vars, coords and dims names of a xarray dataset or data array"""
@@ -1258,7 +1254,7 @@ class MetaCoordSpecs(_MetaCatSpecs_):
         if single_arg:
             meta_args = [meta_args]
         if len(meta_args) > len(dims):
-            msg = f"This data array has less dimensions ({ndim})" " than requested ({})".format(
+            msg = f"This data array has less dimensions ({ndim}) than requested ({{}})".format(
                 len(meta_args)
             )
             if errors == "raise":

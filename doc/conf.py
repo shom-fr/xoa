@@ -10,10 +10,14 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import importlib
+import inspect
 import os
 import sys
+import types
 from matplotlib import MatplotlibDeprecationWarning
 import warnings
+from sphinx_gallery.sorting import ExplicitOrder
 
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), 'ext'))
 
@@ -28,7 +32,7 @@ author = 'Shom'
 import xoa
 
 release = xoa.__version__
-xoa.register_accessors(xoa=True, meta=True, decode_sigma=True)
+xoa.register_accessors(xoa=False, meta=True, decode_sigma=True)
 
 
 # %% General configuration
@@ -49,7 +53,9 @@ extensions = [
     "IPython.sphinxext.ipython_console_highlighting",
     'genoptions',
     'genmetaspecs',
+    'gentide',
     'genlogos',
+    'genfigs',
     'sphinxarg.ext',
     'sphinxcontrib.programoutput',
     'sphinx_autosummary_accessors',
@@ -98,6 +104,27 @@ html_theme_options = {
 
 # %% Autosumarry
 autosummary_generate = True
+autosummary_ignore_module_all = False  # document what a module lists in __all__, even if imported
+
+
+def _set_reexports_as_all(modname, prefixes):
+    """List the objects that a package re-exports as its `__all__`, to have them documented"""
+    mod = importlib.import_module(modname)
+    mod.__all__ = [
+        name
+        for name, obj in vars(mod).items()
+        if not name.startswith("_")
+        and (inspect.isfunction(obj) or inspect.isclass(obj))
+        and getattr(obj, "__module__", "").startswith(prefixes)
+    ]
+
+
+for _modname, _prefixes in {
+    "xoa.meta": ("xoa.meta",),
+    "xoa.plot": ("xoa.plot", "xoa.core.plot"),
+    "xoa.tide": ("xoa.tide",),
+}.items():
+    _set_reexports_as_all(_modname, _prefixes)
 
 # %% Intersphinx
 intersphinx_mapping = {
@@ -105,7 +132,7 @@ intersphinx_mapping = {
     'cmocean': ('https://matplotlib.org/cmocean/', None),
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None),
     'matplotlib': ('https://matplotlib.org/stable/', None),
-    'numba:': ('https://numba.readthedocs.io/en/stable/', None),
+    'numba': ('https://numba.readthedocs.io/en/stable/', None),
     'numpy': ("https://numpy.org/doc/stable/", None),
     'pandas': ('https://pandas.pydata.org/docs/', None),
     'scipy': ('https://docs.scipy.org/doc/scipy/', None),
@@ -138,10 +165,74 @@ extlinks = {
 # nbsphinx_timeout = 120  # in seconds
 
 # %% Sphinx gallery
+TUTORIALS_ORDER = [
+    "plot_options",
+    "plot_cfgm",
+    "plot_naming",
+    "plot_naming_specs",
+    "plot_maps_vectors",
+    "plot_map_decorations",
+    "plot_colormaps_effects",
+    "plot_taylor_diagram",
+    "plot_wave_rose",
+    "plot_grid_tools",
+    "plot_distances",
+    "plot_neighbors",
+    "plot_geosel",
+    "plot_tiles",
+    "plot_sigma_levels",
+    "plot_layer_thicknesses",
+    "plot_croco_uv_depths",
+    "plot_croco_section",
+    "plot_regrid_interp",
+    "plot_kriging",
+    "plot_kriging_sst",
+    "plot_filter_space",
+    "plot_filter_time",
+    "plot_decimate",
+    "plot_gulfstream_dynamics",
+    "plot_dimensionless_numbers",
+    "plot_flow_advection",
+    "plot_mixed_layer",
+    "plot_vertical_modes",
+    "plot_croco_rossby",
+    "plot_tide_station",
+    "plot_tide_map",
+    "plot_stataccum",
+    "plot_mercator_argo",
+    "plot_hycom_gdp",
+]
+
+
+class TutorialsSortKey:
+    """Sort the tutorials of a section like in `TUTORIALS_ORDER`"""
+
+    def __init__(self, src_dir):
+        self.src_dir = src_dir
+
+    def __call__(self, filename):
+        return TUTORIALS_ORDER.index(os.path.splitext(filename)[0])
+
+
 warnings.simplefilter("ignore", MatplotlibDeprecationWarning)
 sphinx_gallery_conf = {
-    "examples_dirs": "../examples",
-    "gallery_dirs": "examples",
+    "examples_dirs": "../tutorials",
+    "gallery_dirs": "tutorials",
+    "subsection_order": ExplicitOrder(
+        [
+            "../tutorials/config",
+            "../tutorials/meta",
+            "../tutorials/graphics",
+            "../tutorials/grids",
+            "../tutorials/vertical",
+            "../tutorials/regrid",
+            "../tutorials/filtering",
+            "../tutorials/dynamics",
+            "../tutorials/tides",
+            "../tutorials/evaluation",
+        ]
+    ),
+    "within_subsection_order": TutorialsSortKey,
     "binder": {
         'org': 'shom-fr',
         'repo': 'xoa',
@@ -159,8 +250,32 @@ ipython_warning_is_error = False
 # %% User directives
 
 
+def _close_figures(app, docname, source):
+    """Close the figures that the ``ipython`` directives of the previous pages left open"""
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+
+
+def _skip_class_aliases(app, what, name, obj, skip, options):
+    """Do not document the aliases of classes, like the deprecated ``CFDataArrayAccessor``"""
+    if inspect.isclass(obj) and obj.__name__ != name:
+        return True
+
+
+def _skip_builtin_methods(app, what, name, obj, skip, options):
+    """Do not document methods inherited from builtin types, like ``int.from_bytes``"""
+    if what in ("class", "exception", "method") and isinstance(
+        obj, (types.BuiltinMethodType, types.MethodDescriptorType)
+    ):
+        return True
+
+
 def setup(app):
     app.add_css_file('custom.css')
+    app.connect("source-read", _close_figures)
+    app.connect("autodoc-skip-member", _skip_class_aliases)
+    app.connect("autodoc-skip-member", _skip_builtin_methods)
 
     app.add_object_type(
         'confopt',

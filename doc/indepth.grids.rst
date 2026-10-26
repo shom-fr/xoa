@@ -11,7 +11,8 @@ regridding operations, and handling terrain-following parametric vertical coordi
 (sigma coordinates). This guide covers three main modules:
 
 - :mod:`xoa.grid`: Grid utilities for 1D to nD grid operations on a single grid
-- :mod:`xoa.regrid`: Regridding utilities for operations between different grids
+- :mod:`xoa.regrid`: Regridding utilities for operations between different grids,
+  with the 1D regridding detailed here and the horizontal one in :ref:`indepth.horizontal`
 - :mod:`xoa.sigma`: Terrain-following parametric vertical coordinates following CF conventions
 
 .. _indepth.grids.grid:
@@ -48,6 +49,13 @@ The :mod:`xoa.grid` module offers various functions to manipulate grids:
     x_back = xgrid.get_edges(x_centers, "x", mode="linear_extrap")
     print(x_back.values)
 
+.. note:: :func:`~xoa.grid.pad`, :func:`~xoa.grid.get_centers`, :func:`~xoa.grid.get_edges`,
+    :func:`~xoa.grid.shift`, :func:`~xoa.grid.diff` and :func:`~xoa.grid.gradient` run numba
+    kernels from :mod:`xoa.core.grid` on single or double precision floats, with the ``"edge"``,
+    ``"linear_extrap"``, ``"constant"`` and ``"wrap"`` pad modes. Other types and modes use xarray.
+    Dask arrays are loaded in memory, so loop over chunks to bound memory usage.
+    Longitudes are kept continuous across the dateline: the centers of 178° and -174° are -178°.
+
 **Applying operations along dimensions:**
 
 The :func:`~xoa.grid.apply_along_dim` function allows you to apply an xarray operator
@@ -67,12 +75,175 @@ on data array or dataset dimensions, potentially changing the size of the array.
     ds_mean = xgrid.apply_along_dim(ds, 'x', xgrid.get_centers)
 
 
+Horizontal resolution and edges
+-------------------------------
+
+The :func:`~xoa.grid.get_resolution` function computes the distance in meters
+between adjacent points along x and y, and :func:`~xoa.grid.get_median_resolution` gives
+a single value in degrees. The :func:`~xoa.grid.get_edge_extents` function gives the
+geographic extent of the strips along the edges of a grid, which follow it when it
+is rotated or curvilinear:
+
+.. ipython:: python
+
+    lon = xr.DataArray(
+        np.arange(0.0, 5.0), dims="lon",
+        attrs={"standard_name": "longitude", "units": "degrees_east"})
+    lat = xr.DataArray(
+        np.arange(0.0, 4.0), dims="lat",
+        attrs={"standard_name": "latitude", "units": "degrees_north"})
+    ds_ll = xr.Dataset(coords={"lon": lon, "lat": lat})
+
+    dx, dy = xgrid.get_resolution(ds_ll)
+    dx.values[0]
+    xgrid.get_median_resolution(ds_ll)
+    xgrid.get_edge_extents(ds_ll, ["north", "west"], n_cells=2)
+
+The :func:`~xoa.grid.to_rect` function converts 2D longitudes and latitudes to 1D axes
+when the grid is not curvilinear, according to :func:`xoa.core.grid.check_grid_type`.
+The :func:`xoa.plot.plot_grid` function draws the edges and centers of a grid, or its bathymetry or
+resolution, on a map (see :ref:`indepth.plot`).
+See the :ref:`sphx_glr_tutorials_grids_plot_grid_tools.py` tutorial for a complete tutorial.
+
+
 Staggered grids
 ---------------
 
 The xoa library supports staggered grids commonly used in ocean and atmospheric models.
 Grid location information can be encoded in variable names using the staggered grid
 locator (see :ref:`indepth.meta` for more details on the :class:`~xoa.meta.SGLocator`).
+
+
+Neighbors with :mod:`xoa.geo`
+-----------------------------
+
+The :class:`xoa.geo.GeoKDTree` class finds the nearest points of a grid or of unstructured points,
+or those within a distance, for target points given as an object or a ``(lon, lat)`` pair.
+The tree is built once and can be queried several times, with :meth:`~xoa.geo.GeoKDTree.query`
+for the k nearest neighbors and :meth:`~xoa.geo.GeoKDTree.query_radius` for those within a distance.
+Both return the neighbors of each target (``output="index"``), or an array on the points of the tree
+with the distance to the closest target and nan elsewhere (``"dist"``), or its boolean version (``"mask"``).
+The :func:`xoa.geo.get_neighbors` function is a one-shot wrapper, and the ``xoa`` accessor
+method of the same name caches the tree.
+
+.. code-block:: python
+
+    tree = GeoKDTree(ds)
+    dist, idx = tree.query(obs, k=3, units="km")
+    nearest = ds.isel(idx)  # pointwise selection
+    dist = tree.query_radius(obs, 30, units="km", output="dist")  # nan beyond 30 km
+    mask = tree.query_radius(obs, 30, units="km", output="mask")
+
+Longitudes and latitudes are converted to cartesian coordinates on the sphere, so
+neighbors are right at the poles and across the dateline, and distances are great circle ones
+(:class:`xoa.core.geo.SphericalKDTree` is the numeric version, with flat arrays).
+Missing neighbors, for instance beyond a maximal distance, have an infinite distance
+and an index of -1, which must not be used to select data.
+See the :ref:`sphx_glr_tutorials_grids_plot_neighbors.py` tutorial.
+
+Distances and directions on the sphere are computed by :func:`xoa.geo.haversine`,
+:func:`xoa.geo.bearing`, :func:`xoa.geo.cdist`, :func:`xoa.geo.pdist` and
+:func:`xoa.geo.get_distances`. The bearing is counter-clockwise from the east, like the angle
+of a vector ``(u, v)``. See the :ref:`sphx_glr_tutorials_grids_plot_distances.py` tutorial.
+
+
+Geographic selection with :mod:`xoa.geo`
+----------------------------------------
+
+The :func:`xoa.geo.get_geosel` function finds the indices of the points of a grid or of a cloud
+of points that are in a box (``lon=(a, b), lat=(c, d)``, where the longitudes may cross the
+dateline), a circle (``circle=(lon, lat, radius)``), a polygon, or the nearest to a point
+(``nearest=(lon, lat)``, or scalar ``lon`` and ``lat``, like ``isel(lon=35, lat=45)``). It accepts a dataset, a data array or a ``(lon, lat)`` pair of
+data arrays, and returns a :class:`xoa.geo.GeoSelection`, with the ``isel`` indexers
+and an optional ``mask``, that is applied to any number of arrays with
+:meth:`~xoa.geo.GeoSelection.apply`.
+The :class:`xoa.geo.GeoSelector` class analyses the coordinates once, to make several selections,
+which the ``get_geosel`` method of the ``xoa`` accessor also does, while its ``geosel`` method
+selects the object directly (``ds.xoa.geosel(lon=(-6, -3), lat=(47, 49))``), like the
+:func:`xoa.geo.geosel` function, and
+the :func:`xoa.geo.with_geosel` decorator adds a ``geosel`` argument to a function.
+Numeric versions with flat arrays are in :mod:`xoa.core.geo`.
+
+.. code-block:: python
+
+    sel = get_geosel(ds, circle=(-4.5, 48, 50), units="km", pad="edges")
+    sub = sel.apply(ds)  # isel, then nan outside of the circle
+    sel = get_geosel(ds, nearest=(-4.5, 48))
+    ds.isel(sel.isel)  # like ds.isel(lon=3, lat=7)
+
+The result depends on the kind of coordinates:
+
+- **Rectangular grid** (1D ``lon`` and ``lat``): a box is exactly made of slices, and there is
+  no mask. A circle or a polygon needs a mask.
+- **Curvilinear grid** (2D ``lon`` and ``lat``): the window is a rectangle of indices,
+  that contains points outside of the shape.
+- **Cloud of points**: the indices of the points inside, which is all that ``isel`` needs.
+
+With ``fit="outer"``, the default, the window is the smallest one that contains all the
+points inside, and the ``mask`` tells which of its points are really inside. With ``fit="inner"``,
+the window is the largest rectangle of indices with only points inside, and there is no mask.
+Use it to get a block of data without missing values.
+
+The ``pad`` argument grows the shape. In grid points (``pad_units="points"``, the default),
+the step is estimated locally from the cell edges, as given by :func:`xoa.core.grid.edges`,
+so that it follows stretched and rotated grids: ``pad=1`` adds about one point around the shape,
+and ``pad="edges"``, which is ``0.5``, selects the points whose cell touches it, as needed to
+draw the selection with ``pcolormesh``. The margin can also be a distance (``"m"``, ``"km"``)
+or an arc (``"deg"``), which is the only choice for a cloud of points.
+
+.. note::
+
+    - A padded window is clipped at the border of the grid, with no extrapolation.
+    - On a curvilinear grid, ``"edges"`` is an estimate based on the extent of the cells, that
+      can miss a cell that touches the shape by a corner only.
+    - With a rectangular grid and a box, a distance margin is computed at the highest latitude
+      of the box, and may select a few more points than needed at the other latitudes.
+    - As for neighbors, a nearest point beyond ``max_dist`` has an index of -1 when there are
+      several targets, and raises an error with a single target.
+
+The shapes are drawn with :func:`xoa.plot.plot_box`, :func:`xoa.plot.plot_circle` and
+:func:`xoa.plot.plot_polygon`, which take the same arguments.
+
+See the :ref:`sphx_glr_tutorials_grids_plot_geosel.py` tutorial.
+
+
+Merging tiles with :mod:`xoa.tiles`
+-----------------------------------
+
+The :class:`xoa.tiles.TileMerger` class merges tiles that are subsets of a larger rectangular
+longitude/latitude grid with constant steps, and :func:`xoa.tiles.merge_tiles` does it in
+a single call. Tiles are datasets, arrays, netcdf files or glob patterns, and may overlap.
+
+.. code-block:: python
+
+    from xoa.tiles import TileMerger, merge_tiles
+
+    ds = merge_tiles("tiles/*.nc", overlap="mean")
+
+    tm = TileMerger(lon_range=(-180, 180))  # or dx, dy, lon0, lat0, nx, ny
+    tm.add("west.nc")
+    tm.add("east.nc")
+    print(tm)  # grid, tiles and estimated memory
+    tm.plot()  # grid, tiles, overlaps and gaps
+    ds = tm.merge()
+
+- The grid steps, origin and size are inferred from the coordinates of the tiles when not given.
+  A tile that is not on the grid, within ``tol`` times the step, raises an error.
+- Coordinates may be 1D or 2D when rectilinear, as in :func:`~xoa.grid.to_rect`, and the merged
+  ones are 1D and increasing.
+- Longitudes are processed modulo 360: tiles may use different conventions, cross the dateline
+  or the Greenwich meridian. The grid is built on the 360 degrees window with the smallest
+  extent, or starting at ``lon0``, and the merged longitudes are put in ``lon_range``, which
+  is inferred from the first tile: ``(0, 360)`` if it has longitudes above 180, and
+  ``(-180, 180)`` otherwise. The columns are sorted again when the window crosses the range.
+- Cells not covered by a tile are filled with nans, and nans of a tile never erase
+  the values of another one.
+- ``overlap`` is ``"last"``, ``"first"``, ``"mean"`` or ``"raise"``.
+- Variables are transposed with longitude and latitude last, and integers are converted to floats.
+- The merge is eager: the :attr:`~xoa.tiles.TileMerger.nbytes` estimate is shown by the
+  representation and the plot, and a warning is issued when it exceeds ``max_memory``.
+
+See the :ref:`sphx_glr_tutorials_grids_plot_tiles.py` tutorial.
 
 
 .. _indepth.grids.regrid:
@@ -104,7 +275,10 @@ These include:
 - **nearest**: Nearest neighbor interpolation
 - **cubic**: Cubic interpolation
 - **hermit/hermitian**: Hermitian interpolation
-- **cellave**: Cell-averaging or conservative regridding
+- **cellave**: Cell-averaging or conservative regridding, from the edges of the input
+  and output cells, which are computed with :func:`~xoa.grid.get_edges` unless given
+  with ``edges``
+- **binning**: Average of the input points that fall in each output cell
 
 Example usage
 ^^^^^^^^^^^^^
@@ -122,6 +296,45 @@ Example usage
 
     # Regrid with linear interpolation
     data_new = regrid.regrid1d(data_old, x_new, method='linear')
+
+    # Average of the input points in the output cells
+    regrid.regrid1d(data_old, x_new[::4], method='binning')
+
+Coordinates
+^^^^^^^^^^^
+
+The input and output coordinates may vary along the other dimensions, like
+the depths of sigma levels, and may have only some of the dimensions of the data,
+like levels that are the same everywhere. They may increase or decrease, and their
+direction may change from a column to another: "bottom" and "top" then refer to
+the smallest and largest values.
+
+When both coordinates have a ``positive`` attribute and they differ, like a depth that
+is positive down and a ``z`` that is positive up, the input coordinate is negated:
+
+.. ipython:: python
+
+    depth = xr.DataArray([10.0, 50.0, 100.0], dims="z", attrs={"positive": "down"})
+    temp = xr.DataArray([15.0, 12.0, 10.0], dims="z", coords={"depth": depth})
+    z = xr.DataArray([-80.0, -30.0], dims="z", attrs={"positive": "up"}, name="z")
+    regrid.regrid1d(temp, z, dim="z", coord_in_name="depth")
+
+Missing values
+^^^^^^^^^^^^^^
+
+The interpolations ignore the missing values at the ends of the columns, and
+interpolate across the inner ones with ``drop_na=True``, up to ``maxgap`` consecutive
+values. With the ``cellave`` and ``binning`` methods, ``na_thres`` is the minimal valid
+fraction of an output cell to get a value: the covered fraction for ``cellave``, and
+the fraction of valid input points for ``binning``.
+
+Performance
+^^^^^^^^^^^
+
+The working dimension is kept in place: the arrays are not transposed nor copied, the
+columns are processed in parallel by numba, and dask arrays are processed block by
+block, with a single chunk along the working dimension only.
+See :ref:`indepth.performance`.
 
 Extrapolation modes
 ^^^^^^^^^^^^^^^^^^^
@@ -144,13 +357,15 @@ Available modes include:
 Horizontal regridding
 ---------------------
 
-For 2D horizontal regridding, xoa provides the :func:`~xoa.regrid.grid2loc` function
-to interpolate from a grid to specific locations.
+The :class:`~xoa.regrid.Regridder` and :class:`~xoa.interp.Interpolator` classes regrid
+and interpolate horizontally, on regular, rectangular and curvilinear grids, with the
+``bilinear``, ``bicubic`` and ``conservative`` methods. They have their own guide,
+:ref:`indepth.horizontal`, and a :ref:`tutorial <sphx_glr_tutorials_regrid_plot_regrid_interp.py>`.
 
 Vertical regridding
 -------------------
 
-Vertical regridding is particularly important for ocean models. The :func:`~xoa.regrid.isoslice`
+Vertical regridding is particularly important for ocean models. The :func:`~xoa.interp.isoslice`
 function can extract data on isobaric or isopycnal surfaces.
 
 
@@ -170,6 +385,9 @@ Sigma coordinates are terrain-following vertical coordinates commonly used in oc
 and atmospheric models. Instead of using fixed depth or pressure levels, sigma
 coordinates follow the bathymetry (ocean models) or topography (atmospheric models),
 which allows better resolution near boundaries.
+which allows better resolution near boundaries.
+The tutorial :ref:`sphx_glr_tutorials_vertical_plot_sigma_levels.py` shows how the stretching
+parameters distribute the levels over a slope.
 
 Supported coordinate types
 ---------------------------
@@ -193,7 +411,7 @@ These include:
 Converting sigma to physical coordinates
 -----------------------------------------
 
-The main functionality is to decode sigma coordinates into physical depths (for ocean)
+The main functionality is to decode sigma coordinates into physical heights ``z`` (for ocean)
 or pressures (for atmosphere) using the appropriate formula terms.
 
 .. note:: The core sigma conversion functions use Numba's guvectorize decorator
@@ -207,7 +425,7 @@ or pressures (for atmosphere) using the appropriate formula terms.
 Ocean sigma coordinates
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-For ocean models, sigma coordinates are converted to depths using formulas that
+For ocean models, sigma coordinates are converted to ``z`` heights, positive up, using formulas that
 depend on:
 
 - **sigma** (σ): The sigma level (typically from -1 to 0)
@@ -226,12 +444,18 @@ depend on:
     # Check the sigma coordinate
     print(ds.s_rho.attrs.get('standard_name'))
 
-    # Decode sigma to depths using the sigma module
-    # The decode_cf_sigma function will automatically detect
-    # the coordinate type and apply the correct formula
+    # Decode sigma to z heights, which are negative in the ocean, using the sigma module
+    # The decode_sigma function will automatically detect
+    # the coordinate type and apply the correct formula.
+    # The croco specs name the heights z_rho and z_w, according to their vertical location.
     from xoa.sigma import decode_sigma
+    xoa.meta.assign_meta_specs(ds, "croco")
     dsz = decode_sigma(ds)
-    print(dsz.depth)
+    print(dsz.z_rho)
+
+Heights are relative to the fixed datum of the formulas by default, so that the free
+surface is at ``z = ssh``. Use ``ref="surface"`` to get them relative to the free surface:
+see :ref:`indepth.vertical`.
 
 Atmosphere sigma coordinates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -250,7 +474,7 @@ For atmospheric models, sigma coordinates are converted to pressure levels:
 Working with vertical sections
 -------------------------------
 
-Once sigma coordinates are decoded to physical depths, you can work with
+Once sigma coordinates are decoded to physical heights, you can work with
 vertical sections and perform operations like:
 
 - Extracting data at specific depth levels
@@ -258,7 +482,7 @@ vertical sections and perform operations like:
 - Computing vertical derivatives
 - Creating vertical transects
 
-See the gallery example :ref:`sphx_glr_examples_plot_croco_section.py` for a practical
+See the gallery tutorial :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py` for a practical
 demonstration of working with sigma coordinates and vertical sections.
 
 Formula terms mapping
@@ -290,25 +514,22 @@ and sigma coordinates using CROCO model output:
     import xoa.meta
     import xoa.regrid
     import numpy as np
-    
-    # To have 'xoa' and 'decode_sigma' accessors
-    xoa.register_accessors()
-    
+
     # Load CROCO sample data
     ds = xoa.open_data_sample("MODELS/CROCO/SOUTH-AFRICA/croco.south-africa.meridional.nc")
-    
+
     # Set internal croco decoding rules and decode s-coordinate and dataset names
     xoa.meta.set_meta_specs('croco')
-    ds_decoded = ds.decode_sigma().xoa.decode()
-    
-    # The sigma coordinate has been converted to depths
-    # You can now regrid to regular depth levels if needed
-    
-    # Define regular depth levels
-    regular_depths = xr.DataArray(np.linspace(-100, 0, 20), dims='depth', attrs={'units': 'm', 'positive': 'up'})
-    
-    # Regrid temperature to regular depths
-    temp_regular = xoa.regrid.regrid1d(ds_decoded.ptemp, regular_depths, extrap="top")
+    ds_decoded = ds.xoa.decode_sigma().xoa.decode()
+
+    # The sigma coordinate has been converted to z heights
+    # You can now regrid to regular z levels if needed
+
+    # Define regular z levels
+    regular_z = xr.DataArray(np.linspace(-100, 0, 20), dims='z', attrs={'units': 'm', 'positive': 'up'})
+
+    # Regrid temperature to regular z levels
+    temp_regular = xoa.regrid.regrid1d(ds_decoded.ptemp, regular_z, extrap="top")
     print(temp_regular[0, :, 0, 0])
 
 See also
@@ -318,5 +539,5 @@ See also
 - :mod:`xoa.regrid`: Regridding module
 - :mod:`xoa.sigma`: Sigma coordinates module
 - :mod:`xoa.coords`: Coordinate utilities
-- :ref:`examples`: Gallery of examples including grid and sigma operations
+- :ref:`tutorials`: Gallery of tutorials including grid and sigma operations
 - :ref:`indepth.meta`: For more on CF metadata and grid location encoding

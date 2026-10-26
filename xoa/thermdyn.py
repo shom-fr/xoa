@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Thermodynamics utilities.
 
 Provides functions to identify and retrieve temperature, salinity and
 density variables from datasets, and to compute the mixed layer depth.
 """
+
+import inspect
+
 import numpy as np
 import xarray as xr
 
+from . import coords as xcoords
 from . import exceptions
+from . import grid as xgrid
 from . import meta as xmeta
 from . import misc as xmisc
-from . import coords as xcoords
 from . import regrid as xregrid
-
+from .core import thermdyn as cthermdyn
 
 # def _get_array_(ds, func, variants, variant, errors, name):
 #     if not variant:
@@ -45,23 +48,31 @@ from . import regrid as xregrid
 #     return das[0]
 
 
+_TEMP_KINDS = {
+    "temp": "In situ",
+    "ctemp": "Conservative temperature",
+    "ptemp": "Potential temperature",
+}
+_TEMP_ALIASES = {"temp": "insitu", "ptemp": "potential", "ctemp": "conservative"}
+
 TEMP_VARIANTS = xmisc.Choices(
-    {
-        None: "No restriction",
-        "temp": "In situ",
-        "ctemp": "Conservative temperature",
-        "atemp": "Absolute temperature",
-        "ptemp": "Potential temperature",
-    },
+    {None: "No restriction", **_TEMP_KINDS},
     parameter="variant",
     description="Restrict checking to a given variant(s)",
-    aliases={"temp": "insitu", "ptemp": "potential", "ctemp": "conservative", "atemp": "absolute"},
+    aliases=_TEMP_ALIASES,
     multi=True,
+)
+
+TEMP_KINDS = xmisc.Choices(
+    {None: "Inferred from the array, else potential", **_TEMP_KINDS},
+    parameter="temp_kind",
+    description="Kind of temperature",
+    aliases=_TEMP_ALIASES,
 )
 
 
 def _get_temp_variant_(variant):
-    variant = DENS_VARIANTS[variant]
+    variant = TEMP_VARIANTS[variant]
     if variant is None:
         variant = ["temp", "ptemp", "ctemp"]
     return variant
@@ -127,28 +138,35 @@ def get_temp(ds, variant=None, errors="warn"):
     # return _get_array_(ds, is_temp, TEMP_VARIANTS, variant, errors, "temperature")
 
 
+_SAL_KINDS = {
+    "asal": "Absolute salinity",
+    "pfsal": "Preformed salinity",
+    "psal": "Practical salinity",
+}
+_SAL_ALIASES = {
+    "psal": "practical",
+    "pfsal": "preformed",
+    "asal": "absolute",
+}
+
 SAL_VARIANTS = xmisc.Choices(
-    {
-        None: "No restriction",
-        "sal": "In situ salinity",
-        "asal": "Absolute salinity",
-        "pfsal": "Preformed salinity",
-        "psal": "Practical salinity",
-    },
+    {None: "No restriction", "sal": "Salinity of unknown kind", **_SAL_KINDS},
     parameter="variant",
     description="Restrict checking to a given variant(s)",
-    aliases={
-        "sal": "insitu",
-        "psal": "practical",
-        "pfsal": "preformed",
-        "asal": "absolute salinity",
-    },
+    aliases=_SAL_ALIASES,
     multi=True,
+)
+
+SAL_KINDS = xmisc.Choices(
+    {None: "Inferred from the array, else practical", **_SAL_KINDS},
+    parameter="sal_kind",
+    description="Kind of salinity",
+    aliases=_SAL_ALIASES,
 )
 
 
 def _get_sal_variant_(variant):
-    variant = DENS_VARIANTS[variant]
+    variant = SAL_VARIANTS[variant]
     if variant is None:
         variant = ["sal", "psal", "pfsal", "asal"]
     return variant
@@ -301,11 +319,177 @@ def get_dens(ds, variant=None, errors="warn"):
     # return _get_array_(ds, is_dens, DENS_VARIANTS, variant, errors, "density")
 
 
+def _format_doc_(*choices):
+    """Decorator that fills the choices placeholders of a docstring"""
+
+    def decorator(func):
+        doc = inspect.cleandoc(func.__doc__)
+        func.__doc__ = doc.format(**{c._parameter: c.to_docstring(0) for c in choices})
+        return func
+
+    return decorator
+
+
+def _get_temp_kind_(temp, kind):
+    """Get the kind of temperature, that is potential unless found otherwise"""
+    kind = TEMP_KINDS[kind]
+    if kind is not None:
+        return kind
+    meta_specs = xmeta.get_meta_specs(temp)
+    for kind in "ptemp", "ctemp":
+        if meta_specs.match_data_var(temp, kind):
+            return kind
+    if temp.attrs.get("standard_name") == "sea_water_temperature":
+        return "temp"
+    return "ptemp"
+
+
+def _get_sal_kind_(sal, kind):
+    """Get the kind of salinity, that is practical unless found otherwise"""
+    kind = SAL_KINDS[kind]
+    if kind is not None:
+        return kind
+    meta_specs = xmeta.get_meta_specs(sal)
+    for kind in "asal", "pfsal":
+        if meta_specs.match_data_var(sal, kind):
+            return kind
+    return "psal"
+
+
+def _as_celsius_(temp):
+    if str(temp.attrs.get("units", "")).lower() in ("k", "kelvin"):
+        temp = temp - 273.15
+    return temp
+
+
+def _get_zlatlon_(da, z, lat, lon):
+    """Get the vertical coordinate, latitudes and longitudes, as needed for the pressure"""
+    z = xcoords.get_z(da) if z is None else xcoords.as_z(z)
+    if lat is None:
+        lat = xcoords.get_lat(da, errors="ignore")
+        if lat is None:
+            raise exceptions.XoaError("The latitude is needed to compute the pressure: pass lat=")
+    if lon is None:
+        lon = xcoords.get_lon(da, errors="ignore")
+        if lon is None:
+            lon = 0.0
+    return z, lat, lon
+
+
+def _format_(out, da, name):
+    out = xcoords.copy_coord_attrs(out, da)
+    xmeta.get_meta_specs(da).format_data_var(
+        out, name, format_coords=False, rename_dims=False, copy=False, replace_attrs=True
+    )
+    return out
+
+
+@_format_doc_(SAL_KINDS)
+def convert_sal(sal, to="asal", sal_kind=None, z=None, lat=None, lon=None):
+    """Convert a salinity from a kind to another one
+
+    Parameters
+    ----------
+    sal: xarray.DataArray
+        Salinity
+    to: str
+        Target kind, among ``"psal"``, ``"asal"`` and ``"pfsal"``, or their aliases.
+    {sal_kind}
+    z: None, xarray.DataArray
+        Vertical coordinate, which defaults to the z or depth of `sal`.
+        See :func:`xoa.coords.as_z` for the sign convention.
+    lat, lon: None, float, xarray.DataArray
+        Latitudes and longitudes, that default to the coordinates of `sal`.
+        The latitude is needed to compute the pressure from the depth.
+
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    convert_temp
+    """
+    to = SAL_KINDS[to]
+    sal_kind = _get_sal_kind_(sal, sal_kind)
+    if to == sal_kind:
+        return _format_(sal.copy(), sal, to)
+    z, lat, lon = _get_zlatlon_(sal, z, lat, lon)
+    out = xr.apply_ufunc(
+        cthermdyn.convert_sal,
+        sal,
+        z,
+        lat,
+        lon,
+        kwargs={"kind": sal_kind, "to": to},
+        join="override",
+        dask="parallelized",
+        output_dtypes=[float],
+    )
+    return _format_(out, sal, to)
+
+
+@_format_doc_(TEMP_KINDS)
+def convert_temp(
+    temp, to="ctemp", temp_kind=None, sal=None, sal_kind=None, z=None, lat=None, lon=None
+):
+    """Convert a temperature from a kind to another one
+
+    Parameters
+    ----------
+    temp: xarray.DataArray
+        Temperature in degrees Celsius or Kelvin
+    to: str
+        Target kind, among ``"temp"``, ``"ptemp"`` and ``"ctemp"``, or their aliases.
+    {temp_kind}
+    sal: xarray.DataArray, None
+        Salinity, which is needed when the kinds differ.
+    sal_kind: str, None
+        Kind of `sal`, as in :func:`convert_sal`.
+    z: None, xarray.DataArray
+        Vertical coordinate, which defaults to the z or depth of `temp`.
+        See :func:`xoa.coords.as_z` for the sign convention.
+    lat, lon: None, float, xarray.DataArray
+        Latitudes and longitudes, that default to the coordinates of `temp`.
+        The latitude is needed to compute the pressure from the depth.
+
+    Return
+    ------
+    xarray.DataArray
+        In degrees Celsius.
+
+    See also
+    --------
+    convert_sal
+    """
+    to = TEMP_KINDS[to]
+    temp_kind = _get_temp_kind_(temp, temp_kind)
+    temp = _as_celsius_(temp)
+    if to == temp_kind:
+        return _format_(temp.copy(), temp, to)
+    if sal is None:
+        raise exceptions.XoaThermdynError("The salinity is needed to convert the temperature")
+    sal_kind = _get_sal_kind_(sal, sal_kind)
+    z, lat, lon = _get_zlatlon_(temp, z, lat, lon)
+    out = xr.apply_ufunc(
+        cthermdyn.convert_temp,
+        temp,
+        sal,
+        z,
+        lat,
+        lon,
+        kwargs={"kind": temp_kind, "to": to, "sal_kind": sal_kind},
+        join="override",
+        dask="parallelized",
+        output_dtypes=[float],
+    )
+    return _format_(out, temp, to)
+
+
 MLD_METHODS = xmisc.Choices(
     {
         "deltatemp": (
-            "depth at which the potential temperature is ``deltatemp`` "
-            "lower than the surface temperature"
+            "depth at which the temperature is ``deltatemp`` lower than the surface temperature"
         ),
         "deltadens": (
             "depth at which the potential density is `deltadens` higher than the surface density"
@@ -317,11 +501,12 @@ MLD_METHODS = xmisc.Choices(
 )
 
 
-@MLD_METHODS.format_method_docstring
+@_format_doc_(TEMP_KINDS, MLD_METHODS)
 def mixed_layer_depth(
     da,
     method=None,
     zref=0.0,
+    temp_kind=None,
     deltatemp=0.2,
     deltadens=0.03,
     kzmax=0.0005,
@@ -334,14 +519,17 @@ def mixed_layer_depth(
     Parameters
     ----------
     da: xarray.DataArray
-        A data array that contains either the potential temperature,
+        A data array that contains either the temperature,
         the potential density or the vertical tracer diffusivity.
-        This array **must contain a depth coordinate**, which should have
+        This array **must contain a depth or z coordinate**, which should have
         a ``positive`` attribute.
     {method}
     zref: float
         Reference depth (in meters) from which the method criterion
         is applied. Defaults to the surface (0).
+    {temp_kind}
+        It is only used by the ``"deltatemp"`` method, for which the in-situ temperature
+        should be avoided.
     deltatemp: float
         Temperature threshold for the ``"deltatemp"`` method (in K or degC).
     deltadens: float
@@ -384,8 +572,10 @@ def mixed_layer_depth(
         assert zdim in da.dims
     assert zdim in da.dims
 
-    # Depths
-    depth = xcoords.get_depth(da)
+    # Depths, as found, since the order of levels follows their positive attribute
+    depth = xcoords.get_vertical(da, errors="ignore")
+    if depth is None:
+        depth = xcoords.get_depth(da)
     positive = xcoords.get_positive_attr(depth, zdim=zdim) or "up"
 
     # Method
@@ -415,6 +605,11 @@ def mixed_layer_depth(
             dep0 = xr.DataArray([zref], dims="depth")
             surf = xregrid.regrid1d(da, dep0, method="linear").squeeze(dim="depth")
         if method == "deltatemp":
+            if _get_temp_kind_(da, temp_kind) == "temp":
+                exceptions.xoa_warn(
+                    "The in-situ temperature is not conserved by vertical displacements: "
+                    "prefer the potential or conservative temperature"
+                )
             isoval = surf - deltatemp
         elif method == "deltadens":
             isoval = surf + deltadens
@@ -440,3 +635,65 @@ def mixed_layer_depth(
 #         if method is None:
 #             mld = meta_specs.search_data_var(ds, "mld", errors="ignore")
 #             if mld is None:
+
+
+@_format_doc_(TEMP_KINDS, SAL_KINDS)
+def get_n2(temp, sal, z=None, lat=None, lon=None, temp_kind=None, sal_kind=None):
+    """Compute the squared Brunt-Vaisala frequency, or buoyancy frequency, in s-2
+
+    It is computed with :func:`gsw.Nsquared` between the levels, and averaged
+    to the levels, so that it can be used with the data that are defined at the levels,
+    like in :class:`xoa.dyn.VerticalModes`.
+
+    Parameters
+    ----------
+    temp: xarray.DataArray
+        Temperature in degrees Celsius or Kelvin. It must have a vertical dimension.
+    sal: xarray.DataArray
+        Salinity
+    z: None, xarray.DataArray
+        Vertical coordinate of the levels, that may vary in space, like with sigma
+        coordinates. It defaults to the z or depth of `temp`.
+        See :func:`xoa.coords.as_z` for the sign convention.
+    lat, lon: None, float, xarray.DataArray
+        Latitudes and longitudes, that default to the coordinates of `temp`.
+        The latitude is needed to compute the pressure from the depth, and the longitude,
+        that defaults to 0, only slightly modifies the absolute salinity.
+    {temp_kind}
+    {sal_kind}
+
+    Return
+    ------
+    xarray.DataArray
+        With the same dimensions as `temp`. It is missing next to the missing values.
+
+    See also
+    --------
+    convert_temp
+    convert_sal
+    xoa.dyn.VerticalModes
+    """
+    zdim = xcoords.get_zdim(temp, errors="raise")
+    temp_kind = _get_temp_kind_(temp, temp_kind)
+    sal_kind = _get_sal_kind_(sal, sal_kind)
+    temp_c = _as_celsius_(temp)
+    z, lat, lon = _get_zlatlon_(temp, z, lat, lon)
+    # The vertical dimension is kept in place
+    lat, lon = (c if isinstance(c, xr.DataArray) else xr.DataArray(c) for c in (lat, lon))
+    n2 = xgrid.map_along_dim(
+        cthermdyn.n2_at_levels,
+        temp_c,
+        zdim,
+        sal,
+        z,
+        lat,
+        lon,
+        temp_kind=temp_kind,
+        sal_kind=sal_kind,
+        dtype="d",
+    )
+    n2 = n2.assign_coords({name: c for name, c in temp.coords.items() if zdim in c.dims})
+    n2 = xcoords.copy_coord_attrs(n2, temp)
+    n2.name = "n2"
+    n2.attrs = {"long_name": "Squared Brunt-Vaisala frequency", "units": "s-2"}
+    return n2

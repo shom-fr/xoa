@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.meta` module
 """
 
 # from unittest.mock import Mock
 import warnings
-import pytest
 
 import numpy as np
+import pytest
 import xarray as xr
 
 import xoa

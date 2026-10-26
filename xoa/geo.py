@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Geographic utilities
 """
+
 # Copyright 2020-2026 Shom
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,17 +17,18 @@ Geographic utilities
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import math
+
 import numpy as np
 import xarray as xr
 
-from . import misc
 from . import coords as xcoords
+from . import exceptions, misc
 from .core import geo as _geo
 
-
 #: Earth radius in meters
-EARTH_RADIUS = 6371e3
+EARTH_RADIUS = _geo.EARTH_RADIUS
 
 
 def haversine(lon0, lat0, lon1, lat1, radius=EARTH_RADIUS):
@@ -58,6 +59,9 @@ def haversine(lon0, lat0, lon1, lat1, radius=EARTH_RADIUS):
 
 def bearing(lon0, lat0, lon1, lat1):
     """Compute the bearing angle (forward azimuth)
+
+    The angle is in degrees, in ]-180, 180], counter-clockwise from the east like the angle
+    of a vector ``(u, v)``: east is 0, north is 90, west is 180 and south is -90.
 
     Parameters
     ----------
@@ -128,12 +132,14 @@ def get_distances(da0, da1=None, radius=EARTH_RADIUS, units="m"):
         dd = pdist(XY0, radius=radius)
         if units == distance_units.km:
             dd *= 1e-3
+        ds0 = ds0.rename(npts="npts0")
+        ds1 = ds0.rename(npts0="npts1")
         dd = xr.DataArray(
             dd,
-            dims=("npts", "npts"),
+            dims=("npts0", "npts1"),
             attrs={"units": du},
             name="distance",
-            coords={"lon": ds0.lon, "lat": ds0.lat},
+            coords={"lon_0": ds0.lon, "lat_0": ds0.lat, "lon_1": ds1.lon, "lat_1": ds1.lat},
         )
     else:
         ds0 = ds0.rename(npts="npts0")
@@ -237,7 +243,7 @@ def _adapative_pdist_(X, method="haversine", **kwargs):
     return scipy.spatial.distance.pdist(X, method=method, **kwargs)
 
 
-class ScipyDistContext(object):
+class ScipyDistContext:
     """Context to switch the :func:`scipy.spatial.distance.cdist` function to :func:`cdist`
 
     Parameters
@@ -359,7 +365,7 @@ def get_extent(extent, margin=0, square=False, min_extent=None):
     return [xmin, xmax, ymin, ymax]
 
 
-def clusterize(obj, npmax, split=False):
+def clusterize(obj, npmax, split=False, seed=None):
     """Split data into clouds of points of max size `npmax`
 
     Input object must have valid geographic coordinates.
@@ -372,6 +378,8 @@ def clusterize(obj, npmax, split=False):
         Maximal number of point per cluster
     split:
         Return one dataset per cluster
+    seed: int, numpy.random.Generator, None
+        Seed of the random initialisation of the k-means, to get reproducible clusters.
 
     Return
     ------
@@ -415,7 +423,7 @@ def clusterize(obj, npmax, split=False):
     points = np.dstack((x, y))[0]
     ii = np.arange(csize)
     while csize > npmax:
-        centroids, global_distorsion = kmeans(points, nclust)
+        centroids, global_distorsion = kmeans(points, nclust, seed=seed)
         indices, distorsions = vq(points, centroids)
         sindices = [ii[indices == nc] for nc in range(nclust)]
         csizes = [sii.shape[0] for sii in sindices]
@@ -491,3 +499,585 @@ def m2deg(met, lat=None, radius=EARTH_RADIUS):
     if lat is not None:
         dd /= np.cos(np.radians(lat))
     return dd
+
+
+def _get_lonlat_(obj):
+    """Get broadcasted longitudes and latitudes as a pair of data arrays"""
+    if isinstance(obj, (tuple, list)):
+        lon, lat = (np.asarray(o, dtype="d") for o in obj)
+        if lon.ndim > 1:
+            raise exceptions.XoaError("Longitudes and latitudes must be scalars or 1D arrays")
+        dims = () if lon.ndim == 0 else ("target",)
+        lon = xr.DataArray(lon, dims=dims)
+        lat = xr.DataArray(lat, dims=dims)
+        return lon, lat
+    lon = xcoords.get_lon(obj)
+    lat = xcoords.get_lat(obj)
+    lat, lon = xr.broadcast(lat, lon)
+    return lon, lat
+
+
+def _check_output_(output):
+    if output not in ("index", "dist", "mask"):
+        raise exceptions.XoaError(f"Invalid output: {output!r}. Use 'index', 'dist' or 'mask'")
+
+
+def _get_scale_(units):
+    """Factor to convert meters to `units`"""
+    return 1e-3 if distance_units[units] == distance_units.km else 1.0
+
+
+def _scale_units_(scale):
+    return "km" if scale == 1e-3 else "m"
+
+
+class GeoKDTree:
+    """A KD-tree of the points of a geographic object, to make several queries
+
+    The tree is built once, from the longitudes and latitudes of `obj`, and used by
+    :meth:`query` and :meth:`query_radius`. Distances are great circle distances.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates, that may be 1D or 2D,
+        defining a grid or a set of unstructured points.
+    radius: float
+        Radius of the sphere in meters, which defaults to the earth radius
+    leafsize: int
+        Number of points at which the tree switches to a brute force search
+
+    See also
+    --------
+    get_neighbors
+    xoa.core.geo.SphericalKDTree
+    """
+
+    def __init__(self, obj, radius=EARTH_RADIUS, leafsize=16):
+        self.lon, self.lat = _get_lonlat_(obj)
+        self.tree = _geo.SphericalKDTree(
+            self.lon.values, self.lat.values, radius=radius, leafsize=leafsize
+        )
+
+    def _as_indices_(self, idx, dims, coords):
+        """Convert flat indices to a dict of data arrays, with -1 for missing ones"""
+        missing = idx < 0
+        out = {}
+        for dim, ii in zip(
+            self.lon.dims, np.unravel_index(np.where(missing, 0, idx), self.lon.shape)
+        ):
+            out[dim] = xr.DataArray(np.where(missing, -1, ii), dims=dims, coords=coords)
+        return out
+
+    def _as_grid_(self, idx, dist, output, scale):
+        """Get the distance to the closest target, or a mask, on the points of the tree"""
+        idx = np.ravel(idx)
+        dist = np.ravel(dist)
+        valid = idx >= 0
+        field = np.full(self.lon.size, np.inf)
+        np.minimum.at(field, idx[valid], dist[valid])
+        field[np.isinf(field)] = np.nan
+        field = field.reshape(self.lon.shape)
+        kwargs = dict(dims=self.lon.dims, coords=self.lon.coords)
+        if output == "mask":
+            return xr.DataArray(
+                ~np.isnan(field),
+                name="mask",
+                attrs={"long_name": "Neighbors of targets"},
+                **kwargs,
+            )
+        return xr.DataArray(
+            field * scale,
+            name="distance",
+            attrs={"long_name": "Distance to the closest target", "units": _scale_units_(scale)},
+            **kwargs,
+        )
+
+    def query(self, target, k=1, max_dist=None, units="m", output="index", workers=1):
+        """Find the nearest neighbors of target points
+
+        Parameters
+        ----------
+        target: xarray.DataArray, xarray.Dataset, tuple
+            Object with longitude and latitude coordinates, or a (lon, lat) pair
+            of scalars or 1D arrays
+        k: int
+            Number of neighbors
+        max_dist: float, None
+            Maximal distance
+        units: int, str, distance_units
+            Units of `max_dist` and of the returned distances, as one of:
+            {distance_units.rst_with_links}
+        output: {{"index", "dist", "mask"}}
+            Return the distances and indices of the neighbors of each target,
+            or a distance or mask array on the points of `obj`.
+        workers: int
+            Number of threads, -1 for all
+
+        Return
+        ------
+        xarray.DataArray, dict
+            With ``output="index"``, the distances, with the dimensions of the target and
+            a trailing ``neighbor`` dimension if `k` is greater than 1, which are inf for
+            missing neighbors. Then, indices as data arrays with the same dimensions,
+            for each dimension of the longitudes and latitudes of `obj`,
+            which are -1 for missing neighbors.
+            They are suited for pointwise selection with :meth:`xarray.DataArray.isel`.
+        xarray.DataArray
+            With ``output="dist"``, the distance to the closest target on the points of `obj`
+            that are neighbors of at least one target, and nan elsewhere.
+            With ``output="mask"``, the boolean array of these points.
+        """
+        _check_output_(output)
+        lon, lat = _get_lonlat_(target)
+        scale = _get_scale_(units)
+        if max_dist is not None:
+            max_dist = max_dist / scale
+        dist, idx = self.tree.query(lon.values, lat.values, k=k, max_dist=max_dist, workers=workers)
+        if output != "index":
+            return self._as_grid_(idx, dist, output, scale)
+        dims = lon.dims
+        if k > 1:
+            dims = dims + ("neighbor",)
+        shape = lon.shape + ((k,) if k > 1 else ())
+        dist = xr.DataArray(
+            dist.reshape(shape) * scale,
+            dims=dims,
+            coords=lon.coords,
+            name="distance",
+            attrs={"long_name": "Distance to neighbors", "units": _scale_units_(scale)},
+        )
+        return dist, self._as_indices_(idx.reshape(shape), dims, lon.coords)
+
+    def query_radius(self, target, radius, units="m", output="index", workers=1):
+        """Find the neighbors of target points within a distance
+
+        Parameters
+        ----------
+        target: xarray.DataArray, xarray.Dataset, tuple
+            Object with longitude and latitude coordinates, or a (lon, lat) pair
+            of scalars or 1D arrays
+        radius: float
+            Maximal distance
+        units: int, str, distance_units
+            Units of `radius` and of the returned distances, as one of:
+            {distance_units.rst_with_links}
+        output: {{"index", "dist", "mask"}}
+            Return the indices of the neighbors of each target,
+            or a distance or mask array on the points of `obj`.
+        workers: int
+            Number of threads, -1 for all
+
+        Return
+        ------
+        list
+            With ``output="index"``, a list with one item per target point, in the
+            flattened order, which is a dict of indices along a ``neighbor`` dimension
+            for each dimension of the longitudes and latitudes of `obj`.
+            They are suited for pointwise selection with :meth:`xarray.DataArray.isel`.
+        xarray.DataArray
+            With ``output="dist"``, the distance to the closest target on the points of `obj`
+            that are within `radius` of at least one target, and nan elsewhere.
+            With ``output="mask"``, the boolean array of these points.
+        """
+        _check_output_(output)
+        lon, lat = _get_lonlat_(target)
+        scale = _get_scale_(units)
+        found = self.tree.query_ball_point(lon.values, lat.values, radius / scale, workers=workers)
+        if output == "index":
+            return [self._as_indices_(ff, "neighbor", None) for ff in found]
+        idx = np.concatenate(found) if found else np.array([], dtype="i8")
+        counts = [len(ff) for ff in found]
+        dist = _geo.haversine(
+            np.repeat(lon.values.ravel(), counts),
+            np.repeat(lat.values.ravel(), counts),
+            self.lon.values.ravel()[idx],
+            self.lat.values.ravel()[idx],
+        )
+        return self._as_grid_(idx, dist * self.tree.radius, output, scale)
+
+
+GeoKDTree.query.__doc__ = GeoKDTree.query.__doc__.format(**locals())
+GeoKDTree.query_radius.__doc__ = GeoKDTree.query_radius.__doc__.format(**locals())
+
+
+def pop_tree_kwargs(kwargs):
+    """Pop the :class:`GeoKDTree` parameters from query ones
+
+    The ``radius`` parameter of :class:`GeoKDTree` is given as ``sphere_radius``,
+    since ``radius`` is the search radius of the queries.
+
+    Parameters
+    ----------
+    kwargs: dict
+        Parameters of a query and of the tree, which is updated in place
+
+    Return
+    ------
+    dict
+        Parameters of :class:`GeoKDTree`
+    """
+    tkw = {name: kwargs.pop(name) for name in ("leafsize",) if name in kwargs}
+    if "sphere_radius" in kwargs:
+        tkw["radius"] = kwargs.pop("sphere_radius")
+    return tkw
+
+
+def get_neighbors(obj, target, k=None, radius=None, units="m", output="index", **kwargs):
+    """Find the nearest neighbors of target points, or those within a distance
+
+    This builds a :class:`GeoKDTree` for a single query. Build it once instead
+    to make several queries on the same points.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset, GeoKDTree
+        Object with longitude and latitude coordinates, that may be 1D or 2D,
+        or an already built tree
+    target: xarray.DataArray, xarray.Dataset, tuple
+        Object with longitude and latitude coordinates, or a (lon, lat) pair
+    k: int, None
+        Number of neighbors, see :meth:`GeoKDTree.query`
+    radius: float, None
+        Maximal distance, see :meth:`GeoKDTree.query_radius`.
+        With `k`, it is the maximal distance of the neighbors.
+    units: int, str, distance_units
+        Distance units
+    output: {"index", "dist", "mask"}
+        Return the neighbors of each target, or a distance or mask array on the points of `obj`
+    kwargs:
+        ``sphere_radius`` and ``leafsize`` are passed to :class:`GeoKDTree`,
+        and ``workers`` to the query.
+
+    Return
+    ------
+    See :meth:`GeoKDTree.query` with `k`, :meth:`GeoKDTree.query_radius` otherwise.
+    """
+    if k is None and radius is None:
+        raise exceptions.XoaError("Either k or radius must be given")
+    tree = obj if isinstance(obj, GeoKDTree) else GeoKDTree(obj, **pop_tree_kwargs(kwargs))
+    if k is not None:
+        return tree.query(target, k=k, max_dist=radius, units=units, output=output, **kwargs)
+    return tree.query_radius(target, radius, units=units, output=output, **kwargs)
+
+
+# %% Geographic selection
+
+
+def _get_lonlat_kind_(obj):
+    """Get longitudes and latitudes as data arrays, and the kind of coordinates"""
+    if isinstance(obj, (tuple, list)):
+        lon, lat = obj
+        if not (isinstance(lon, xr.DataArray) and isinstance(lat, xr.DataArray)):
+            raise exceptions.XoaError("Longitudes and latitudes must be data arrays")
+    else:
+        lon = xcoords.get_lon(obj)
+        lat = xcoords.get_lat(obj)
+    if lon.ndim == 2 and set(lon.dims) == set(lat.dims):
+        return lon, lat.transpose(*lon.dims), "curv"
+    if lon.ndim == 1 and lat.ndim == 1:
+        return lon, lat, "cloud" if lon.dims == lat.dims else "rect"
+    raise exceptions.XoaError("Longitudes and latitudes must be 1D, or 2D with the same dimensions")
+
+
+def _apply_mask_(obj, mask):
+    """Mask the data arrays that have all the dimensions of the mask"""
+    if isinstance(obj, xr.Dataset):
+        return obj.map(lambda da: _apply_mask_(da, mask), keep_attrs=True)
+    return obj.where(mask) if set(mask.dims) <= set(obj.dims) else obj
+
+
+class GeoSelection:
+    """Result of a geographic selection, to apply to any number of arrays
+
+    Parameters
+    ----------
+    isel: dict
+        Indexers to pass to :meth:`xarray.DataArray.isel`, with slices, indices or,
+        for pointwise selections, data arrays.
+    mask: xarray.DataArray, None
+        Boolean mask of the points of the selected window that are inside the shape,
+        or None when all of them are.
+    dist: xarray.DataArray, None
+        Distances to the targets of a nearest point selection.
+    """
+
+    def __init__(self, isel, mask=None, dist=None):
+        self.isel = isel
+        self.mask = mask
+        self.dist = dist
+
+    def __repr__(self):
+        isel = {
+            dim: i if np.ndim(i) == 0 or isinstance(i, slice) else "[...]"
+            for dim, i in self.isel.items()
+        }
+        return f"GeoSelection(isel={isel}, mask={'no' if self.mask is None else 'yes'})"
+
+    def apply(self, *objs, mask=True):
+        """Select data arrays or datasets
+
+        The dimensions that an object does not have are ignored, and the data arrays that
+        have not all the dimensions of the mask are not masked.
+
+        Parameters
+        ----------
+        objs: xarray.DataArray, xarray.Dataset
+        mask: bool
+            Set the points outside the shape to nan
+
+        Return
+        ------
+        xarray.DataArray, xarray.Dataset, tuple
+            A single object, or a tuple of them if several are passed
+        """
+        out = []
+        for obj in objs:
+            obj = obj.isel(self.isel, missing_dims="ignore")
+            if mask and self.mask is not None:
+                obj = _apply_mask_(obj, self.mask)
+            out.append(obj)
+        return out[0] if len(out) == 1 else tuple(out)
+
+
+class GeoSelector:
+    """Select the points of a grid or a cloud of points near a point or in a shape
+
+    The coordinates are analysed once, so that several selections can be made.
+    The selections are :class:`GeoSelection` objects that can be applied to several arrays.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset, tuple
+        Object with longitude and latitude coordinates, or a (lon, lat) pair of data arrays.
+        They are 1D with different dimensions for a rectangular grid, 2D for a curvilinear
+        grid, and 1D with the same dimension for a cloud of points.
+    radius: float
+        Radius of the sphere in meters, which defaults to the earth radius
+
+    See also
+    --------
+    get_geosel
+    xoa.core.geo.GeoSelector
+    """
+
+    def __init__(self, obj, radius=EARTH_RADIUS):
+        self.lon, self.lat, self.kind = _get_lonlat_kind_(obj)
+        self.dims = self.lon.dims if self.kind != "rect" else (self.lon.dims[0], self.lat.dims[0])
+        self.core = _geo.GeoSelector(
+            self.lon.values, self.lat.values, kind=self.kind, radius=radius
+        )
+
+    def _as_isel_(self, indexers):
+        return dict(zip(self.dims, indexers))
+
+    def select(
+        self,
+        lon=None,
+        lat=None,
+        circle=None,
+        polygon=None,
+        fit="outer",
+        pad=0,
+        pad_units="points",
+        units="m",
+    ):
+        """Select the points in a box, a circle or a polygon
+
+        Parameters
+        ----------
+        lon, lat: (float, float), None
+            Ranges of longitudes, that may cross the dateline like ``(170, -170)``,
+            and latitudes, to select a box. A missing range is global.
+        circle: (float, float, float)
+            Longitude, latitude and radius, in `units`
+        polygon: array_like(n, 2), shapely.Polygon
+            Vertices as (lon, lat) pairs in degrees
+        fit: {"outer", "inner"}
+            Either the smallest window that contains all the points inside the shape,
+            with a mask of those that are inside when some are not,
+            or the largest window that contains only points inside, without mask.
+        pad: float, "edges"
+            Margin around the shape. With ``"edges"``, which is 0.5 grid point, the points
+            are selected when their cell touches the shape.
+        pad_units: {"points", "m", "km", "deg"}
+            Grid points, estimated locally from the cells, a distance, or an arc in degrees.
+            Grid points are not valid for a cloud of points.
+        units: {"m", "km"}
+            Units of the radius of the circle
+
+        Return
+        ------
+        GeoSelection
+        """
+        from .core.poly import as_polygons
+
+        scale = _get_scale_(units)
+        if sum(v is not None for v in (circle, polygon, lon if lon is not None else lat)) != 1:
+            raise exceptions.XoaError("Give either lon and/or lat, or circle, or polygon")
+        if circle is not None:
+            shape = _geo.Circle(circle[0], circle[1], circle[2] / scale, self.core.radius)
+        elif polygon is not None:
+            polys = as_polygons(polygon)
+            if len(polys) != 1:
+                raise exceptions.XoaError("A single polygon is expected")
+            shape = _geo.Polygon(polys[0])
+        else:
+            if any(v is not None and np.shape(v) != (2,) for v in (lon, lat)):
+                raise exceptions.XoaError(
+                    "lon and lat must be (min, max) ranges. "
+                    "For the nearest point, give both as scalars or use nearest=(lon, lat)"
+                )
+            shape = _geo.Box(lon, lat)
+        if pad_units in ("m", "km", "meters", "kilometers"):
+            pad, pad_units = pad / _get_scale_(pad_units), "dist"
+        indexers, mask = self.core.select(shape, fit=fit, pad=pad, pad_units=pad_units)
+        if mask is not None:
+            mask = xr.DataArray(mask, dims=self.dims, name="mask")
+        return GeoSelection(self._as_isel_(indexers), mask)
+
+    def nearest(self, lon, lat, max_dist=None, units="m"):
+        """Select the points that are the closest to target points
+
+        Parameters
+        ----------
+        lon, lat: float, array_like
+            Target longitudes and latitudes, scalars or 1D arrays
+        max_dist: float, None
+            Maximal distance in `units`
+        units: {"m", "km"}
+            Units of distances
+
+        Return
+        ------
+        GeoSelection
+            With scalar targets, the indexers are integers like ``isel(lon=3, lat=7)``.
+            With 1D targets, they are data arrays for a pointwise selection,
+            which are -1 for targets without neighbor, where the distance is infinite.
+        """
+        scale = _get_scale_(units)
+        tlon, tlat = _get_lonlat_((lon, lat))
+        indexers, dist = self.core.nearest(
+            tlon.values,
+            tlat.values,
+            max_dist=None if max_dist is None else max_dist / scale,
+        )
+        dist = xr.DataArray(
+            (dist * scale).reshape(tlon.shape),
+            dims=tlon.dims,
+            name="distance",
+            attrs={"long_name": "Distance to the target", "units": _scale_units_(scale)},
+        )
+        if tlon.ndim == 0:
+            if indexers[0][0] < 0:
+                raise exceptions.XoaError("No point within the maximal distance")
+            return GeoSelection(self._as_isel_([int(i[0]) for i in indexers]), dist=dist[()])
+        isel = self._as_isel_([xr.DataArray(i, dims=tlon.dims) for i in indexers])
+        return GeoSelection(isel, dist=dist)
+
+
+def get_geosel(obj, lon=None, lat=None, circle=None, polygon=None, nearest=None, **kwargs):
+    """Get the selection of the points near a point or in a shape
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset, tuple, GeoSelector
+        Object with longitude and latitude coordinates, a (lon, lat) pair of data arrays,
+        or an already built selector
+    lon, lat, circle, polygon:
+        Box, circle or polygon, see :meth:`GeoSelector.select`.
+        Scalar `lon` and `lat` select the nearest point, like ``isel(lon=35, lat=45)``.
+    nearest: (float, float), None
+        Target longitude and latitude, scalars or 1D arrays,
+        see :meth:`GeoSelector.nearest`
+    kwargs:
+        ``fit``, ``pad``, ``pad_units`` and ``units`` are passed to
+        :meth:`GeoSelector.select`, ``max_dist`` and ``units`` to
+        :meth:`GeoSelector.nearest`, and ``sphere_radius`` to :class:`GeoSelector`.
+
+    Return
+    ------
+    GeoSelection
+        Use its ``isel`` and ``mask`` attributes or its :meth:`~GeoSelection.apply` method.
+
+    Example
+    -------
+    .. code-block:: python
+
+        sel = get_geosel(ds, lon=(-6, -3), lat=(47, 49), pad="edges")
+        ds_sub = sel.apply(ds)
+        sel = get_geosel(ds, circle=(-4.5, 48, 50), units="km", fit="inner")
+        sel = get_geosel(ds, nearest=(-4.5, 48))
+        ds.isel(sel.isel)
+    """
+    if isinstance(obj, GeoSelector):
+        selector = obj
+    else:
+        radius = {"radius": kwargs.pop("sphere_radius")} if "sphere_radius" in kwargs else {}
+        selector = GeoSelector(obj, **radius)
+    if (
+        nearest is None
+        and circle is None
+        and polygon is None
+        and lon is not None
+        and lat is not None
+        and np.ndim(lon) == 0
+        and np.ndim(lat) == 0
+    ):  # like isel(lon=35, lat=45)
+        nearest, lon, lat = (lon, lat), None, None
+    if nearest is not None:
+        if any(v is not None for v in (lon, lat, circle, polygon)):
+            raise exceptions.XoaError("nearest cannot be used with a shape")
+        return selector.nearest(*nearest, **kwargs)
+    return selector.select(lon=lon, lat=lat, circle=circle, polygon=polygon, **kwargs)
+
+
+def geosel(obj, *args, mask=True, **kwargs):
+    """Select a data array or dataset in a box, a circle or a polygon, or at the nearest point
+
+    This builds the selector, makes the selection with :func:`get_geosel`, whose arguments
+    it takes, and applies it to `obj`. To select several objects, use :func:`get_geosel`
+    and :meth:`GeoSelection.apply`.
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        Object with longitude and latitude coordinates
+    mask: bool
+        Set the points of the window that are outside of the shape to nan
+
+    Return
+    ------
+    xarray.DataArray, xarray.Dataset
+
+    Example
+    -------
+    .. code-block:: python
+
+        sub = geosel(ds, lon=(-6, -3), lat=(47, 49))
+        sub = geosel(ds, circle=(-4.5, 48, 50), units="km", fit="inner")
+    """
+    return get_geosel(obj, *args, **kwargs).apply(obj, mask=mask)
+
+
+def with_geosel(func):
+    """Decorator that adds a ``geosel`` argument to a function whose first argument is a
+    data array or dataset, to select it geographically before calling the function
+
+    The ``geosel`` argument is either a :class:`GeoSelection` or a dict of arguments of
+    :func:`get_geosel`, like ``geosel=dict(lon=(-6, -3), lat=(47, 49))``.
+    """
+
+    @functools.wraps(func)
+    def wrapper(obj, *args, geosel=None, **kwargs):
+        if geosel is not None:
+            if not isinstance(geosel, GeoSelection):
+                geosel = get_geosel(obj, **geosel)
+            obj = geosel.apply(obj)
+        return func(obj, *args, **kwargs)
+
+    wrapper.__doc__ = (wrapper.__doc__ or "") + (
+        "\n\n    The ``geosel`` keyword selects `obj` geographically beforehand,"
+        " see :func:`xoa.geo.get_geosel`."
+    )
+    return wrapper

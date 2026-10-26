@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.meta` module
 """
 
-import pytest
 import numpy as np
+import pytest
 import xarray as xr
 
+import xoa
 from xoa import meta
-from xoa.meta.sglocator import SGLocator
-from xoa.meta.general import MetaSpecs
-from xoa.meta.categories import MetaVarSpecs, MetaCoordSpecs
+from xoa.meta.categories import MetaCoordSpecs, MetaVarSpecs
 from xoa.meta.configs import META_CONFIGS
+from xoa.meta.general import MetaSpecs
+from xoa.meta.sglocator import SGLocator
 
 
 class TestSGLocator:
@@ -101,7 +101,6 @@ class TestSGLocator:
 
         # Should not raise with errors="ignore"
         sgl.get_loc_from_da(da, errors="ignore")
-
 
     @pytest.mark.parametrize(
         "name_format,attr,root,loc,expected",
@@ -682,6 +681,14 @@ class TestMetaConfigs:
             specs = MetaSpecs(META_CONFIGS[config_name])
             assert isinstance(specs, MetaSpecs)
 
+    @pytest.mark.parametrize("source", ["IBI-MFC (PdE Production Center)", "MERCATOR GLORYS12V1"])
+    def test_mercator_config_is_inferred_from_the_source(self, source):
+        """The Mercator specs match the IBI and GLORYS products"""
+        meta.register_meta_specs(xoa.get_meta_config_file("mercator"))
+        ds = xr.Dataset({"uo": ("x", [1.0])}, attrs={"source": source})
+        assert meta.infer_meta_specs(ds, named=True).name == "mercator"
+        assert ds.xoa.get("u").name == "uo"
+
 
 class TestCoordSpecs:
     """Additional tests for coordinate specifications"""
@@ -727,7 +734,9 @@ class TestCoordSpecs:
         lat = xr.DataArray([4, 5], dims='yy', attrs={'units': 'degrees_north'})
         depth = xr.DataArray([4, 5], dims='level', attrs={'axis': 'Z'})
         da = xr.DataArray(
-            np.ones((2, 2, 2, 2)), dims=('r', 'level', 'yy', 'xi'), coords={'level': depth, 'yy': lat}
+            np.ones((2, 2, 2, 2)),
+            dims=('r', 'level', 'yy', 'xi'),
+            coords={'level': depth, 'yy': lat},
         )
 
         specs = MetaSpecs()
@@ -737,7 +746,9 @@ class TestCoordSpecs:
     def test_search_from_dim(self):
         """Test searching coordinates from dimension"""
         lon = xr.DataArray([1, 2], dims='lon')
-        level = xr.DataArray([1, 2, 3], dims='aa', attrs={'standard_name': 'ocean_sigma_coordinate'})
+        level = xr.DataArray(
+            [1, 2, 3], dims='aa', attrs={'standard_name': 'ocean_sigma_coordinate'}
+        )
         mem = xr.DataArray(range(3), dims='mem')
         temp = xr.DataArray(
             np.zeros((mem.size, level.size, lon.size)),
@@ -779,9 +790,7 @@ class TestFormatDataVar:
     def test_format_data_var_basic(self):
         """Test basic data variable formatting"""
         lon = xr.DataArray(range(5), dims='xxx', name='xxx', attrs={'standard_name': 'longitude'})
-        temp = xr.DataArray(
-            range(20, 25), dims='xxx', coords={'xxx': lon}, name='temp'
-        )
+        temp = xr.DataArray(range(20, 25), dims='xxx', coords={'xxx': lon}, name='temp')
         specs = MetaSpecs()
         temp_fmt = specs.format_data_var(temp)
         assert temp_fmt.name == "temp"
@@ -799,7 +808,7 @@ class TestFormatDataVar:
         """Test formatting coordinate as data variable"""
         da = xr.DataArray(0, attrs={'standard_name': 'longitude_at_u_location'})
         specs = MetaSpecs()
-        da_fmt = specs.format_data_var(da)
+        specs.format_data_var(da)
         # Should not raise error
 
 
@@ -836,7 +845,9 @@ class TestGetSpecs:
 
     def test_get_from_dataset(self):
         """Test get method from dataset"""
-        ds = xr.Dataset({"xtemp": ("x", [0], {"standard_name": "sea_water_temperature"}), "psal": 1})
+        ds = xr.Dataset(
+            {"xtemp": ("x", [0], {"standard_name": "sea_water_temperature"}), "psal": 1}
+        )
 
         specs = MetaSpecs()
         assert specs.get(ds, "temp").name == "xtemp"

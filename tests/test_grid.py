@@ -1,18 +1,19 @@
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.grid` module
 """
+
 import functools
 import warnings
+
 import numpy as np
-import xarray as xr
 import pytest
+import xarray as xr
 
 import xoa
 from xoa import grid
 
 
-@functools.lru_cache()
+@functools.lru_cache
 def get_da():
     x = xr.DataArray(np.arange(4), dims='x')
     y = xr.DataArray(np.arange(3), dims='y')
@@ -79,7 +80,114 @@ def test_get_edges():
     assert dae.shape == (da.shape[0], da.shape[1] + 1, da.shape[2])
     np.testing.assert_allclose(dae.y[:2].values, da.y[:2] - 0.5)
     np.testing.assert_allclose(dae.lat[:2, 0], da.lat[:2, 0] - 1.5)
+    # Outer edges are extrapolated
+    np.testing.assert_allclose(dae[1, 0, 0], da[1, 0, 0] - 0.5 * (da[1, 1, 0] - da[1, 0, 0]))
+    # Unless the end values are asked to be replicated
+    dae = grid.get_edges(da, "y", mode="edge")
     assert dae[1, 0, 0] == da[1, 0, 0]
+
+
+@pytest.mark.parametrize("chunked", [False, True])
+def test_float_operators_vs_xarray(chunked):
+    """Float arrays use the numba kernels, which must agree with xarray"""
+    rng = np.random.default_rng(0)
+    da = xr.DataArray(rng.random((3, 4, 5), dtype="f4"), dims=("z", "y", "x"))
+    if chunked:
+        pytest.importorskip("dask")
+        da = da.chunk({"y": 2})
+    pad_width = {"y": (2, 1), "x": 1}
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        dap = grid.pad(da, pad_width)
+        dapl = grid.pad(da, {"y": (2, 1)}, mode="linear_extrap")
+        dac = grid.get_centers(da, ("y", "x"))
+        dae = grid.get_edges(da, "x")
+        daed = grid.get_edges(da, "x", mode="edge")
+        dad = grid.diff(da, "y")
+    assert dap.dtype == da.dtype
+    ref = da.pad({"y": (2, 1)}, mode="edge").pad({"x": 1}, mode="edge")
+    np.testing.assert_array_equal(dap, ref)
+    np.testing.assert_allclose(dapl[:, 1], da[:, 0] + (da[:, 0] - da[:, 1]), rtol=1e-6)
+    np.testing.assert_allclose(
+        dac, 0.25 * (da[:, :-1, :-1] + da[:, 1:, :-1] + da[:, :-1, 1:] + da[:, 1:, 1:]), rtol=1e-6
+    )
+    np.testing.assert_allclose(dae[..., 1:-1], 0.5 * (da[..., :-1] + da[..., 1:]), rtol=1e-6)
+    np.testing.assert_allclose(dae[..., 0], da[..., 0] + 0.5 * (da[..., 0] - da[..., 1]), rtol=1e-6)
+    np.testing.assert_array_equal(daed[..., 0], da[..., 0])
+    np.testing.assert_allclose(dad, da.diff("y"), rtol=1e-6)
+
+
+def test_int_operators():
+    """Other types use xarray"""
+    da = xr.DataArray(np.arange(4), dims="x")
+    assert grid.pad(da, {"x": 1}, coord_mode="edge").dtype == da.dtype
+    np.testing.assert_allclose(grid.get_centers(da, "x"), [0.5, 1.5, 2.5])
+    np.testing.assert_array_equal(grid.diff(da, "x"), [1, 1, 1])
+
+
+def test_pad_modes():
+    da = xr.DataArray(np.arange(4.0), dims="x")
+    for mode in "constant", "wrap":
+        np.testing.assert_array_equal(
+            grid.pad(da, {"x": (1, 2)}, mode=mode, coord_mode="edge"),
+            da.pad(x=(1, 2), mode=mode),
+        )
+    np.testing.assert_array_equal(
+        grid.pad(da, {"x": 1}, mode="constant", constant_values=7, coord_mode="edge"),
+        [7, 0, 1, 2, 3, 7],
+    )
+
+
+def test_dateline():
+    """Longitudes stay continuous across the dateline"""
+    lon = xr.DataArray(
+        [170.0, 178.0, -174.0, -166.0],
+        dims="x",
+        name="lon",
+        attrs={"standard_name": "longitude", "units": "degrees_east"},
+    )
+    da = xr.DataArray(np.arange(4.0), dims="x", coords={"lon": lon})
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        np.testing.assert_allclose(grid.get_centers(da, "x").lon, [174, -178, -170])
+        np.testing.assert_allclose(grid.get_edges(da, "x").lon, [166, 174, -178, -170, -162])
+        np.testing.assert_allclose(grid.pad(da, {"x": 1}).lon, [162, 170, 178, -174, -166, -158])
+        np.testing.assert_allclose(grid.shift(da, {"x": 1}).lon, [174, -178, -170, -162])
+        np.testing.assert_allclose(grid.diff(da, "x").lon, [174, -178, -170])
+        np.testing.assert_allclose(grid.diff(lon, "x"), [8, 8, 8])
+        np.testing.assert_allclose(grid.get_centers(lon, "x"), [174, -178, -170])
+    # Left untouched when continuous
+    lon0 = xr.DataArray(lon.values % 360, dims="x", name="lon", attrs=lon.attrs)
+    da0 = da.assign_coords(lon=lon0)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", ".*cf.*")
+        np.testing.assert_allclose(grid.get_centers(da0, "x").lon, [174, 182, 190])
+
+
+def test_shift_vs_pad_centers():
+    da = xr.DataArray(np.random.default_rng(0).random((3, 4)), dims=("y", "x"))
+    for mode in "edge", "linear_extrap":
+        for dirs, width in [({"x": -1}, (1, 0)), ({"x": 1}, (0, 1))]:
+            ref = grid.get_centers(grid.pad(da, {"x": width}, mode=mode), "x")
+            np.testing.assert_allclose(grid.shift(da, dirs, mode=mode), ref)
+
+
+def test_gradient():
+    da = xr.DataArray(
+        np.arange(12.0).reshape(3, 4) ** 2,
+        dims=("y", "x"),
+        coords={"x": [0.0, 1.0, 3.0, 7.0], "y": [0, 1, 2]},
+        attrs={"long_name": "Sq"},
+    )
+    dg = grid.gradient(da, "x")
+    assert dg.shape == (3, 3)
+    np.testing.assert_allclose(dg, da.diff("x") / da.x.diff("x"))
+    np.testing.assert_allclose(dg.x, [0.5, 2.0, 5.0])
+    assert dg.long_name == "Sq"
+    # 3D coordinate and integer data
+    depth = da.x * xr.ones_like(da) + da.y
+    di = grid.gradient(da.astype(int), "x", coord=depth)
+    np.testing.assert_allclose(di, da.diff("x") / depth.diff("x"))
 
 
 def test_shift():
@@ -119,6 +227,8 @@ class TestDepthConversion:
         depth = grid.dz2depth(dz, positive, ref=ref, ref_type=ref_type)
         np.testing.assert_allclose(depth.isel(x=1), expected)
         assert depth.z[0] == -0.5
+        assert depth.name == ("z" if positive == "up" else "depth")
+        assert depth.attrs["positive"] == positive
 
         depth = grid.dz2depth(dz, positive, ref=ref, ref_type=ref_type, centered=True)
         assert depth[0, 0] == 0.5 * sum(expected[:2])
@@ -143,3 +253,486 @@ def test_to_rect():
     ds = xr.Dataset({"temp": temp})
     dsr = grid.to_rect(ds)
     assert dsr.temp.dims == tempr.dims
+
+
+def test_to_rect_curvilinear():
+    """A curvilinear grid is left unchanged"""
+    x = xr.DataArray(np.arange(4), dims='x')
+    y = xr.DataArray(np.arange(3), dims='y')
+    xx, yy = np.meshgrid(np.arange(4.0), np.arange(3.0))
+    lon = xr.DataArray(xx + 0.1 * yy, dims=('y', 'x'), attrs={"standard_name": "longitude"})
+    lat = xr.DataArray(yy + 0.1 * xx, dims=('y', 'x'), attrs={"standard_name": "latitude"})
+    temp = xr.DataArray(
+        np.ones((3, 4)), dims=('y', 'x'), coords={'lon': lon, 'lat': lat, "y": y, "x": x}
+    )
+    with pytest.warns(xoa.XoaWarning):
+        out = grid.to_rect(temp)
+    assert out.lon.ndim == 2
+    assert out.dims == temp.dims
+    with pytest.raises(xoa.XoaError):
+        grid.to_rect(temp, errors="raise")
+    assert grid.to_rect(temp, errors="ignore").lon.ndim == 2
+
+
+def test_grid_ds2grid_dict():
+    lon = xr.DataArray(
+        np.arange(5.0), dims="lon", attrs={"standard_name": "longitude", "units": "degrees_east"}
+    )
+    lat = xr.DataArray(
+        np.arange(4.0), dims="lat", attrs={"standard_name": "latitude", "units": "degrees_north"}
+    )
+    ds = xr.Dataset(coords={"lon": lon, "lat": lat})
+    ds["mask"] = xr.DataArray(np.ones((4, 5), dtype=bool), dims=("lat", "lon"))
+    gd = grid.ds2grid_dict(ds, mask="mask")
+    assert gd["dims"] == ("lat", "lon")
+    assert gd["lon"].shape == gd["lat"].shape == (4, 5)
+    assert gd["type"] == "regular"
+    # Edges and bounds are large and only computed on demand
+    assert not {"lon_edges", "lat_edges", "lon_bounds", "lat_bounds"} & set(gd)
+    gd = grid.ds2grid_dict(ds, mask="mask", bounds=True)
+    assert gd["lon_edges"].shape == (5, 6)
+    assert gd["lon_bounds"].shape == (4, 5, 4)
+    assert gd["mask"].shape == (4, 5)
+    assert "time_name" not in gd
+
+
+def _lonlat_ds():
+    lon = xr.DataArray(
+        np.linspace(0, 4, 5),
+        dims="lon",
+        attrs={"standard_name": "longitude", "units": "degrees_east"},
+    )
+    lat = xr.DataArray(
+        np.linspace(0, 3, 4),
+        dims="lat",
+        attrs={"standard_name": "latitude", "units": "degrees_north"},
+    )
+    return xr.Dataset(coords={"lon": lon, "lat": lat})
+
+
+def _interp_along_axis_(data, zi, zo, axis):
+    """Linear interpolation with np.interp, by columns, for map_along_dim"""
+    from xoa.core.num import broadcast_along_axis
+
+    (vv, vzi, vzo), outer, inner = broadcast_along_axis(data, zi, zo, axis=axis)
+    no, ni = int(np.prod(outer)), int(np.prod(inner))
+    out = np.empty((no, vzo.shape[1], ni))
+    for io in range(no):
+        for p in range(ni):
+            out[io, :, p] = np.interp(
+                vzo[io % vzo.shape[0], :, p % vzo.shape[2]],
+                vzi[io % vzi.shape[0], :, p % vzi.shape[2]],
+                vv[io % vv.shape[0], :, p % vv.shape[2]],
+                left=np.nan,
+                right=np.nan,
+            )
+    return out.reshape(outer + (vzo.shape[1],) + inner)
+
+
+@pytest.mark.parametrize(
+    "vdims,zidims,zodims,odims",
+    [
+        (("z", "x"), ("z",), ("depth",), ("depth", "x")),
+        (("z", "x"), ("z", "x"), ("depth", "x"), ("depth", "x")),
+        (("x", "z"), ("x", "z"), ("depth",), ("x", "depth")),
+        (("t", "z", "y", "x"), ("z",), ("depth",), ("t", "depth", "y", "x")),
+        (("t", "z", "y", "x"), ("z", "y", "x"), ("depth",), ("t", "depth", "y", "x")),
+        (("t", "z", "y", "x"), ("t", "z", "y", "x"), ("depth",), ("t", "depth", "y", "x")),
+        (("t", "z", "y", "x"), ("t", "z"), ("depth",), ("t", "depth", "y", "x")),
+        (("t", "z", "y", "x"), ("z", "x"), ("depth",), ("t", "depth", "y", "x")),
+        (("t", "z", "y", "x"), ("z", "y", "x"), ("depth", "y", "x"), ("t", "depth", "y", "x")),
+        (("z", "t", "y", "x"), ("y", "x", "z"), ("depth",), ("depth", "t", "y", "x")),
+        (("z", "x"), ("z",), ("depth", "t"), ("t", "depth", "x")),  # extra dim
+    ],
+)
+@pytest.mark.parametrize("use_dask", [False, True])
+def test_map_along_dim(vdims, zidims, zodims, odims, use_dask):
+    rng = np.random.default_rng(0)
+    sizes = {"t": 3, "z": 6, "y": 4, "x": 5, "depth": 8}
+    data = xr.DataArray(
+        rng.random([sizes[d] for d in vdims]),
+        dims=vdims,
+        coords={"x": np.arange(sizes["x"])},
+        name="temp",
+        attrs={"units": "degC"},
+    )
+    zbase = np.linspace(-100, 0, sizes["z"]).reshape([-1 if d == "z" else 1 for d in zidims])
+    zi = xr.DataArray(
+        zbase * (1 + 0.3 * rng.random([1 if d == "z" else sizes[d] for d in zidims])), dims=zidims
+    ).broadcast_like(xr.DataArray(np.empty([sizes[d] for d in zidims]), dims=zidims))
+    zobase = np.linspace(-95, 0, sizes["depth"]).reshape(
+        [-1 if d == "depth" else 1 for d in zodims]
+    )
+    zo = xr.DataArray(
+        zobase * (1 + 0.1 * rng.random([1 if d == "depth" else sizes[d] for d in zodims])),
+        dims=zodims,
+    )
+    if use_dask:
+        data = data.chunk({d: 2 for d in vdims if d != "z"})
+
+    out = grid.map_along_dim(_interp_along_axis_, data, "z", zi, zo, out_dim="depth")
+
+    assert out.dims == odims
+    assert out.name == "temp" and out.attrs == {"units": "degC"}
+    assert "x" in out.coords
+    if use_dask:
+        assert out.chunks is not None
+        assert out.chunksizes["depth"] == (sizes["depth"],)
+    # Reference with np.interp on each column
+    ref = xr.apply_ufunc(
+        lambda v, a, b: np.interp(b, a, v, left=np.nan, right=np.nan),
+        data.compute(),
+        zi,
+        zo,
+        input_core_dims=[["z"], ["z"], ["depth"]],
+        output_core_dims=[["depth"]],
+        vectorize=True,
+    ).transpose(*odims)
+    np.testing.assert_allclose(out.values, ref.values)
+
+
+def test_map_along_dim_without_dim():
+    # An array without the working dimension gets a size of 1 along it
+    da = xr.DataArray(np.ones((4, 2, 3)), dims=("t", "z", "x"))
+    factor = xr.DataArray(np.arange(3.0), dims="x")
+    shapes = []
+
+    def func(data, factor, axis):
+        shapes.append(factor.shape)
+        return data * factor
+
+    out = grid.map_along_dim(func, da, "z", factor)
+    assert shapes == [(1, 1, 3)]
+    np.testing.assert_allclose(out, da * factor)
+    out = grid.map_along_dim(func, da.chunk(t=1), "z", factor)
+    np.testing.assert_allclose(out, da * factor)
+
+
+def test_map_along_dim_coord_named_as_dim():
+    # An output coordinate along "level" that is also named like the working dimension
+    da = xr.DataArray(np.ones((4, 2)), dims=("depth", "member"))
+    depth = xr.DataArray(
+        np.arange(3.0),
+        dims="level",
+        name="depth",
+        coords={"level": np.arange(3), "depth": ("level", np.arange(3.0))},
+    )
+
+    def func(data, depth, axis):
+        return np.repeat(data[:3], 1, axis=axis)
+
+    out = grid.map_along_dim(func, da, "depth", depth, out_dim="level")
+    assert out.dims == ("level", "member")
+
+
+def test_map_along_dim_errors():
+    da = xr.DataArray(np.ones((2, 3)), dims=("z", "x"))
+    with pytest.raises(xoa.exceptions.XoaError):
+        grid.map_along_dim(
+            lambda *a, axis: a[0],
+            da,
+            "z",
+            xr.DataArray(np.ones((2, 2)), dims=("z", "depth")),
+            out_dim="depth",
+        )
+
+
+def test_get_lonlat_2d():
+    ds = _lonlat_ds()
+    lon, lat = grid.get_lonlat_2d(ds)
+    assert lon.dims == lat.dims == ("lat", "lon")
+    assert lon.shape == lat.shape == (4, 5)
+    np.testing.assert_allclose(lon[0], ds.lon)
+    np.testing.assert_allclose(lat[:, 0], ds.lat)
+    # From a data array with 2D coordinates and transposed dimensions
+    lon2d, lat2d = xr.broadcast(ds.lon, ds.lat)
+    da = xr.DataArray(
+        np.zeros(lon2d.shape), dims=lon2d.dims, coords={"lon": lon2d, "lat": lat2d}
+    ).transpose("lon", "lat")
+    lon2, lat2 = grid.get_lonlat_2d(da)
+    assert lon2.dims == ("lat", "lon")
+    np.testing.assert_allclose(lon2, lon)
+    np.testing.assert_allclose(lat2, lat)
+    # Not 2D
+    with pytest.raises(xoa.exceptions.XoaError):
+        grid.get_lonlat_2d(
+            xr.DataArray([0.0, 1.0], dims="lon", coords={"lon": [0.0, 1.0], "lat": 0.0})
+        )
+
+
+def test_get_resolution():
+    ds = _lonlat_ds()
+    dx, dy = grid.get_resolution(ds)
+    assert dx.dims == dy.dims == ("lat", "lon")
+    assert dx.shape == (4, 4)
+    assert dy.shape == (3, 5)
+    assert dx.attrs["units"] == "m"
+    ref = np.deg2rad(1.0) * 6371e3
+    np.testing.assert_allclose(dy, ref)
+    np.testing.assert_allclose(dx[0], ref)
+    # From a data array with 2D coordinates and transposed dimensions
+    lon2d, lat2d = xr.broadcast(ds.lon, ds.lat)
+    da = xr.DataArray(
+        np.zeros(lon2d.shape), dims=lon2d.dims, coords={"lon": lon2d, "lat": lat2d}
+    ).transpose("lon", "lat")
+    dx2, dy2 = grid.get_resolution(da)
+    np.testing.assert_allclose(dx2, dx)
+
+
+def test_get_dx_dy():
+    ds = _lonlat_ds()
+    dx, dy = grid.get_dx_dy(ds)
+    assert dx.dims == dy.dims == ("lat", "lon")
+    assert dx.shape == dy.shape == (4, 5)
+    assert dx.attrs["units"] == "m"
+    ref = np.deg2rad(1.0) * 6371e3
+    np.testing.assert_allclose(dy, ref)
+    np.testing.assert_allclose(dx[0], ref)
+    # Smaller x resolution at high latitudes
+    assert dx[-1, 0] < dx[0, 0]
+
+
+def test_get_median_resolution():
+    np.testing.assert_allclose(grid.get_median_resolution(_lonlat_ds()), 1.0)
+
+
+def test_get_edge_extents():
+    ds = _lonlat_ds()
+    ext = grid.get_edge_extents(ds, "all", n_cells=2)
+    assert list(ext) == ["north", "south", "east", "west"]
+    assert ext["north"] == [0.0, 4.0, 2.0, 3.0]
+    assert ext["south"] == [0.0, 4.0, 0.0, 1.0]
+    assert ext["east"] == [3.0, 4.0, 0.0, 3.0]
+    assert ext["west"] == [0.0, 1.0, 0.0, 3.0]
+    ext = grid.get_edge_extents(ds, ["west", "north", "west"], n_cells=1)
+    assert list(ext) == ["west", "north"]
+    assert ext["north"] == [0.0, 4.0, 3.0, 3.0]
+    with pytest.raises(xoa.XoaError):
+        grid.get_edge_extents(ds, "up")
+
+
+class TestGetFingerprint:
+    @staticmethod
+    def get_ds(lon0=0.0, nlat=4):
+        lon = xr.DataArray(
+            lon0 + np.arange(5.0),
+            dims="lon",
+            attrs={"standard_name": "longitude", "units": "degrees_east"},
+        )
+        lat = xr.DataArray(
+            np.arange(float(nlat)),
+            dims="lat",
+            attrs={"standard_name": "latitude", "units": "degrees_north"},
+        )
+        return xr.Dataset(coords={"lon": lon, "lat": lat})
+
+    def test_equal_grids_have_the_same_fingerprint(self):
+        assert grid.get_fingerprint(self.get_ds()) == grid.get_fingerprint(self.get_ds())
+        assert isinstance(grid.get_fingerprint(self.get_ds()), str)
+
+    def test_whatever_the_dimensions_and_the_kind_of_object(self):
+        ds = self.get_ds()
+        ref = grid.get_fingerprint(ds)
+        # 1D axes or the same 2D coordinates, with other dimension names
+        lon2d, lat2d = xr.broadcast(ds.lon, ds.lat)
+        da = xr.DataArray(
+            np.zeros((4, 5)),
+            dims=("a", "b"),
+            coords={"lon": (("a", "b"), lon2d.transpose("lat", "lon").values, ds.lon.attrs)},
+        )
+        da = da.assign_coords(lat=(("a", "b"), lat2d.transpose("lat", "lon").values, ds.lat.attrs))
+        assert grid.get_fingerprint(da) == ref
+        # A data array that has the coordinates of the dataset
+        assert (
+            grid.get_fingerprint(
+                xr.DataArray(np.zeros((4, 5)), dims=("lat", "lon"), coords=ds.coords)
+            )
+            == ref
+        )
+        # A grid dictionary
+        assert grid.get_fingerprint(grid.ds2grid_dict(ds)) == ref
+
+    def test_what_changes_the_fingerprint(self):
+        ref = grid.get_fingerprint(self.get_ds())
+        assert grid.get_fingerprint(self.get_ds(lon0=1e-6)) != ref
+        assert grid.get_fingerprint(self.get_ds(nlat=5)) != ref
+        mask = np.ones((4, 5), bool)
+        with_mask = grid.get_fingerprint(self.get_ds(), mask=mask)
+        assert with_mask != ref
+        mask[0, 0] = False
+        assert grid.get_fingerprint(self.get_ds(), mask=mask) != with_mask
+
+    def test_mask_by_name(self):
+        ds = self.get_ds()
+        mask = np.ones((4, 5), bool)
+        ds["valid"] = (("lat", "lon"), mask)
+        assert grid.get_fingerprint(ds, mask="valid") == grid.get_fingerprint(ds, mask=mask)
+
+    def test_decode_dz2depth(self):
+        """Test the output name of the decoding, and its conflict with a dimension"""
+        dz = xr.DataArray(
+            np.resize([100, 500, 1000.0], (2, 3)).T,
+            dims=("lev", "x"),
+            coords={"lev": ("lev", np.arange(3, dtype="d"), {"positive": "down"})},
+            name="dz",
+        )
+        ds = grid.decode_dz2depth(dz.to_dataset())
+        assert "depth" in ds.coords
+        dz = dz.rename(lev="z")
+        dz["z"].attrs["positive"] = "up"
+        ds = grid.decode_dz2depth(dz.to_dataset(), errors="ignore")
+        assert ds.z.dims == ("z",)
+        with pytest.raises(xoa.XoaError):
+            grid.decode_dz2depth(dz.to_dataset())
+
+
+class TestDz2z:
+    """Test z and thickness conversions"""
+
+    dz = xr.DataArray([1.0, 3.0, 4.0], dims="nz")
+
+    @pytest.mark.parametrize(
+        "positive, kwargs, expected",
+        [
+            ["down", {}, [0, -1, -4, -8]],
+            ["up", {}, [-8, -7, -4, 0]],
+            ["up", {"top": 0.5}, [-7.5, -6.5, -3.5, 0.5]],
+            ["up", {"bottom": -10}, [-10, -9, -6, -2]],
+            ["down", {"top": 2}, [2, 1, -2, -6]],
+            ["down", {"bottom": -10}, [-2, -3, -6, -10]],
+        ],
+    )
+    def test_dz2z(self, positive, kwargs, expected):
+        z = grid.dz2z(self.dz, positive, zdim="nz", **kwargs)
+        np.testing.assert_allclose(z, expected)
+        assert z.name == "z" and z.attrs["positive"] == "up"
+        zc = grid.dz2z(self.dz, positive, zdim="nz", centered=True, **kwargs)
+        np.testing.assert_allclose(zc, 0.5 * (np.array(expected)[1:] + np.array(expected)[:-1]))
+
+    def test_dz2z_errors(self):
+        with pytest.raises(xoa.XoaError):
+            grid.dz2z(self.dz, "up", zdim="nz", top=0, bottom=-8)
+        with pytest.raises(xoa.XoaError):
+            grid.dz2z(self.dz, zdim="nz")
+
+    def test_dz2depth_is_minus_dz2z(self):
+        z = grid.dz2z(self.dz, "down", zdim="nz", top=2)
+        np.testing.assert_allclose(grid.dz2depth(self.dz, "down", zdim="nz", ref=-2), -z)
+
+    @pytest.mark.parametrize("positive", ["up", "down"])
+    def test_z2dz_round_trip_with_varying_z(self, positive):
+        # Sigma-like layers whose thickness varies in space
+        h = xr.DataArray([10.0, 40.0, 90.0], dims="x")
+        dz = xr.DataArray(np.full(5, 0.2), dims="nz") * h
+        zc = grid.dz2z(dz, "up", zdim="nz", centered=True)
+        if positive == "down":
+            zc = zc.isel(nz=slice(None, None, -1))
+        out = grid.z2dz(zc, zdim="nz")
+        assert out.name == "dz" and out.dims == zc.dims
+        np.testing.assert_allclose(
+            out, dz.transpose(*out.dims).isel(nz=slice(None, None, 1 if positive == "up" else -1))
+        )
+
+    def test_z2dz_depth_and_outer_edges(self):
+        # Stretched layers: the inner interfaces are the middle of the centers, hence approximate,
+        # but the total thickness is exact when the outer ones are provided
+        dz = xr.DataArray([1.0, 3.0, 4.0], dims="nz")
+        z = grid.dz2z(dz, "up", zdim="nz", centered=True)
+        assert not np.isclose(grid.z2dz(z, zdim="nz").sum(), 8.0)
+        out = grid.z2dz(z, zdim="nz", top=0, bottom=-8)
+        assert np.isclose(out.sum(), 8.0)
+        # Depth, which is positive down
+        depth = (0 - z).assign_attrs(positive="down").rename("depth")
+        np.testing.assert_allclose(grid.z2dz(depth, zdim="nz", top=0, bottom=-8), out)
+
+    def test_get_dz(self):
+        dz = xr.DataArray(np.resize([100.0, 300.0], (3, 2)), dims=("lev", "x"), name="dz")
+        dz["lev"] = ("lev", np.arange(3.0), {"positive": "down"})
+        # From a thickness variable
+        np.testing.assert_allclose(grid.get_dz(dz.to_dataset()), dz)
+        # From z, which is exact for evenly spaced levels
+        z = grid.dz2z(dz, "down", zdim="lev", centered=True)
+        da = xr.DataArray(np.zeros(z.shape), dims=z.dims, coords={"z": z})
+        np.testing.assert_allclose(grid.get_dz(da).transpose(*dz.dims), dz)
+        # Nothing
+        assert grid.get_dz(xr.DataArray([1.0], dims="foo"), errors="ignore") is None
+        with pytest.raises(xoa.XoaError):
+            grid.get_dz(xr.DataArray([1.0], dims="foo"))
+
+    def test_vintegrate_vmean(self):
+        z = xr.DataArray([-1000.0, -300.0, -100.0, -10.0], dims="depth", attrs={"positive": "up"})
+        dz = xr.DataArray([700.0, 450.0, 145.0, 90.0], dims="depth")
+        da = xr.DataArray(
+            [[1.0, 2.0, 3.0, 4.0], [1.0, np.nan, 3.0, 4.0]],
+            dims=("x", "depth"),
+            coords={"depth": z},
+            name="temp",
+            attrs={"units": "K"},
+        )
+        # Thickness weighted, with valid values only
+        vint = grid.vintegrate(da, dz=dz)
+        np.testing.assert_allclose(vint, [2395.0, 1495.0])
+        assert vint.attrs["units"] == "K m"
+        vmean = grid.vmean(da, dz=dz)
+        np.testing.assert_allclose(vmean, [2395.0 / 1385.0, 1495.0 / 935.0])
+        assert vmean.attrs["units"] == "K" and vmean.name == "temp"
+        # Differs from the plain mean, and thicknesses are found from z
+        assert float(vmean[0]) != float(da[0].mean())
+        np.testing.assert_allclose(grid.vmean(da), vmean)
+        # Layers crossing the bounds are partly accounted for
+        np.testing.assert_allclose(grid.vintegrate(da, zmax=-200.0)[0], 1 * 700 + 2 * 325)
+        np.testing.assert_allclose(
+            grid.vmean(da, zmin=-500.0, zmax=-50.0)[0],
+            (2 * 425 + 3 * 122.5 + 4 * 5) / 552.5,
+        )
+        # Nothing valid
+        assert np.isnan(grid.vmean(da, zmin=100.0)).all()
+        assert np.isnan(grid.vintegrate(da, zmin=100.0)).all()
+
+    def test_get_dz_terms_and_decode_dz2z(self):
+        dz = xr.DataArray(
+            np.resize([100, 500, 1000.0], (2, 3)).T,
+            dims=("lev", "x"),
+            coords={"lev": ("lev", np.arange(3, dtype="d"), {"positive": "down"})},
+            name="dz",
+        )
+        assert grid.get_dz_terms(dz.to_dataset())[1] == "lev"
+        assert grid.get_dz_terms(xr.Dataset(), errors="ignore") is None
+        ds = grid.decode_dz2z(dz.to_dataset())
+        np.testing.assert_allclose(ds.z.isel(x=0), [-50, -350, -1100])
+
+
+def test_apply_along_dim_name_kwargs():
+    """The keywords of a coordinate do not leak to the next ones"""
+    da = xr.DataArray(
+        np.arange(3.0),
+        dims="x",
+        coords={"y": ("x", np.arange(3.0)), "z": ("x", np.arange(3.0))},
+    )
+    calls = []
+
+    def func(da, dim, **kwargs):
+        calls.append(kwargs)
+        return da
+
+    grid.apply_along_dim(da, "x", func, name_kwargs={"y": {"a": 1}}, b=0)
+    assert calls == [{"b": 0}, {"b": 0, "a": 1}, {"b": 0}]
+
+
+def test_apply_along_dim_dataset():
+    ds = xr.Dataset(
+        {
+            "temp": (("x", "y"), np.arange(12.0).reshape(4, 3), {"units": "degC"}),
+            "mask": ("y", np.ones(3)),
+        },
+        coords={"x": np.arange(4.0), "y": np.arange(3.0)},
+        attrs={"title": "test"},
+    )
+    out = grid.apply_along_dim(ds, "x", grid.get_centers)
+    assert isinstance(out, xr.Dataset)
+    assert out.sizes == {"x": 3, "y": 3}
+    np.testing.assert_allclose(out.x, [0.5, 1.5, 2.5])
+    np.testing.assert_allclose(out.temp, 0.5 * (ds.temp[1:].values + ds.temp[:-1].values))
+    assert out.temp.attrs == {"units": "degC"}
+    assert out.attrs == {"title": "test"}
+    xr.testing.assert_identical(out.mask, ds.mask)  # without the dimension

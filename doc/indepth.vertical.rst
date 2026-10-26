@@ -1,0 +1,233 @@
+.. _indepth.vertical:
+
+Vertical coordinates: z and depth
+#################################
+
+Introduction
+============
+
+Ocean data come with two opposite conventions for the vertical coordinate, and mixing them
+silently flips a section or shifts a mixed layer depth.
+:mod:`xoa` names and handles them separately:
+
+.. list-table::
+    :header-rows: 1
+
+    * -
+      - ``z``
+      - ``depth``
+    * - Sign in the ocean
+      - negative
+      - positive
+    * - Increases towards
+      - the surface
+      - the bottom
+    * - ``positive`` attribute
+      - ``"up"``
+      - ``"down"``
+    * - ``standard_name``
+      - ``altitude``
+      - ``ocean_layer_depth``
+    * - Produced by
+      - :func:`xoa.sigma.decode_sigma`, :func:`xoa.grid.dz2z`, :func:`xoa.grid.dz2depth` with ``positive="up"``
+      - :func:`xoa.grid.dz2depth` with ``positive="down"``
+
+``z`` is the same thing as ``depth`` with the opposite sign: ``z = -depth``.
+The ``altitude`` coordinate is something else: it belongs to the atmosphere, in meters or
+hPa.
+
+This guide explains how the two are found, converted and produced, and what to watch for.
+The tutorial :ref:`sphx_glr_tutorials_vertical_plot_croco_section.py` shows them at work on a
+CROCO section, and :ref:`sphx_glr_tutorials_dynamics_plot_mixed_layer.py` shows isotherms and mixed layers.
+
+.. ipython:: python
+
+    @suppress
+    import warnings
+    @suppress
+    warnings.simplefilter("ignore")
+    import numpy as np
+    import xarray as xr
+    import xoa
+    from xoa import coords
+
+Sign and order are two different things
+=======================================
+
+The sign and the order of the levels along the vertical dimension are independent.
+A ``depth`` may go from the surface to the bottom (the usual case for observations and
+z-level models), but also from the bottom to the surface, like a sigma-level model whose
+first level is the deepest.
+Likewise, a ``z`` of such a model goes from the bottom to the surface, but a ``z`` can also
+be stored from the surface to the bottom.
+
+The ``positive`` attribute only tells the sign.
+The functions that change the sign, :func:`~xoa.coords.to_z` and :func:`~xoa.coords.to_depth`,
+**do not change the order**, unless you ask for it with ``reverse``:
+
+.. ipython:: python
+
+    depth = xr.DataArray([0., 10, 50], dims="k", name="depth", attrs={"units": "m"})
+    z = coords.to_z(depth)
+    print(z.values, z.attrs)
+    print(coords.to_z(depth, reverse=True).values)
+
+``reverse=True`` reverses along the first dimension, and a dimension name reverses along that one.
+The conversion only negates the array, so it is lazy with dask arrays, and it costs
+one pass over the values. The output keeps only the ``units`` attribute and gets the new
+``positive`` one: other attributes, like the ``standard_name``, are not valid anymore.
+The stale copy of the input that a coordinate carries is dropped.
+
+Finding z and depth
+===================
+
+The :func:`~xoa.coords.get_z` and :func:`~xoa.coords.get_depth` functions look for
+the coordinate with :mod:`xoa.meta`, and fall back on the other one. The sign is changed whenever the ``positive`` attribute, or the name when there is none, differs from the requested convention:
+
+.. ipython:: python
+
+    da = xr.DataArray(
+        np.ones(3), dims="k", coords={"z": coords.to_z(depth, reverse=True)}
+    )
+    coords.get_z(da).name
+    coords.get_depth(da).values
+    coords.get_depth(da).attrs["positive"]
+
+When neither is found in a dataset, they are computed, depending on the ``type`` of the
+``[vertical]`` section of the meta configuration: from sigma-like coordinates with
+:func:`xoa.sigma.decode_sigma`, or from layer thicknesses with
+:func:`xoa.grid.decode_dz2z`.
+Like the other finders, they take an ``errors`` argument, with ``"raise"`` as default
+and ``"ignore"`` that returns ``None`` silently.
+The ``xoa`` accessors have the same ``get_z`` and ``get_depth`` methods, and the
+``da.xoa.z`` shortcut.
+
+Use :func:`~xoa.coords.get_vertical` instead when you want what is there, **without
+conversion**: it looks for a depth, then a ``z``, then an altitude.
+
+.. ipython:: python
+
+    coords.get_vertical(da).name
+
+Computing z and depth
+=====================
+
+Sigma coordinates give a ``z``, since the formulas of the CF conventions give
+heights that are negative in the ocean.
+The meta specs are inferred from the dataset, and here they are explicitly set
+to the default ones with :func:`xoa.meta.assign_meta_specs`:
+
+.. ipython:: python
+
+    from xoa import sigma
+    ds = xr.Dataset(
+        {"temp": (("sig", "x"), np.ones((5, 2)))},
+        coords={
+            "sig": ("sig", np.linspace(-1, 0, 5), {
+                "standard_name": "ocean_sigma_coordinate",
+                "formula_terms": "sigma: sig eta: ssh depth: bathy"}),
+            "ssh": ("x", np.zeros(2)),
+            "bathy": ("x", [50., 100.]),
+        },
+    )
+    ds = xoa.meta.assign_meta_specs(ds, "default")
+    dsz = sigma.decode_sigma(ds)
+    dsz.z.isel(x=1).values
+    coords.get_depth(ds).isel(x=1).values
+
+Note that ``depth`` is also the name of the bathymetry term of the formulas, which
+is positive down but is not a coordinate.
+
+Heights at other vertical locations, like the w levels of CROCO, are named with the
+location, like ``z_rho`` and ``z_w``, which requires meta specs whose name format has
+a location, like ``croco``. Otherwise, decoding raises an error instead of writing twice
+to ``z``.
+
+These heights are relative to the fixed datum of the formulas, at which the sea surface
+height is zero, so the free surface is at ``z = ssh``. When you want the free surface at
+zero, to interpolate at a given distance below it for instance, use ``ref="surface"``:
+the ``ssh`` is subtracted in the computation, so the water column and the levels
+are unchanged. The result has a ``xoa_vertical_ref`` attribute set to ``"surface"``,
+and loses its ``altitude`` standard name, which is relative to the datum:
+
+.. ipython:: python
+
+    ds["ssh"] = ("x", [1., -2.])
+    sigma.decode_sigma(ds).z.isel(sig=-1).values
+    sigma.decode_sigma(ds, ref="surface").z.isel(sig=-1).values
+
+Layer thicknesses are integrated by :func:`xoa.grid.dz2z`, which always returns a ``z``.
+The surface of the water column is at zero by default, or at the ``top`` argument,
+or the bottom is at the ``bottom`` argument, with ``z`` values. The :func:`xoa.grid.dz2depth`
+function is a variant that returns a ``z`` when ``positive="up"`` and a ``depth`` otherwise.
+The ``positive`` argument is
+also what decides which end of the levels is the surface, as well as the
+``[vertical] positive`` option of the configuration or the ``positive`` attribute
+of the vertical dimension coordinate when it is inferred.
+The tutorial :ref:`sphx_glr_tutorials_vertical_plot_layer_thicknesses.py` shows the conversions
+between thicknesses and depths, and the use of the thicknesses as weights.
+
+.. ipython:: python
+
+    from xoa import grid
+    dz = xr.DataArray(np.full((3, 2), 10.), dims=("lev", "x"), name="dz")
+    grid.dz2depth(dz, "down").isel(x=0).values
+    z = grid.dz2z(dz, "up")
+    z.name, z.isel(x=0).values
+
+Layer thicknesses can also be recovered from a ``z`` or a ``depth``, at the center of the layers,
+by :func:`xoa.grid.z2dz`. Interfaces are the middle of consecutive levels and the
+outer ones are extrapolated, unless ``top`` and ``bottom`` are given. This is exact for
+evenly spaced levels and approximate otherwise. :func:`xoa.grid.get_dz` does the whole job:
+it returns the thickness variable if there is one, else it computes them from what
+:func:`~xoa.coords.get_z` finds. Weighted statistics rely on it, see :ref:`indepth.stataccum`.
+A plain ``da.mean(zdim)`` ignores these thicknesses: use :func:`xoa.grid.vmean` and
+:func:`xoa.grid.vintegrate` to average and integrate along the vertical, optionally between
+``zmin`` and ``zmax``.
+
+.. ipython:: python
+
+    zc = grid.dz2z(dz, "up", centered=True)
+    grid.z2dz(zc).isel(x=0).values
+
+What uses them
+==============
+
+- :func:`xoa.plot.plot_section` plots the vertical coordinate as it is found, and inverts
+  the vertical axis when it is positive down.
+- :func:`xoa.thermdyn.mixed_layer_depth` also uses the coordinate as it is found, since
+  the ``positive`` attribute also tells it where the surface is. It always returns
+  a positive value, which you may negate to draw it on a ``z`` axis.
+- :func:`xoa.plot.plot_ts` converts to ``z`` with :func:`~xoa.coords.get_z` before
+  computing the pressure with ``gsw.p_from_z``.
+- :func:`xoa.regrid.regrid1d` works with any coordinate you give it: interpolate
+  from ``z`` to ``z`` or from ``depth`` to ``depth``. When the input and output coordinates
+  both have a ``positive`` attribute and they differ, like a ``depth`` regridded to ``z`` levels,
+  it negates the input coordinate. Without these attributes, convert before.
+
+Pitfalls
+========
+
+- **The attribute prevails over the name.** :func:`~xoa.coords.get_z` and
+  :func:`~xoa.coords.get_depth` guarantee their sign from the ``positive`` attribute of what they
+  find: a variable named ``depth`` whose attribute is ``"up"`` is negated by
+  :func:`~xoa.coords.get_depth` and returned as is by :func:`~xoa.coords.get_z`.
+  Without this attribute, the name decides, and ``depth`` is taken as positive down.
+  Set the attribute of your coordinates when their sign is not the usual one.
+- **Mixing signs in a regridding or an isoline.** Values and bounds must have the same sign:
+  ``-15`` m is a ``z``, ``15`` m is a ``depth``. Only :func:`xoa.regrid.regrid1d` converts
+  its input coordinate, and only when the ``positive`` attributes of both coordinates are set.
+- **A dimension called** ``z``. A vertical dimension named like the ``z`` coordinate,
+  or a dimension coordinate holding level indices, is read as a ``z`` coordinate.
+  A 2D ``z`` computed from the thicknesses cannot be assigned to a dataset with a ``z``
+  dimension: :func:`xoa.grid.decode_dz2z` then raises an error, or leaves the dataset
+  unchanged with ``errors="ignore"``, and you have to use :func:`xoa.grid.dz2z`
+  and give it another name.
+- **Staggered locations.** With a configuration like ``croco``, ``z`` gets the location
+  suffix of its grid, like ``z_w``, as the other coordinates.
+  To get ``z`` at the u and v points, move the sea surface height and the bathymetry or move ``z``
+  itself from the rho points: see :ref:`sphx_glr_tutorials_vertical_plot_croco_uv_depths.py`.
+- **Datasets in which the levels are not ordered like their sign suggests.** Functions that
+  need the surface level, like the mixed layer depth, take it from the ``positive`` attribute
+  and the order of the levels: check that they are consistent after converting
+  with ``reverse``.

@@ -9,4 +9,11 @@ In-depth guides
     indepth.meta
     indepth.cfgm
     indepth.grids
+    indepth.vertical
+    indepth.dyn
+    indepth.tide
+    indepth.regrid
+    indepth.plot
     indepth.filtering
+    indepth.performance
+    indepth.stataccum

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Test the :mod:`xoa.accessors` module
 """
 
 import warnings
-import pytest
+
 import numpy as np
+import pytest
 import xarray as xr
 
 import xoa
@@ -21,9 +21,11 @@ class TestAccessorRegistration:
         accessors.register_meta_accessors(name='meta')
 
         # Create a simple dataset
-        ds = xr.Dataset({
-            'temperature': (['x', 'y'], np.random.rand(3, 4)),
-        })
+        ds = xr.Dataset(
+            {
+                'temperature': (['x', 'y'], np.random.rand(3, 4)),
+            }
+        )
 
         # Check that meta accessor is available
         assert hasattr(ds, 'meta')
@@ -43,9 +45,11 @@ class TestAccessorRegistration:
         """Test registering meta accessors with custom name"""
         accessors.register_meta_accessors(name='mymeta')
 
-        ds = xr.Dataset({
-            'temp': (['x'], np.array([1, 2, 3])),
-        })
+        ds = xr.Dataset(
+            {
+                'temp': (['x'], np.array([1, 2, 3])),
+            }
+        )
 
         # Check that custom name accessor is available
         assert hasattr(ds, 'mymeta')
@@ -72,23 +76,32 @@ class TestMetaAccessorMethods:
         accessors.register_meta_accessors(name='meta')
 
         # Create test dataset with CF-like names
-        self.ds = xr.Dataset({
-            'SST': (['time', 'lat', 'lon'], np.random.rand(2, 3, 4), {
-                'standard_name': 'sea_surface_temperature',
-                'long_name': 'Sea Surface Temperature',
-                'units': 'degC'
-            }),
-        }, coords={
-            'lon': (['lon'], np.linspace(-180, 180, 4), {
-                'standard_name': 'longitude',
-                'units': 'degrees_east'
-            }),
-            'lat': (['lat'], np.linspace(-90, 90, 3), {
-                'standard_name': 'latitude',
-                'units': 'degrees_north'
-            }),
-            'time': (['time'], np.array([0, 1])),
-        })
+        self.ds = xr.Dataset(
+            {
+                'SST': (
+                    ['time', 'lat', 'lon'],
+                    np.random.rand(2, 3, 4),
+                    {
+                        'standard_name': 'sea_surface_temperature',
+                        'long_name': 'Sea Surface Temperature',
+                        'units': 'degC',
+                    },
+                ),
+            },
+            coords={
+                'lon': (
+                    ['lon'],
+                    np.linspace(-180, 180, 4),
+                    {'standard_name': 'longitude', 'units': 'degrees_east'},
+                ),
+                'lat': (
+                    ['lat'],
+                    np.linspace(-90, 90, 3),
+                    {'standard_name': 'latitude', 'units': 'degrees_north'},
+                ),
+                'time': (['time'], np.array([0, 1])),
+            },
+        )
 
     def test_metaspecs_property(self):
         """Test that meta_specs property works"""
@@ -102,6 +115,19 @@ class TestMetaAccessorMethods:
         new_specs = meta.get_meta_specs()
         self.ds.meta.set_meta_specs(new_specs)
         assert self.ds.meta.get_meta_specs() is new_specs
+
+    def test_set_meta_specs_from_name_and_dict(self):
+        """Specs are set from the name of internal specs or from a dict"""
+        from xoa import meta
+
+        registered = list(meta.get_cache()["registered"])
+        try:
+            self.ds.meta.set_meta_specs("croco")  # internal specs get registered
+            assert self.ds.meta.get_meta_specs().name == "croco"
+        finally:
+            meta.get_cache()["registered"][:] = registered
+        self.ds.meta.set_meta_specs({"data_vars": {"banana": {"standard_name": "banana"}}})
+        assert "banana" in self.ds.meta.get_meta_specs().data_vars
 
     def test_get_meta_specs(self):
         """Test getting meta specs"""
@@ -150,9 +176,11 @@ class TestXoaAccessorSubaccessors:
         # Register accessors
         xoa.register_accessors(xoa=True, meta=True)
 
-        self.ds = xr.Dataset({
-            'temp': (['x'], np.array([20, 21, 22])),
-        })
+        self.ds = xr.Dataset(
+            {
+                'temp': (['x'], np.array([20, 21, 22])),
+            }
+        )
 
     def test_xoa_meta_subaccessor(self):
         """Test that .xoa.meta subaccessor works"""
@@ -161,6 +189,24 @@ class TestXoaAccessorSubaccessors:
         meta_accessor = self.ds.xoa.meta
         # Since the return is based on the object state, just check it's accessible
         assert meta_accessor is not None or hasattr(self.ds.xoa, '_meta')
+
+    def test_xoa_get_z_and_depth(self):
+        """Test the conversion between z and depth"""
+        z = xr.DataArray(
+            [-20.0, -10, 0], dims="k", name="z", attrs={"units": "m", "positive": "up"}
+        )
+        da = xr.DataArray(np.ones(3), dims="k", coords={"z": z})
+        assert da.xoa.get_z().name == "z"
+        np.testing.assert_array_equal(da.xoa.get_depth(), [20, 10, 0])
+        assert da.xoa.z.name == "z"
+
+    def test_xoa_decode_sigma_subaccessor(self):
+        """Test that .xoa.decode_sigma is a SigmaAccessor, cached on the xoa accessor"""
+        from xoa.accessors import SigmaAccessor
+
+        accessor = self.ds.xoa
+        assert isinstance(accessor.decode_sigma, SigmaAccessor)
+        assert accessor.decode_sigma is accessor.decode_sigma
 
     def test_xoa_cf_subaccessor_deprecated(self):
         """Test that .xoa.cf subaccessor issues deprecation warning"""
@@ -199,8 +245,10 @@ class TestRegisterAccessorsFunction:
 
             # Check warning was issued
             assert len(w) >= 1
-            assert any(issubclass(warn.category, (DeprecationWarning, xoa.XoaDeprecationWarning))
-                      for warn in w)
+            assert any(
+                issubclass(warn.category, (DeprecationWarning, xoa.XoaDeprecationWarning))
+                for warn in w
+            )
 
     def test_register_both_meta_and_xcf(self):
         """Test that both meta and xcf can be registered (for compatibility)"""
@@ -231,3 +279,188 @@ class TestAccessorClassHierarchy:
     def test_xoa_dataarray_accessor_base(self):
         """Test that XoaDataArrayAccessor inherits from MetaDataArrayAccessor"""
         assert issubclass(accessors.XoaDataArrayAccessor, accessors.MetaDataArrayAccessor)
+
+
+class TestInterpRegridAccessor:
+    """Tests for the interp and regrid methods of the xoa accessors"""
+
+    def setup_method(self):
+        xoa.register_accessors(xoa=True, meta=True)
+        lon = xr.DataArray(
+            np.linspace(0, 5, 11),
+            dims="lon",
+            attrs={"standard_name": "longitude", "units": "degrees_east"},
+        )
+        lat = xr.DataArray(
+            np.linspace(0, 4, 9),
+            dims="lat",
+            attrs={"standard_name": "latitude", "units": "degrees_north"},
+        )
+        self.da = (2 * lon + lat).transpose("lat", "lon").rename("var")
+        self.da = self.da.assign_coords(lon=lon, lat=lat)
+        self.dst = xr.Dataset(
+            coords={
+                "lon": ("lon", np.linspace(1.2, 3.8, 5), lon.attrs),
+                "lat": ("lat", np.linspace(1.2, 2.8, 4), lat.attrs),
+            }
+        )
+
+    def test_interp(self):
+        dst_lon = np.array([1.0, 2.5, 3.0])
+        dst_lat = np.array([1.0, 2.0, 2.5])
+        for obj in self.da, self.da.to_dataset():
+            out = obj.xoa.interp(dst_lon, dst_lat)
+            res = out if isinstance(out, xr.DataArray) else out["var"]
+            np.testing.assert_allclose(res, 2 * dst_lon + dst_lat)
+
+    def test_regrid(self):
+        for method in "bilinear", "bicubic":
+            for obj in self.da, self.da.to_dataset():
+                out = obj.xoa.regrid(self.dst, method=method)
+                res = out if isinstance(out, xr.DataArray) else out["var"]
+                expected = 2 * self.dst.lon + self.dst.lat
+                np.testing.assert_allclose(
+                    res.transpose("lat", "lon"), expected.transpose("lat", "lon")
+                )
+
+
+class TestPlotAccessor:
+    def setup_method(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        xoa.register_accessors()
+        lon = xr.DataArray(
+            np.linspace(0, 3, 4), dims="lon", attrs={"standard_name": "longitude"}, name="lon"
+        )
+        lat = xr.DataArray(
+            np.linspace(0, 2, 3), dims="lat", attrs={"standard_name": "latitude"}, name="lat"
+        )
+        self.da = xr.DataArray(
+            np.random.default_rng(0).normal(size=(3, 4)),
+            dims=("lat", "lon"),
+            coords={"lon": lon, "lat": lat},
+            name="var",
+        )
+
+    def test_plot_methods(self):
+        import matplotlib.pyplot as plt
+
+        for obj in self.da, self.da.to_dataset():
+            assert isinstance(obj.xoa.plot, accessors.XoaPlotAccessor)
+        pytest.importorskip("cartopy")
+        assert self.da.xoa.plot.field() is not None
+        assert self.da.xoa.plot.grid() is not None
+        assert self.da.xoa.plot.taylor(self.da) is not None
+        plt.close("all")
+
+
+class TestDynGridAccessor:
+    def setup_method(self):
+        xoa.register_accessors()
+        lon = xr.DataArray(
+            np.arange(6.0), dims="lon", attrs={"standard_name": "longitude"}, name="lon"
+        )
+        lat = xr.DataArray(
+            np.arange(5.0), dims="lat", attrs={"standard_name": "latitude"}, name="lat"
+        )
+        coords = {"lon": lon, "lat": lat}
+        self.ds = xr.Dataset(
+            {
+                "u": (("lat", "lon"), -np.arange(5.0)[:, None] + np.zeros(6)),
+                "v": (("lat", "lon"), np.zeros((5, 1)) + np.arange(6.0)),
+                "ssh": (("lat", "lon"), np.arange(6.0) + np.arange(5.0)[:, None]),
+            },
+            coords=coords,
+        )
+
+    def test_dataset_methods(self):
+        from xoa import dyn
+
+        ds = self.ds
+        np.testing.assert_allclose(ds.xoa.get_relvort(), dyn.get_relvort(ds.u, ds.v))
+        np.testing.assert_allclose(ds.xoa.get_div(), dyn.get_div(ds.u, ds.v))
+        np.testing.assert_allclose(ds.xoa.get_okuboweiss(), dyn.get_okuboweiss(ds.u, ds.v))
+        for res, ref in zip(ds.xoa.get_strain(), dyn.get_strain(ds.u, ds.v)):
+            np.testing.assert_allclose(res, ref)
+        assert ds.xoa.get_relvort(dx=1e5, dy=1e5).shape == ds.u.shape
+
+    def test_dataset_without_velocities(self):
+        with pytest.raises(Exception):
+            self.ds[["ssh"]].xoa.get_relvort()
+
+    def test_dataarray_methods(self):
+        from xoa import dyn
+
+        ug, vg = self.ds.ssh.xoa.get_geos()
+        ref_ug, ref_vg = dyn.get_geos(self.ds.ssh)
+        np.testing.assert_allclose(ug, ref_ug)
+        np.testing.assert_allclose(vg, ref_vg)
+        uc, vc = self.ds.ssh.xoa.get_cyclogeos(niter=10)
+        ref_uc, ref_vc = dyn.get_cyclogeos(self.ds.ssh, niter=10)
+        np.testing.assert_allclose(uc, ref_uc, equal_nan=True)
+        np.testing.assert_allclose(vc, ref_vc, equal_nan=True)
+
+    def test_get_polygon_mask(self):
+        poly = [(0.0, 0.0), (2.0, 0.0), (2.0, 2.0), (0.0, 2.0)]
+        for obj in self.ds, self.ds.ssh:
+            mask = obj.xoa.get_polygon_mask(poly)
+            assert mask.dtype == bool
+            assert int(mask.sum()) == 5
+            assert int(obj.xoa.get_polygon_mask(poly, threshold=1.0).sum()) == 1
+
+
+def test_xoa_accessor_is_registered_on_import():
+    """The main accessor is available without calling register_accessors"""
+    import subprocess
+    import sys
+
+    code = (
+        "import xarray as xr, xoa; "
+        "assert hasattr(xr.DataArray, 'xoa') and hasattr(xr.Dataset, 'xoa'); "
+        "assert not hasattr(xr.Dataset, 'meta')"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
+
+
+class TestTideAccessor:
+    def setup_method(self):
+        time = np.datetime64("2024-01-01", "s") + np.arange(240) * np.timedelta64(3600, "s")
+        h = np.cos(2 * np.pi * np.arange(240) / 12.42)
+        self.da = xr.DataArray(h, dims="time", coords={"time": time}, name="ssh")
+
+    def test_harmonic(self):
+        from xoa import tide
+
+        coef = self.da.xoa.harmonic_analysis(names=["M2", "S2"], uncertainty=False)
+        ref = tide.harmonic_analysis(self.da, names=["M2", "S2"], uncertainty=False)
+        np.testing.assert_allclose(coef.amp, ref.amp)
+        pred = coef.xoa.harmonic_predict(self.da.time.values)
+        np.testing.assert_allclose(pred, tide.harmonic_predict(ref, self.da.time.values))
+
+    def test_tidal_filter(self):
+        from xoa import tide
+
+        out = self.da.xoa.tidal_filter("demerliac")
+        xr.testing.assert_allclose(out, tide.tidal_filter(self.da, "demerliac"))
+
+
+def test_accessor_get_geosel():
+    import numpy as np
+    import xarray as xr
+
+    import xoa  # noqa: F401
+
+    lon = xr.DataArray(np.arange(0.0, 40.0, 10.0), dims="x", name="lon")
+    lat = xr.DataArray(np.arange(0.0, 30.0, 10.0), dims="y", name="lat")
+    da = xr.DataArray(np.ones((3, 4)), dims=("y", "x"), coords={"lon": lon, "lat": lat})
+    sel = da.xoa.get_geosel(lon=(5.0, 25.0), lat=(0.0, 10.0))
+    assert sel.isel == {"x": slice(1, 3), "y": slice(0, 2)}
+    assert da.xoa.get_geoselector() is da.xoa.get_geoselector()
+    assert da.xoa.get_geosel(nearest=(11.0, 9.0)).isel == {"x": 1, "y": 1}
+    sub = da.xoa.geosel(lon=(5.0, 25.0), lat=(0.0, 10.0))
+    assert sub.shape == (2, 2)
+    sub = da.xoa.geosel(circle=(10.0, 10.0, 1200.0), units="km")
+    assert sub.isnull().any() and sub.notnull().any()
+    assert not da.xoa.geosel(circle=(10.0, 10.0, 1200.0), units="km", mask=False).isnull().any()
+    assert float(da.xoa.geosel(nearest=(11.0, 9.0)).lon) == 10.0

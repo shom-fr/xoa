@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 xarray and pandas xoa accessors
 
 """
+
 # Copyright 2020-2026 Shom
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +24,7 @@ from . import exceptions
 from .misc import ERRORS
 
 
-class _BasicMetaAccessor_(object):
+class _BasicMetaAccessor_:
     """Base class for meta-aware xarray accessors"""
 
     def __init__(self, obj, meta_specs=None):
@@ -52,15 +52,21 @@ class _BasicMetaAccessor_(object):
 
         Parameters
         ----------
-        meta_specs: xoa.meta.MetaSpecs
+        meta_specs: xoa.meta.MetaSpecs, str, dict
+            Either a :class:`~xoa.meta.MetaSpecs` instance, the name of registered or internal
+            specs, or an argument to instantiate one like a dict or a file name.
 
         See also
         --------
         :ref:`indepth.meta`
         """
+        from . import meta
         from .meta.general import MetaSpecs
 
-        assert isinstance(meta_specs, MetaSpecs)
+        if isinstance(meta_specs, str):
+            meta_specs = meta.get_meta_specs_from_name(meta_specs, errors="ignore") or meta_specs
+        if not isinstance(meta_specs, MetaSpecs):
+            meta_specs = MetaSpecs(meta_specs)
         self._meta_specs = meta_specs
         self._assign_meta_specs_()
 
@@ -312,10 +318,36 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         return self.meta_specs.encode(self._obj, **kwargs)
 
     @ERRORS.format_method_docstring
-    def get_depth(self, errors="ignore"):
-        """Get the depth as computed or recognized by the :meth:`~xoa.meta.MetaSpecs`
+    def get_z(self, errors="ignore"):
+        """Get the z, positive up, as computed or recognized by the :meth:`~xoa.meta.MetaSpecs`
 
-        If a depth variable cannot be found, it tries to compute either
+        If a z variable cannot be found, it uses the depth if any, or tries to compute either
+        from sigma-like coordinates or from layer thicknesses.
+
+        Parameters
+        ----------
+        {errors}
+
+        Return
+        ------
+        xarray.DataArray, None
+
+        See also
+        --------
+        :func:`xoa.coords.get_z`
+        :func:`xoa.coords.to_z`
+        :func:`xoa.sigma.decode_sigma`
+        :ref:`indepth.meta`
+        """
+        from .coords import get_z
+
+        return get_z(self._obj, errors=errors)
+
+    @ERRORS.format_method_docstring
+    def get_depth(self, errors="ignore"):
+        """Get the depth, positive down, as computed or recognized by the :meth:`~xoa.meta.MetaSpecs`
+
+        If a depth variable cannot be found, it uses the z if any, or tries to compute either
         from sigma-like coordinates or from layer thicknesses.
 
         Parameters
@@ -329,6 +361,7 @@ class _MetaAccessor_(_BasicMetaAccessor_):
         See also
         --------
         :func:`xoa.coords.get_depth`
+        :func:`xoa.coords.to_depth`
         :func:`xoa.grid.decode_dz2depth`
         :func:`xoa.sigma.decode_sigma`
         :ref:`indepth.meta`
@@ -561,7 +594,7 @@ class SigmaAccessor(_BasicMetaAccessor_):
         self._ds = self._obj
 
     @ERRORS.format_method_docstring
-    def decode(self, rename=False, errors="raise"):
+    def decode(self, rename=False, ref="datum", errors="raise"):
         """Compute depth from sigma coordinates
 
         Parameters
@@ -569,6 +602,8 @@ class SigmaAccessor(_BasicMetaAccessor_):
         rename: bool
             Rename and format arrays to make them compliant with
             :mod:`xoa.meta`
+        ref: {{"datum", "surface"}}
+            Reference of the heights, see :func:`xoa.sigma.decode_sigma`.
         {errors}
 
         Return
@@ -581,11 +616,11 @@ class SigmaAccessor(_BasicMetaAccessor_):
         """
         from .sigma import decode_sigma
 
-        return decode_sigma(self._ds, rename=rename, errors=errors)
+        return decode_sigma(self._ds, rename=rename, ref=ref, errors=errors)
 
-    def __call__(self):
+    def __call__(self, **kwargs):
         """Shortcut to :meth:`decode`"""
-        return self.decode()
+        return self.decode(**kwargs)
 
     def get_sigma_terms(self, loc=None, rename=False):
         """Call :func:`get_sigma_terms` on the dataset
@@ -641,7 +676,297 @@ class SigmaAccessor(_BasicMetaAccessor_):
         return get_sigma_terms(self._ds, loc=loc, rename=rename)
 
 
-class XoaDataArrayAccessor(MetaDataArrayAccessor):
+class _InterpRegridMixin_:
+    """Horizontal interpolation and regridding methods of the main xoa accessors"""
+
+    def interp(
+        self,
+        dst_lon,
+        dst_lat,
+        method="bilinear",
+        skipna=False,
+        na_thres=1.0,
+        **kwargs,
+    ):
+        """Interpolate to arbitrary destination points
+
+        Parameters
+        ----------
+        dst_lon, dst_lat: array_like, xarray.DataArray
+            Destination coordinates, any shape.
+            See :func:`xoa.coords.geo_merge`.
+        method: str, int
+            Interpolation method, see :class:`xoa.interp.xy_interp_methods`
+        skipna: bool
+            Skip NaN values
+        na_thres: float
+            Threshold for NaN handling
+        kwargs:
+            Extra parameters are passed to :class:`xoa.interp.Interpolator`,
+            like ``weights_file``, ``src_mask``, ``bias`` or ``tension``.
+
+        Return
+        ------
+        xarray.DataArray, xarray.Dataset
+
+        See also
+        --------
+        xoa.interp.interpxy
+        xoa.interp.Interpolator
+        """
+        from .interp import interpxy
+
+        return interpxy(
+            self._obj, dst_lon, dst_lat, method, skipna=skipna, na_thres=na_thres, **kwargs
+        )
+
+    def regrid(
+        self,
+        dst,
+        method="bilinear",
+        dst_time=None,
+        skipna=False,
+        na_thres=1.0,
+        **kwargs,
+    ):
+        """Regrid horizontally, and optionally in time, to a destination grid
+
+        Parameters
+        ----------
+        dst: xarray.DataArray, xarray.Dataset
+            Destination grid with longitude and latitude coordinates
+        method: str, int
+            Regridding method, see :class:`xoa.regrid.xy_regrid_methods`
+        dst_time: array_like, xarray.DataArray, None
+            Target times
+        skipna: bool
+            Skip NaN values
+        na_thres: float
+            Threshold for NaN handling
+        kwargs:
+            Extra parameters are passed to :class:`xoa.regrid.Regridder`,
+            like ``weights_file``, ``src_mask``, ``dst_mask``, ``bias`` or ``tension``.
+
+        Return
+        ------
+        xarray.DataArray, xarray.Dataset
+
+        See also
+        --------
+        xoa.regrid.regridxy
+        xoa.regrid.Regridder
+        """
+        from .regrid import regridxy
+
+        return regridxy(
+            self._obj, dst, method, dst_time=dst_time, skipna=skipna, na_thres=na_thres, **kwargs
+        )
+
+
+class XoaPlotAccessor:
+    """Plotting methods of the main xoa accessors, that call the :mod:`xoa.plot` functions
+
+    The accessed array or dataset is passed as the first argument.
+    """
+
+    def __init__(self, obj):
+        self._obj = obj
+
+    def field(self, *args, **kwargs):
+        """Plot a field on a map, see :func:`xoa.plot.plot_field`"""
+        from .plot import plot_field
+
+        return plot_field(self._obj, *args, **kwargs)
+
+    def grid(self, *args, **kwargs):
+        """Plot a grid, see :func:`xoa.plot.plot_grid`"""
+        from .plot import plot_grid
+
+        return plot_grid(self._obj, *args, **kwargs)
+
+    def section(self, *args, **kwargs):
+        """Plot a vertical section, see :func:`xoa.plot.plot_section`"""
+        from .plot import plot_section
+
+        return plot_section(self._obj, *args, **kwargs)
+
+    def stick(self, *args, **kwargs):
+        """Plot sticks of currents, see :func:`xoa.plot.plot_stick`"""
+        from .plot import plot_stick
+
+        return plot_stick(self._obj, *args, **kwargs)
+
+    def rose(self, *args, **kwargs):
+        """Plot a wind or wave rose, see :func:`xoa.plot.plot_rose`"""
+        from .plot import plot_rose
+
+        return plot_rose(self._obj, *args, **kwargs)
+
+    def taylor(self, ref, *args, **kwargs):
+        """Plot a Taylor diagram against a reference, see :func:`xoa.plot.plot_taylor`"""
+        from .plot import plot_taylor
+
+        return plot_taylor(self._obj, ref, *args, **kwargs)
+
+
+class _PlotMixin_:
+    """Provide the ``plot`` subaccessor"""
+
+    @property
+    def plot(self):
+        """The :class:`XoaPlotAccessor` subaccessor"""
+        return XoaPlotAccessor(self._obj)
+
+
+class _GridMixin_:
+    """Provide the grid methods"""
+
+    def get_polygon_mask(self, polygon, threshold=0.5):
+        """Get a mask of the cells that are inside polygons, see :func:`xoa.mask.get_polygon_mask`"""
+        from .mask import get_polygon_mask
+
+        return get_polygon_mask(self._obj, polygon, threshold=threshold)
+
+    def get_kdtree(self, **kwargs):
+        """Get the :class:`xoa.geo.GeoKDTree` of the points, which is built once and cached
+
+        The tree is rebuilt when the parameters are different from the previous call.
+        """
+        from .geo import GeoKDTree, pop_tree_kwargs
+
+        kwargs = pop_tree_kwargs(kwargs)
+        cache = getattr(self, "_kdtree", None)
+        if cache is None or cache[0] != kwargs:
+            cache = self._kdtree = (kwargs, GeoKDTree(self._obj, **kwargs))
+        return cache[1]
+
+    def get_neighbors(self, target, k=None, radius=None, units="m", output="index", **kwargs):
+        """Find the neighbors of target points, see :func:`xoa.geo.get_neighbors`
+
+        The tree is cached for successive calls, see :meth:`get_kdtree`.
+        """
+        from .geo import get_neighbors, pop_tree_kwargs
+
+        tree = self.get_kdtree(**pop_tree_kwargs(kwargs))
+        return get_neighbors(tree, target, k=k, radius=radius, units=units, output=output, **kwargs)
+
+    def get_geoselector(self, **kwargs):
+        """Get the :class:`xoa.geo.GeoSelector` of the points, which is built once and cached"""
+        from .geo import GeoSelector
+
+        cache = getattr(self, "_geoselector", None)
+        if cache is None or cache[0] != kwargs:
+            cache = self._geoselector = (kwargs, GeoSelector(self._obj, **kwargs))
+        return cache[1]
+
+    def get_geosel(self, *args, sphere_radius=None, **kwargs):
+        """Select the points near a point or in a shape, see :func:`xoa.geo.get_geosel`
+
+        The selector is cached for successive calls, see :meth:`get_geoselector`.
+        """
+        from .geo import get_geosel
+
+        radius = {} if sphere_radius is None else {"radius": sphere_radius}
+        return get_geosel(self.get_geoselector(**radius), *args, **kwargs)
+
+    def geosel(self, *args, mask=True, **kwargs):
+        """Select the object in a box, a circle or a polygon, or at the nearest point
+
+        It applies the selection of :meth:`get_geosel`, whose arguments it takes,
+        to the object, like :func:`xoa.geo.geosel` but with the cached selector.
+        With ``mask=False``, the points of the window that are outside of the shape
+        are not set to nan.
+        """
+        return self.get_geosel(*args, **kwargs).apply(self._obj, mask=mask)
+
+
+class _DynDataArrayMixin_:
+    """Provide the dynamics methods that work on a sea surface height"""
+
+    def get_geos(self, dx=None, dy=None):
+        """Get the geostrophic currents, see :func:`xoa.dyn.get_geos`"""
+        from .dyn import get_geos
+
+        return get_geos(self._obj, dx=dx, dy=dy)
+
+    def get_cyclogeos(self, **kwargs):
+        """Get the cyclogeostrophic currents, see :func:`xoa.dyn.get_cyclogeos`"""
+        from .dyn import get_cyclogeos
+
+        return get_cyclogeos(self._obj, **kwargs)
+
+
+class _DynDatasetMixin_:
+    """Provide the dynamics methods that work on the velocities of a dataset"""
+
+    def _get_uv_(self):
+        return self.get("u", errors="raise"), self.get("v", errors="raise")
+
+    def get_relvort(self, dx=None, dy=None, z=None):
+        """Get the relative vorticity, see :func:`xoa.dyn.get_relvort`"""
+        from .dyn import get_relvort
+
+        return get_relvort(*self._get_uv_(), dx=dx, dy=dy, z=z)
+
+    def get_rossby(self, dx=None, dy=None, z=None):
+        """Get the Rossby number, see :func:`xoa.numbers.get_rossby`"""
+        from .numbers import get_rossby
+
+        return get_rossby(*self._get_uv_(), dx=dx, dy=dy, z=z)
+
+    def get_div(self, dx=None, dy=None, z=None, normalize=False):
+        """Get the horizontal divergence, see :func:`xoa.dyn.get_div`"""
+        from .dyn import get_div
+
+        return get_div(*self._get_uv_(), dx=dx, dy=dy, z=z, normalize=normalize)
+
+    def get_strain(self, dx=None, dy=None, z=None, normalize=False):
+        """Get the normal and shear strains, see :func:`xoa.dyn.get_strain`"""
+        from .dyn import get_strain
+
+        return get_strain(*self._get_uv_(), dx=dx, dy=dy, z=z, normalize=normalize)
+
+    def get_okuboweiss(self, dx=None, dy=None, z=None, normalize=False):
+        """Get the Okubo-Weiss parameter, see :func:`xoa.dyn.get_okuboweiss`"""
+        from .dyn import get_okuboweiss
+
+        return get_okuboweiss(*self._get_uv_(), dx=dx, dy=dy, z=z, normalize=normalize)
+
+
+class _TideDataArrayMixin_:
+    """Provide the tide methods that work on a sea surface height or a current component"""
+
+    def harmonic_analysis(self, **kwargs):
+        """Get the tidal harmonic coefficients, see :func:`xoa.tide.harmonic_analysis`"""
+        from .tide import harmonic_analysis
+
+        return harmonic_analysis(self._obj, **kwargs)
+
+    def tidal_filter(self, filter_name, **kwargs):
+        """Filter the tide, see :func:`xoa.tide.tidal_filter`"""
+        from .tide import tidal_filter
+
+        return tidal_filter(self._obj, filter_name, **kwargs)
+
+
+class _TideDatasetMixin_:
+    """Provide the tide methods that work on the coefficients of a harmonic analysis"""
+
+    def harmonic_predict(self, t_out, **kwargs):
+        """Predict the tide from harmonic coefficients, see :func:`xoa.tide.harmonic_predict`"""
+        from .tide import harmonic_predict
+
+        return harmonic_predict(self._obj, t_out, **kwargs)
+
+
+class XoaDataArrayAccessor(
+    _PlotMixin_,
+    _InterpRegridMixin_,
+    _GridMixin_,
+    _DynDataArrayMixin_,
+    _TideDataArrayMixin_,
+    MetaDataArrayAccessor,
+):
     """Main xoa accessor registered on :class:`xarray.DataArray`"""
 
     @property
@@ -668,7 +993,14 @@ class XoaDataArrayAccessor(MetaDataArrayAccessor):
         return self.meta
 
 
-class XoaDatasetAccessor(MetaDatasetAccessor):
+class XoaDatasetAccessor(
+    _PlotMixin_,
+    _InterpRegridMixin_,
+    _GridMixin_,
+    _DynDatasetMixin_,
+    _TideDatasetMixin_,
+    MetaDatasetAccessor,
+):
     """Main xoa accessor registered on :class:`xarray.Dataset`"""
 
     @property
@@ -697,9 +1029,10 @@ class XoaDatasetAccessor(MetaDatasetAccessor):
     @property
     def decode_sigma(self):
         """The :class:`~xoa.accessors.SigmaAccessor` subaccessor for sigma coordinates"""
-        if not hasattr(self, "_sigma"):
-            self._sigma = SigmaAccessor(self._ds)
-        return self._sigma
+        # __getattr__ is a meta search that never raises, hence the __dict__ access
+        if "_sigma" not in self.__dict__:
+            self.__dict__["_sigma"] = SigmaAccessor(self._obj)
+        return self.__dict__["_sigma"]
 
 
 def _register_xarray_accessors_(dataarrays=None, datasets=None):
@@ -731,6 +1064,7 @@ def register_cf_accessors(name='xcf'):
         Use :func:`register_meta_accessors` instead.
     """
     import warnings
+
     from . import XoaDeprecationWarning
 
     warnings.warn(

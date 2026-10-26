@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Naming convention tools for reading and formatting variables
 
@@ -22,17 +21,12 @@ See the :ref:`indepth.meta` section.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import pprint
-import copy
 
-from .. import exceptions
-from .. import options
-from .. import misc
-from . import configs
-
-from . import sglocator
-from . import categories
+from .. import exceptions, misc, options
+from . import categories, configs, sglocator
 
 # Argument passed to dict_merge to merge Meta configs
 _META_DICT_MERGE_KWARGS = dict(
@@ -96,7 +90,7 @@ class MetaSpecs(categories._MetaBase_):
     a generic name, a categories name, alternates names, some properties
     and attributes like standard_name, long_name, axis.
 
-    Have a look to the :ref:`default specifications <appendix.meta_specs.default>`
+    Have a look to the :ref:`default configurations <appendix.meta.default>`
     and to the :ref:`indepth.meta` section.
 
 
@@ -123,7 +117,7 @@ class MetaSpecs(categories._MetaBase_):
     MetaVarSpecs
     SGLocator
     :ref:`indepth.meta`
-    :ref:`appendix.meta_specs.default`
+    :ref:`appendix.meta.default`
     """
 
     def __init__(self, cfg=None, default=True, user=True, name=None, cache=None):
@@ -307,9 +301,7 @@ class MetaSpecs(categories._MetaBase_):
             return self.__dict__["_metas"][name]
         if name == "dims":
             return self._dict["dims"]
-        raise AttributeError(
-            "'{}' object has no attribute '{}'".format(self.__class__.__name__, name)
-        )
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
     @property
     def dims(self):
@@ -427,13 +419,12 @@ class MetaSpecs(categories._MetaBase_):
                 from_cat, from_name = from_name.split(":")[:2]
             else:
                 from_cat = category
-            assert (
-                from_cat != category or name != from_name
-            ), "Cannot inherit meta specs from it self"
+            assert from_cat != category or name != from_name, (
+                "Cannot inherit meta specs from it self"
+            )
 
             # Parents must be already processed
-            for item in self._process_entry_(from_cat, from_name):
-                yield item
+            yield from self._process_entry_(from_cat, from_name)
 
             # Inherit with merging
             entries[name] = specs = misc.dict_merge(
@@ -1115,7 +1106,7 @@ class MetaSpecs(categories._MetaBase_):
 
         # Assign meta specs
         if self.name:
-            from . import is_registered_meta_specs, register_meta_specs, assign_meta_specs
+            from . import assign_meta_specs, is_registered_meta_specs, register_meta_specs
 
             if not is_registered_meta_specs(self.name):
                 register_meta_specs(self)

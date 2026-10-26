@@ -1,8 +1,12 @@
 """
 Routines related to ocean dynamics.
 
-Provides :func:`get_sea_level` for identifying sea level variables
-and :func:`flow2d` for 2D Lagrangian particle advection.
+Provides :func:`get_sea_level` for identifying sea level variables,
+:func:`flow2d` for 2D Lagrangian particle advection, and the kinematic diagnostics
+computed from velocities on collocated grids, that may have levels with a variable vertical
+coordinate (see also :class:`VerticalModes` for the vertical modes): :func:`get_relvort`, :func:`get_div`,
+:func:`get_strain`, :func:`get_okuboweiss`, as well as :func:`get_coriolis` and
+:func:`get_geos`.
 """
 
 # Copyright 2020-2026 Shom
@@ -19,19 +23,20 @@ and :func:`flow2d` for 2D Lagrangian particle advection.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import textwrap
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 
-from . import exceptions
 from . import coords as xcoords
+from . import exceptions, geo, interp
 from . import grid as xgrid
 from . import meta as xmeta
 from . import misc as xmisc
-from . import interp
-from . import geo
-
+from . import stats as xstats
+from .core import dyn as cdyn
+from .core import modes as cmodes
 
 SEA_LEVEL_VARIANTS = xmisc.Choices(
     {
@@ -94,6 +99,94 @@ def get_sea_level(ds, variant=None, errors="ignore"):
     # except Exception as e:
     #     raise exceptions.XoaError("Can't find a single sea level-like variable: " + e.message)
     # return sea_level
+
+
+_UV_KINDS = {
+    "generic": ("u", "v"),
+    "geo": ("ugeo", "vgeo"),
+    "grid": ("ux", "vy"),
+    "geos": ("ugeos", "vgeos"),
+    "bt": ("ubt", "vbt"),
+    "bc": ("ubc", "vbc"),
+    "surf": ("usurf", "vsurf"),
+}
+
+UV_VARIANTS = xmisc.Choices(
+    {
+        None: "Currents, i.e. all but the geostrophic and baroclinic ones",
+        "generic": "velocity of unknown orientation",
+        "geo": "eastward and northward velocity",
+        "grid": "velocity along the grid axes",
+        "geos": "geostrophic velocity",
+        "bt": "barotropic velocity",
+        "bc": "baroclinic velocity",
+        "surf": "surface velocity",
+    },
+    parameter="variant",
+    description="Restrict checking to a given variant(s)",
+    multi=True,
+)
+
+_UV_DEFAULT = ("geo", "grid", "generic", "surf", "bt")
+
+
+def _get_uv_(ds, index, variant, errors):
+    variant = UV_VARIANTS[variant]
+    if variant is None:
+        variant = _UV_DEFAULT
+    names = [_UV_KINDS[kind][index] for kind in np.atleast_1d(variant)]
+    return xmeta.get_meta_specs(ds).get(ds, names, errors=errors)
+
+
+@UV_VARIANTS.format_function_docstring
+def get_u(ds, variant=None, errors="ignore"):
+    """Search for a eastward or along-X velocity variable in a dataset
+
+    The variants are searched in the given order with the :mod:`xoa.meta` specifications.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+    {variant}
+    errors: str
+        Error handling: ``"ignore"``, ``"warn"`` or ``"raise"``.
+
+    Return
+    ------
+    xarray.DataArray, None
+        The velocity array, or None if not found.
+
+    See also
+    --------
+    get_v
+    get_sea_level
+    """
+    return _get_uv_(ds, 0, variant, errors)
+
+
+@UV_VARIANTS.format_function_docstring
+def get_v(ds, variant=None, errors="ignore"):
+    """Search for a northward or along-Y velocity variable in a dataset
+
+    See :func:`get_u` for the details.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+    {variant}
+    errors: str
+        Error handling: ``"ignore"``, ``"warn"`` or ``"raise"``.
+
+    Return
+    ------
+    xarray.DataArray, None
+        The velocity array, or None if not found.
+
+    See also
+    --------
+    get_u
+    """
+    return _get_uv_(ds, 1, variant, errors)
 
 
 def _get_uv2d_(t, txy, gx, gy, gz, gt, guv):
@@ -220,7 +313,7 @@ def flow2d(u, v, xy0, duration, step, date=None):
     tt0 = None
     if isinstance(xy0, xr.Dataset):
         tx0 = xcoords.get_lon(xy0).values.ravel()
-        ty0 = xcoords.get_lon(xy0).values.ravel()
+        ty0 = xcoords.get_lat(xy0).values.ravel()
         tt0 = xcoords.get_time(xy0, errors='ignore')
     elif isinstance(xy0, int):
         tx0 = np.random.uniform(gx.min(), gx.max(), xy0)
@@ -259,3 +352,786 @@ def flow2d(u, v, xy0, duration, step, date=None):
             'time': time,
         }
     )
+
+
+def _get_dx_dy_(u, dx, dy):
+    """Get the resolutions, that are computed from coordinates when not provided"""
+    if dx is None or dy is None:
+        dx0, dy0 = xgrid.get_dx_dy(u)
+        dx = dx0 if dx is None else dx
+        dy = dy0 if dy is None else dy
+    return dx, dy
+
+
+def _normalize_(da, u, divisor, name, long_name):
+    """Divide a diagnostic by a scale to make it dimensionless"""
+    return xcoords.set_name_attrs((da / divisor).transpose(*u.dims), u, name, long_name, "1")
+
+
+def _apply_kinematics_(func, nout, u, v, dx, dy, z, names, long_names, units):
+    """Apply a core function to velocities and set the attributes of its outputs"""
+    xdim = xcoords.get_xdim(u, errors="raise")
+    ydim = xcoords.get_ydim(u, errors="raise")
+    dx, dy = _get_dx_dy_(u, dx, dy)
+    dx = xr.DataArray(dx) if np.ndim(dx) == 0 else dx
+    dy = xr.DataArray(dy) if np.ndim(dy) == 0 else dy
+    hdims = [ydim, xdim]
+    args = [u, v, dx, dy]
+    in_dims = [hdims, hdims] + [hdims if np.ndim(d) else [] for d in (dx, dy)]
+    out_dims = hdims
+    if z is not None:
+        zdim = xcoords.get_zdim(u, errors="raise")
+        out_dims = [zdim] + hdims
+        in_dims = [out_dims] * 2 + in_dims[2:] + [out_dims]
+        args.append(z)
+    res = xr.apply_ufunc(
+        func,
+        *args,
+        join="override",
+        input_core_dims=in_dims,
+        output_core_dims=[out_dims] * nout,
+        dask="parallelized",
+        output_dtypes=[float] * nout,
+        dask_gufunc_kwargs={"allow_rechunk": True},
+    )
+    if nout == 1:
+        res = (res,)
+    out = []
+    for da, name, long_name, unit in zip(res, names, long_names, units):
+        out.append(xcoords.set_name_attrs(da.transpose(*u.dims), u, name, long_name, unit))
+    return out[0] if nout == 1 else tuple(out)
+
+
+_DOC_UV_ = """
+    Parameters
+    ----------
+    u, v: xarray.DataArray
+        Zonal and meridional velocities in m s-1 on the same collocated grid,
+        with the X and Y dimensions found with :mod:`xoa.coords`.
+    dx, dy: None, float, xarray.DataArray
+        Resolutions along X and Y in meters, which default to the ones computed
+        from the coordinates with :func:`xoa.grid.get_dx_dy`.
+    z: None, xarray.DataArray
+        Vertical coordinate of the levels, like the depths or heights of the sigma levels.
+        The horizontal derivatives are then computed at constant z instead of along the
+        levels, which are sloping. The velocities must then have a vertical dimension,
+        which is the one of `z`, and the sign convention of `z` does not matter.
+        See :ref:`indepth.dyn`.
+{normalize}
+"""
+
+_DOC_NORMALIZE_ = {
+    "div": "the Coriolis parameter",
+    "strain": "the absolute value of the Coriolis parameter",
+    "okuboweiss": "its standard deviation",
+}
+
+
+def format_uv_docstring(func):
+    """Decorator that inserts the description of the velocity parameters in a docstring
+
+    The ``{parameters}`` placeholder of the docstring is replaced by the description
+    of the `u`, `v`, `dx`, `dy` and `z` parameters, and of `normalize`
+    for the functions that have it.
+
+    Parameters
+    ----------
+    func: callable
+        Function whose name starts with ``get_``
+
+    Return
+    ------
+    callable
+        The same function, with its docstring formatted
+    """
+    # The indentation of docstrings is already removed
+    scale = _DOC_NORMALIZE_.get(func.__name__[4:])
+    normalize = (
+        ""
+        if scale is None
+        else f"    normalize: bool\n        Divide the result by {scale} to make it dimensionless.\n"
+    )
+    doc = _DOC_UV_.replace("{normalize}", normalize)
+    func.__doc__ = func.__doc__.replace("{parameters}", textwrap.dedent(doc))
+    return func
+
+
+@format_uv_docstring
+def get_relvort(u, v, dx=None, dy=None, z=None):
+    """Compute the relative vorticity, in s-1
+
+    It is :math:`\\partial_x v - \\partial_y u`, which is positive for a counter-clockwise
+    rotation, i.e. a cyclonic one in the northern hemisphere.
+    {parameters}
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    xoa.core.dyn.relvort
+    """
+    return _apply_kinematics_(
+        cdyn.relvort, 1, u, v, dx, dy, z, ["relvort"], ["Relative vorticity"], ["s-1"]
+    )
+
+
+@format_uv_docstring
+def get_div(u, v, dx=None, dy=None, z=None, normalize=False):
+    """Compute the horizontal divergence, in s-1
+
+    It is :math:`\\partial_x u + \\partial_y v`.
+    {parameters}
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    xoa.core.dyn.div
+    """
+    div = _apply_kinematics_(
+        cdyn.div, 1, u, v, dx, dy, z, ["div"], ["Horizontal divergence"], ["s-1"]
+    )
+    if normalize:
+        corio = get_coriolis(xgrid.get_lonlat_2d(u)[1])
+        div = _normalize_(div, u, corio, "div", "Divergence / f")
+    return div
+
+
+@format_uv_docstring
+def get_strain(u, v, dx=None, dy=None, z=None, normalize=False):
+    """Compute the normal and shear strains, in s-1
+
+    They are :math:`\\partial_x u - \\partial_y v` and :math:`\\partial_x v + \\partial_y u`.
+    {parameters}
+    Return
+    ------
+    xarray.DataArray
+        Normal strain
+    xarray.DataArray
+        Shear strain
+
+    See also
+    --------
+    xoa.core.dyn.strain
+    """
+    strains = _apply_kinematics_(
+        cdyn.strain,
+        2,
+        u,
+        v,
+        dx,
+        dy,
+        z,
+        ["strain_normal", "strain_shear"],
+        ["Normal strain", "Shear strain"],
+        ["s-1", "s-1"],
+    )
+    if normalize:
+        corio = abs(get_coriolis(xgrid.get_lonlat_2d(u)[1]))
+        strains = tuple(
+            _normalize_(da, u, corio, da.name, da.long_name + " / |f|") for da in strains
+        )
+    return strains
+
+
+@format_uv_docstring
+def get_okuboweiss(u, v, dx=None, dy=None, z=None, normalize=False):
+    """Compute the Okubo-Weiss parameter, in s-2
+
+    It is the squared strain minus the squared vorticity: it is negative where
+    rotation dominates, like in the core of eddies, and positive where strain dominates.
+    {parameters}
+    Return
+    ------
+    xarray.DataArray
+
+    See also
+    --------
+    xoa.core.dyn.okuboweiss
+    """
+    ow = _apply_kinematics_(
+        cdyn.okuboweiss,
+        1,
+        u,
+        v,
+        dx,
+        dy,
+        z,
+        ["okuboweiss"],
+        ["Okubo-Weiss parameter"],
+        ["s-2"],
+    )
+    if normalize:
+        ow = _normalize_(ow, u, ow.std(), "okuboweiss", "Okubo-Weiss / std")
+    return ow
+
+
+def get_coriolis(lat):
+    """Compute the Coriolis parameter, in s-1
+
+    Parameters
+    ----------
+    lat: xarray.DataArray, float, array_like
+        Latitudes in degrees
+
+    Return
+    ------
+    xarray.DataArray, float, numpy.ndarray
+        Same type as the input
+    """
+    corio = cdyn.coriolis(lat)
+    if isinstance(corio, xr.DataArray):
+        corio.name = "coriolis"
+        corio.attrs.update(long_name="Coriolis parameter", units="s-1")
+    return corio
+
+
+def get_geos(ssh, dx=None, dy=None):
+    """Compute the geostrophic currents from the sea surface height, in m s-1
+
+    They balance the Coriolis force with the pressure gradient:
+
+    .. math::
+
+        u_g = -\\frac{g}{f} \\partial_y \\eta, \\quad
+        v_g = \\frac{g}{f} \\partial_x \\eta
+
+    where :math:`\\eta` is the sea surface height and :math:`f` the Coriolis parameter,
+    see :func:`get_coriolis`.
+
+    Parameters
+    ----------
+    ssh: xarray.DataArray
+        Sea surface height in meters
+    dx, dy: None, float, xarray.DataArray
+        Resolutions along X and Y in meters, which default to the ones computed
+        from the coordinates with :func:`xoa.grid.get_dx_dy`.
+
+    Return
+    ------
+    xarray.DataArray
+        Zonal geostrophic current
+    xarray.DataArray
+        Meridional geostrophic current
+
+    See also
+    --------
+    xoa.core.dyn.geos
+    """
+    xdim = xcoords.get_xdim(ssh, errors="raise")
+    ydim = xcoords.get_ydim(ssh, errors="raise")
+    dx, dy = _get_dx_dy_(ssh, dx, dy)
+    dx = xr.DataArray(dx) if np.ndim(dx) == 0 else dx
+    dy = xr.DataArray(dy) if np.ndim(dy) == 0 else dy
+    lon, lat = xgrid.get_lonlat_2d(ssh)
+    corio = get_coriolis(lat)
+    core_dims = [ydim, xdim]
+    ug, vg = xr.apply_ufunc(
+        cdyn.geos,
+        ssh,
+        dx,
+        dy,
+        corio,
+        join="override",
+        input_core_dims=[core_dims]
+        + [core_dims if np.ndim(d) else [] for d in (dx, dy)]
+        + [core_dims],
+        output_core_dims=[[ydim, xdim]] * 2,
+        dask="parallelized",
+        output_dtypes=[float] * 2,
+        dask_gufunc_kwargs={"allow_rechunk": True},
+    )
+    out = []
+    for da, name, long_name in zip(
+        (ug, vg),
+        ("ugeos", "vgeos"),
+        ("Zonal geostrophic current", "Meridional geostrophic current"),
+    ):
+        out.append(xcoords.set_name_attrs(da.transpose(*ssh.dims), ssh, name, long_name, "m s-1"))
+    return tuple(out)
+
+
+def get_cyclogeos(
+    ssh, dx=None, dy=None, terms="full", smooth=None, niter=300, tol=1e-4, relax=0.5, fmin=1e-5
+):
+    """Compute the cyclogeostrophic currents from the sea surface height, in m s-1
+
+    They include the advection terms of the momentum equations on top of the geostrophic
+    balance, which is needed where the currents are curved like in eddies and meanders.
+    The currents :math:`\\mathbf{u}` satisfy
+
+    .. math::
+
+        f \\mathbf{k} \\times \\mathbf{u} + (\\mathbf{u} \\cdot \\nabla) \\mathbf{u}
+        = f \\mathbf{k} \\times \\mathbf{u}_g
+
+    where :math:`\\mathbf{u}_g` are the geostrophic currents of :func:`get_geos`.
+    They are found with an iterative method like the one of Penven et al. (2014), that starts
+    from :math:`\\mathbf{u}_g` and corrects it with the advection terms of the previous
+    iteration until the currents no longer change:
+
+    .. math::
+
+        u_{n+1} = u_g - \\frac{u_n \\partial_x v_n + v_n \\partial_y v_n}{f}, \\quad
+        v_{n+1} = v_g + \\frac{u_n \\partial_x u_n + v_n \\partial_y u_n}{f}
+
+    See :func:`xoa.core.dyn.cyclogeos` for the details.
+
+    Parameters
+    ----------
+    ssh: xarray.DataArray
+        Sea surface height in meters
+    dx, dy: None, float, xarray.DataArray
+        Resolutions along X and Y in meters, which default to the ones computed
+        from the coordinates with :func:`xoa.grid.get_dx_dy`.
+    terms: {"full", "penven"}
+        Advection terms of the correction: the four terms of the complete advection,
+        or the two terms that are taught as the ones of Penven et al. (2014).
+        See :func:`xoa.core.dyn.cyclogeos`.
+    smooth: None, int
+        Number of smoothings of the advection terms at each iteration, which prevents
+        the iterations from diverging. It defaults to 1 with the ``"full"`` terms and to 0
+        with the ``"penven"`` ones. See :func:`xoa.core.dyn.cyclogeos`.
+    niter: int
+        Maximal number of iterations
+    tol: float
+        The iterations stop when the currents change by less than this value, in m s-1
+    relax: float
+        Relaxation factor between 0 and 1
+    fmin: float
+        Minimal absolute value of the Coriolis parameter, in s-1, below which the currents
+        are missing, which is close to the equator
+
+    Return
+    ------
+    xarray.DataArray
+        Zonal cyclogeostrophic current
+    xarray.DataArray
+        Meridional cyclogeostrophic current
+
+    Currents are missing where the iterations did not converge, like in very strong
+    anticyclones that have no cyclogeostrophic solution.
+
+    References
+    ----------
+    Penven, P., Halo, I., Pous, S., Marié, L. (2014), Cyclogeostrophic balance in the
+    Mozambique Channel, J. Geophys. Res. Oceans, 119, 1054-1067, doi:10.1002/2013JC009528.
+
+    See also
+    --------
+    get_geos
+    xoa.core.dyn.cyclogeos
+    """
+    xdim = xcoords.get_xdim(ssh, errors="raise")
+    ydim = xcoords.get_ydim(ssh, errors="raise")
+    dx, dy = _get_dx_dy_(ssh, dx, dy)
+    if np.ndim(dx) == 0:
+        dx = xr.DataArray(dx)
+    if np.ndim(dy) == 0:
+        dy = xr.DataArray(dy)
+    ug, vg = get_geos(ssh, dx=dx, dy=dy)
+    corio = get_coriolis(xgrid.get_lonlat_2d(ssh)[1])
+    core_dims = [ydim, xdim]
+    uc, vc = xr.apply_ufunc(
+        cdyn.cyclogeos,
+        ug,
+        vg,
+        dx,
+        dy,
+        corio,
+        join="override",
+        input_core_dims=[core_dims, core_dims]
+        + [core_dims if np.ndim(d) else [] for d in (dx, dy)]
+        + [core_dims],
+        output_core_dims=[core_dims] * 2,
+        dask="parallelized",
+        output_dtypes=[float] * 2,
+        dask_gufunc_kwargs={"allow_rechunk": True},
+        kwargs={
+            "terms": terms,
+            "smooth": smooth,
+            "niter": niter,
+            "tol": tol,
+            "relax": relax,
+            "fmin": fmin,
+        },
+    )
+    out = []
+    for da, name, long_name in zip(
+        (uc, vc),
+        ("ucgeos", "vcgeos"),
+        ("Zonal cyclogeostrophic current", "Meridional cyclogeostrophic current"),
+    ):
+        out.append(xcoords.set_name_attrs(da.transpose(*ssh.dims), ssh, name, long_name, "m s-1"))
+    return tuple(out)
+
+
+def get_rossby_radius(n2, z=None, lat=None, zrange=None, fmin=1e-5):
+    """Estimate the first baroclinic Rossby radius of deformation, in m
+
+    It uses the WKB approximation of Chelton et al. (1998),
+    :math:`R_d = \\frac{1}{\\pi |f|} \\int N \\, dz`, where the integral
+    of the buoyancy frequency :math:`N = \\sqrt{N^2}` is taken over the water column.
+    It is much cheaper than :class:`VerticalModes`, which gives the exact radii of all the modes,
+    and it is typically within a few tens of percent of the first one.
+
+    Parameters
+    ----------
+    n2: xarray.DataArray
+        Squared Brunt-Vaisala frequency in s-2 at the levels, with a vertical dimension,
+        like the one computed by :func:`xoa.thermdyn.get_n2`.
+        Negative values are set to zero and missing ones are skipped,
+        so that the radius is the one of the water column described by the data.
+    z: None, xarray.DataArray
+        Vertical coordinate of the levels, which defaults to the one of `n2`.
+        See :func:`xoa.coords.as_z` for the sign convention.
+    lat: None, float, xarray.DataArray
+        Latitudes, which default to the ones of the coordinates of `n2`.
+    zrange: None, tuple(float)
+        Integrate only the levels between these two z values, positive up and thus
+        negative in the ocean, like with :class:`VerticalModes`. It is useful to focus
+        on a layer.
+    fmin: float
+        The radii are missing where the absolute value of the Coriolis parameter
+        is smaller than this value in s-1, like close to the equator.
+
+    Return
+    ------
+    xarray.DataArray
+        Radii in meters, without the vertical dimension
+
+    See also
+    --------
+    VerticalModes
+    xoa.thermdyn.get_n2
+    """
+    zdim = xcoords.get_zdim(n2, errors="raise")
+    z = xcoords.get_z(n2) if z is None else z
+    dz = xgrid.z2dz(z, zdim=zdim)
+    if zrange is not None:
+        zmin, zmax = sorted(zrange)
+        zup = xcoords.as_z(z)
+        n2 = n2.where((zup >= zmin) & (zup <= zmax))
+    if lat is None:
+        lat = xcoords.get_lat(n2, errors="ignore")
+        if lat is None:
+            raise exceptions.XoaError("The latitude is needed to compute the radius: pass lat=")
+    corio = abs(get_coriolis(float(lat) if np.ndim(lat) == 0 else lat))
+    nint = (np.sqrt(n2.clip(min=0)) * dz).sum(zdim, skipna=True, min_count=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rd = xr.where(corio >= fmin, nint / (np.pi * corio), np.nan)
+    rd = rd.transpose(*[d for d in n2.dims if d in rd.dims], ...)
+    return xcoords.set_name_attrs(rd, n2, "rd", "Rossby radius of deformation", "m")
+
+
+def _mode_dims_(res, ref, *drop):
+    """Order the dimensions of a result: the mode, the ones of the reference and the others"""
+    dims = [d for d in res.dims if d not in drop]
+    first = ["mode"] if "mode" in res.dims else []
+    ordered = [d for d in ref.dims if d in dims and d != "mode"]
+    return res.transpose(*first, *ordered, *[d for d in dims if d not in ordered and d != "mode"])
+
+
+class VerticalModes:
+    """Vertical modes of water columns, to decompose and recompose profiles
+
+    The quasi-geostrophic vertical modes :math:`F_n(z)` are computed from the stratification
+    of each water column, with :mod:`xoa.core.modes`: the first one is the barotropic mode,
+    and the next ones are the baroclinic modes, that have more and more nodes and are slower
+    and slower. Profiles of the currents, of the pressure or of the temperature
+    are then split into the amplitudes of the modes with :meth:`decomp`
+    and put back together with :meth:`recomp`.
+
+    Everything works with extra dimensions, like time or horizontal ones, and with dask,
+    since the computations are done with :func:`xarray.apply_ufunc`.
+    The levels may vary in space, like with sigma coordinates, the levels that are below
+    the bottom are missing, and the columns that have different depths have
+    different modes.
+
+    Parameters
+    ----------
+    n2: xarray.DataArray
+        Squared Brunt-Vaisala frequency in s-2 at the levels, with a vertical dimension.
+        See :func:`xoa.thermdyn.get_n2`.
+    z: None, xarray.DataArray
+        Vertical coordinate of the levels, which defaults to the one of `n2`.
+        It may vary in space, and its sign convention is given by its ``positive``
+        attribute, see :func:`xoa.coords.as_z`.
+    nmodes: int
+        Number of modes, including the barotropic one
+    bc: {"rigid", "free"}
+        Boundary condition at the surface: either a rigid lid, which has no
+        speed for the barotropic mode, or a free surface.
+    lat: None, float, xarray.DataArray
+        Latitudes, to compute the deformation radii. They default to the ones
+        of the coordinates, if any.
+    zrange: None, tuple(float)
+        Focus on a layer: only the levels between these two z values, positive up
+        and thus negative in the ocean, are used, and the modes have no flux through
+        the limits of the layer. Everything is missing outside of it.
+    n2min: float
+        Minimal stratification in s-2, which is used in the unstable or mixed layers
+    fmin: float
+        The deformation radii are missing where the absolute value of
+        the Coriolis parameter is smaller than this value in s-1, like close to the equator.
+
+    Attributes
+    ----------
+    modes: xarray.DataArray
+        The modes, whose mean square over the water column is one,
+        and which are positive at the surface, with the ``mode`` dimension first.
+    c: xarray.DataArray
+        Speeds of the modes in m s-1, which are missing for the barotropic mode of
+        the rigid lid.
+    rd: None, xarray.DataArray
+        Deformation radii in meters, which are the speeds divided by the Coriolis parameter,
+        if the latitudes are known.
+    dz: xarray.DataArray
+        Thickness of the layers, that are the weights of the integrals.
+
+    Example
+    -------
+    .. code-block:: python
+
+        n2 = xoa.thermdyn.get_n2(ds.temp, ds.sal)
+        vm = xoa.dyn.VerticalModes(n2, nmodes=5)
+        amps = vm.decomp(ds.u)  # Amplitudes of the modes
+        baroclinic = vm.recomp(amps, modes=[1, 2])  # Part of the first baroclinic modes
+        vm.rd.isel(mode=1)  # First deformation radius
+
+    See also
+    --------
+    xoa.core.modes.vertical_modes
+    xoa.thermdyn.get_n2
+    """
+
+    def __init__(
+        self, n2, z=None, nmodes=5, bc="rigid", lat=None, zrange=None, n2min=1e-9, fmin=1e-5
+    ):
+        nmodes = int(nmodes)
+        if nmodes < 1:
+            raise ValueError("nmodes must be a positive integer")
+        if bc not in ("rigid", "free"):
+            raise ValueError(f"bc must be 'rigid' or 'free', not {bc!r}")
+        self.nmodes = nmodes
+        self.bc = bc
+        self.zrange = None if zrange is None else tuple(float(v) for v in zrange)
+        self.zdim = zdim = xcoords.get_zdim(n2, errors="raise")
+        self.n2 = n2
+
+        # Vertical coordinate, which is positive up
+        z = xcoords.get_z(n2) if z is None else z
+        z = xcoords.as_z(z)
+        self.z = z
+
+        # Layer
+        zmin, zmax = -np.inf, np.inf
+        if self.zrange is not None:
+            zmin, zmax = sorted(self.zrange)
+
+        modes, c, dz = xr.apply_ufunc(
+            cmodes.vertical_modes,
+            n2,
+            z,
+            input_core_dims=[[zdim], [zdim]],
+            output_core_dims=[["mode", zdim], ["mode"], [zdim]],
+            kwargs={
+                "nmodes": nmodes,
+                "free_surface": bc == "free",
+                "zmin": zmin,
+                "zmax": zmax,
+                "n2min": n2min,
+            },
+            join="override",
+            dask="parallelized",
+            output_dtypes=[float] * 3,
+            dask_gufunc_kwargs={"output_sizes": {"mode": nmodes}, "allow_rechunk": True},
+        )
+        specs = (
+            (modes, "vmodes", "Vertical modes", "1"),
+            (c, "c", "Speed of the vertical modes", "m s-1"),
+            (dz, "dz", "Thickness of the layers", "m"),
+        )
+        out = []
+        for da, name, long_name, units in specs:
+            da = _mode_dims_(da, n2)
+            if "mode" in da.dims:
+                da = da.assign_coords(mode=np.arange(nmodes))
+            out.append(xcoords.set_name_attrs(da, n2, name, long_name, units))
+        self.modes, self.c, self.dz = out
+
+        # Deformation radii
+        self.rd = None
+        if lat is None:
+            lat = xcoords.get_lat(n2, errors="ignore")
+        if lat is not None:
+            corio = abs(get_coriolis(float(lat) if np.ndim(lat) == 0 else lat))
+            with np.errstate(divide="ignore", invalid="ignore"):
+                rd = xr.where(corio >= fmin, self.c / corio, np.nan)
+            self.rd = xcoords.set_name_attrs(
+                rd, n2, "rd", "Deformation radius of the vertical modes", "m"
+            )
+            self.rd = _mode_dims_(self.rd, self.c)
+
+    def __repr__(self):
+        zrange = "" if self.zrange is None else f", zrange={self.zrange}"
+        return f"<VerticalModes: {self.nmodes} modes, bc={self.bc!r}, zdim={self.zdim!r}{zrange}>"
+
+    def decomp(self, da, nmodes=None):
+        """Decompose profiles into the amplitudes of the vertical modes
+
+        The amplitude of the barotropic mode is the vertical mean of the profile.
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Profiles, with the vertical dimension of the modes and possibly other dimensions,
+            that are broadcast with the ones of the modes. It must be defined at all
+            the levels of the water columns, or the amplitudes are missing.
+        nmodes: None, int
+            Number of modes to keep, which defaults to all of them.
+
+        Return
+        ------
+        xarray.DataArray
+            The amplitudes, with the ``mode`` dimension first and the other dimensions
+            of the profiles, without the vertical one.
+
+        See also
+        --------
+        recomp
+        """
+        modes = self.modes if nmodes is None else self.modes.isel(mode=slice(0, nmodes))
+        amps = xr.apply_ufunc(
+            cmodes.project,
+            da,
+            modes,
+            self.dz,
+            input_core_dims=[[self.zdim], ["mode", self.zdim], [self.zdim]],
+            output_core_dims=[["mode"]],
+            join="override",
+            dask="parallelized",
+            output_dtypes=[float],
+            dask_gufunc_kwargs={
+                "output_sizes": {"mode": modes.sizes["mode"]},
+                "allow_rechunk": True,
+            },
+        )
+        amps = amps.assign_coords(mode=modes.mode.values)
+        amps = _mode_dims_(amps, da)
+        amps = xcoords.copy_coord_attrs(amps, da)
+        amps.name = "amps"
+        amps.attrs = {
+            "long_name": "Amplitude of the vertical modes",
+            "units": da.attrs.get("units", ""),
+        }
+        return amps
+
+    def recomp(self, amps, modes=None):
+        """Recompose profiles from the amplitudes of the vertical modes
+
+        Parameters
+        ----------
+        amps: xarray.DataArray
+            Amplitudes as returned by :meth:`decomp`, that may have less modes
+            than the object.
+        modes: None, int, list(int)
+            Modes to use: the first ones if it is an integer, else the ones of the list,
+            the other amplitudes being null. All the modes of `amps` by default.
+
+        Return
+        ------
+        xarray.DataArray
+            Profiles, with the vertical dimension at the same place as in the
+            stratification, and the other dimensions after them. They are missing
+            outside of the layer of the zoom.
+
+        See also
+        --------
+        decomp
+        """
+        available = amps.mode.values
+        if modes is not None:
+            wanted = np.arange(modes) if np.ndim(modes) == 0 else np.asarray(modes)
+            missing = [int(m) for m in wanted if m not in available]
+            if missing:
+                raise ValueError(f"The modes {missing} are not available in the amplitudes")
+            amps = amps.where(amps.mode.isin(wanted), 0.0)
+        basis = self.modes.sel(mode=available)
+        rec = xr.apply_ufunc(
+            cmodes.reconstruct,
+            amps,
+            basis,
+            input_core_dims=[["mode"], ["mode", self.zdim]],
+            output_core_dims=[[self.zdim]],
+            join="override",
+            dask="parallelized",
+            output_dtypes=[float],
+            dask_gufunc_kwargs={"allow_rechunk": True},
+        )
+        rec = _mode_dims_(rec, self.n2)
+        rec = xcoords.copy_coord_attrs(rec, amps)
+        rec.name = "recomp"
+        rec.attrs = {
+            "long_name": "Profile recomposed from its vertical modes",
+            "units": amps.attrs.get("units", ""),
+        }
+        return rec
+
+    def energy_share(self, u, v=None):
+        """Get the share of the kinetic energy of each mode
+
+        The mean kinetic energy over the water column is the sum of the squared amplitudes
+        of the modes, by orthogonality. This is the ratio of each of them to the total.
+
+        Parameters
+        ----------
+        u: xarray.DataArray
+            Profiles of the currents, or of a single component
+        v: None, xarray.DataArray
+            Profiles of the other component
+
+        Return
+        ------
+        xarray.DataArray
+            Shares between 0 and 1, with the ``mode`` dimension first
+
+        See also
+        --------
+        decomp
+        """
+        comps = [u] if v is None else [u, v]
+        energy = sum(self.decomp(c) ** 2 for c in comps)
+        total = sum((c**2 * self.dz).sum(self.zdim) / self.dz.sum(self.zdim) for c in comps)
+        share = energy / total
+        return xcoords.set_name_attrs(share, u, "energy_share", "Share of the kinetic energy", "1")
+
+    def truncation_error(self, da, nmodes):
+        """Get the error of recomposing profiles with a limited number of modes
+
+        Parameters
+        ----------
+        da: xarray.DataArray
+            Profiles
+        nmodes: list(int)
+            Numbers of modes to test, which must not exceed the ones of the object
+
+        Return
+        ------
+        xarray.DataArray
+            Root mean square error over all the points, with an ``nmodes`` dimension
+
+        See also
+        --------
+        recomp
+        """
+        amps = self.decomp(da)
+        errors = [float(xstats.rms(self.recomp(amps, modes=n), ref=da)) for n in nmodes]
+        errors = xr.DataArray(errors, dims="nmodes", coords={"nmodes": list(nmodes)}, name="rms")
+        errors.attrs = {
+            "long_name": "Truncation error of the vertical modes",
+            "units": da.attrs.get("units", ""),
+        }
+        return errors
