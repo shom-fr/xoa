@@ -115,6 +115,7 @@ Deprecations
 
 Bug fixes
 ---------
+- :func:`xoa.grid.apply_along_dim` failed with datasets since xarray 2025.09.1, whose :meth:`xarray.Dataset.update` returns None.
 - Fix :func:`xoa.grid.map_along_dim` when an output coordinate has a coordinate named like the working dimension, and import ``cmocean`` in :mod:`xoa` to register the ``cmo.*`` colormaps.
 - The ``bottom`` and ``top`` extrapolation modes of the ``cellave`` method of :func:`xoa.regrid.regrid1d` were ignored.
 - The ``conserv`` argument of :func:`xoa.regrid.regrid1d` was ignored by the ``cellave`` method. The conservative regridding also gives NaN instead of 0 where there is no valid input.
