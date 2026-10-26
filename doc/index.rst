@@ -28,6 +28,7 @@
    accessors
    changes
    roadmap
+   contributing
    references
    appendix
    Github repository <https://github.com/shom-fr/xoa>
