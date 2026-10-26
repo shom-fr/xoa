@@ -1655,6 +1655,11 @@ def plot_vectors(
     margin=0.0,
     map_kw=None,
     title=None,
+    ustd=None,
+    vstd=None,
+    uvcorr=None,
+    nsigma=2.45,
+    ellipse_kwargs=None,
     **kwargs,
 ):
     """Plot currents on a map as arrows, under-sampled to stay readable
@@ -1694,6 +1699,21 @@ def plot_vectors(
     map_kw: None, dict
         Parameters that decorate the map. See :func:`plot_field`.
     title: None, str
+    ustd: None, xarray.DataArray
+        Standard deviation of `u` on the same grid. When provided, an uncertainty ellipse
+        is drawn at the tip of each arrow, see :func:`xoa.core.plot.plot_vector_ellipses`.
+        It is available as the ``ellipses`` attribute of the returned quiver.
+    vstd: None, xarray.DataArray
+        Standard deviation of `v`, which defaults to `ustd`
+    uvcorr: None, xarray.DataArray
+        Correlation between `u` and `v`, which defaults to zero
+    nsigma: float
+        Radius of the ellipses in standard deviations. The default includes 95% of a
+        gaussian distribution in 2D, while 2 only includes 86%.
+    ellipse_kwargs: None, dict
+        Parameters of the ellipses, like ``facecolor``, ``edgecolor`` or ``label``.
+        They are drawn with the color of the arrows, with a transparent face,
+        unless the arrows are colored by speed.
     kwargs:
         Extra parameters are passed to :func:`xoa.core.plot.plot_vectors`, like
         ``scale``, ``width``, ``cmap`` or ``alpha``. The scale is adapted by default
@@ -1756,6 +1776,27 @@ def plot_vectors(
         **kwargs,
     )
 
+    if ustd is not None:
+        if not by_speed:
+            ellipse_kwargs = {
+                "facecolor": mcolors.to_rgba(color, 0.2),
+                "edgecolor": color,
+                **(ellipse_kwargs or {}),
+            }
+        quiver.ellipses = _add_ellipses_(
+            ax,
+            quiver,
+            lon,
+            lat,
+            (sy, sx),
+            transform,
+            dims,
+            ustd,
+            vstd,
+            uvcorr,
+            nsigma,
+            ellipse_kwargs,
+        )
     if by_speed and add_cbar:
         label = xr.DataArray(speed, attrs={"long_name": "Speed", "units": u.attrs.get("units")})
         add_colorbar(quiver, ax, da=label, **(cbar_kwargs or {}))
@@ -1764,6 +1805,20 @@ def plot_vectors(
     if title:
         ax.set_title(title)
     return quiver
+
+
+def _add_ellipses_(ax, quiver, lon, lat, stride, transform, dims, ustd, vstd, uvcorr, nsigma, kw):
+    """Add the uncertainty ellipses of an under-sampled quiver, rotated like its arrows"""
+    sub = (slice(None, None, stride[0]), slice(None, None, stride[1]))
+    std = [None if a is None else a.transpose(*dims).values[sub] for a in (ustd, vstd, uvcorr)]
+    rotation = None
+    if transform != getattr(ax, "projection", transform):
+        x, y = lon.values[sub], lat.values[sub]
+        ru, rv = ax.projection.transform_vectors(transform, x, y, np.ones_like(x), np.zeros_like(x))
+        rotation = np.arctan2(rv, ru)
+    return cplot.plot_vector_ellipses(
+        ax, quiver, *std, nsigma=nsigma, rotation=rotation, **(kw or {})
+    )
 
 
 def _taylor_points_(da, ref, dim):

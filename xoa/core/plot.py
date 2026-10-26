@@ -20,14 +20,19 @@ They are used by the high level plotting functions of the :mod:`xoa.plot` module
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+import os
 import warnings
 
+import matplotlib.artist as martist
 import matplotlib.collections as mcollections
+import matplotlib.legend as mlegend
+import matplotlib.legend_handler as mlegend_handler
 import matplotlib.patches as mpatches
 import matplotlib.patheffects as mpatheffects
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
+import numba as nb
 import numpy as np
 
 from .. import exceptions, misc
@@ -37,6 +42,8 @@ from .geo import EARTH_RADIUS, haversine
 from .grid import centers2edges
 from .poly import unwrap_longitudes
 from .stats import rose_hist
+
+NOT_CI = os.environ.get("CI", "false") == "false"
 
 # %% Maps
 
@@ -899,7 +906,7 @@ def _get_blur_effects_(kw):
 
 #: Default parameters of the effects of the map decorations
 EFFECT_DEFAULTS = {
-    "shadow": {"offset": (1, -1), "alpha": 0.3, "width": 2.0, "color": "k"},
+    "shadow": {"offset": (1, -1), "alpha": 0.15, "width": 2.0, "color": "k"},
     "glow": {"offset": (0, 0), "alpha": 1.0, "width": 3.0, "color": "w"},
 }
 
@@ -1508,6 +1515,191 @@ def plot_vectors(ax, lon, lat, u, v, stride=(1, 1), c=None, transform=None, **kw
     kwargs.setdefault("headlength", 4.5)
     kwargs.setdefault("headaxislength", 4.0)
     return ax.quiver(*args, **kwargs)
+
+
+# %% Uncertainty ellipses of vectors
+
+
+@nb.njit(cache=NOT_CI, nogil=True, parallel=True)
+def _cov2ellipse_(ustd, vstd, uvcorr):
+    n = ustd.size
+    major = np.empty(n)
+    minor = np.empty(n)
+    angle = np.empty(n)
+    for i in nb.prange(n):
+        cuu = ustd[i] * ustd[i]
+        cvv = vstd[i] * vstd[i]
+        cuv = ustd[i] * vstd[i] * uvcorr[i]
+        half_diff = 0.5 * (cuu - cvv)
+        radius = np.sqrt(half_diff * half_diff + cuv * cuv)
+        mean = 0.5 * (cuu + cvv)
+        major[i] = np.sqrt(mean + radius)
+        minor[i] = np.sqrt(max(mean - radius, 0.0))
+        angle[i] = 0.5 * np.arctan2(2 * cuv, cuu - cvv)
+    return major, minor, angle
+
+
+def cov2ellipse(ustd, vstd, uvcorr):
+    """Get the ellipses that are described by 2x2 covariance matrices
+
+    Parameters
+    ----------
+    ustd, vstd: array_like
+        Standard deviations of the two components
+    uvcorr: array_like
+        Correlation between the two components, between -1 and 1
+
+    Return
+    ------
+    numpy.ndarray
+        Standard deviation along the major axis, that is the square root
+        of the largest eigenvalue
+    numpy.ndarray
+        Standard deviation along the minor axis
+    numpy.ndarray
+        Angle of the major axis in radians, counter-clockwise from the first component
+    """
+    ustd, vstd, uvcorr = np.broadcast_arrays(
+        *(np.asarray(a, dtype="d") for a in (ustd, vstd, uvcorr))
+    )
+    shape = ustd.shape
+    out = _cov2ellipse_(*(np.ascontiguousarray(a).ravel() for a in (ustd, vstd, uvcorr)))
+    return tuple(o.reshape(shape) for o in out)
+
+
+class QuiverEllipses(mcollections.EllipseCollection):
+    """Ellipses at the tip of the arrows of a quiver
+
+    The ellipses follow the quiver when the axes are resized or the figure is saved
+    with another resolution. Only the quivers whose angles are ``"uv"`` and whose
+    scale is explicit are supported, like the ones of :func:`plot_vectors`.
+
+    Parameters
+    ----------
+    quiver: matplotlib.quiver.Quiver
+    ustd, vstd: array_like
+        Standard deviations of the components, in the units of the vectors.
+        They have the size of the quiver, which can be flattened.
+        When `vstd` is not provided, `ustd` is used for both components.
+    uvcorr: None, array_like
+        Correlation of the components, which is zero by default.
+    nsigma: float
+        Radius of the ellipses in standard deviations. The default includes 95% of a
+        gaussian distribution in 2D, while 2 only includes 86%.
+    rotation: None, array_like
+        Angle in radians from the frame of the standard deviations
+        to the one of the vectors, as the projection of a map may impose
+    kwargs:
+        Extra parameters are passed to :class:`matplotlib.collections.EllipseCollection`
+    """
+
+    def __init__(self, quiver, ustd, vstd=None, uvcorr=None, nsigma=2.45, rotation=None, **kwargs):
+        if quiver.angles != "uv":
+            raise exceptions.XoaError("Ellipses need a quiver whose angles are 'uv'")
+        if quiver.scale is None or quiver.scale_units in (None, "xy"):
+            raise exceptions.XoaError(
+                "Ellipses need a quiver whose scale is given, with scale_units in "
+                "'width', 'height', 'dots', 'inches', 'x' or 'y'"
+            )
+        shape = np.shape(quiver.U)
+        size = int(np.prod(shape))
+
+        def _get_(a, default):
+            if a is None:
+                return np.full(size, default)
+            a = np.ma.filled(np.ma.masked_invalid(a).astype("d"), np.nan)
+            if a.size != size:
+                try:
+                    a = np.broadcast_to(a, shape)
+                except ValueError:
+                    raise exceptions.XoaError(
+                        "The uncertainties must have the size of the quiver"
+                    ) from None
+            return a.ravel()
+
+        ustd = _get_(ustd, np.nan)
+        vstd = ustd if vstd is None else _get_(vstd, np.nan)
+        major, minor, angle = cov2ellipse(ustd, vstd, _get_(uvcorr, 0.0))
+        if rotation is not None:
+            angle = angle + np.asarray(rotation, dtype="d").ravel()
+        self._quiver = quiver
+        self._radii = nsigma * major, nsigma * minor
+        self._theta = angle
+        kwargs["units"] = "dots"
+        super().__init__(
+            self._radii[0],
+            self._radii[1],
+            np.rad2deg(angle),
+            offsets=np.zeros((size, 2)),
+            offset_transform=mtransforms.IdentityTransform(),
+            **kwargs,
+        )
+
+    def get_pixels_per_unit(self):
+        """Length in pixels of a vector of unit length"""
+        qv = self._quiver
+        units = qv.scale_units
+        if units == "x":
+            ppu = qv.axes.bbox.width / qv.axes.viewLim.width
+        elif units == "y":
+            ppu = qv.axes.bbox.height / qv.axes.viewLim.height
+        else:
+            ppu = qv._dots_per_unit(units)
+        return ppu / qv.scale
+
+    def get_tips(self):
+        """Positions of the tips of the arrows in display coordinates"""
+        qv = self._quiver
+        pivot = {"tail": 1.0, "mid": 0.5, "middle": 0.5, "tip": 0.0}[qv.pivot]
+        uv = np.ma.filled(qv.U.ravel(), np.nan) + 1j * np.ma.filled(qv.V.ravel(), np.nan)
+        length = pivot * self.get_pixels_per_unit() * uv
+        xy = qv.get_offset_transform().transform(np.ma.filled(qv.XY, np.nan))
+        return xy + np.column_stack((length.real, length.imag))
+
+    @martist.allow_rasterization
+    def draw(self, renderer):
+        scale = self.get_pixels_per_unit()
+        self.set_widths(2 * scale * self._radii[0])
+        self.set_heights(2 * scale * self._radii[1])
+        self.set_offsets(self.get_tips())
+        super().draw(renderer)
+
+
+class _HandlerQuiverEllipses(mlegend_handler.HandlerPolyCollection):
+    """Legend handler that draws the ellipses as a single one"""
+
+    def create_artists(
+        self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans
+    ):
+        center = 0.5 * width - 0.5 * xdescent, 0.5 * height - 0.5 * ydescent
+        patch = mpatches.Ellipse(xy=center, width=width + xdescent, height=height + ydescent)
+        self.update_prop(patch, orig_handle, legend)
+        patch.set_transform(trans)
+        return [patch]
+
+
+mlegend.Legend.update_default_handler_map({QuiverEllipses: _HandlerQuiverEllipses()})
+
+
+def plot_vector_ellipses(
+    ax, quiver, ustd, vstd=None, uvcorr=None, nsigma=2.45, rotation=None, **kwargs
+):
+    """Add uncertainty ellipses at the tip of the arrows of a quiver
+
+    See :class:`QuiverEllipses` for the parameters.
+    By default, the ellipses are filled with a transparent gray and have a thin black edge.
+
+    Return
+    ------
+    QuiverEllipses
+    """
+    kwargs.setdefault("facecolor", (0, 0, 0, 0.1))
+    kwargs.setdefault("edgecolor", "k")
+    kwargs.setdefault("linewidth", 0.5)
+    kwargs.setdefault("zorder", quiver.get_zorder())
+    ellipses = QuiverEllipses(quiver, ustd, vstd, uvcorr, nsigma, rotation, **kwargs)
+    ax.add_collection(ellipses, autolim=False)
+    return ellipses
 
 
 # %% Taylor diagrams

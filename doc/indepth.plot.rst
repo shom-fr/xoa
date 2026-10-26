@@ -63,7 +63,7 @@ Two layers
       - A current time series as sticks
     * - :func:`~xoa.plot.plot_vectors`
       - :func:`~xoa.core.plot.plot_vectors`
-      - Currents on a map as under-sampled arrows, with a reference arrow
+      - Currents on a map as under-sampled arrows, with a reference arrow and optional uncertainty ellipses
     * - :func:`~xoa.plot.plot_taylor`
       - :func:`~xoa.core.plot.plot_taylor`
       - A Taylor diagram of arrays against a reference
@@ -451,6 +451,26 @@ A reference stick is drawn above the left corner of the axes, like the reference
 :func:`~xoa.plot.plot_vectors`: its value is rounded to 1, 2 or 5 times a power of ten
 by :func:`xoa.core.plot.get_quiverkey_value` and it is added with
 :func:`xoa.core.plot.add_quiverkey`, that you can use with any quiver. Pass ``key=False`` to remove it.
+
+Uncertainty ellipses
+====================
+
+Pass ``ustd`` to :func:`~xoa.plot.plot_vectors`, with optionally ``vstd`` (``ustd`` by default)
+and ``uvcorr`` (zero by default), to draw an ellipse at the tip of each arrow.
+The ellipse is the one of the covariance matrix of the components, with a radius of
+``nsigma`` standard deviations. In 2D, the default ``nsigma=2.45`` includes 95% of a
+gaussian distribution, while ``nsigma=2`` only includes 86%.
+The standard deviations are under-sampled like the arrows, in the same units, and
+the ellipses are rotated like them when the projection of the map requires it.
+They have the color of the arrows, with a transparent face, unless the arrows are colored by speed.
+They are the ``ellipses`` attribute of the returned quiver, and ``ellipse_kwargs`` sets their style
+and a ``label`` for the legend.
+
+At a lower level, :func:`xoa.core.plot.plot_vector_ellipses` adds them to any quiver whose
+``angles`` are ``"uv"`` (the default) and whose ``scale`` is given with a ``scale_units``
+among ``"width"``, ``"height"``, ``"dots"``, ``"inches"``, ``"x"`` and ``"y"``.
+All the values of ``pivot`` are supported.
+See :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
 
 Taylor diagrams
 ===============

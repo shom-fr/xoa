@@ -9,6 +9,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.collections as mcollections
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import matplotlib.quiver as mquiver
 import numpy as np
@@ -555,6 +556,54 @@ class TestPlotVectors:
         assert len(fig.axes) == 2  # With a colorbar
         quiver = xplot.plot_vectors(u, v, color="speed", add_colorbar=False, key=False)
         assert len(quiver.axes.figure.axes) == 1
+
+    def test_ellipses(self):
+        u, v = self.get_uv()
+        std = (0 * u + 0.1).rename("ustd")
+        quiver = xplot.plot_vectors(u, v, stride=1, ustd=std, vstd=std / 2, uvcorr=0 * std)
+        assert quiver.ellipses.axes is quiver.axes
+        assert len(quiver.ellipses.get_widths()) == u.size
+        quiver.axes.figure.canvas.draw()
+        assert xplot.plot_vectors(u, v, stride=1).__dict__.get("ellipses") is None
+
+    def test_ellipses_take_the_color_of_the_arrows(self):
+        u, v = self.get_uv()
+        std = 0 * u + 0.1
+        ellipses = xplot.plot_vectors(u, v, color="tab:red", ustd=std).ellipses
+        np.testing.assert_allclose(ellipses.get_facecolor()[0][:3], mcolors.to_rgb("tab:red"))
+        assert ellipses.get_facecolor()[0][3] < 1
+        np.testing.assert_allclose(ellipses.get_edgecolor()[0], mcolors.to_rgba("tab:red"))
+        ellipses = xplot.plot_vectors(
+            u, v, color="tab:red", ustd=std, ellipse_kwargs={"facecolor": "none"}
+        ).ellipses
+        assert ellipses.get_facecolor().shape[0] == 0 or ellipses.get_facecolor()[0][3] == 0
+        ellipses = xplot.plot_vectors(u, v, color="speed", ustd=std).ellipses
+        np.testing.assert_allclose(ellipses.get_edgecolor()[0][:3], 0)
+
+    def test_ellipses_with_stride_and_transposed_dims(self):
+        u, v = self.get_uv()
+        std = (0 * u + 0.1).rename("ustd")
+        quiver = xplot.plot_vectors(
+            u,
+            v,
+            stride=(2, 3),
+            ustd=std.transpose("lon", "lat"),
+            nsigma=1,
+            ellipse_kwargs={"label": "1 sigma"},
+        )
+        assert len(quiver.ellipses.get_widths()) == quiver.U.size
+        assert quiver.ellipses.get_label() == "1 sigma"
+
+    def test_ellipses_rotated_by_the_projection(self):
+        ccrs = pytest.importorskip("cartopy.crs")
+        u, v = self.get_uv()
+        std = 0 * u + 0.1
+        ax = xplot.get_map_axes(None, (10, 20, 40, 60), ccrs.PlateCarree(), None)
+        quiver = xplot.plot_vectors(u, v, ax=ax, stride=1, ustd=std, vstd=std / 2)
+        np.testing.assert_allclose(quiver.ellipses.get_angles(), 0, atol=1e-6)
+        ax = xplot.get_map_axes(None, (10, 20, 40, 60), ccrs.Mercator(), None)
+        quiver = xplot.plot_vectors(u, v, ax=ax, stride=1, ustd=std, vstd=std / 2)
+        assert quiver.ellipses.get_angles().shape == (u.size,)
 
     def test_no_key_and_title(self):
         u, v = self.get_uv()
