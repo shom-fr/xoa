@@ -66,9 +66,10 @@ paths = sorted(glob.glob(os.path.join(tmpdir.name, "tile*.nc")))
 # only their coordinates are read at this stage.
 # The grid steps, origin and size are inferred from the coordinates of the tiles.
 # The representation shows them, the position of each tile as index slices and the
-# estimated memory of the merge.
+# estimated memory of the merge. The merged longitudes are put in ``lon_range``, which would
+# otherwise be inferred from the first tile.
 
-tm = TileMerger()
+tm = TileMerger(lon_range=(-180, 180))
 tm.add(os.path.join(tmpdir.name, "tile*.nc"))
 print(tm)
 
@@ -139,7 +140,8 @@ for j in range(6):
             tile = ds.isel(longitude=slice(10 * i, 10 * i + 12), latitude=slice(8 * j, 8 * j + 10))
             tile.attrs = {"name": f"{j}{i}"}
             many.append(tile)
-tm_many = TileMerger(tiles=many)
+tm_many = TileMerger(lon_range=(-180, 180))
+tm_many.add(many)
 print(tm_many)
 tm_many.plot()
 
@@ -162,8 +164,8 @@ tm2 = TileMerger(
     lat0=grid["lat0"] - 5 * grid["dy"],
     nx=grid["nx"] + 10,
     ny=grid["ny"] + 10,
-    tiles=paths,
 )
+tm2.add(paths)
 tm2.plot()
 
 # %%
@@ -177,7 +179,7 @@ tm2.plot()
 print(tm2.memory)
 with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter("always")
-    TileMerger(tiles=paths, max_memory=100e3).merge()
+    TileMerger(max_memory=100e3).add(paths).merge()
 print(caught[0].message)
 
 # %%

@@ -944,3 +944,27 @@ class TestRose:
             xplot.plot_rose(ds[["hs"]])
         with pytest.raises(xoa.XoaError, match="wind speed or the wave height"):
             xplot.plot_rose(xr.Dataset({"foo": ("time", [1.0])}))
+
+
+class TestShapes:
+    """Shapes with the arguments of the geographical selections"""
+
+    def test_circle_units(self):
+        ax = plt.figure().add_subplot(111)
+        km = xplot.plot_circle((-3.5, 48, 70), units="km", ax=ax).get_xy()
+        m = xplot.plot_circle((-3.5, 48, 70000), ax=ax).get_xy()
+        np.testing.assert_allclose(km, m)
+
+    def test_box_and_current_axes(self):
+        ax = plt.figure().add_subplot(111)
+        patch = xplot.plot_box(lon=xr.DataArray([-6, -4]), lat=(46, 48))
+        assert patch.axes is ax
+
+    def test_polygon(self):
+        shapely = pytest.importorskip("shapely.geometry")
+        ax = plt.figure().add_subplot(111)
+        verts = [[-6, 46], [-4, 45.5], [-3.5, 47.5]]
+        patch = xplot.plot_polygon(shapely.Polygon(verts), ax=ax)
+        np.testing.assert_allclose(patch.get_xy()[:3], verts)
+        with pytest.raises(xoa.XoaError, match="single polygon"):
+            xplot.plot_polygon(shapely.MultiPolygon([shapely.Polygon(verts)] * 2), ax=ax)

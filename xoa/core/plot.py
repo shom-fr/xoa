@@ -35,6 +35,7 @@ from ..options import get_options
 from ..options import resolve_option as _opt
 from .geo import EARTH_RADIUS, haversine
 from .grid import centers2edges
+from .poly import unwrap_longitudes
 from .stats import rose_hist
 
 # %% Maps
@@ -399,6 +400,109 @@ AX_SETUP_KEYS = (
     "bbox",
     "fancy",
 )
+
+
+# %% Shapes
+
+
+def _add_shape_(ax, lon, lat, transform, kwargs):
+    """Add a closed polygon of positions in degrees, that is drawn as an outline by default"""
+    kwargs.setdefault("fill", False)
+    kwargs.setdefault("edgecolor", "C3")
+    kwargs.setdefault("linewidth", 1.2)
+    if transform is None and hasattr(ax, "projection"):
+        transform = import_cartopy()[0].PlateCarree()
+    if transform is not None:
+        kwargs["transform"] = transform
+    return ax.add_patch(mpatches.Polygon(np.stack([lon, lat], axis=1), closed=True, **kwargs))
+
+
+def plot_box(ax, lon, lat, transform=None, npts=50, **kwargs):
+    """Plot a box of longitudes and latitudes, like the one of :func:`~xoa.geo.get_geosel`
+
+    Parameters
+    ----------
+    ax: matplotlib.axes.Axes
+    lon, lat: (float, float)
+        Ranges of longitudes, that may cross the dateline like ``(170, -170)``, and latitudes
+    transform: None, cartopy.crs.CRS
+        Coordinate system of the positions, which defaults to plate carrée for a map
+    npts: int
+        Number of points per side, so that the sides follow the meridians and parallels
+        in any projection
+    kwargs:
+        Extra parameters are passed to :class:`matplotlib.patches.Polygon`.
+        The box is an outline by default.
+
+    Return
+    ------
+    matplotlib.patches.Polygon
+    """
+    lon0, lon1 = float(lon[0]), float(lon[1])
+    lat0, lat1 = float(lat[0]), float(lat[1])
+    if lon1 < lon0:
+        lon1 += 360.0
+    xs, ys = np.linspace(lon0, lon1, npts), np.linspace(lat0, lat1, npts)
+    x = np.concatenate([xs, np.full(npts, lon1), xs[::-1], np.full(npts, lon0)])
+    y = np.concatenate([np.full(npts, lat0), ys, np.full(npts, lat1), ys[::-1]])
+    return _add_shape_(ax, x, y, transform, kwargs)
+
+
+def plot_circle(ax, lon, lat, radius, transform=None, npts=180, **kwargs):
+    """Plot a circle of great circle distance, like the one of :func:`~xoa.geo.get_geosel`
+
+    Parameters
+    ----------
+    ax: matplotlib.axes.Axes
+    lon, lat: float
+        Position of the center in degrees
+    radius: float
+        Radius in meters
+    transform: None, cartopy.crs.CRS
+        Coordinate system of the positions, which defaults to plate carrée for a map
+    npts: int
+        Number of points of the outline
+    kwargs:
+        Extra parameters are passed to :class:`matplotlib.patches.Polygon`.
+        The circle is an outline by default.
+
+    Return
+    ------
+    matplotlib.patches.Polygon
+    """
+    lat0, dist = np.deg2rad(float(lat)), radius / EARTH_RADIUS
+    bearing = np.linspace(0, 2 * np.pi, npts, endpoint=False)
+    lats = np.arcsin(np.sin(lat0) * np.cos(dist) + np.cos(lat0) * np.sin(dist) * np.cos(bearing))
+    dlon = np.arctan2(
+        np.sin(bearing) * np.sin(dist) * np.cos(lat0),
+        np.cos(dist) - np.sin(lat0) * np.sin(lats),
+    )
+    return _add_shape_(ax, float(lon) + np.rad2deg(dlon), np.rad2deg(lats), transform, kwargs)
+
+
+def plot_polygon(ax, polygon, transform=None, **kwargs):
+    """Plot a polygon, like the one of :func:`~xoa.geo.get_geosel`
+
+    Parameters
+    ----------
+    ax: matplotlib.axes.Axes
+    polygon: array_like(n, 2)
+        Vertices as (lon, lat) pairs in degrees, that may cross the dateline.
+        The sides are straight lines in longitude and latitude.
+    transform: None, cartopy.crs.CRS
+        Coordinate system of the positions, which defaults to plate carrée for a map
+    kwargs:
+        Extra parameters are passed to :class:`matplotlib.patches.Polygon`.
+        The polygon is an outline by default.
+
+    Return
+    ------
+    matplotlib.patches.Polygon
+    """
+    poly = np.asarray(polygon, dtype="d")
+    if poly.ndim != 2 or poly.shape[1] != 2 or len(poly) < 3:
+        raise exceptions.XoaError("A polygon must be an array of at least 3 (lon, lat) pairs")
+    return _add_shape_(ax, unwrap_longitudes(poly[:, 0], poly[0, 0]), poly[:, 1], transform, kwargs)
 
 
 # %% Colorbars

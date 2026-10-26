@@ -52,6 +52,7 @@ from .core.plot import (  # noqa
     import_cartopy,
     setup_map_axes,
 )
+from .core.poly import as_polygons
 from .options import resolve_option as _opt
 
 _AX_SETUP_KEYS = cplot.AX_SETUP_KEYS
@@ -2005,6 +2006,92 @@ def plot_rose(value, direction=None, cartesian=None, from_=False, **kwargs):
         direction = np.degrees(np.arctan2(u, v)) + (180.0 if from_ else 0.0)
     kwargs.setdefault("label", get_label(value))
     return cplot.plot_rose(direction.values % 360.0, value.values, **kwargs)
+
+
+# %% Shapes
+
+
+def plot_box(lon, lat, ax=None, **kwargs):
+    """Plot a box, with the arguments of :func:`xoa.geo.get_geosel`
+
+    Parameters
+    ----------
+    lon, lat: (float, float)
+        Ranges of longitudes, that may cross the dateline like ``(170, -170)``, and latitudes
+    ax: None, matplotlib.axes.Axes
+        Axes to plot on, which defaults to the current one
+    kwargs:
+        Extra parameters are passed to :func:`xoa.core.plot.plot_box`.
+
+    Return
+    ------
+    matplotlib.patches.Polygon
+
+    See also
+    --------
+    plot_circle
+    plot_polygon
+    """
+    ax = plt.gca() if ax is None else ax
+    return cplot.plot_box(ax, lon, lat, **kwargs)
+
+
+def plot_circle(circle, units="m", ax=None, **kwargs):
+    """Plot a circle, with the arguments of :func:`xoa.geo.get_geosel`
+
+    Parameters
+    ----------
+    circle: (float, float, float)
+        Longitude, latitude and radius, in `units`
+    units: {"m", "km"}
+        Units of the radius
+    ax: None, matplotlib.axes.Axes
+        Axes to plot on, which defaults to the current one
+    kwargs:
+        Extra parameters are passed to :func:`xoa.core.plot.plot_circle`.
+
+    Return
+    ------
+    matplotlib.patches.Polygon
+
+    See also
+    --------
+    plot_box
+    plot_polygon
+    """
+    lon, lat, radius = circle
+    if xgeo.distance_units[units] == xgeo.distance_units.km:
+        radius = radius * 1e3
+    ax = plt.gca() if ax is None else ax
+    return cplot.plot_circle(ax, lon, lat, radius, **kwargs)
+
+
+def plot_polygon(polygon, ax=None, **kwargs):
+    """Plot a polygon, with the arguments of :func:`xoa.geo.get_geosel`
+
+    Parameters
+    ----------
+    polygon: array_like(n, 2), shapely.Polygon
+        Vertices as (lon, lat) pairs in degrees
+    ax: None, matplotlib.axes.Axes
+        Axes to plot on, which defaults to the current one
+    kwargs:
+        Extra parameters are passed to :func:`xoa.core.plot.plot_polygon`.
+
+    Return
+    ------
+    matplotlib.patches.Polygon
+
+    See also
+    --------
+    plot_box
+    plot_circle
+    """
+    polys = as_polygons(polygon)
+    if len(polys) != 1:
+        raise exceptions.XoaError("A single polygon is expected")
+    ax = plt.gca() if ax is None else ax
+    return cplot.plot_polygon(ax, polys[0], **kwargs)
 
 
 # %% Filters

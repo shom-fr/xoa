@@ -14,6 +14,7 @@ import xoa
 from xoa import plot as xplot
 from xoa.core import grid as cgrid
 from xoa.core import plot as cplot
+from xoa.core.geo import EARTH_RADIUS, haversine
 
 
 @pytest.fixture(autouse=True)
@@ -710,3 +711,40 @@ class TestLayers:
         with xoa.set_options("plot", map_layer=True):
             cplot.decorate_map(ax, gridlines=False)
         assert names == [None, "natgeo", None]
+
+
+class TestShapes:
+    """Outlines of the shapes of the geographical selections"""
+
+    @pytest.fixture
+    def ax(self):
+        return plt.figure().add_subplot(111)
+
+    def test_box(self, ax):
+        xy = cplot.plot_box(ax, (-6, -4), (46, 48)).get_xy()
+        assert (xy[:, 0].min(), xy[:, 0].max()) == (-6, -4)
+        assert (xy[:, 1].min(), xy[:, 1].max()) == (46, 48)
+        xy = cplot.plot_box(ax, (170, -170), (-90, 90)).get_xy()
+        assert (xy[:, 0].min(), xy[:, 0].max()) == (170, 190)
+        assert (xy[:, 1].min(), xy[:, 1].max()) == (-90, 90)
+        with pytest.raises(TypeError):
+            cplot.plot_box(ax, (-6, -4))
+
+    def test_circle(self, ax):
+        xy = cplot.plot_circle(ax, -3.5, 48, 70e3).get_xy()
+        dist = haversine(-3.5, 48, xy[:, 0], xy[:, 1]) * EARTH_RADIUS
+        np.testing.assert_allclose(dist, 70e3, rtol=1e-6)
+
+    def test_polygon(self, ax):
+        patch = cplot.plot_polygon(ax, [[179, 0], [-179, 0], [-179, 1]])
+        np.testing.assert_allclose(patch.get_xy()[:3, 0], [179, 181, 181])
+        with pytest.raises(xoa.XoaError, match="at least 3"):
+            cplot.plot_polygon(ax, [[0, 0], [1, 1]])
+
+    def test_style_and_map(self):
+        pytest.importorskip("cartopy")
+        ccrs, _ = cplot.import_cartopy()
+        ax = plt.figure().add_subplot(111, projection=ccrs.PlateCarree())
+        patch = cplot.plot_box(ax, (-6, -4), (46, 48), edgecolor="C1")
+        assert not patch.get_fill()
+        assert patch.get_edgecolor()[:3] == matplotlib.colors.to_rgb("C1")
