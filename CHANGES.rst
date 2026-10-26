@@ -4,6 +4,10 @@ What's new
 Unreleased
 ==========
 
+New features
+------------
+- Add the :ref:`contributing` guide, with the release procedure.
+
 2026.10.0
 =========
 
