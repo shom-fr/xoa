@@ -2,12 +2,12 @@ name: xoa-rtd
 
 channels:
   - conda-forge
-  - defaults
 
 dependencies:
   - platformdirs
   - cartopy
   - cmocean
+  - dask-core
   - gsw
   - ipython
   - ipykernel
@@ -17,7 +17,8 @@ dependencies:
   - numba
   - owslib
   - pip
-  - python>=3.10
+  - python>=3.12
+  - scipy
   - xarray>=2024.6
   - pip:
       - configobj
@@ -29,4 +30,3 @@ dependencies:
       - sphinx-argparse
       - sphinx-gallery
       - sphinxcontrib-programoutput
-

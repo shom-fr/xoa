@@ -73,3 +73,8 @@ Run the installation command::
 For development, install it in editable mode with the tools of the ``dev`` extra::
 
     $ pip install -e ".[dev]"
+
+or, with conda::
+
+    $ conda env create -f env/environment.yml
+    $ conda env update -f env/environment.dev.yml -n xoa
