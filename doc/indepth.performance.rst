@@ -128,8 +128,12 @@ threads, set with :func:`numba.set_num_threads`, is the number of threads of the
     # Fastest: as many blocks as cpus, and the most memory
     temp.to_netcdf("temp.nc")
 
-When the data are read from and written to files, these operations often take most
-of the time: more dask threads then mostly speed up the input and output.
+More dask workers do not speed up the computation itself, since the numba kernels
+already use all the cpus: in the figures below, one block at a time is as fast as 8 workers.
+They are useful when the data are read from and written to files, which often takes
+most of the time: the input and output of some blocks then overlap the computation of
+others, at the cost of more blocks in memory. So start with one block at a time, and
+increase ``num_workers`` only if the input and output dominate.
 
 The numba threading layer
 -------------------------
