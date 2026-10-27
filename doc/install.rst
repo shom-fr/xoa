@@ -15,11 +15,15 @@ xoa requires ``python>3`` and depends on the following packages:
 
    * - `platformdirs <https://github.com/tox-dev/platformdirs>`_
      - A small Python module for determining appropriate platform-specific dirs, e.g. a "user data dir".
+   * - `cartopy <https://scitools.org.uk/cartopy>`_
+     - Cartographic projections and maps.
    * - `cmocean <https://matplotlib.org/cmocean>`_
      - Beautiful colormaps for oceanography.
    * - `configobj <https://configobj.readthedocs.io/en/latest/configobj.html>`_
      - ConfigObj is a simple but powerful config file reader and writer:
        an ini file round-tripper.
+   * - `dask <https://www.dask.org/>`_
+     - Parallel and out-of-core computing with chunked arrays.
    * - `gsw <https://teos-10.github.io/GSW-Python/>`_
      - gsw is the python implementation of the Thermodynamic Equation of
        Seawater 2010 (TEOS-10).
@@ -65,3 +69,7 @@ Run the installation command::
 
     $ cd xoa
     $ pip install .
+
+For development, install it in editable mode with the tools of the ``dev`` extra::
+
+    $ pip install -e ".[dev]"
