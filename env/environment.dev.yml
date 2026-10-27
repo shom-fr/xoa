@@ -1,0 +1,14 @@
+# Development tools, to be added to environment.yml:
+#   conda env update -f env/environment.yml -n xoa
+#   conda env update -f env/environment.dev.yml -n xoa
+name: xoa
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - pre-commit
+  - pytest
+  - ruff
+  - shapely

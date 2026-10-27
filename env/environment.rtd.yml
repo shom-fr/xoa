@@ -8,6 +8,7 @@ dependencies:
   - platformdirs
   - cartopy
   - cmocean
+  - dask-core
   - gsw
   - ipython
   - ipykernel
@@ -18,6 +19,7 @@ dependencies:
   - owslib
   - pip
   - python>=3.10
+  - scipy
   - xarray>=2024.6
   - pip:
       - configobj
@@ -29,4 +31,3 @@ dependencies:
       - sphinx-argparse
       - sphinx-gallery
       - sphinxcontrib-programoutput
-
