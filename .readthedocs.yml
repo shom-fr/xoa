@@ -6,6 +6,12 @@ sphinx:
   configuration: doc/conf.py
   fail_on_warning: false
 
+# Install current library
+python:
+  install:
+    - method: pip
+      path: .
+
 # Build
 build:
   os: "ubuntu-26.04"

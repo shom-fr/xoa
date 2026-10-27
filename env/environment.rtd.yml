@@ -21,7 +21,6 @@ dependencies:
   - scipy
   - xarray>=2024.6
   - pip:
-      - .
       - configobj
       - pooch
       - seaborn
