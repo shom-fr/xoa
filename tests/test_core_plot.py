@@ -425,6 +425,8 @@ def test_get_projection():
     assert isinstance(cplot.get_projection("robinson"), ccrs.Robinson)
     proj = cplot.get_projection("stereographic", [10, 20, -40, -30])
     assert isinstance(proj, ccrs.Stereographic) and proj.proj4_params["lat_0"] == -35
+    assert cplot.get_projection("webmerc") == ccrs.Mercator.GOOGLE
+    assert cplot.get_projection("WebMercator") == ccrs.Mercator.GOOGLE
     crs = ccrs.PlateCarree()
     assert cplot.get_projection(crs) is crs
     with pytest.raises(cplot.exceptions.XoaError, match="Invalid projection name"):
@@ -779,6 +781,28 @@ class TestLayers:
         assert len(ax.get_children()) == n0 + 1  # the land
         with pytest.raises(OSError):
             cplot.add_layer(ax, fallback=False)
+
+    def test_layer_projection(self):
+        ccrs, _ = cplot.import_cartopy()
+        assert cplot.get_layer_projection() is None
+        assert cplot.get_layer_projection(True) == ccrs.Mercator.GOOGLE
+        assert cplot.get_layer_projection("natgeo") == ccrs.Mercator.GOOGLE
+        with xoa.set_options("plot", map_layer=True):
+            assert cplot.get_layer_projection() == ccrs.Mercator.GOOGLE
+        layers = {"mine": {"kind": "wms", "url": "http://x/wms?", "layer": "L"}}
+        with xoa.set_options("layers", **layers):
+            assert cplot.get_layer_projection("mine") is None
+
+    def test_create_map_projection(self, monkeypatch):
+        ccrs, _ = cplot.import_cartopy()
+        monkeypatch.setattr(cplot, "add_layer", lambda ax, name=None, **kw: None)
+        extent = [-5.8, -4.2, 47.9, 48.7]
+        _, ax = cplot.create_map(extent, layer=True, gridlines=False)
+        assert ax.projection == ccrs.Mercator.GOOGLE
+        _, ax = cplot.create_map(extent, layer=True, projection="pc", gridlines=False)
+        assert isinstance(ax.projection, ccrs.PlateCarree)
+        _, ax = cplot.create_map(extent, gridlines=False)
+        assert ax.projection != ccrs.Mercator.GOOGLE
 
     def test_decorate_map(self, ax, monkeypatch):
         names = []

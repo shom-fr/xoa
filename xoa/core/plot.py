@@ -74,7 +74,12 @@ def import_cartopy():
 
 
 #: Short names of the projections
-PROJ_ALIASES = {"merc": "mercator", "pc": "platecarree", "ortho": "orthographic"}
+PROJ_ALIASES = {
+    "merc": "mercator",
+    "pc": "platecarree",
+    "ortho": "orthographic",
+    "webmerc": "webmercator",
+}
 
 
 def get_projection(projection=None, extent=None):
@@ -87,7 +92,9 @@ def get_projection(projection=None, extent=None):
         :mod:`cartopy.crs` projection class that has no mandatory parameter,
         like ``"mercator"``, ``"platecarree"``, ``"orthographic"``, ``"stereographic"``
         or ``"lambertazimuthalequalarea"``.
-        The aliases ``"merc"``, ``"pc"`` and ``"ortho"`` are also accepted.
+        ``"webmercator"`` is the web Mercator projection
+        :attr:`cartopy.crs.Mercator.GOOGLE` of the tiles of most web map services.
+        The aliases ``"merc"``, ``"pc"``, ``"ortho"`` and ``"webmerc"`` are also accepted.
         The default is :class:`cartopy.crs.Mercator`.
         The orthographic projection shows the Earth as seen from above a point,
         which limits the deformation of the cells of regional grids.
@@ -114,10 +121,12 @@ def get_projection(projection=None, extent=None):
         and not name.startswith("_")
     }
     name = PROJ_ALIASES.get(projection.lower(), projection.lower())
+    if name == "webmercator":
+        return ccrs.Mercator.GOOGLE
     if name not in classes:
         raise exceptions.XoaError(
             f"Invalid projection name: {projection}. Choose among: "
-            + ", ".join(sorted(classes))
+            + ", ".join(sorted([*classes, "webmercator"]))
             + ", or one of the aliases: "
             + ", ".join(PROJ_ALIASES)
         )
@@ -191,6 +200,36 @@ def get_layer(name=None):
             f"Invalid layer name: {name}. Choose one of: {', '.join(layers.sections)}"
         )
     return dict(layers[name])
+
+
+def get_layer_projection(layer=None):
+    """Get the projection of a map that suits its background layer
+
+    The tiles of a WMTS layer are warped with a nearest neighbor interpolation when the map
+    has another projection, which blurs their texts and lines.
+    They are in the web Mercator projection for most services, like the default one.
+
+    Parameters
+    ----------
+    layer: None, bool, str
+        Background layer as accepted by :func:`decorate_map`,
+        which defaults to the ``plot.map_layer`` option
+
+    Return
+    ------
+    cartopy.crs.Projection, None
+        :attr:`cartopy.crs.Mercator.GOOGLE` for a WMTS layer, else None
+
+    See also
+    --------
+    get_projection
+    """
+    layer = _opt(layer, "plot.map_layer")
+    if not layer:
+        return None
+    if get_layer(layer if isinstance(layer, str) else None)["kind"] != "wmts":
+        return None
+    return get_projection("webmercator")
 
 
 def add_layer(ax, name=None, alpha=None, zorder=None, attribution=None, fallback=True, **kwargs):
@@ -370,7 +409,8 @@ def create_map(
         Figure size in inches, which defaults to the ``plot.map_figsize`` option
     projection: None, str, cartopy.crs.CRS
         Projection of the map, or its name as accepted by :func:`get_projection`,
-        which defaults to ``Mercator``
+        which defaults to the one of the background layer given by :func:`get_layer_projection`,
+        else to ``Mercator``
     transform: None, cartopy.crs.CRS
         Coordinate system of the extent, which defaults to ``PlateCarree``
     title: None, str
@@ -382,6 +422,8 @@ def create_map(
     matplotlib.figure.Figure
     cartopy.mpl.geoaxes.GeoAxes
     """
+    if projection is None:
+        projection = get_layer_projection(kwargs.get("layer"))
     projection = get_projection(projection, extent)
     fig = plt.figure(figsize=_opt(figsize, "plot.map_figsize"))
     ax = fig.add_subplot(111, projection=projection)

@@ -9,6 +9,12 @@ New features
 - Add the ``dev`` extra with the tools for development (``pytest``, ``pre-commit``, ``ruff`` and ``shapely``).
 - Add the :ref:`contributing` guide, with the release procedure.
 - Test Python 3.10 to 3.13 in the CI, which installs xoa with pip and the ``dev`` extra.
+- Add the ``"webmercator"`` projection, alias ``"webmerc"``, to :func:`xoa.core.plot.get_projection`: the web Mercator projection of the tiles of most web map services.
+- Add :func:`xoa.core.plot.get_layer_projection` to get the projection of a map that suits its background layer.
+
+Bug fixes
+---------
+- The maps of :func:`xoa.plot.create_map`, :func:`xoa.plot.plot_field` and :func:`xoa.plot.plot_fields` with a WMTS background ``layer`` default to the web Mercator projection of its tiles, which are no longer warped: their texts and lines were blurred.
 
 Breaking changes
 ----------------
