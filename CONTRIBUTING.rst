@@ -15,6 +15,7 @@ Pull requests
 - Branch from ``develop`` and open the pull request against it.
 - Install the pre-commit hooks (``pre-commit install``), which run ``ruff`` like the CI.
 - Add tests and run ``pytest``.
+- Squash feature pull requests into ``develop``: one commit per pull request.
 - Document user visible changes in ``CHANGES.rst`` under ``Unreleased``,
   and list new modules in ``api.rst``.
 - Follow the ``CODE_OF_CONDUCT.rst``.
@@ -26,7 +27,9 @@ The version comes from the git tag (``setuptools-scm``) and follows ``YYYY.M.pat
 
 #. Title the ``Unreleased`` changes of ``CHANGES.rst`` with the version,
    and leave an empty ``Unreleased`` above.
-#. Merge a ``Version YYYY.M.patch`` pull request from ``develop`` to ``main``.
+#. Merge a ``Version YYYY.M.patch`` pull request from ``develop`` to ``main``
+   with a **merge commit**, not a squash: a squash would leave ``main`` out of the
+   history of ``develop`` and the next release pull request would show conflicts.
 #. Tag the merge commit and push the tag::
 
        git tag -a vYYYY.M.patch -m "Version YYYY.M.patch"
