@@ -63,13 +63,25 @@ The tidal functions of :mod:`xoa.tide` follow the same rule with the time dimens
 Dask arrays
 ===========
 
-The working dimension must be a single chunk, and the other dimensions keep their
-chunks, so chunk your data along the other dimensions, like the time:
+The working dimension is the one along which the kernel computes, like ``z`` for a
+vertical interpolation. It must be a single chunk, and the other dimensions keep their
+chunks, so chunk your data along the other dimensions. We recommend one block per
+time step:
 
 .. code-block:: python
 
     ds = xr.open_dataset("model.nc", chunks={"time": 1})
     temp = xoa.regrid.regrid1d(ds.temp, levels)
+
+If a single time step does not fit in memory, chunk ``y`` and ``x`` too,
+like ``chunks={"time": 1, "y": 500, "x": 500}``, but never ``z`` here.
+
+.. figure:: _static/chunks.png
+    :width: 90%
+    :alt: Blocks of one time step, or tiles of a time step, that keep the whole z dimension
+
+    The working dimension ``z`` is never split: a block is a time step (left) or a tile of
+    a time step (right).
 
 The memory is then about the number of blocks processed at the same time,
 times the size of an input block and of an output block.
@@ -77,16 +89,27 @@ times the size of an input block and of an output block.
 Threads or processes?
 ---------------------
 
-Use threads, which is the default scheduler of dask. The numba kernels run
-their own threads and release the GIL, so they do not block the dask threads.
+Use threads, which is the default scheduler of dask. They share the memory, so the
+blocks are not copied, and the numba kernels release the GIL, so the threads
+really run in parallel.
 With processes, each worker imports numpy, numba and xarray again, and the blocks are
 copied between the processes: in our tests, it was slower and used four times more memory.
 
 Speed or memory
 ---------------
 
-The number of dask threads sets the number of blocks in memory, and the number of numba
-threads the parallelism within a block:
+With the ``threads`` scheduler, ``num_workers`` is the number of dask threads, which is
+the number of blocks processed at the same time, hence the memory. The number of numba
+threads, set with :func:`numba.set_num_threads`, is the number of threads of the
+``prange`` loops of the kernel, which is the parallelism within a block:
+
+.. figure:: _static/dask-threads.png
+    :width: 70%
+    :alt: Dask threads take blocks, and numba threads compute inside each of them
+
+    With ``num_workers=2`` and ``numba.set_num_threads(4)``: 2 dask threads take 2 blocks
+    at the same time, and 4 numba threads compute in each of them, so 8 cpus are used.
+    The other blocks wait for a free dask thread.
 
 .. code-block:: python
 
@@ -137,7 +160,7 @@ implementation with :func:`xarray.apply_ufunc`:
     * - dask, one block at a time
       - 1.9 to 2.1
       - same
-    * - dask, 8 threads
+    * - dask, 8 workers
       - 1.8 to 2.0
       - same
 

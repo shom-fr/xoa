@@ -14,6 +14,10 @@ Breaking changes
 ----------------
 - ``cartopy``, ``matplotlib`` and ``dask`` are standard dependencies: the ``plot`` extra is removed.
 
+Documentation
+-------------
+- Clarify the :ref:`indepth.performance` guide, with figures of the chunks and of the dask and numba threads, and add dask to intersphinx.
+
 2026.10.0
 =========
 
