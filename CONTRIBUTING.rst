@@ -42,4 +42,5 @@ The version comes from the git tag (``setuptools-scm``) and follows ``YYYY.M.pat
 
 #. Check Read the Docs and merge the pull request of the
    `conda-forge feedstock <https://github.com/conda-forge/xoa-feedstock>`_.
-#. Merge ``main`` back into ``develop``.
+#. Merge ``main`` back into ``develop``: a fast-forward, unless ``main`` received
+   other commits. It keeps the tag reachable from ``develop`` for the dev versions.
