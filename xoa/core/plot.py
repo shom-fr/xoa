@@ -833,7 +833,7 @@ def add_quiverkey(ax, quiver, value, units="", pos=None, **kwargs):
         try:
             ax.apply_aspect()
             qkey._init()
-            xverts = np.asarray(qkey.verts[0])[:, 0]
+            xverts = qkey.vector.get_paths()[0].vertices[:, 0]
             trans = qkey.vector.get_transform()
             width = (
                 trans.transform([[xverts.max(), 0]])[0, 0]

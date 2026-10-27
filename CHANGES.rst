@@ -14,6 +14,10 @@ Breaking changes
 ----------------
 - ``cartopy``, ``matplotlib`` and ``dask`` are standard dependencies: the ``plot`` extra is removed.
 
+Bug fixes
+---------
+- :func:`xoa.core.plot.add_quiverkey` no longer uses the ``verts`` attribute of the quiver key, deprecated in Matplotlib 3.11.
+
 Documentation
 -------------
 - Clarify the :ref:`indepth.performance` guide, with figures of the chunks and of the dask and numba threads, and add dask to intersphinx.
