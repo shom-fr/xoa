@@ -131,6 +131,7 @@ intersphinx_mapping = {
     'python': ('https://docs.python.org/fr/3/', None),
     'cmocean': ('https://matplotlib.org/cmocean/', None),
     'configobj': ('https://configobj.readthedocs.io/en/latest/', None),
+    'dask': ('https://docs.dask.org/en/stable/', None),
     'matplotlib': ('https://matplotlib.org/stable/', None),
     'numba': ('https://numba.readthedocs.io/en/stable/', None),
     'numpy': ("https://numpy.org/doc/stable/", None),
