@@ -38,7 +38,6 @@ jobs:
     - name: Install dependencies
       run: |
         conda env update --file env/environment.rtd.yml --name base
-        pip install .
     - name: Build the docs
       run: |
         sphinx-build -b html doc doc/_build/html

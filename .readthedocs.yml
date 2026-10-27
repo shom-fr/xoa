@@ -6,19 +6,12 @@ sphinx:
   configuration: doc/conf.py
   fail_on_warning: false
 
-# Install current library
-python:
-  install:
-    - method: pip
-      path: .
-
 # Build
 build:
-  os: "ubuntu-22.04"
+  os: "ubuntu-26.04"
   tools:
-      python: "mambaforge-4.10"
+      python: "miniforge3-latest"
 
 # Conda
 conda:
     environment: env/environment.rtd.yml
-
