@@ -21,6 +21,8 @@ import xarray as xr
 
 from .. import dyn as xdyn
 from .. import exceptions
+from .. import grid as xgrid
+from ..core import num as cnum
 from ..core import tide as tide_core
 from .data import (
     auto_constituents,
@@ -42,12 +44,11 @@ def _to_seconds_(time_values):
 # %% harmonic datasets
 
 
-def _coef_dataset_(names, omega, t_ref, variables, spatial_dims, spatial_shape, attrs=None):
-    """Build a coefficient dataset from flat arrays
+def _coef_dataset_(names, omega, t_ref, variables, attrs=None):
+    """Build a coefficient dataset from data arrays
 
-    ``variables`` maps names to ``(array, attrs, has_constituent_dim)``.
+    ``variables`` maps names to ``(data array, attrs)``.
     """
-    nf = len(names)
     freq_cpd = omega * 86400.0 / (2 * np.pi)
     coords = {
         "constituent": xr.DataArray(
@@ -59,41 +60,51 @@ def _coef_dataset_(names, omega, t_ref, variables, spatial_dims, spatial_shape, 
             attrs={"long_name": "Tidal frequency", "units": "cycles per day"},
         ),
     }
-    sdims = list(spatial_dims)
     data_vars = {}
-    for name, (arr, vattrs, lead) in variables.items():
-        shape = (nf, *spatial_shape) if lead else spatial_shape
-        dims = (["constituent"] + sdims) if lead else sdims
-        data_vars[name] = xr.DataArray(arr.reshape(shape), dims=dims, attrs=vattrs)
+    for name, (da, vattrs) in variables.items():
+        da = da.rename(name)
+        da.attrs = vattrs
+        data_vars[name] = da
     return xr.Dataset(data_vars, coords=coords, attrs={"t_ref": float(t_ref), **(attrs or {})})
 
 
-def _spatial_coords_(da, t_dim):
-    """Non-time coordinates of ``da``, to attach to a coefficient dataset"""
-    return {k: c for k, c in da.coords.items() if t_dim not in c.dims}
+def _map_outer_(func, arrays, axis, n_out, dtype=float):
+    """Call a ``(n, ninner)`` function on arrays viewed around an axis, without moving it
+
+    The function takes 2D arrays and returns a 2D array of ``n_out`` rows.
+    The result has the shape of the first array, with ``n_out`` along `axis`.
+    """
+    views = [cnum.view_along_axis(arr, axis) for arr in arrays]
+    shape = list(arrays[0].shape)
+    shape[axis] = n_out
+    if len(views[0]) == 1:  # no outer axes: no copy
+        return func(*(view[0] for view in views)).reshape(shape)
+    out = np.empty((views[0].shape[0], n_out, views[0].shape[2]), dtype)
+    for i in range(len(out)):
+        out[i] = func(*(view[i] for view in views))
+    return out.reshape(shape)
 
 
-def _flat_coef_(coef, name, nf=None):
-    """Values of a coefficient variable as ``(nf, ns)``, or ``(ns,)`` if ``nf`` is None"""
-    values = coef[name].values
-    return values.ravel() if nf is None else values.reshape(nf, -1)
+def _predict_(func, ref, others, t_out, t_dim, long_name, dtype=float):
+    """Evaluate a prediction kernel along the constituent dimension of coefficient arrays
 
-
-def _prediction_da_(values, t_out, coef, ref, t_dim, long_name):
+    The kernel takes 2D coefficients arrays ``(nf, ns)`` and returns ``(nt, ns)``.
+    The time dimension replaces the constituent dimension in place, and dask arrays are
+    processed by blocks.
+    """
     if t_dim is None:
         t_dim = t_out.dims[0] if isinstance(t_out, xr.DataArray) else "time"
-    spatial_dims = list(coef[ref].dims)
-    spatial_shape = tuple(coef.sizes[d] for d in spatial_dims)
-    coords = {t_dim: xr.DataArray(np.asarray(t_out), dims=[t_dim])}
-    coords.update(
-        {k: c for k, c in coef.coords.items() if c.dims and set(c.dims) <= set(spatial_dims)}
+    nt = len(t_out)
+
+    def block(*arrs, axis):
+        return _map_outer_(func, arrs, axis, nt, dtype)
+
+    da = xgrid.map_along_dim(
+        block, ref, "constituent", *others, out_dim=t_dim, out_size=nt, dtype=dtype
     )
-    return xr.DataArray(
-        values.reshape((len(coords[t_dim]), *spatial_shape)),
-        dims=[t_dim] + spatial_dims,
-        coords=coords,
-        attrs={"long_name": long_name},
-    )
+    da = da.assign_coords({t_dim: xr.DataArray(np.asarray(t_out), dims=[t_dim])})
+    da.name, da.attrs = None, {"long_name": long_name}
+    return da
 
 
 # %% harmonic analysis
@@ -176,29 +187,23 @@ class TidalHarmonic:
         return M, pinv(M), ok
 
     def _apply_(self, func, ncoef, *das):
-        """Apply a block function to arrays (time, ...) and return the flat (ncoef, ns) result
+        """Apply a block function along time and return the result with a ``coef`` dimension
 
         The function takes arrays ``(nt, ns)`` and returns an array ``(ncoef, ns)``.
-        Dask arrays are processed by spatial blocks, time being a single chunk.
+        The time dimension is replaced in place, and dask arrays are processed by blocks.
         """
         t_dim = get_time_dim(das[0], self._t_dim)
-        sdims = [d for d in das[0].dims if d != t_dim]
-        das = [da.transpose(t_dim, *sdims) for da in das]
 
-        def block(*arrs):
-            out = func(*(a.reshape(a.shape[0], -1) for a in arrs))
-            return out.reshape((ncoef, *arrs[0].shape[1:]))
+        def block(*arrs, axis):
+            return _map_outer_(func, arrs, axis, ncoef)
 
-        if any(da.chunks is not None for da in das):
-            import dask.array
+        return xgrid.map_along_dim(
+            block, das[0], t_dim, *das[1:], out_dim="coef", out_size=ncoef, dtype=float
+        )
 
-            data = [da.data for da in xr.unify_chunks(*(da.chunk({t_dim: -1}) for da in das))]
-            chunks = ((ncoef,), *data[0].chunks[1:])
-            out = dask.array.map_blocks(block, *data, chunks=chunks, dtype=float)
-        else:
-            out = block(*(da.values for da in das))
-        sshape = tuple(das[0].sizes[d] for d in sdims)
-        return np.asarray(out).reshape(ncoef, -1), sdims, sshape
+    def _split_(self, res, start, stop=None):
+        """Constituent-wise slice of the flat coefficients"""
+        return res.isel(coef=slice(start, stop)).rename(coef="constituent")
 
     def analyse(self, da, uncertainty=True, greenwich=False):
         """Harmonic analysis of a scalar data array like the sea surface height
@@ -206,7 +211,7 @@ class TidalHarmonic:
         Parameters
         ----------
         da: xarray.DataArray
-            Array with the time dimension first.
+            Array with the time dimension anywhere.
             Missing time steps of a 1D series are ignored.
         uncertainty: bool
             Compute the 1-sigma amplitude and phase uncertainties,
@@ -236,23 +241,24 @@ class TidalHarmonic:
                 out.extend(tide_core.solve_ssh_uncertainty(A, Ai, h, h0, amp, phase))
             return np.vstack(out)
 
-        flat, sdims, sshape = self._apply_(block, 1 + (4 if uncertainty else 2) * nf, da)
-        h0, amp, phase = flat[0], flat[1 : nf + 1], flat[nf + 1 : 2 * nf + 1]
-        amp_std, phase_std = (
-            (flat[2 * nf + 1 : 3 * nf + 1], flat[3 * nf + 1 :]) if uncertainty else (0, 0)
-        )
+        res = self._apply_(block, 1 + (4 if uncertainty else 2) * nf, da)
+        h0 = res.isel(coef=0, drop=True)
+        amp, phase = self._split_(res, 1, nf + 1), self._split_(res, nf + 1, 2 * nf + 1)
 
+        f = xr.DataArray(self._f, dims="constituent")
+        u = xr.DataArray(self._u, dims="constituent")
         if self.nodal:
-            amp = amp / self._f[:, None]
-            phase = phase + self._u[:, None]
-            amp_std = amp_std / self._f[:, None] if uncertainty else amp_std
+            amp = amp / f
         if greenwich:
-            v0 = equilibrium_argument(self.names, self._t_ref)
-            phase = tide_core.local_to_greenwich(phase, v0, self._u)
+            # g = V0 + u + pi/2 - phase, see xoa.core.tide.local_to_greenwich
+            v0 = xr.DataArray(equilibrium_argument(self.names, self._t_ref), dims="constituent")
+            phase = (v0 + u + np.pi / 2 - phase) % (2 * np.pi)
+        elif self.nodal:
+            phase = phase + u
 
         variables = {
-            "h0": (h0, {}, False),
-            "amp": (amp, {"long_name": "Amplitude"}, True),
+            "h0": (h0, {}),
+            "amp": (amp, {"long_name": "Amplitude"}),
             "phase": (
                 phase,
                 {
@@ -263,30 +269,25 @@ class TidalHarmonic:
                         else "Local phase (sin convention, ref t_ref)"
                     ),
                 },
-                True,
             ),
         }
         if uncertainty:
+            amp_std = self._split_(res, 2 * nf + 1, 3 * nf + 1)
             variables["amp_std"] = (
-                amp_std,
+                amp_std / f if self.nodal else amp_std,
                 {"long_name": "1-sigma amplitude uncertainty (white-noise)"},
-                True,
             )
             variables["phase_std"] = (
-                phase_std,
+                self._split_(res, 3 * nf + 1),
                 {"long_name": "1-sigma phase uncertainty (white-noise)", "units": "rad"},
-                True,
             )
-        ds = _coef_dataset_(
+        return _coef_dataset_(
             self.names,
             self.omega,
             self._t_ref,
             variables,
-            sdims,
-            sshape,
             attrs={"nodal": self.nodal, "phase_convention": "greenwich" if greenwich else "local"},
         )
-        return ds.assign_coords(_spatial_coords_(da, get_time_dim(da, self._t_dim)))
 
     def analyse_uv(self, da_u, da_v):
         """Harmonic analysis of tidal currents
@@ -294,7 +295,7 @@ class TidalHarmonic:
         Parameters
         ----------
         da_u, da_v: xarray.DataArray
-            Eastward and northward velocities with the time dimension first.
+            Eastward and northward velocities.
 
         Return
         ------
@@ -311,17 +312,16 @@ class TidalHarmonic:
             u0, v0, smaj, smin, incl, phas = tide_core.solve_currents(Mi, u, v)
             return np.vstack([u0[None], v0[None], smaj, smin, incl, phas])
 
-        flat, sdims, sshape = self._apply_(block, 2 + 4 * nf, da_u, da_v)
+        res = self._apply_(block, 2 + 4 * nf, da_u, da_v)
         variables = {
-            "u0": (flat[0], {}, False),
-            "v0": (flat[1], {}, False),
-            "semi_major": (flat[2 : nf + 2], {"long_name": "Semi-major axis"}, True),
-            "semi_minor": (flat[nf + 2 : 2 * nf + 2], {"long_name": "Semi-minor axis"}, True),
-            "inclination": (flat[2 * nf + 2 : 3 * nf + 2], {"units": "rad"}, True),
-            "phase": (flat[3 * nf + 2 :], {"units": "rad"}, True),
+            "u0": (res.isel(coef=0, drop=True), {}),
+            "v0": (res.isel(coef=1, drop=True), {}),
+            "semi_major": (self._split_(res, 2, nf + 2), {"long_name": "Semi-major axis"}),
+            "semi_minor": (self._split_(res, nf + 2, 2 * nf + 2), {"long_name": "Semi-minor axis"}),
+            "inclination": (self._split_(res, 2 * nf + 2, 3 * nf + 2), {"units": "rad"}),
+            "phase": (self._split_(res, 3 * nf + 2), {"units": "rad"}),
         }
-        ds = _coef_dataset_(self.names, self.omega, self._t_ref, variables, sdims, sshape)
-        return ds.assign_coords(_spatial_coords_(da_u, get_time_dim(da_u, self._t_dim)))
+        return _coef_dataset_(self.names, self.omega, self._t_ref, variables)
 
     def ensemble(self, coef, n_members=50, seed=None, inflate=1.0):
         """Ensemble of coefficient sets drawn from the analysis uncertainties
@@ -429,7 +429,7 @@ def harmonic_predict(coef, t_out, t_dim=None, nodal=True):
     Return
     ------
     xarray.DataArray
-        Array with the time dimension first.
+        Array where time replaces the constituent dimension of the coefficients.
     """
     names = list(coef["constituent"].values)
     nf = len(names)
@@ -439,15 +439,19 @@ def harmonic_predict(coef, t_out, t_dim=None, nodal=True):
         f, u = nodal_corrections(t_ref, names)
     else:
         f, u = np.ones(nf), np.zeros(nf)
-    amp, phase = _flat_coef_(coef, "amp", nf), _flat_coef_(coef, "phase", nf)
+    f, u = xr.DataArray(f, dims="constituent"), xr.DataArray(u, dims="constituent")
+    phase = coef["phase"]
     if coef.attrs.get("phase_convention", "local") == "greenwich":
-        phase = equilibrium_argument(names, t_ref)[:, None] + u[:, None] + np.pi / 2 - phase
+        v0 = xr.DataArray(equilibrium_argument(names, t_ref), dims="constituent")
+        phase = v0 + u + np.pi / 2 - phase
     else:
-        phase = phase - u[:, None]
-    h = tide_core.predict_ssh(
-        t_sec - t_ref, get_frequencies(names), _flat_coef_(coef, "h0"), amp * f[:, None], phase
-    )
-    return _prediction_da_(h, t_out, coef, "h0", t_dim, "Tidal prediction")
+        phase = phase - u
+    t_rel, omega = t_sec - t_ref, get_frequencies(names)
+
+    def kernel(amp, phase, h0):
+        return tide_core.predict_ssh(t_rel, omega, h0[0], amp, phase)
+
+    return _predict_(kernel, coef["amp"] * f, [phase, coef["h0"]], t_out, t_dim, "Tidal prediction")
 
 
 def harmonic_predict_uv(coef, t_out, t_dim=None):
@@ -464,20 +468,27 @@ def harmonic_predict_uv(coef, t_out, t_dim=None):
     Return
     ------
     xarray.DataArray, xarray.DataArray
-        Eastward and northward velocities with the time dimension first.
+        Eastward and northward velocities, like :func:`harmonic_predict`.
     """
     names = list(coef["constituent"].values)
-    nf = len(names)
     t_sec = _to_seconds_(t_out)
     t_ref = float(coef.attrs.get("t_ref", t_sec[0]))
-    u, v = tide_core.predict_currents(
-        t_sec - t_ref,
-        get_frequencies(names),
-        _flat_coef_(coef, "u0"),
-        _flat_coef_(coef, "v0"),
-        *(_flat_coef_(coef, k, nf) for k in ("semi_major", "semi_minor", "inclination", "phase")),
+    t_rel, omega = t_sec - t_ref, get_frequencies(names)
+
+    def kernel(smaj, smin, incl, phase, u0, v0):
+        return tide_core.predict_currents_complex(
+            t_rel, omega, u0[0], v0[0], smaj, smin, incl, phase
+        )
+
+    w = _predict_(
+        kernel,
+        coef["semi_major"],
+        [coef[k] for k in ("semi_minor", "inclination", "phase", "u0", "v0")],
+        t_out,
+        t_dim,
+        "Tidal prediction",
+        dtype=complex,
     )
-    return (
-        _prediction_da_(u, t_out, coef, "u0", t_dim, "Tidal u prediction"),
-        _prediction_da_(v, t_out, coef, "u0", t_dim, "Tidal v prediction"),
-    )
+    u, v = w.real, w.imag
+    u.attrs, v.attrs = {"long_name": "Tidal u prediction"}, {"long_name": "Tidal v prediction"}
+    return u, v

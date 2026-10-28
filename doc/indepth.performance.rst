@@ -58,7 +58,7 @@ with all the dimensions in the same order, and processes the dask arrays block b
 
 This is used by :func:`xoa.regrid.regrid1d`, :func:`xoa.regrid.extrap1d`,
 :func:`xoa.interp.isoslice` and :func:`xoa.thermdyn.get_n2`.
-The tidal functions of :mod:`xoa.tide` follow the same rule with the time dimension first.
+The tidal analyses, predictions and diagnostics of :mod:`xoa.tide` use it too, with the time dimension kept in place.
 
 Dask arrays
 ===========

@@ -107,6 +107,55 @@ def test_analysis_dask(tide_ssh):
     assert "lon" in coef.coords
 
 
+def test_predict_dask_is_lazy(tide_ssh, tide_uv):
+    pytest.importorskip("dask")
+    da, *_ = tide_ssh
+    coef = xtide.harmonic_analysis(da, names=TIDE_NAMES, greenwich=True)
+    pred = xtide.harmonic_predict(coef.chunk({"y": 1}), da.time.values)
+    assert pred.chunks is not None and pred.dims == da.dims
+    np.testing.assert_allclose(pred, xtide.harmonic_predict(coef, da.time.values))
+    da_u, da_v, *_ = tide_uv
+    coef = xtide.harmonic_analysis_uv(da_u, da_v, names=TIDE_NAMES)
+    u, v = xtide.harmonic_predict_uv(coef.chunk({"y": 1}), da_u.time.values)
+    ref_u, ref_v = xtide.harmonic_predict_uv(coef, da_u.time.values)
+    assert u.chunks is not None and v.chunks is not None
+    np.testing.assert_allclose(u, ref_u)
+    np.testing.assert_allclose(v, ref_v)
+
+
+def test_analysis_lazy_with_dask(tide_ssh):
+    pytest.importorskip("dask")
+    da, *_ = tide_ssh
+    coef = xtide.harmonic_analysis(da.chunk({"y": 1}), names=TIDE_NAMES)
+    assert coef["amp"].chunks is not None
+
+
+@pytest.mark.parametrize("use_dask", [False, True])
+def test_time_in_any_position(use_dask, tide_ssh, tide_uv):
+    da, *_ = tide_ssh
+    da_u, da_v, *_ = tide_uv
+    ref = xtide.harmonic_analysis(da, names=TIDE_NAMES, greenwich=True)
+    ref_uv = xtide.harmonic_analysis_uv(da_u, da_v, names=TIDE_NAMES)
+    moved = [x.transpose("y", "time", "x") for x in (da, da_u, da_v)]
+    if use_dask:
+        pytest.importorskip("dask")
+        moved = [x.chunk({"x": 2}) for x in moved]
+    coef = xtide.harmonic_analysis(moved[0], names=TIDE_NAMES, greenwich=True)
+    assert coef["amp"].dims == ("y", "constituent", "x")
+    np.testing.assert_allclose(coef["amp"].transpose(*ref["amp"].dims), ref["amp"])
+    np.testing.assert_allclose(coef["phase"].transpose(*ref["phase"].dims), ref["phase"])
+    coef_uv = xtide.harmonic_analysis_uv(moved[1], moved[2], names=TIDE_NAMES)
+    np.testing.assert_allclose(
+        coef_uv["semi_major"].transpose(*ref_uv["semi_major"].dims), ref_uv["semi_major"]
+    )
+    pred = xtide.harmonic_predict(coef, da.time.values)
+    assert pred.dims == ("y", "time", "x")
+    np.testing.assert_allclose(pred.transpose(*da.dims), da, atol=1e-8)
+    u, v = xtide.harmonic_predict_uv(coef_uv, da.time.values)
+    assert u.dims == v.dims == ("y", "time", "x")
+    np.testing.assert_allclose(u.transpose(*da.dims), da_u, atol=1e-8)
+
+
 def test_auto_names(tide_ssh):
     da, *_ = tide_ssh
     th = xtide.TidalHarmonic(da.time.values)

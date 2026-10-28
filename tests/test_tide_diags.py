@@ -24,8 +24,18 @@ def test_high_waters_and_range():
     rng = xtide.tidal_range(h)
     assert float(rng.max()) <= 2 * 1.3 + 1e-6
     assert xtide.high_waters(h.expand_dims(x=2).transpose("time", "x")).shape == (len(h), 2)
-    with pytest.raises(Exception):
-        xtide.high_waters(h.expand_dims(x=2), time_dim="time")
+    # time dimension in any position
+    hw2 = xtide.high_waters(h.expand_dims(x=2), time_dim="time")
+    assert hw2.dims == ("x", "time")
+    np.testing.assert_array_equal(hw2.isel(x=1), hw)
+
+
+def test_diags_dask():
+    pytest.importorskip("dask")
+    h = semidiurnal_series().expand_dims(x=3).transpose("time", "x")
+    hw = xtide.high_waters(h.chunk({"x": 1}))
+    assert hw.chunks is not None
+    np.testing.assert_array_equal(hw, xtide.high_waters(h))
 
 
 def test_skew_surge_and_spring():

@@ -133,8 +133,8 @@ squares. The design matrix only depends on the time axis, so its pseudo-inverse 
 once and applied to all the points with a single matrix product.
 :class:`~xoa.tide.TidalHarmonic` keeps it for several analyses of the same time axis.
 
-The data must have time as their first dimension, followed by any others like ``y`` and ``x``.
-The time dimension is found with :func:`xoa.coords.get_tdim` (``time``, ``valid_time``, etc.)
+The time dimension may be anywhere, like in ``(time, y, x)``: it is kept in place.
+It is found with :func:`xoa.coords.get_tdim` (``time``, ``valid_time``, etc.)
 unless ``t_dim`` is given, and a dataset can be passed to find the sea surface height
 or the velocities with :mod:`xoa.meta`.
 The result is a :class:`xarray.Dataset` indexed by ``constituent``:
@@ -147,6 +147,8 @@ Missing values of a 1D series (observations) are ignored: only the valid time st
 with an error if there are too few and a warning if more than 10% are dropped.
 Gridded data are not checked: a point with a gap gives NaN coefficients.
 Do not chunk along time when using dask arrays; chunks along the other dimensions are fine.
+The analyses and the predictions stay lazy with dask arrays, so that huge datasets are processed
+by blocks, the prediction of a long period never being fully in memory.
 
 .. rubric:: Pitfalls
 
@@ -165,7 +167,7 @@ Do not chunk along time when using dask arrays; chunks along the other dimension
 Diagnostics
 ===========
 
-The diagnostics work on regularly sampled series with time as first dimension, found
+The diagnostics work on regularly sampled series, found
 like in the analysis unless ``time_dim`` is given, at all points
 in parallel. The high waters are the local maxima separated by at least ``min_separation`` samples.
 The skew surge is the difference between the highest observed level around a predicted
