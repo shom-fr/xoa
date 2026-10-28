@@ -19,7 +19,7 @@ Tidal diagnostics: form number, high waters, skew surge, tidal range and atlas
 import numpy as np
 import xarray as xr
 
-from .. import exceptions
+from .. import grid as xgrid
 from ..core import signal as signal_core
 from ..core import tide as tide_core
 from .data import get_time_dim
@@ -29,22 +29,17 @@ from .data import get_time_dim
 
 def _apply_kernel_(func, dtype, template, *others, time_dim=None, **kwargs):
     # Apply a core kernel working on time-first (nt, ...) arrays to data arrays.
-    # The axes are never moved, so time_dim must be the first dimension of all
-    # inputs. Dask arrays are processed block by block (time is one chunk).
+    # The time dimension is kept in place, and dask arrays are processed by blocks.
     time_dim = get_time_dim(template, time_dim)
-    for x in (template, *others):
-        if x.dims[0] != time_dim:
-            raise exceptions.XoaError(f"'{time_dim}' must be the first dimension, got {x.dims}")
-    arrays = [template] + [x.broadcast_like(template).transpose(*template.dims) for x in others]
-    if any(x.chunks is not None for x in arrays):
-        import dask.array
+    others = [x.broadcast_like(template) for x in others]
 
-        # one chunk along time, the same spatial chunks for all the inputs
-        data = [x.data for x in xr.unify_chunks(*(x.chunk({time_dim: -1}) for x in arrays))]
-        out = dask.array.map_blocks(lambda *b: func(*b, **kwargs), *data, dtype=dtype)
-    else:
-        out = func(*(x.values for x in arrays), **kwargs)
-    return xr.DataArray(out, dims=template.dims, coords=template.coords)
+    def block(*arrs, axis):
+        out = func(*(np.moveaxis(arr, axis, 0) for arr in arrs), **kwargs)
+        return np.moveaxis(out, 0, axis)
+
+    out = xgrid.map_along_dim(block, template, time_dim, *others, dtype=dtype)
+    out.attrs = {}
+    return out.assign_coords({k: c for k, c in template.coords.items() if time_dim in c.dims})
 
 
 def form_number(coef):
@@ -72,7 +67,7 @@ def high_waters(h, min_separation=9, time_dim=None):
     Parameters
     ----------
     h: xarray.DataArray
-        Sea level, typically the predicted tide, with ``time_dim`` first.
+        Sea level, typically the predicted tide.
     min_separation: int
         Minimal number of samples between two high waters (9 for hourly
         data and a semi-diurnal tide).
@@ -172,7 +167,7 @@ def tidal_range(h, window=13, time_dim=None):
     Parameters
     ----------
     h: xarray.DataArray
-        Array with ``time_dim`` first.
+        Sea level.
     window: int
         Window in samples, a bit more than one semi-diurnal cycle.
     time_dim: str, None

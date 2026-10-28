@@ -10,6 +10,8 @@ New features
 - Add the :ref:`contributing` guide, with the release procedure.
 - Test Python 3.10 to 3.13 in the CI, which installs xoa with pip and the ``dev`` extra.
 - Add the ``"webmercator"`` projection, alias ``"webmerc"``, to :func:`xoa.core.plot.get_projection`: the web Mercator projection of the tiles of most web map services.
+- :mod:`xoa.tide` analyses, predictions and diagnostics use :func:`xoa.grid.map_along_dim`: the time dimension may be anywhere and the predictions are lazy with dask arrays, which needs up to 3 times less memory.
+- Add :func:`xoa.core.tide.predict_currents_complex`.
 - Add :func:`xoa.core.plot.get_layer_projection` to get the projection of a map that suits its background layer.
 
 Bug fixes

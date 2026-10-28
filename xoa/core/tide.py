@@ -373,8 +373,8 @@ def solve_currents(Mi, u, v):
     return (w0.real, w0.imag, A + B, A - B, incl, phase)
 
 
-def predict_currents(t, omega, u0, v0, semi_major, semi_minor, inclination, phase):
-    """Harmonic reconstruction of tidal currents at all grid points.
+def predict_currents_complex(t, omega, u0, v0, semi_major, semi_minor, inclination, phase):
+    """Harmonic reconstruction of tidal currents as the complex velocity ``u + 1j * v``.
 
     Reconstructs the complex phasor coefficients (R, S) from the ellipse
     parameters and evaluates w = M @ x — one complex BLAS DGEMM.
@@ -388,7 +388,7 @@ def predict_currents(t, omega, u0, v0, semi_major, semi_minor, inclination, phas
 
     Returns
     -------
-    u, v : ndarray (nt, ns)
+    w : ndarray (nt, ns) complex
     """
     Af = (semi_major + semi_minor) * 0.5  # (nf, ns)
     Bf = (semi_major - semi_minor) * 0.5  # (nf, ns)
@@ -397,7 +397,19 @@ def predict_currents(t, omega, u0, v0, semi_major, semi_minor, inclination, phas
     R = Af * np.exp(1j * P)  # counter-rotating phasor  (nf, ns)
     S = Bf * np.exp(1j * Q)  # co-rotating phasor       (nf, ns)
     x = np.vstack([(u0 + 1j * v0)[None], R, S])  # (1+2*nf, ns)
-    w = design_matrix_currents(t, omega) @ x  # (nt, ns) complex
+    return design_matrix_currents(t, omega) @ x  # (nt, ns) complex
+
+
+def predict_currents(t, omega, u0, v0, semi_major, semi_minor, inclination, phase):
+    """Harmonic reconstruction of tidal currents at all grid points.
+
+    See :func:`predict_currents_complex`.
+
+    Returns
+    -------
+    u, v : ndarray (nt, ns)
+    """
+    w = predict_currents_complex(t, omega, u0, v0, semi_major, semi_minor, inclination, phase)
     return w.real, w.imag
 
 
