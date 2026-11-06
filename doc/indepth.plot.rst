@@ -387,6 +387,16 @@ coordinates are pixels, the rule is easy to follow:
     cplot.get_strides("auto", lon, lat, ax, min_spacing=5)
     cplot.get_strides((2, 4), lon, lat)
 
+Without axes, the spacing can be measured on a web map, like those of Leaflet or OpenLayers,
+at a ``zoom`` level: the points are placed with :func:`~xoa.core.plot.get_webmercator_pixels`.
+This is how a web application undersamples the arrows of the currents for the view:
+
+.. ipython:: python
+
+    lon, lat = np.meshgrid(np.arange(-5, -4.5, 0.01), np.arange(48, 48.3, 0.01))
+    cplot.get_strides("auto", lon, lat, zoom=10, min_spacing=20)
+    cplot.get_strides("auto", lon, lat, zoom=13, min_spacing=20)
+
 The same grid is drawn with :func:`~xoa.plot.plot_grid`, with a stride that suits the figure:
 
 .. ipython:: python
