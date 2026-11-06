@@ -447,6 +447,9 @@ Sticks
 line, are oriented along the current and are as long as its speed. This is a compact way to
 show the rotation of tidal currents. Pass ``u`` and ``v``, or a dataset that holds them,
 and use ``scale`` to change the lengths (the smaller, the longer).
+By default, the scale is computed by :func:`xoa.core.plot.get_stick_scale` so that the strong
+sticks, at the 99th percentile of the speed, span the fraction of the axes width given
+by the ``plot.stick_length`` option.
 A reference stick is drawn above the left corner of the axes, like the reference arrow of
 :func:`~xoa.plot.plot_vectors`: its value is rounded to 1, 2 or 5 times a power of ten
 by :func:`xoa.core.plot.get_quiverkey_value` and it is added with

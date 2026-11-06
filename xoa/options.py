@@ -46,6 +46,7 @@ vectors_min_spacing = float(default=16) # minimal spacing in pixels between vect
 key_pos = float_list(min=2, max=2, default=list(0.0, 1.03)) # position of the reference arrow in axes coordinates
 key_percentile = float(default=80) # percentile of the speed used to choose the reference arrow value
 stick_color = string(default="steelblue") # color of sticks
+stick_length = float(default=0.12) # length of the strong sticks in fraction of the axes width
 
 map_figsize = float_list(min=2, max=2, default=list(8, 8)) # figure size in inches
 map_gridlines = boolean(default=True) # add labelled gridlines

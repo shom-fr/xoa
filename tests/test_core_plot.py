@@ -234,6 +234,22 @@ class TestPlotSticks:
         assert not ax.get_yaxis().get_visible()
         assert len(ax.lines) == 1  # the zero line
 
+    def test_auto_scale(self):
+        # the strong sticks span the plot.stick_length fraction of the axes width
+        u = np.r_[np.ones(99), 50.0, np.nan]
+        v = np.zeros(101)
+        assert cplot.get_stick_scale(u, v, length=0.5, percentile=50) == pytest.approx(2.0)
+        assert cplot.get_stick_scale(u, v, length=0.1) < 50 / 0.1  # the peak is ignored
+        assert cplot.get_stick_scale([0.0, np.nan], [0.0, 0.0]) is None
+        fig, ax = plt.subplots()
+        x = np.arange(4.0)
+        with xoa.set_options("plot", stick_length=0.25):
+            quiver = cplot.plot_sticks(ax, x, [1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0])
+        assert quiver.scale == pytest.approx(4.0)
+        assert quiver.scale_units == "width"
+        quiver = cplot.plot_sticks(ax, x, [0.0] * 4, [0.0] * 4)  # matplotlib autoscale
+        assert quiver.scale is None
+
     def test_head_less_by_default_and_overridable(self):
         fig, ax = plt.subplots()
         quiver = cplot.plot_sticks(ax, [0.0, 1.0], [1.0, 1.0], [0.0, 0.0])

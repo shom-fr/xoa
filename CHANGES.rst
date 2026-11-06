@@ -16,6 +16,7 @@ New features
 
 Bug fixes
 ---------
+- The sticks of :func:`xoa.plot.plot_stick` and :func:`xoa.core.plot.plot_sticks` are no longer tiny by default: the scale is computed by the new :func:`xoa.core.plot.get_stick_scale` so that the strong sticks span the fraction of the axes width given by the new ``plot.stick_length`` option.
 - The maps of :func:`xoa.plot.create_map`, :func:`xoa.plot.plot_field` and :func:`xoa.plot.plot_fields` with a WMTS background ``layer`` default to the web Mercator projection of its tiles, which are no longer warped: their texts and lines were blurred.
 
 Breaking changes

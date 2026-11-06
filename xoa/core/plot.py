@@ -1484,6 +1484,36 @@ def add_fancy_map_frame(
     return artists
 
 
+def get_stick_scale(u, v, length=None, percentile=99.0):
+    """Get the quiver scale of sticks so that the strong ones span a fraction of the axes width
+
+    The strong speed is a high percentile of the speeds, so that a few peaks
+    do not shrink all the sticks.
+
+    Parameters
+    ----------
+    u, v: array_like
+        Components of the vectors, with possibly missing values
+    length: None, float
+        Length of the strong sticks in fraction of the width of the axes,
+        which defaults to the ``plot.stick_length`` option
+    percentile: float
+        Percentile of the speeds that gives the strong speed
+
+    Return
+    ------
+    float, None
+        Scale to pass to :meth:`matplotlib.axes.Axes.quiver` with ``scale_units="width"``,
+        or None when there is no positive speed
+    """
+    speed = np.hypot(np.asarray(u, dtype="d"), np.asarray(v, dtype="d"))
+    speed = speed[np.isfinite(speed)]
+    strong = np.percentile(speed, percentile) if speed.size else 0.0
+    if not strong > 0:
+        return None
+    return float(strong / _opt(length, "plot.stick_length"))
+
+
 def plot_sticks(ax, x, u, v, scale=None, color=None, **kwargs):
     """Plot vectors as sticks anchored at ``y=0``
 
@@ -1496,7 +1526,8 @@ def plot_sticks(ax, x, u, v, scale=None, color=None, **kwargs):
         Components of the vectors
     scale: None, float
         Scale passed to :meth:`matplotlib.axes.Axes.quiver`: the smaller, the longer
-        the sticks.
+        the sticks. When None, it is computed with :func:`get_stick_scale` so that the strong
+        sticks span the ``plot.stick_length`` fraction of the axes width.
     color: None, color
         Color of the sticks, which defaults to the ``plot.stick_color`` option
     kwargs:
@@ -1512,6 +1543,10 @@ def plot_sticks(ax, x, u, v, scale=None, color=None, **kwargs):
     kwargs.setdefault("headlength", 0)
     kwargs.setdefault("headwidth", 1)
     kwargs.setdefault("width", 0.002)
+    if scale is None:
+        scale = get_stick_scale(u, v)
+        if scale is not None:
+            kwargs.setdefault("scale_units", "width")
     quiver = ax.quiver(
         np.asarray(x), np.zeros(u.shape), u, np.asarray(v), scale=scale, color=color, **kwargs
     )
