@@ -170,6 +170,12 @@ Numeric versions with flat arrays are in :mod:`xoa.core.geo`.
     sub = sel.apply(ds)  # isel, then nan outside of the circle
     sel = get_geosel(ds, nearest=(-4.5, 48))
     ds.isel(sel.isel)  # like ds.isel(lon=3, lat=7)
+    sel = get_geosel(ds.u, nearest=(-4.5, 48), valid="auto")  # nearest point with data
+
+The nearest point may be searched among the valid points only, like the sea points, with
+``valid``: a boolean mask with the horizontal dimensions, or ``"auto"`` to use the points where
+the data array or the dataset has data, as given by :func:`xoa.geo.get_valid_mask`.
+The search among the valid points is cached by the selector for each mask.
 
 The result depends on the kind of coordinates:
 

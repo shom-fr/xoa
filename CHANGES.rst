@@ -13,6 +13,7 @@ New features
 - :mod:`xoa.tide` analyses, predictions and diagnostics use :func:`xoa.grid.map_along_dim`: the time dimension may be anywhere and the predictions are lazy with dask arrays, which needs up to 3 times less memory.
 - Add :func:`xoa.core.tide.predict_currents_complex`.
 - Add :func:`xoa.core.plot.get_layer_projection` to get the projection of a map that suits its background layer.
+- :func:`xoa.geo.get_geosel` and :meth:`xoa.geo.GeoSelector.nearest` accept ``valid`` to select the nearest point among the valid ones only, like the sea points: a boolean mask, or ``"auto"`` to use the points that have data, given by the new :func:`xoa.geo.get_valid_mask`.
 
 Bug fixes
 ---------
