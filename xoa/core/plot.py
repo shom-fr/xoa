@@ -589,7 +589,58 @@ def add_colorbar(mappable, ax=None, **kwargs):
 _MAX_SPACING_LINES = 64
 
 
-def get_strides(stride, lon, lat, ax=None, transform=None, min_spacing=None):
+def get_webmercator_pixels(lon, lat, zoom, tile_size=256):
+    """Get the pixel coordinates of points on a web map at a zoom level
+
+    These are the "global" pixel coordinates of web Mercator maps like those of Leaflet
+    or OpenLayers: the world is ``tile_size * 2**zoom`` pixels wide, with ``x`` increasing
+    eastward from the dateline and ``y`` increasing southward from the north.
+
+    Parameters
+    ----------
+    lon, lat: array_like
+        Longitudes and latitudes in degrees
+    zoom: float
+        Zoom level
+    tile_size: int
+        Size of the tiles in pixels
+
+    Return
+    ------
+    numpy.ndarray
+        Array of shape ``lon.shape + (2,)`` with the ``x`` and ``y`` pixel coordinates
+    """
+    size = tile_size * 2.0**zoom
+    lon = np.asarray(lon, dtype=np.float64)
+    lat = np.clip(np.asarray(lat, dtype=np.float64), -85.05112878, 85.05112878)
+    x = (lon + 180.0) / 360.0 * size
+    y = (1.0 - np.arcsinh(np.tan(np.radians(lat))) / np.pi) / 2.0 * size
+    return np.stack([x, y], axis=-1)
+
+
+def _get_auto_strides_(lon, lat, to_pixels, min_spacing):
+    """Strides that keep `min_spacing` pixels between the centers, along each direction"""
+    lon = np.asarray(lon, dtype=np.float64)
+    lat = np.asarray(lat, dtype=np.float64)
+    stride = []
+    for axis in 0, 1:
+        if lon.shape[axis] < 2:
+            stride.append(1)
+            continue
+        # Measure on a bounded number of lines, to be cheap with large grids
+        step = max(1, lon.shape[1 - axis] // _MAX_SPACING_LINES)
+        sub = (
+            (slice(None, None, step), slice(None))
+            if axis == 1
+            else (slice(None), slice(None, None, step))
+        )
+        pix = to_pixels(lon[sub], lat[sub])
+        spacing = np.nanmedian(np.linalg.norm(np.diff(pix, axis=axis), axis=-1))
+        stride.append(1 if not spacing > 0 else max(1, int(np.ceil(min_spacing / spacing))))
+    return stride
+
+
+def get_strides(stride, lon, lat, ax=None, transform=None, min_spacing=None, zoom=None):
     """Get the under-sampling strides along y and x
 
     Parameters
@@ -598,16 +649,20 @@ def get_strides(stride, lon, lat, ax=None, transform=None, min_spacing=None):
         Either ``"auto"``, one positive integer for both directions or a ``(y, x)`` tuple.
         With ``"auto"``, it is the smallest value that keeps at least ``min_spacing`` pixels
         between consecutive centers along each direction. The spacing is measured on the axes,
-        so it accounts for its size, the extent, the projection and the rotation of the grid.
+        so it accounts for its size, the extent, the projection and the rotation of the grid,
+        or on a web map at the ``zoom`` level.
     lon, lat: array_like(ny, nx)
         Longitudes and latitudes in degrees
     ax: None, matplotlib.axes.Axes
-        Axes that is needed in ``"auto"`` mode
+        Axes that is needed in ``"auto"`` mode, unless ``zoom`` is given
     transform: None, cartopy.crs.CRS
         Coordinate system of ``lon`` and ``lat``, when the axes have a projection
     min_spacing: None, float
         Minimal spacing in pixels for the ``"auto"`` mode,
         which defaults to the ``plot.mesh_min_spacing`` option
+    zoom: None, float
+        Zoom level of a web Mercator map, like Leaflet's, where the spacing is measured
+        in ``"auto"`` mode when there are no axes, see :func:`get_webmercator_pixels`
 
     Return
     ------
@@ -617,31 +672,26 @@ def get_strides(stride, lon, lat, ax=None, transform=None, min_spacing=None):
         Stride along x
     """
     if isinstance(stride, str) and stride == "auto":
-        if ax is None:
-            raise exceptions.XoaError("The axes are needed to compute an automatic stride")
-        ax.apply_aspect()
         min_spacing = _opt(min_spacing, "plot.mesh_min_spacing")
-        lon = np.asarray(lon, dtype=np.float64)
-        lat = np.asarray(lat, dtype=np.float64)
-        stride = []
-        for axis in 0, 1:
-            if lon.shape[axis] < 2:
-                stride.append(1)
-                continue
-            # Measure on a bounded number of lines, to be cheap with large grids
-            step = max(1, lon.shape[1 - axis] // _MAX_SPACING_LINES)
-            sub = (
-                (slice(None, None, step), slice(None))
-                if axis == 1
-                else (slice(None), slice(None, None, step))
+        if ax is not None:
+            ax.apply_aspect()
+
+            def to_pixels(sublon, sublat):
+                xy = np.stack([sublon, sublat], axis=-1)
+                if hasattr(ax, "projection"):
+                    xy = ax.projection.transform_points(transform, sublon, sublat)[..., :2]
+                return ax.transData.transform(xy.reshape(-1, 2)).reshape(xy.shape)
+
+        elif zoom is not None:
+
+            def to_pixels(sublon, sublat):
+                return get_webmercator_pixels(sublon, sublat, zoom)
+
+        else:
+            raise exceptions.XoaError(
+                "The axes or a zoom level are needed to compute an automatic stride"
             )
-            sublon, sublat = lon[sub], lat[sub]
-            xy = np.stack([sublon, sublat], axis=-1)
-            if hasattr(ax, "projection"):
-                xy = ax.projection.transform_points(transform, sublon, sublat)[..., :2]
-            pix = ax.transData.transform(xy.reshape(-1, 2)).reshape(xy.shape)
-            spacing = np.nanmedian(np.linalg.norm(np.diff(pix, axis=axis), axis=-1))
-            stride.append(1 if not spacing > 0 else max(1, int(np.ceil(min_spacing / spacing))))
+        stride = _get_auto_strides_(lon, lat, to_pixels, min_spacing)
     elif np.isscalar(stride):
         stride = (stride, stride)
     try:
@@ -1484,6 +1534,36 @@ def add_fancy_map_frame(
     return artists
 
 
+def get_stick_scale(u, v, length=None, percentile=99.0):
+    """Get the quiver scale of sticks so that the strong ones span a fraction of the axes width
+
+    The strong speed is a high percentile of the speeds, so that a few peaks
+    do not shrink all the sticks.
+
+    Parameters
+    ----------
+    u, v: array_like
+        Components of the vectors, with possibly missing values
+    length: None, float
+        Length of the strong sticks in fraction of the width of the axes,
+        which defaults to the ``plot.stick_length`` option
+    percentile: float
+        Percentile of the speeds that gives the strong speed
+
+    Return
+    ------
+    float, None
+        Scale to pass to :meth:`matplotlib.axes.Axes.quiver` with ``scale_units="width"``,
+        or None when there is no positive speed
+    """
+    speed = np.hypot(np.asarray(u, dtype="d"), np.asarray(v, dtype="d"))
+    speed = speed[np.isfinite(speed)]
+    strong = np.percentile(speed, percentile) if speed.size else 0.0
+    if not strong > 0:
+        return None
+    return float(strong / _opt(length, "plot.stick_length"))
+
+
 def plot_sticks(ax, x, u, v, scale=None, color=None, **kwargs):
     """Plot vectors as sticks anchored at ``y=0``
 
@@ -1496,7 +1576,8 @@ def plot_sticks(ax, x, u, v, scale=None, color=None, **kwargs):
         Components of the vectors
     scale: None, float
         Scale passed to :meth:`matplotlib.axes.Axes.quiver`: the smaller, the longer
-        the sticks.
+        the sticks. When None, it is computed with :func:`get_stick_scale` so that the strong
+        sticks span the ``plot.stick_length`` fraction of the axes width.
     color: None, color
         Color of the sticks, which defaults to the ``plot.stick_color`` option
     kwargs:
@@ -1512,6 +1593,10 @@ def plot_sticks(ax, x, u, v, scale=None, color=None, **kwargs):
     kwargs.setdefault("headlength", 0)
     kwargs.setdefault("headwidth", 1)
     kwargs.setdefault("width", 0.002)
+    if scale is None:
+        scale = get_stick_scale(u, v)
+        if scale is not None:
+            kwargs.setdefault("scale_units", "width")
     quiver = ax.quiver(
         np.asarray(x), np.zeros(u.shape), u, np.asarray(v), scale=scale, color=color, **kwargs
     )

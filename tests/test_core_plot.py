@@ -64,8 +64,34 @@ class TestStrides:
 
     def test_auto_needs_axes(self):
         lon, lat = get_lonlat(5, 4)
-        with pytest.raises(xoa.XoaError, match="axes"):
+        with pytest.raises(xoa.XoaError, match="axes or a zoom"):
             cplot.get_strides("auto", lon, lat)
+
+    def test_webmercator_pixels(self):
+        pix = cplot.get_webmercator_pixels([-180.0, 0.0, 180.0], [0.0, 0.0, 0.0], 0)
+        np.testing.assert_allclose(pix, [[0, 128], [128, 128], [256, 128]])
+        # one more zoom level doubles the size, and the north is at the top
+        pix = cplot.get_webmercator_pixels([0.0, 0.0], [85.0511287, 45.0], 1)
+        np.testing.assert_allclose(pix[0], [256, 0], atol=1e-4)
+        assert 0 < pix[1, 1] < 256
+        assert pix.shape == (2, 2)
+
+    def test_auto_with_zoom(self):
+        # 0.01 degree is about 7.3 pixels at zoom 10 near the equator
+        lon, lat = np.meshgrid(np.arange(0.0, 0.5, 0.01), np.arange(0.0, 0.3, 0.01))
+        assert cplot.get_strides("auto", lon, lat, zoom=10, min_spacing=20) == (3, 3)
+        assert cplot.get_strides("auto", lon, lat, zoom=11, min_spacing=20) == (2, 2)
+        assert cplot.get_strides("auto", lon, lat, zoom=15, min_spacing=20) == (1, 1)
+        # At 60°N, the meridional spacing is doubled in pixels, not the zonal one
+        lon, lat = np.meshgrid(np.arange(0.0, 0.5, 0.01), np.arange(60.0, 60.3, 0.01))
+        assert cplot.get_strides("auto", lon, lat, zoom=10, min_spacing=20) == (2, 3)
+
+    def test_auto_with_zoom_rotated_grid(self):
+        # a grid rotated by 45°: the spacing is measured along each index direction
+        x, y = np.meshgrid(np.arange(30.0), np.arange(20.0))
+        lon = 0.01 * (x - y) / np.sqrt(2)
+        lat = 0.01 * (x + y) / np.sqrt(2)
+        assert cplot.get_strides("auto", lon, lat, zoom=10, min_spacing=20) == (3, 3)
 
     def test_auto_follows_the_pixel_spacing(self):
         # 101 points over 100 data units drawn on 500 pixels: 5 pixels between points
@@ -233,6 +259,22 @@ class TestPlotSticks:
         np.testing.assert_allclose(quiver.Y, 0)
         assert not ax.get_yaxis().get_visible()
         assert len(ax.lines) == 1  # the zero line
+
+    def test_auto_scale(self):
+        # the strong sticks span the plot.stick_length fraction of the axes width
+        u = np.r_[np.ones(99), 50.0, np.nan]
+        v = np.zeros(101)
+        assert cplot.get_stick_scale(u, v, length=0.5, percentile=50) == pytest.approx(2.0)
+        assert cplot.get_stick_scale(u, v, length=0.1) < 50 / 0.1  # the peak is ignored
+        assert cplot.get_stick_scale([0.0, np.nan], [0.0, 0.0]) is None
+        fig, ax = plt.subplots()
+        x = np.arange(4.0)
+        with xoa.set_options("plot", stick_length=0.25):
+            quiver = cplot.plot_sticks(ax, x, [1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0])
+        assert quiver.scale == pytest.approx(4.0)
+        assert quiver.scale_units == "width"
+        quiver = cplot.plot_sticks(ax, x, [0.0] * 4, [0.0] * 4)  # matplotlib autoscale
+        assert quiver.scale is None
 
     def test_head_less_by_default_and_overridable(self):
         fig, ax = plt.subplots()

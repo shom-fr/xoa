@@ -18,6 +18,7 @@ Geographic utilities
 # limitations under the License.
 
 import functools
+import hashlib
 import math
 
 import numpy as np
@@ -867,6 +868,7 @@ class GeoSelector:
         self.core = _geo.GeoSelector(
             self.lon.values, self.lat.values, kind=self.kind, radius=radius
         )
+        self._valid_cores = {}
 
     def _as_isel_(self, indexers):
         return dict(zip(self.dims, indexers))
@@ -936,7 +938,29 @@ class GeoSelector:
             mask = xr.DataArray(mask, dims=self.dims, name="mask")
         return GeoSelection(self._as_isel_(indexers), mask)
 
-    def nearest(self, lon, lat, max_dist=None, units="m"):
+    def _get_valid_core_(self, valid):
+        """Core selector of the valid points of the grid, and their indices along each dim"""
+        if not isinstance(valid, xr.DataArray) or set(valid.dims) != set(self.dims):
+            raise exceptions.XoaError(
+                f"valid must be a boolean data array with the dimensions {self.dims}"
+            )
+        mask = np.asarray(valid.transpose(*self.dims).values, dtype=bool)
+        key = (mask.shape, hashlib.sha1(np.packbits(mask)).hexdigest())
+        if key not in self._valid_cores:
+            indices = np.nonzero(mask)
+            if not indices[0].size:
+                raise exceptions.XoaError("There is no valid point")
+            if self.kind == "rect":  # dims are (lon, lat)
+                vlon, vlat = self.lon.values[indices[0]], self.lat.values[indices[1]]
+            else:
+                vlon, vlat = self.lon.values[indices], self.lat.values[indices]
+            core = _geo.GeoSelector(vlon, vlat, kind="cloud", radius=self.core.radius)
+            if len(self._valid_cores) >= 8:
+                self._valid_cores.pop(next(iter(self._valid_cores)))
+            self._valid_cores[key] = core, indices
+        return self._valid_cores[key]
+
+    def nearest(self, lon, lat, max_dist=None, units="m", valid=None):
         """Select the points that are the closest to target points
 
         Parameters
@@ -947,6 +971,10 @@ class GeoSelector:
             Maximal distance in `units`
         units: {"m", "km"}
             Units of distances
+        valid: None, xarray.DataArray
+            Boolean mask of the points that can be selected, with the horizontal
+            dimensions, like the sea points or those that have data,
+            see :func:`get_valid_mask`. The search is cached for each mask.
 
         Return
         ------
@@ -957,11 +985,16 @@ class GeoSelector:
         """
         scale = _get_scale_(units)
         tlon, tlat = _get_lonlat_((lon, lat))
-        indexers, dist = self.core.nearest(
-            tlon.values,
-            tlat.values,
-            max_dist=None if max_dist is None else max_dist / scale,
-        )
+        max_dist = None if max_dist is None else max_dist / scale
+        if valid is None:
+            indexers, dist = self.core.nearest(tlon.values, tlat.values, max_dist=max_dist)
+        else:
+            core, indices = self._get_valid_core_(valid)
+            (ivalid,), dist = core.nearest(tlon.values, tlat.values, max_dist=max_dist)
+            found = ivalid >= 0
+            indexers = tuple(
+                np.where(found, idx[np.where(found, ivalid, 0)], -1) for idx in indices
+            )
         dist = xr.DataArray(
             (dist * scale).reshape(tlon.shape),
             dims=tlon.dims,
@@ -974,6 +1007,37 @@ class GeoSelector:
             return GeoSelection(self._as_isel_([int(i[0]) for i in indexers]), dist=dist[()])
         isel = self._as_isel_([xr.DataArray(i, dims=tlon.dims) for i in indexers])
         return GeoSelection(isel, dist=dist)
+
+
+def get_valid_mask(obj, dims):
+    """Get the mask of the points where an array or a dataset has data
+
+    Parameters
+    ----------
+    obj: xarray.DataArray, xarray.Dataset
+        With a dataset, the data variables that have all the `dims` are used
+    dims: tuple(str)
+        Horizontal dimensions, like :attr:`GeoSelector.dims`
+
+    Return
+    ------
+    xarray.DataArray
+        Points where at least one value is not missing along the other dimensions,
+        like the time or the depth, and in at least one data variable
+    """
+    if isinstance(obj, xr.Dataset):
+        das = [da for da in obj.data_vars.values() if set(dims) <= set(da.dims)]
+        if not das:
+            raise exceptions.XoaError(f"No data variable has the dimensions {tuple(dims)}")
+        masks = [get_valid_mask(da, dims) for da in das]
+        return functools.reduce(lambda a, b: a | b, masks)
+    if not set(dims) <= set(obj.dims):
+        raise exceptions.XoaError(f"The data array has not the dimensions {tuple(dims)}")
+    others = [dim for dim in obj.dims if dim not in dims]
+    mask = obj.notnull()
+    if others:
+        mask = mask.any(dim=others)
+    return mask.transpose(*dims).rename("valid")
 
 
 def get_geosel(obj, lon=None, lat=None, circle=None, polygon=None, nearest=None, **kwargs):
@@ -992,8 +1056,10 @@ def get_geosel(obj, lon=None, lat=None, circle=None, polygon=None, nearest=None,
         see :meth:`GeoSelector.nearest`
     kwargs:
         ``fit``, ``pad``, ``pad_units`` and ``units`` are passed to
-        :meth:`GeoSelector.select`, ``max_dist`` and ``units`` to
+        :meth:`GeoSelector.select`, ``max_dist``, ``units`` and ``valid`` to
         :meth:`GeoSelector.nearest`, and ``sphere_radius`` to :class:`GeoSelector`.
+        ``valid="auto"`` selects the nearest point that has data in `obj`,
+        with :func:`get_valid_mask`: not a land point for instance.
 
     Return
     ------
@@ -1009,6 +1075,7 @@ def get_geosel(obj, lon=None, lat=None, circle=None, polygon=None, nearest=None,
         sel = get_geosel(ds, circle=(-4.5, 48, 50), units="km", fit="inner")
         sel = get_geosel(ds, nearest=(-4.5, 48))
         ds.isel(sel.isel)
+        sel = get_geosel(ds.u, nearest=(-4.5, 48), valid="auto")  # nearest sea point
     """
     if isinstance(obj, GeoSelector):
         selector = obj
@@ -1028,6 +1095,12 @@ def get_geosel(obj, lon=None, lat=None, circle=None, polygon=None, nearest=None,
     if nearest is not None:
         if any(v is not None for v in (lon, lat, circle, polygon)):
             raise exceptions.XoaError("nearest cannot be used with a shape")
+        if isinstance(kwargs.get("valid"), str):
+            if kwargs["valid"] != "auto" or isinstance(obj, (GeoSelector, tuple, list)):
+                raise exceptions.XoaError(
+                    'valid must be a mask, or "auto" with a data array or a dataset'
+                )
+            kwargs["valid"] = get_valid_mask(obj, selector.dims)
         return selector.nearest(*nearest, **kwargs)
     return selector.select(lon=lon, lat=lat, circle=circle, polygon=polygon, **kwargs)
 

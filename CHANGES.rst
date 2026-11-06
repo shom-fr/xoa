@@ -13,9 +13,12 @@ New features
 - :mod:`xoa.tide` analyses, predictions and diagnostics use :func:`xoa.grid.map_along_dim`: the time dimension may be anywhere and the predictions are lazy with dask arrays, which needs up to 3 times less memory.
 - Add :func:`xoa.core.tide.predict_currents_complex`.
 - Add :func:`xoa.core.plot.get_layer_projection` to get the projection of a map that suits its background layer.
+- :func:`xoa.core.plot.get_strides` accepts ``zoom`` to compute the automatic strides on a web map, without axes, with the new :func:`xoa.core.plot.get_webmercator_pixels`: for instance to undersample the arrows of a web application.
+- :func:`xoa.geo.get_geosel` and :meth:`xoa.geo.GeoSelector.nearest` accept ``valid`` to select the nearest point among the valid ones only, like the sea points: a boolean mask, or ``"auto"`` to use the points that have data, given by the new :func:`xoa.geo.get_valid_mask`.
 
 Bug fixes
 ---------
+- The sticks of :func:`xoa.plot.plot_stick` and :func:`xoa.core.plot.plot_sticks` are no longer tiny by default: the scale is computed by the new :func:`xoa.core.plot.get_stick_scale` so that the strong sticks span the fraction of the axes width given by the new ``plot.stick_length`` option.
 - The maps of :func:`xoa.plot.create_map`, :func:`xoa.plot.plot_field` and :func:`xoa.plot.plot_fields` with a WMTS background ``layer`` default to the web Mercator projection of its tiles, which are no longer warped: their texts and lines were blurred.
 
 Breaking changes

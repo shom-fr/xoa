@@ -306,6 +306,54 @@ class TestGeoSel:
         sel = geo.get_geosel(cloud, nearest=(9.0, 9.0))
         assert sel.isel == {"n": 1}
 
+    def test_nearest_valid_rect(self, rect):
+        # (358, 11) is near (0, 10): make it and its neighbours land
+        land = rect.copy()
+        land[6:9, [0, 1, 35]] = np.nan
+        sel = geo.get_geosel(land, nearest=(358.0, 11.0), valid="auto")
+        assert np.isfinite(land.isel(sel.isel))
+        assert sel.isel["y"] == 7 and sel.isel["x"] in (2, 34)
+        ref = geo.get_geosel(rect, nearest=(358.0, 11.0))
+        assert float(sel.dist) > float(ref.dist)
+        # explicit mask, on a selector
+        selector = geo.GeoSelector(rect)
+        valid = land.notnull()
+        assert selector.nearest(358.0, 11.0, valid=valid).isel == sel.isel
+        assert len(selector._valid_cores) == 1
+        selector.nearest(358.0, 11.0, valid=valid)
+        assert len(selector._valid_cores) == 1  # cached
+        with pytest.raises(exceptions.XoaError):
+            selector.nearest(358.0, 11.0, valid=valid, max_dist=100.0, units="km")
+
+    def test_nearest_valid_curv_vector(self, curv):
+        temp = curv.temp.where(curv.temp % 3 != 0)
+        ds = curv.assign(temp=temp.expand_dims(time=2).copy())
+        ds["temp"][0] = np.nan  # the mask is reduced along time
+        targets = ([11.0, 14.0, 50.0], [41.0, 44.0, 0.0])
+        sel = geo.get_geosel(ds, nearest=targets, valid="auto", max_dist=50, units="km")
+        assert sel.isel["x"].values[-1] == -1 and np.isinf(sel.dist.values[-1])
+        sub = ds.temp.isel(time=1).isel({dim: idx[:2] for dim, idx in sel.isel.items()})
+        assert np.isfinite(sub).all()
+        valid = geo.get_valid_mask(ds, ("y", "x"))
+        assert valid.dims == ("y", "x") and not valid.values.all() and valid.values.any()
+
+    def test_nearest_valid_cloud(self, cloud):
+        data = cloud.where(cloud.n != 1)
+        sel = geo.get_geosel(data, nearest=(9.0, 9.0), valid="auto")
+        assert sel.isel == {"n": 0}
+
+    def test_nearest_valid_errors(self, rect):
+        with pytest.raises(exceptions.XoaError):
+            geo.get_geosel((rect.lon, rect.lat), nearest=(0, 0), valid="auto")
+        with pytest.raises(exceptions.XoaError):
+            geo.get_geosel(rect, nearest=(0, 0), valid="yes")
+        with pytest.raises(exceptions.XoaError):
+            geo.get_geosel(rect * np.nan, nearest=(0, 0), valid="auto")
+        with pytest.raises(exceptions.XoaError):
+            geo.GeoSelector(rect).nearest(0, 0, valid=rect.isel(x=0).notnull())
+        with pytest.raises(exceptions.XoaError):
+            geo.get_valid_mask(xr.Dataset({"a": ("t", [1.0])}), ("y", "x"))
+
     def test_tuple(self, rect):
         sel = geo.get_geosel((rect.lon, rect.lat), lon=(15.0, 45.0))
         assert sel.isel["x"] == slice(2, 5)
