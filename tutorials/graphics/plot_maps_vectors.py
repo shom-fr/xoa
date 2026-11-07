@@ -10,6 +10,7 @@ In this tutorial, we show how to:
 * compare several fields in a single figure,
 * overlay under-sampled arrows of the currents, optionally colored by the speed,
   with a reference arrow whose value is rounded, and uncertainty ellipses at their tip,
+* choose the arrows of a web map at a zoom level,
 * plot a current time series as sticks,
 * show the location of the domain with a minimap, placed so that the figure stays compact.
 
@@ -28,6 +29,8 @@ import xarray as xr
 
 import xoa
 from xoa import meta
+from xoa.core.plot import get_strides
+from xoa.grid import get_lonlat_2d
 from xoa.plot import (
     plot_double_minimap,
     plot_field,
@@ -157,11 +160,32 @@ plot_vectors(
 ).axes.legend(loc="lower right")
 
 # %%
+# Arrows for a web map
+# --------------------
+#
+# A web application draws the arrows itself, over tiles in the web Mercator projection, at
+# a zoom level. :func:`~xoa.core.plot.get_strides` finds the strides that keep
+# at least ``min_spacing`` pixels between the arrows at a given ``zoom``, without any axes,
+# using :func:`~xoa.core.plot.get_webmercator_pixels`. The strides get smaller as the zoom
+# increases. The maps of :mod:`xoa.plot` with a WMTS background ``layer`` use
+# the same projection by default, given by :func:`~xoa.core.plot.get_layer_projection`.
+
+lon2d, lat2d = get_lonlat_2d(ds)
+for zoom in 5, 6, 7:
+    print(zoom, get_strides("auto", lon2d, lat2d, zoom=zoom))
+sy, sx = get_strides("auto", lon2d, lat2d, zoom=6)
+plot_vectors(ds.u[::sy, ::sx], ds.v[::sy, ::sx], stride=1, map_kw=MAP_KW, title="Zoom 6")
+
+# %%
 # Current time series
 # -------------------
 #
 # Along a single axis, :func:`~xoa.plot.plot_stick` draws a current series as sticks anchored on a
 # line, like a tidal current at a mooring. Here the series is synthetic.
+#
+# The scale of the sticks is computed so that the strong ones span a fraction of the width of the
+# axes, which is set by the ``plot.stick_length`` option and given by
+# :func:`~xoa.core.plot.get_stick_scale`.
 
 time = np.array("2020-01-01", dtype="M8[h]") + np.arange(72)
 phase = 2 * np.pi * np.arange(72) / 12.42
