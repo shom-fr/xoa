@@ -35,14 +35,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
-    - name: Add conda to system path
-      run: |
-        echo $CONDA/bin >> $GITHUB_PATH
+    - name: Set up conda
+      uses: conda-incubator/setup-miniconda@v4
+      with:
+        environment-file: env/environment.rtd.yml
+        activate-environment: xoa-rtd
     - name: Install dependencies
+      shell: bash -el {0}
       run: |
-        conda env update --file env/environment.rtd.yml --name base
         pip install .
     - name: Build the docs
+      shell: bash -el {0}
       run: |
         sphinx-build -b html doc doc/_build/html
     - name: Upload the docs
