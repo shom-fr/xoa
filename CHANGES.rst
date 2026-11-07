@@ -32,6 +32,7 @@ Bug fixes
 Documentation
 -------------
 - Clarify the :ref:`indepth.performance` guide, with figures of the chunks and of the dask and numba threads, and add dask to intersphinx.
+- Add the nearest valid point to :ref:`sphx_glr_tutorials_grids_plot_geosel.py` and the arrows of a web map to :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
 
 2026.10.0
 =========

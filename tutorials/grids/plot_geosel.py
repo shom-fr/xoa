@@ -10,7 +10,7 @@ In this tutorial, we show how to:
 * choose between the smallest window that covers the shape and a mask (``outer``),
   or the largest window with only points inside (``inner``),
 * add a margin of grid points, down to the cell edges, or of a distance,
-* select a point, with scalar ``lon`` and ``lat``, or the nearest points to targets,
+* select a point, with scalar ``lon`` and ``lat``, or the nearest points to targets, among the valid ones if needed,
 * reuse a selection for several arrays.
 
 Distances are great circle ones, and the shapes can cross the dateline.
@@ -219,6 +219,28 @@ print(rect.isel(sel.isel).values)
 targets = ([-6.0, -5.0, -4.0], [46.0, 47.0, 48.0])
 sel = get_geosel(curv, nearest=targets, units="km")
 print(curv.isel(sel.isel).sst.values, sel.dist.values.round(1))
+
+# %%
+# The nearest valid point
+# -----------------------
+#
+# A target on land has a land point as nearest neighbor, which has no data. With ``valid``, the
+# search is restricted to the points of a boolean mask, or to the points that have data with
+# ``valid="auto"``, as given by :func:`~xoa.geo.get_valid_mask`.
+
+land = (lon > -4.3 + 0.5 * np.sin(4 * (lat - 45))).transpose("lat", "lon")
+sst = rect.where(~land)
+targets = ([-3.5, -3.0], [46.0, 47.5])
+
+fig, axes = new_map(2, width=3.4)
+for ax, valid in zip(axes, [None, "auto"]):
+    sel = get_geosel(sst, nearest=targets, units="km", valid=valid)
+    near = sst.isel(sel.isel)
+    ax.pcolormesh(lon, lat, np.where(land, 0, 1), cmap="Blues", transform=pc, shading="nearest")
+    ax.plot(*targets, "k^", transform=pc)
+    ax.plot(near.lon, near.lat, "ro", transform=pc)
+    ax.set_title(f"valid={valid!r}")
+    print(valid, near.values, sel.dist.values.round(1))
 
 # %%
 # Reusing a selector, and the decorator
