@@ -4,6 +4,9 @@ What's new
 Unreleased
 ==========
 
+2026.11.0
+=========
+
 New features
 ------------
 - Add the ``dev`` extra with the tools for development (``pytest``, ``pre-commit``, ``ruff`` and ``shapely``).
@@ -20,14 +23,11 @@ Bug fixes
 ---------
 - The sticks of :func:`xoa.plot.plot_stick` and :func:`xoa.core.plot.plot_sticks` are no longer tiny by default: the scale is computed by the new :func:`xoa.core.plot.get_stick_scale` so that the strong sticks span the fraction of the axes width given by the new ``plot.stick_length`` option.
 - The maps of :func:`xoa.plot.create_map`, :func:`xoa.plot.plot_field` and :func:`xoa.plot.plot_fields` with a WMTS background ``layer`` default to the web Mercator projection of its tiles, which are no longer warped: their texts and lines were blurred.
+- :func:`xoa.core.plot.add_quiverkey` no longer uses the ``verts`` attribute of the quiver key, deprecated in Matplotlib 3.11.
 
 Breaking changes
 ----------------
 - ``cartopy``, ``matplotlib`` and ``dask`` are standard dependencies: the ``plot`` extra is removed.
-
-Bug fixes
----------
-- :func:`xoa.core.plot.add_quiverkey` no longer uses the ``verts`` attribute of the quiver key, deprecated in Matplotlib 3.11.
 
 Documentation
 -------------
