@@ -387,6 +387,16 @@ coordinates are pixels, the rule is easy to follow:
     cplot.get_strides("auto", lon, lat, ax, min_spacing=5)
     cplot.get_strides((2, 4), lon, lat)
 
+Without axes, the spacing can be measured on a web map, like those of Leaflet or OpenLayers,
+at a ``zoom`` level: the points are placed with :func:`~xoa.core.plot.get_webmercator_pixels`.
+This is how a web application undersamples the arrows of the currents for the view:
+
+.. ipython:: python
+
+    lon, lat = np.meshgrid(np.arange(-5, -4.5, 0.01), np.arange(48, 48.3, 0.01))
+    cplot.get_strides("auto", lon, lat, zoom=10, min_spacing=20)
+    cplot.get_strides("auto", lon, lat, zoom=13, min_spacing=20)
+
 The same grid is drawn with :func:`~xoa.plot.plot_grid`, with a stride that suits the figure:
 
 .. ipython:: python
@@ -447,6 +457,9 @@ Sticks
 line, are oriented along the current and are as long as its speed. This is a compact way to
 show the rotation of tidal currents. Pass ``u`` and ``v``, or a dataset that holds them,
 and use ``scale`` to change the lengths (the smaller, the longer).
+By default, the scale is computed by :func:`xoa.core.plot.get_stick_scale` so that the strong
+sticks, at the 99th percentile of the speed, span the fraction of the axes width given
+by the ``plot.stick_length`` option.
 A reference stick is drawn above the left corner of the axes, like the reference arrow of
 :func:`~xoa.plot.plot_vectors`: its value is rounded to 1, 2 or 5 times a power of ten
 by :func:`xoa.core.plot.get_quiverkey_value` and it is added with

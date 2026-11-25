@@ -16,6 +16,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Atmospheric Science"
@@ -23,10 +25,12 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "platformdirs",
+    "cartopy",
     "cmocean",
     "configobj",
     "dask",
     "gsw",
+    "matplotlib",
     "netCDF4",
     "numba",
     "pooch",
@@ -35,13 +39,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-plot = ["cartopy"]
+dev = [
+  "pre-commit",
+  "pytest",
+  "ruff",
+  "shapely",
+]
 docs = [
-  "cartopy",
-  "cmocean",
   "ipython",
   "jupyter_client",
-  "matplotlib",
   "owslib",
   "sphinx<9",
   "sphinx_autosummary_accessors",

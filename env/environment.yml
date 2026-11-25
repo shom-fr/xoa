@@ -9,8 +9,10 @@ dependencies:
   - cartopy
   - cmocean
   - configobj
+  - dask-core
   - gsw
   - matplotlib-base
+  - netcdf4
   - numba
   - python>=3.10
   - pooch

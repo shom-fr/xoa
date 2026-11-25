@@ -49,6 +49,7 @@ from .core.plot import (  # noqa
     create_map,
     decorate_map,
     get_layer,
+    get_layer_projection,
     import_cartopy,
     setup_map_axes,
 )
@@ -1072,7 +1073,8 @@ def plot_fields(
         Number of columns, which defaults to the number of fields up to three.
     projection: None, str, cartopy.crs.Projection
         Projection of the maps, see :func:`xoa.core.plot.get_projection`.
-        The default is Mercator.
+        The default is the one of the background layer of `map_kw`,
+        given by :func:`xoa.core.plot.get_layer_projection`, else Mercator.
     figsize: None, tuple
         Size of the figure, which defaults to a size that depends on the grid of axes.
     titles: None, list(str)
@@ -1121,6 +1123,8 @@ def plot_fields(
     nrows = -(-nfields // ncols)
     if figsize is None:
         figsize = (5.5 * ncols, 4.8 * nrows)
+    if projection is None:
+        projection = cplot.get_layer_projection((map_kw or {}).get("layer"))
     projection = cplot.get_projection(projection)
     fig, axes = plt.subplots(
         nrows,

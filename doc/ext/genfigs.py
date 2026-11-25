@@ -12,7 +12,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
+from matplotlib.patches import FancyBboxPatch, Polygon
 
 from xoa.core.grid import centers2edges, edges2bounds, create_rotated_grid
 from xoa.core.poly import clip_polygon, spherical_area
@@ -260,11 +260,133 @@ def gen_method_stencils(outfile):
     plt.close(fig)
 
 
+def _cuboid(ax, x, y, width, depth, height, **kwargs):
+    """Draw a parallelepiped in oblique projection with its front face at ``(x, y)``"""
+    dx, dy = 0.5 * depth, 0.3 * depth
+    faces = [
+        ([(x, y), (x + width, y), (x + width, y + height), (x, y + height)], "#eef2f6"),
+        (
+            [
+                (x, y + height),
+                (x + dx, y + height + dy),
+                (x + width + dx, y + height + dy),
+                (x + width, y + height),
+            ],
+            "#d5dde6",
+        ),
+        (
+            [
+                (x + width, y),
+                (x + width + dx, y + dy),
+                (x + width + dx, y + height + dy),
+                (x + width, y + height),
+            ],
+            "#bfcad6",
+        ),
+    ]
+    for corners, color in faces:
+        ax.add_patch(Polygon(corners, facecolor=color, edgecolor="#1f3a5f", lw=0.8, **kwargs))
+
+
+def gen_chunks(outfile):
+    """Figure that shows how to chunk an array whose working dimension is ``z``
+
+    The working dimension is never split: a block is a whole water column for the tile that it
+    covers, with one block per time step or per tile of a time step.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(9, 3.4))
+    titles = ['chunks={"time": 1}', 'chunks={"time": 1, "y": 500, "x": 500}']
+    for ax, title in zip(axes, titles):
+        ax.set_title(title, fontsize=10, family="monospace")
+        ax.set(xlim=(-0.7, 4.7), ylim=(-0.9, 2.2), aspect="equal")
+        ax.axis("off")
+        ax.annotate("", (-0.25, 1.2), (-0.25, 0), arrowprops=dict(arrowstyle="->"))
+        ax.text(-0.35, 0.6, "z", ha="right", va="center", fontsize=9, family="monospace")
+
+    # One block per time step
+    ax = axes[0]
+    for t in range(3):
+        _cuboid(ax, 1.5 * t, 0, 1.0, 0.8, 1.2)
+        ax.text(1.5 * t + 0.5, -0.3, f"time={t}", ha="center", fontsize=8, family="monospace")
+
+    # Tiles in y and x for each time step, back row first
+    ax = axes[1]
+    for t in range(2):
+        for j in (1, 0):
+            for i in range(3):
+                _cuboid(ax, 2.2 * t + 0.55 * i + 0.25 * j, 0.15 * j, 0.55, 0.5, 1.2)
+        ax.text(2.2 * t + 0.9, -0.3, f"time={t}", ha="center", fontsize=8, family="monospace")
+    ax.annotate("", (1.9, -0.55), (0.0, -0.55), arrowprops=dict(arrowstyle="->"))
+    ax.text(0.95, -0.85, "x", ha="center", fontsize=9, family="monospace")
+    ax.annotate("", (2.7, -0.35), (2.2, -0.65), arrowprops=dict(arrowstyle="->"))
+    ax.text(2.8, -0.45, "y", fontsize=9, family="monospace")
+
+    fig.tight_layout()
+    fig.savefig(outfile, dpi=110)
+    plt.close(fig)
+
+
+def gen_dask_threads(outfile):
+    """Figure that shows the dask threads, the blocks they process and the numba threads"""
+    fig, ax = plt.subplots(figsize=(6.5, 3.2))
+    ax.set(xlim=(-1.9, 5.0), ylim=(-0.2, 2.8), aspect="equal")
+    ax.axis("off")
+    rows = {"dask threads": 2.3, "blocks": 1.2, "numba threads": 0.1}
+    for label, y in rows.items():
+        ax.text(-0.75, y + 0.2, label, ha="right", va="center", fontsize=10)
+
+    for i in range(4):  # 2 blocks in progress, the others wait
+        active = i < 2
+        ax.add_patch(
+            FancyBboxPatch(
+                (1.4 * i - 0.45, 1.2),
+                0.9,
+                0.4,
+                boxstyle="round,pad=0,rounding_size=0.06",
+                facecolor="#cde9f5" if active else "#eeeeee",
+                edgecolor="#1f3a5f",
+                lw=0.8,
+            )
+        )
+        if active:
+            ax.add_patch(
+                FancyBboxPatch(
+                    (1.4 * i - 0.45, 2.3),
+                    0.9,
+                    0.4,
+                    boxstyle="round,pad=0,rounding_size=0.06",
+                    facecolor="#5ac2e7",
+                    edgecolor="#1f3a5f",
+                    lw=0.8,
+                )
+            )
+            ax.text(1.4 * i, 2.5, "dask", ha="center", va="center", fontsize=10)
+            for y0, y1 in ((2.3, 1.6), (1.2, 0.6)):
+                ax.annotate("", (1.4 * i, y1), (1.4 * i, y0), arrowprops=dict(arrowstyle="->"))
+            for k in range(4):
+                ax.add_patch(
+                    Polygon(
+                        [(1.4 * i + 0.22 * (k - 2) + 0.02 + dx, 0.1 + dy) for dx, dy in
+                         ((0, 0), (0.18, 0), (0.18, 0.3), (0, 0.3))],
+                        facecolor="#cde9f5",
+                        edgecolor="#1f3a5f",
+                        lw=0.8,
+                    )
+                )
+    ax.text(4.2, 0.25, "blocks waiting", ha="center", va="center", fontsize=9, style="italic")
+
+    fig.tight_layout()
+    fig.savefig(outfile, dpi=110)
+    plt.close(fig)
+
+
 def genfigs(app):
     """Generate the figures during the documentation compilation"""
     gendir = os.path.join(app.env.srcdir, "_static")
     gen_interp_vs_regrid(os.path.join(gendir, "interp-vs-regrid.png"))
     gen_method_stencils(os.path.join(gendir, "method-stencils.png"))
+    gen_chunks(os.path.join(gendir, "chunks.png"))
+    gen_dask_threads(os.path.join(gendir, "dask-threads.png"))
 
 
 def setup(app):
@@ -276,3 +398,5 @@ if __name__ == "__main__":
     outdir = sys.argv[1] if len(sys.argv) > 1 else "."
     gen_interp_vs_regrid(os.path.join(outdir, "interp-vs-regrid.png"))
     gen_method_stencils(os.path.join(outdir, "method-stencils.png"))
+    gen_chunks(os.path.join(outdir, "chunks.png"))
+    gen_dask_threads(os.path.join(outdir, "dask-threads.png"))
