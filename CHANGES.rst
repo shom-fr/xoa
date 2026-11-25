@@ -4,35 +4,35 @@ What's new
 Unreleased
 ==========
 
+2026.11.0
+=========
+
 New features
 ------------
-- Add the ``dev`` extra with the tools for development (``pytest``, ``pre-commit``, ``ruff`` and ``shapely``).
-- Add the :ref:`contributing` guide, with the release procedure.
+- Add the ``dev`` extra with the development tools (``pytest``, ``pre-commit``, ``ruff`` and ``shapely``).
+- Add the :ref:`contributing` guide, including the release procedure.
 - Test Python 3.10 to 3.13 in the CI, which installs xoa with pip and the ``dev`` extra.
-- Add the ``"webmercator"`` projection, alias ``"webmerc"``, to :func:`xoa.core.plot.get_projection`: the web Mercator projection of the tiles of most web map services.
-- :mod:`xoa.tide` analyses, predictions and diagnostics use :func:`xoa.grid.map_along_dim`: the time dimension may be anywhere and the predictions are lazy with dask arrays, which needs up to 3 times less memory.
-- Add :func:`xoa.core.tide.predict_currents_complex`.
-- Add :func:`xoa.core.plot.get_layer_projection` to get the projection of a map that suits its background layer.
-- :func:`xoa.core.plot.get_strides` accepts ``zoom`` to compute the automatic strides on a web map, without axes, with the new :func:`xoa.core.plot.get_webmercator_pixels`: for instance to undersample the arrows of a web application.
-- :func:`xoa.geo.get_geosel` and :meth:`xoa.geo.GeoSelector.nearest` accept ``valid`` to select the nearest point among the valid ones only, like the sea points: a boolean mask, or ``"auto"`` to use the points that have data, given by the new :func:`xoa.geo.get_valid_mask`.
+- Add the ``"webmercator"`` projection, with the ``"webmerc"`` alias, to :func:`xoa.core.plot.get_projection`: the Web Mercator projection used by the tiles of most web map services.
+- The :mod:`xoa.tide` analyses, predictions and diagnostics use :func:`xoa.grid.map_along_dim`: the time dimension may be at any position, and the predictions are computed lazily on dask arrays, with up to a third of the memory.
+- Add :func:`xoa.core.tide.predict_currents_complex` to predict tidal currents as complex velocities.
+- Add :func:`xoa.core.plot.get_layer_projection` to get the map projection that suits a background layer.
+- :func:`xoa.core.plot.get_strides` accepts ``zoom`` to compute automatic strides for a web map without axes, using the new :func:`xoa.core.plot.get_webmercator_pixels`: for instance, to subsample the arrows of a web application.
+- :func:`xoa.geo.get_geosel` and :meth:`xoa.geo.GeoSelector.nearest` accept ``valid`` to select the nearest point among valid points only, such as sea points: either a boolean mask, or ``"auto"`` to use the points that have data, as given by the new :func:`xoa.geo.get_valid_mask`.
 
 Bug fixes
 ---------
-- The sticks of :func:`xoa.plot.plot_stick` and :func:`xoa.core.plot.plot_sticks` are no longer tiny by default: the scale is computed by the new :func:`xoa.core.plot.get_stick_scale` so that the strong sticks span the fraction of the axes width given by the new ``plot.stick_length`` option.
-- The maps of :func:`xoa.plot.create_map`, :func:`xoa.plot.plot_field` and :func:`xoa.plot.plot_fields` with a WMTS background ``layer`` default to the web Mercator projection of its tiles, which are no longer warped: their texts and lines were blurred.
+- The sticks of :func:`xoa.plot.plot_stick` and :func:`xoa.core.plot.plot_sticks` are no longer tiny by default: the scale is computed by the new :func:`xoa.core.plot.get_stick_scale`, so that the strongest sticks span the fraction of the axes width given by the new ``plot.stick_length`` option.
+- Maps created by :func:`xoa.plot.create_map`, :func:`xoa.plot.plot_field` and :func:`xoa.plot.plot_fields` with a WMTS background ``layer`` default to the Web Mercator projection of its tiles, so that the tiles are no longer warped, which blurred their text and lines.
+- :func:`xoa.core.plot.add_quiverkey` no longer uses the ``verts`` attribute of the quiver key, which is deprecated in Matplotlib 3.11.
 
 Breaking changes
 ----------------
-- ``cartopy``, ``matplotlib`` and ``dask`` are standard dependencies: the ``plot`` extra is removed.
-
-Bug fixes
----------
-- :func:`xoa.core.plot.add_quiverkey` no longer uses the ``verts`` attribute of the quiver key, deprecated in Matplotlib 3.11.
+- ``cartopy``, ``matplotlib`` and ``dask`` are now required dependencies, and the ``plot`` extra is removed.
 
 Documentation
 -------------
-- Clarify the :ref:`indepth.performance` guide, with figures of the chunks and of the dask and numba threads, and add dask to intersphinx.
-- Add the nearest valid point to :ref:`sphx_glr_tutorials_grids_plot_geosel.py` and the arrows of a web map to :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
+- Clarify the :ref:`indepth.performance` guide, with figures showing the chunks and the dask and numba threads, and add dask to intersphinx.
+- Add the nearest valid point to :ref:`sphx_glr_tutorials_grids_plot_geosel.py`, and the arrows of a web map to :ref:`sphx_glr_tutorials_graphics_plot_maps_vectors.py`.
 
 2026.10.0
 =========
