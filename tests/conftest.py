@@ -4,6 +4,7 @@ import xarray as xr
 
 import xoa.tide as xtide
 from xoa.core import tide as ctide
+from xoa.tide.harmonic import _nodal_modulation_
 
 collect_ignore = ["test_cf.py"]
 
@@ -12,16 +13,30 @@ TIDE_NT, TIDE_NY, TIDE_NX = 720, 3, 4  # 30 days of hourly data
 TIDE_TIME = np.datetime64("2024-01-01", "s") + np.arange(TIDE_NT) * np.timedelta64(3600, "s")
 
 
-def make_tide_ssh(seed=0):
-    """Synthetic sea level (time, y, x) and its true mean, amplitudes and phases"""
+def make_tide_ssh(seed=0, nodal=True):
+    """Synthetic sea level (time, y, x) and its true mean, amplitudes and phases
+
+    With ``nodal``, the amplitudes and phases are modulated by the nodal corrections
+    relative to those of the first time, like for a real signal.
+    """
     rng = np.random.default_rng(seed)
     nf, ny, nx = len(TIDE_NAMES), TIDE_NY, TIDE_NX
     omega = xtide.get_frequencies(TIDE_NAMES)
     h0 = rng.uniform(0.1, 0.5, (ny, nx))
     amp = rng.uniform(0.1, 2.0, (nf, ny, nx))
     phase = rng.uniform(0, 2 * np.pi, (nf, ny, nx))
+    fr = du = None
+    if nodal:
+        t_sec = TIDE_TIME.astype("d")
+        fr, du = _nodal_modulation_(TIDE_NAMES, t_sec, t_sec[0], 86400.0)[2:]
     h = ctide.predict_ssh(
-        np.arange(TIDE_NT) * 3600.0, omega, h0.ravel(), amp.reshape(nf, -1), phase.reshape(nf, -1)
+        np.arange(TIDE_NT) * 3600.0,
+        omega,
+        h0.ravel(),
+        amp.reshape(nf, -1),
+        phase.reshape(nf, -1),
+        fr,
+        du,
     )
     da = xr.DataArray(
         h.reshape(TIDE_NT, ny, nx), dims=("time", "y", "x"), coords={"time": TIDE_TIME}

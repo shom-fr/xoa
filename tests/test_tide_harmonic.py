@@ -5,7 +5,7 @@ Test the :mod:`xoa.tide.harmonic` module
 import numpy as np
 import pytest
 import xarray as xr
-from conftest import TIDE_NAMES, TIDE_NX, TIDE_NY, TIDE_TIME
+from conftest import TIDE_NAMES, TIDE_NX, TIDE_NY, TIDE_TIME, make_tide_ssh
 
 import xoa.tide as xtide
 from xoa.exceptions import XoaError
@@ -27,8 +27,8 @@ def test_analysis_prediction_roundtrip_3d(greenwich, tide_ssh):
     assert xtide.harmonic_predict(coef, later).shape == (48, TIDE_NY, TIDE_NX)
 
 
-def test_analysis_without_nodal_recovers_coefficients(tide_ssh):
-    da, h0, amp, phase = tide_ssh
+def test_analysis_without_nodal_recovers_coefficients():
+    da, h0, amp, phase = make_tide_ssh(nodal=False)
     coef = xtide.harmonic_analysis(da, names=TIDE_NAMES, nodal=False, uncertainty=False)
     np.testing.assert_allclose(coef["amp"], amp, atol=1e-8)
     np.testing.assert_allclose(np.cos(coef["phase"]), np.cos(phase), atol=1e-8)
@@ -186,3 +186,54 @@ def test_time_dim_and_variables_are_searched(tide_ssh, tide_uv):
     assert "semi_major" in coef
     with pytest.raises(XoaError):
         xtide.harmonic_analysis(xr.Dataset({"foo": da}))
+
+
+@pytest.mark.parametrize("nodal_step", [86400.0, None])
+def test_predict_follows_nodal_corrections(nodal_step):
+    names = ["M2", "K1", "O1"]
+    rng = np.random.default_rng(0)
+    amp, phase = rng.uniform(0.5, 2, 3), rng.uniform(0, 2 * np.pi, 3)
+    t0 = np.datetime64("2020-01-01", "s")
+    coef = xr.Dataset(
+        {
+            "amp": ("constituent", amp),
+            "phase": ("constituent", phase),
+            "h0": 0.1,
+        },
+        coords={"constituent": names},
+        attrs={"nodal": True, "phase_convention": "greenwich", "t_ref": float(t0.astype("d"))},
+    )
+    times = t0 + np.arange(0, 5 * 365 * 24, 1001) * np.timedelta64(3600, "s")
+    pred = xtide.harmonic_predict(coef, times, nodal_step=nodal_step)
+    # exact formula at each time: h0 + Σ f(t)·A·cos(V0(t) + u(t) − g)
+    t_sec = times.astype("d")
+    f, u = xtide.nodal_corrections(t_sec, names)
+    v0 = xtide.equilibrium_argument(names, t_sec)
+    ref = 0.1 + (f * amp[:, None] * np.cos(v0 + u - phase[:, None])).sum(axis=0)
+    if nodal_step is None:  # nodal corrections of t_ref only: wrong after a few months
+        assert abs(pred - ref).max() > 0.05
+    else:
+        # V0 + ω(t - t_ref) drifts slightly from V0(t), whose rates are those of Schureman
+        np.testing.assert_allclose(pred, ref, atol=1e-4)
+
+
+def test_analysis_with_nodal_steps_recovers_long_signal():
+    names = ["M2", "S2", "K1", "O1"]
+    coef = xr.Dataset(
+        {
+            "amp": ("constituent", [1.5, 0.5, 0.2, 0.1]),
+            "phase": ("constituent", [1.0, 2.0, 3.0, 4.0]),
+            "h0": 0.0,
+        },
+        coords={"constituent": names},
+        attrs={"nodal": True, "phase_convention": "greenwich", "t_ref": 0.0},
+    )
+    times = np.datetime64("2020-01-01", "s") + np.arange(400 * 24) * np.timedelta64(3600, "s")
+    da = xtide.harmonic_predict(coef, times)
+    ana = xtide.harmonic_analysis(da, names=names, greenwich=True, uncertainty=False)
+    np.testing.assert_allclose(ana["amp"], coef["amp"], atol=1e-6)
+    np.testing.assert_allclose(np.cos(ana["phase"] - coef["phase"]), 1, atol=1e-10)
+    old = xtide.harmonic_analysis(
+        da, names=names, greenwich=True, uncertainty=False, nodal_step=None
+    )
+    assert abs(old["amp"] - coef["amp"]).max() > 5e-5

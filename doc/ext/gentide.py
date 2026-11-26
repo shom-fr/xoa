@@ -1,7 +1,7 @@
 """Generate the table of the default tidal constituents"""
 
-import os
 import logging
+import os
 
 import numpy as np
 
@@ -22,9 +22,11 @@ def genrst(app):
     rst += "      - Period (h)\n      - Satellites\n      - Compound of\n"
     for name, period in zip(names, periods):
         const = db[name]
-        compound = " + ".join(
-            f"{mult}×{src}" if mult > 1 else src for src, mult in const["compound_of"] or []
-        )
+        compound = ""
+        for src, mult in const["compound_of"] or []:
+            sign = " − " if mult < 0 else (" + " if compound else "")
+            compound += sign + (f"{abs(mult)}×{src}" if abs(mult) > 1 else src)
+        compound = compound.lstrip()
         rst += f"    * - ``{name}``\n      - {const['species']}\n"
         rst += f"      - ``{const['doodson']}``\n      - {period:.3f}\n"
         rst += f"      - {len(const['satellites'])}\n      - {compound}\n"

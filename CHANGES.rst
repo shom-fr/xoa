@@ -4,6 +4,16 @@ What's new
 Unreleased
 ==========
 
+New features
+------------
+- The nodal corrections of :mod:`xoa.tide` analyses and predictions follow the time, updated every ``nodal_step`` (one day by default).
+- Compound constituents accept negative multipliers.
+- Add 13 constituents to the default database, like MSf, MU2, NU2, L2 and 2SM2.
+
+Bug fixes
+---------
+- Use the satellites of Foreman (1977): the nodal factors of K2, K1, O1 and Mf were wrong by up to 6%.
+
 2026.11.0
 =========
 

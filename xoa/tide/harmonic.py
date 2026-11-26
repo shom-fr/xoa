@@ -127,9 +127,13 @@ class TidalHarmonic:
         Name of the time dimension of the data arrays, searched with
         :func:`xoa.coords.get_tdim` when None.
     nodal: bool
-        Apply the nodal corrections.
+        Apply the nodal corrections to the analysis of scalars.
     rayleigh_min: float
         Rayleigh criterion multiplier, used only when ``names`` is None.
+    nodal_step: float, None
+        Time step in seconds at which the nodal corrections ``f`` and ``u`` are computed
+        and then linearly interpolated, so that they follow the time over long records.
+        When None, they are those of the middle of the record.
 
     Note
     ----
@@ -137,18 +141,22 @@ class TidalHarmonic:
     Spatial chunking is fine.
     """
 
-    def __init__(self, t, names=None, t_dim=None, nodal=True, rayleigh_min=1.0):
+    def __init__(self, t, names=None, t_dim=None, nodal=True, rayleigh_min=1.0, nodal_step=86400.0):
         t_sec = _to_seconds_(t)
         if names is None:
             names = auto_constituents((t_sec[-1] - t_sec[0]) / 86400.0, rayleigh_min)
         self.names = list(names)
         self.omega = get_frequencies(self.names)
         self.nodal = nodal
+        self.nodal_step = nodal_step
         self._t_dim = t_dim
 
+        fr = du = None
         if nodal:
             self._t_ref = float(t_sec[len(t_sec) // 2])
-            self._f, self._u = nodal_corrections(self._t_ref, self.names)
+            self._f, self._u, fr, du = _nodal_modulation_(
+                self.names, t_sec, self._t_ref, nodal_step
+            )
         else:
             self._t_ref = float(t_sec[0])
             self._f = np.ones(len(self.names))
@@ -156,7 +164,7 @@ class TidalHarmonic:
 
         # Time is relative to t_ref so that phases refer to the middle of the record
         t_rel = t_sec - self._t_ref
-        self._A = tide_core.design_matrix(t_rel, self.omega)
+        self._A = tide_core.design_matrix(t_rel, self.omega, fr, du)
         self._Ai = tide_core.design_matrix_pinv(self._A)
         self._M = tide_core.design_matrix_currents(t_rel, self.omega)
         self._Mi = tide_core.design_matrix_currents_pinv(self._M)
@@ -367,7 +375,7 @@ class TidalHarmonic:
 
         See :func:`harmonic_predict`.
         """
-        return harmonic_predict(coef, t_out, self._t_dim, self.nodal)
+        return harmonic_predict(coef, t_out, self._t_dim, self.nodal, self.nodal_step)
 
     def predict_uv(self, coef, t_out):
         """Reconstruct the currents from coefficients
@@ -378,7 +386,14 @@ class TidalHarmonic:
 
 
 def harmonic_analysis(
-    da, names=None, t_dim=None, nodal=True, rayleigh_min=1.0, uncertainty=True, greenwich=False
+    da,
+    names=None,
+    t_dim=None,
+    nodal=True,
+    rayleigh_min=1.0,
+    uncertainty=True,
+    greenwich=False,
+    nodal_step=86400.0,
 ):
     """One-shot harmonic analysis of a scalar data array
 
@@ -390,7 +405,7 @@ def harmonic_analysis(
     if isinstance(da, xr.Dataset):
         da = xdyn.get_sea_level(da, errors="raise")
     t_dim = get_time_dim(da, t_dim)
-    return TidalHarmonic(da[t_dim].values, names, t_dim, nodal, rayleigh_min).analyse(
+    return TidalHarmonic(da[t_dim].values, names, t_dim, nodal, rayleigh_min, nodal_step).analyse(
         da, uncertainty=uncertainty, greenwich=greenwich
     )
 
@@ -413,8 +428,32 @@ def harmonic_analysis_uv(da_u, da_v=None, names=None, t_dim=None, nodal=True, ra
     )
 
 
-def harmonic_predict(coef, t_out, t_dim=None, nodal=True):
+def _nodal_modulation_(names, t_sec, t_ref, nodal_step):
+    """Nodal corrections relative to those of ``t_ref``, of shape ``(nf, nt)``
+
+    Return ``(f_ref, u_ref, fr, du)`` where ``fr = f(t) / f(t_ref)`` and ``du = u(t) - u(t_ref)``.
+    They are computed every ``nodal_step`` seconds and linearly interpolated in time,
+    since they vary over 18.6 years. ``fr`` and ``du`` are None when ``nodal_step`` is None.
+    """
+    f_ref, u_ref = nodal_corrections(t_ref, names)
+    if nodal_step is None:
+        return f_ref, u_ref, None, None
+    t0, t1 = float(np.min(t_sec)), float(np.max(t_sec))
+    nstep = max(int(np.ceil((t1 - t0) / nodal_step)), 1)
+    t_nodal = np.linspace(t0, t0 + nstep * nodal_step, nstep + 1)
+    f, u = nodal_corrections(t_nodal, names)
+    du = np.angle(np.exp(1j * (u - u_ref[:, None])))  # small, no wrapping
+    fr = np.array([np.interp(t_sec, t_nodal, fi / fref) for fi, fref in zip(f, f_ref)])
+    du = np.array([np.interp(t_sec, t_nodal, dui) for dui in du])
+    return f_ref, u_ref, fr, du
+
+
+def harmonic_predict(coef, t_out, t_dim=None, nodal=True, nodal_step=86400.0):
     """Predict a scalar signal from harmonic coefficients
+
+    With the Greenwich phase convention, the prediction is::
+
+        h(t) = h0 + Σ f(t)·A·cos(V₀(t_ref) + ω(t−t_ref) + u(t) − g)
 
     Parameters
     ----------
@@ -425,6 +464,11 @@ def harmonic_predict(coef, t_out, t_dim=None, nodal=True):
         Name of the output time dimension: that of ``t_out`` when it is a data array, else
         the time dimension of the coefficients' source, i.e. ``"time"``.
     nodal: bool
+    nodal_step: float, None
+        Time step in seconds at which the nodal corrections ``f`` and ``u`` are computed,
+        before a linear interpolation in time.
+        When None, they are those of the reference time ``t_ref``, which is valid over
+        a few weeks only.
 
     Return
     ------
@@ -435,8 +479,9 @@ def harmonic_predict(coef, t_out, t_dim=None, nodal=True):
     nf = len(names)
     t_sec = _to_seconds_(t_out)
     t_ref = float(coef.attrs.get("t_ref", t_sec[0]))
+    fr = du = None
     if coef.attrs.get("nodal", nodal):
-        f, u = nodal_corrections(t_ref, names)
+        f, u, fr, du = _nodal_modulation_(names, t_sec, t_ref, nodal_step)
     else:
         f, u = np.ones(nf), np.zeros(nf)
     f, u = xr.DataArray(f, dims="constituent"), xr.DataArray(u, dims="constituent")
@@ -449,7 +494,7 @@ def harmonic_predict(coef, t_out, t_dim=None, nodal=True):
     t_rel, omega = t_sec - t_ref, get_frequencies(names)
 
     def kernel(amp, phase, h0):
-        return tide_core.predict_ssh(t_rel, omega, h0[0], amp, phase)
+        return tide_core.predict_ssh(t_rel, omega, h0[0], amp, phase, fr, du)
 
     return _predict_(kernel, coef["amp"] * f, [phase, coef["h0"]], t_out, t_dim, "Tidal prediction")
 

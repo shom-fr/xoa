@@ -338,13 +338,13 @@ def equilibrium_argument(names, t_ref):
     Parameters
     ----------
     names: list of str
-    t_ref: float
+    t_ref: float or numpy.ndarray
         Seconds since 1970-01-01 00:00:00 UTC
 
     Return
     ------
     numpy.ndarray
-        Argument in radians, in [0, 2π)
+        Argument in radians, in [0, 2π), of shape ``(nf,) + numpy.shape(t_ref)``
 
     References
     ----------
@@ -369,33 +369,48 @@ def equilibrium_argument(names, t_ref):
 def nodal_corrections(t_ref, names):
     """Nodal amplitude factor ``f`` and phase correction ``u`` of named constituents
 
+    The corrections of a compound constituent are those of its components:
+    ``f = Π f_i^|m_i|`` and ``u = Σ m_i u_i``, where the multipliers ``m_i``
+    may be negative, like for ``MSf = S2 - M2``.
+
     Parameters
     ----------
-    t_ref: float
-        Reference time in seconds since 1970-01-01, typically mid-record
+    t_ref: float or numpy.ndarray
+        Reference time(s) in seconds since 1970-01-01, typically mid-record
     names: list of str
 
     Return
     ------
     f: numpy.ndarray
-        Amplitude factors, close to 1
+        Amplitude factors, close to 1, of shape ``(nf,) + numpy.shape(t_ref)``
     u: numpy.ndarray
-        Phase corrections in radians
+        Phase corrections in radians, of the same shape
     """
+    db = get_constituents()
     _, _, p, N, _, p1 = tide_core.astronomical_args(t_ref)
-    f = np.ones(len(names))
-    u = np.zeros(len(names))
-    for i, name in enumerate(names):
-        c = get_constituents()[name]
+    N, p, p1 = np.deg2rad(N), np.deg2rad(p), np.deg2rad(p1)
+    cache = {}
+
+    def single(name):
+        if name in cache:
+            return cache[name]
+        c = db[name]
         if c["compound_of"]:
-            f[i], u[i] = 1.0, 0.0
+            f, u = np.ones_like(N), np.zeros_like(N)
             for comp_name, mult in c["compound_of"]:
-                fc, uc = nodal_corrections(t_ref, [comp_name])
-                f[i] *= float(fc[0]) ** mult
-                u[i] += mult * float(uc[0])
+                fc, uc = single(comp_name)
+                f = f * fc ** abs(mult)
+                u = u + mult * uc
         else:
-            z = complex(1.0, 0.0)
+            z = np.ones_like(N, dtype=complex)
             for r, dN, dp, dp1, phi0 in c["satellites"]:
-                z += r * np.exp(1j * np.deg2rad(dN * N + dp * p + dp1 * p1 + phi0))
-            f[i], u[i] = abs(z), np.angle(z)
+                z = z + r * np.exp(1j * (dN * N + dp * p + dp1 * p1 + np.deg2rad(phi0)))
+            f, u = np.abs(z), np.angle(z)
+        cache[name] = f, u
+        return f, u
+
+    shape = (len(names),) + np.shape(N)
+    f, u = np.ones(shape), np.zeros(shape)
+    for i, name in enumerate(names):
+        f[i], u[i] = single(name)
     return f, u

@@ -64,20 +64,20 @@ Adding or changing constituents
 
 The database is a plain text file, so you can add constituents or change the default ones
 without touching xoa. Write a file with one section per constituent, for instance
-:file:`tide.cfg` in your working directory, with the long-period constituent MSf and the
-shallow-water constituent 2MS6 that is made of twice M2 and once S2::
+:file:`tide.cfg` in your working directory, with the long-period constituent MSm and the
+shallow-water constituent 2MK6 that is made of twice M2 and once K2::
 
-    [MSf]
-    doodson = 073.555
+    [MSm]
+    doodson = 063.655
     species = 0
 
-    [2MS6]
-    doodson = 673.555
+    [2MK6]
+    doodson = 675.555
     species = 6
     [[compound_of]]
     [[[M2]]]
     multiplier = 2
-    [[[S2]]]
+    [[[K2]]]
     multiplier = 1
 
 and make it the current database with :class:`~xoa.tide.set_constituents`.
@@ -90,7 +90,7 @@ Used as a context manager, it restores the previous database when it exits::
     xtide.get_constituent_names()
 
     with xtide.set_constituents("tide.cfg", replace=True):
-        coef = xtide.harmonic_analysis(ssh, names=["MSf", "2MS6"])
+        coef = xtide.harmonic_analysis(ssh, names=["MSm", "2MK6"])
 
 The constituents are then available by name, like the default ones.
 :func:`~xoa.tide.reset_constituents` goes back to the defaults,
@@ -103,10 +103,15 @@ file, like :file:`~/.config/xoa/tide.cfg`, whose path is returned by
 The :ref:`appendix.tide` appendix lists the default constituents and their file, and
 describes all the keys.
 The Doodson number sets the frequency, which is the way to check what you wrote:
-``2 * np.pi / xtide.get_frequencies(["MSf"]) / 86400`` is the period in days, about 14.77 here.
+``2 * np.pi / xtide.get_frequencies(["MSm"]) / 86400`` is the period in days, about 31.81 here.
 The satellites only give the nodal corrections: without them, the amplitude factor is 1 and the
 phase correction is 0, which is right for a constituent without nodal modulation.
-The nodal corrections of a compound constituent are those of its sources.
+The default satellites are those of Foreman (1977), as in t_tide and utide,
+without the latitude-dependent ones.
+The nodal corrections of a compound constituent are those of its sources: the amplitude factor
+is :math:`\prod f_i^{|m_i|}` and the phase correction :math:`\sum m_i u_i`,
+where the multipliers :math:`m_i` may be negative, like for 2SM2 that is made of twice S2
+minus M2.
 
 Some points deserve attention:
 
@@ -157,6 +162,10 @@ by blocks, the prediction of a long period never being fully in memory.
   The convention is stored in the ``phase_convention`` attribute and used when predicting.
 - **Nodal corrections** account for the 18.6 year modulation of the amplitudes and phases.
   They are on by default and matter for records of a year or more, and for predictions.
+  They follow the time: they are computed every ``nodal_step`` seconds, one day by default,
+  and linearly interpolated, both in the analysis of scalars and in the prediction.
+  With ``nodal_step=None``, those of ``t_ref`` are used for the whole period, which is only
+  valid over a few weeks.
 - **Uncertainties** assume white residuals. They are too small when the residual is a
   surge: :meth:`~xoa.tide.TidalHarmonic.ensemble` accepts an ``inflate`` factor, 3 to 5 being typical.
 - **Currents** are analysed as rotating ellipses: the semi-minor axis is negative for a
