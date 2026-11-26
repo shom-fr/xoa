@@ -71,11 +71,13 @@ The keys of a section are:
     * - ``satellites``
       - string, empty by default
       - Nodal satellites, as ``r dN dp dp1 phi0`` groups of 5 floats separated by semicolons,
-        like ``0.188 1 0 0 0 ; 0.0089 0 0 0 0``. See :func:`xoa.tide.data.is_satellites`.
+        like ``0.0373 1 0 0 180 ; 0.0005 2 0 0 0``, such that
+        :math:`f e^{iu} = 1 + \sum r e^{i(dN\,N + dp\,p + dp1\,p_1 + \phi_0)}`,
+        where :math:`N` is the longitude of the lunar node. See :func:`xoa.tide.data.is_satellites`.
     * - ``[[compound_of]]``
       - subsection
       - Only for compound constituents: one ``[[[name]]]`` subsection per source constituent,
-        with its integer ``multiplier``, ``1`` by default
+        with its integer ``multiplier``, ``1`` by default, which may be negative
 
 .. _appendix.tide.specs:
 

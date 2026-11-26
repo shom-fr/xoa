@@ -79,20 +79,24 @@ def astronomical_args(t_sec):
 
     Parameters
     ----------
-    t_sec : float
+    t_sec : float or ndarray
         Seconds since 1970-01-01 00:00:00 UTC.
 
     Returns
     -------
-    s, h, p, N, N_prime, p1 : float (degrees)
+    s, h, p, N, N_prime, p1 : float or ndarray (degrees)
+        Same shape as ``t_sec``.
         N' = -N mod 360 (positive nodal argument used in Doodson convention).
 
     References
     ----------
     Schureman (1958) Table 1.
     """
-    T = t_sec / 86400.0 + _JD_UNIX_ - _JD_J1900_  # days since J1900.0
-    vals = (_ARG_EPOCH_ + _ARG_RATES_ * T) % 360.0
+    T = np.asarray(t_sec, dtype="d") / 86400.0 + _JD_UNIX_ - _JD_J1900_  # days since J1900.0
+    vals = (_ARG_EPOCH_ + _ARG_RATES_ * T[..., None]) % 360.0
+    vals = [vals[..., i] for i in range(5)]
+    if T.ndim == 0:
+        vals = [float(v) for v in vals]
     return vals[0], vals[1], vals[2], vals[3], (360.0 - vals[3]) % 360.0, vals[4]
 
 
@@ -156,7 +160,7 @@ def greenwich_to_local(phase_g, v0, u):
 # %% design matrix
 
 
-def design_matrix(t, omega):
+def design_matrix(t, omega, fr=None, du=None):
     """Harmonic least-squares design matrix for SSH analysis.
 
     Parameters
@@ -165,14 +169,23 @@ def design_matrix(t, omega):
         Time in seconds.
     omega : ndarray (nf,)
         Angular frequencies in rad/s.
+    fr : ndarray (nf, nt), None
+        Nodal amplitude factors relative to those of the reference time.
+    du : ndarray (nf, nt), None
+        Nodal phase corrections relative to those of the reference time, in radians.
 
     Returns
     -------
     A : ndarray (nt, 1+2*nf)
-        Columns: [1, sin(ω₁t)…sin(ωₙt), cos(ω₁t)…cos(ωₙt)]
+        Columns: [1, fr·sin(ω₁t+du)…, fr·cos(ω₁t+du)…]
     """
     ot = t[:, None] * omega[None, :]  # (nt, nf)
-    return np.hstack([np.ones((len(t), 1)), np.sin(ot), np.cos(ot)])
+    if du is not None:
+        ot = ot + du.T
+    sin, cos = np.sin(ot), np.cos(ot)
+    if fr is not None:
+        sin, cos = sin * fr.T, cos * fr.T
+    return np.hstack([np.ones((len(t), 1)), sin, cos])
 
 
 def design_matrix_pinv(A):
@@ -217,7 +230,7 @@ def solve_ssh(Ai, h):
     return h0, amp, phase
 
 
-def predict_ssh(t, omega, h0, amp, phase):
+def predict_ssh(t, omega, h0, amp, phase, fr=None, du=None):
     """Harmonic reconstruction of SSH at all grid points.
 
     Equivalent to the analysis transpose: h = A @ x, where x holds the
@@ -230,6 +243,8 @@ def predict_ssh(t, omega, h0, amp, phase):
     h0 : ndarray (ns,)
     amp : ndarray (nf, ns)
     phase : ndarray (nf, ns)
+    fr, du : ndarray (nf, nt), None
+        Relative nodal corrections, see :func:`design_matrix`.
 
     Returns
     -------
@@ -238,7 +253,7 @@ def predict_ssh(t, omega, h0, amp, phase):
     a = amp * np.cos(phase)  # sin coefficients  (nf, ns)
     b = amp * np.sin(phase)  # cos coefficients  (nf, ns)
     x = np.vstack([h0[None], a, b])  # (1+2*nf, ns)
-    return design_matrix(t, omega) @ x
+    return design_matrix(t, omega, fr, du) @ x
 
 
 # %% uncertainty
